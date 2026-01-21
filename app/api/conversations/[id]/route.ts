@@ -71,13 +71,27 @@ export async function GET(
     });
 
     // Check if there are more messages to load
+    // Since we reversed the messages, the first one (index 0) is the oldest
     const hasMore = parsedMessages.length === limit;
     const oldestMessageId = parsedMessages.length > 0 ? parsedMessages[0].id : null;
+    
+    // Also check if there are actually more messages in the database
+    let actuallyHasMore = hasMore;
+    if (hasMore && oldestMessageId) {
+      const checkMoreResult = await db.query(
+        `SELECT id FROM messages 
+         WHERE conversation_id = $1 AND id < $2 
+         ORDER BY sent_at DESC LIMIT 1`,
+        [conversationId, oldestMessageId]
+      );
+      // Update hasMore based on actual database check
+      actuallyHasMore = checkMoreResult.rows.length > 0;
+    }
 
     return NextResponse.json({
       conversation: conversationResult.rows[0],
       messages: parsedMessages,
-      hasMore,
+      hasMore: actuallyHasMore,
       oldestMessageId,
     });
   } catch (error: any) {

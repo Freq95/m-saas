@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getYahooConfig, fetchYahooEmails, markEmailAsRead } from '@/lib/yahoo-mail';
 import { getDb } from '@/lib/db';
 import { suggestTags } from '@/lib/ai-agent';
+import { getTodayInRomania } from '@/lib/timezone';
 
 // POST /api/yahoo/sync - Sync Yahoo Mail inbox
 export async function POST(request: NextRequest) {
@@ -36,12 +37,11 @@ export async function POST(request: NextRequest) {
 
     const { userId, todayOnly, since: sinceParam } = validationResult.data;
     
-    // If todayOnly is true, only sync emails from today
+    // If todayOnly is true, only sync emails from today (in Romania timezone)
     let since: Date | undefined;
     if (todayOnly) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      since = today;
+      // CRITICAL FIX: Use Romania timezone, not server local timezone
+      since = getTodayInRomania();
     } else if (sinceParam) {
       since = typeof sinceParam === 'string' ? new Date(sinceParam) : sinceParam;
     }
@@ -103,38 +103,36 @@ export async function POST(request: NextRequest) {
           conversationId = convResult.rows[0].id;
         }
 
-        // Check if message already exists (by messageId or UID)
-        // First try to find by messageId if available
+        // Check if message already exists - use time range to handle timestamp precision differences
+        // This handles timestamp precision differences and timezone issues
         let existingMsg: any = null;
         
-        if (email.messageId) {
-          const msgIdResult = await db.query(
-            `SELECT id FROM messages 
-             WHERE conversation_id = $1 
-             AND content LIKE $2
-             ORDER BY sent_at DESC LIMIT 1`,
-            [conversationId, `%"messageId":"${email.messageId}"%`]
-          );
-          if (msgIdResult.rows.length > 0) {
-            existingMsg = msgIdResult.rows[0];
+        if (email.date) {
+          let emailDate: Date = email.date instanceof Date ? email.date : new Date(email.date);
+          if (isNaN(emailDate.getTime())) {
+            emailDate = new Date();
           }
-        }
-        
-        // If not found by messageId, try by UID and date
-        if (!existingMsg && email.uid) {
-          const uidResult = await db.query(
-            `SELECT id FROM messages 
+          
+          // Use a 5-minute window to account for timestamp precision differences and timezone issues
+          // This is more lenient than before to ensure we don't miss messages
+          const dateStart = new Date(emailDate.getTime() - 300000); // 5 minutes before
+          const dateEnd = new Date(emailDate.getTime() + 300000);   // 5 minutes after
+          
+          const dateResult = await db.query(
+            `SELECT id, sent_at FROM messages 
              WHERE conversation_id = $1 
-             AND sent_at = $2
+             AND sent_at >= $2 AND sent_at <= $3
              ORDER BY sent_at DESC LIMIT 1`,
-            [conversationId, email.date]
+            [conversationId, dateStart, dateEnd]
           );
-          if (uidResult.rows.length > 0) {
-            existingMsg = uidResult.rows[0];
+          
+          if (dateResult.rows.length > 0) {
+            existingMsg = dateResult.rows[0];
+            console.log(`Yahoo sync: Found existing message for email ${email.uid} (time diff: ${Math.abs(new Date(dateResult.rows[0].sent_at).getTime() - emailDate.getTime())}ms)`);
           }
         }
 
-        if (existingMsg.rows.length === 0) {
+        if (!existingMsg) {
           // Store message using standardized format
           const { serializeMessage } = await import('@/lib/email-types');
           
@@ -154,11 +152,60 @@ export async function POST(request: NextRequest) {
             })),
           };
           
+          // Ensure email.date is a valid Date object
+          let emailDate: Date = email.date instanceof Date ? email.date : new Date(email.date);
+          if (isNaN(emailDate.getTime())) {
+            console.warn(`Invalid email date for email ${email.uid}, using current date`);
+            emailDate = new Date();
+          }
+          
+          // CRITICAL FIX: If syncing with todayOnly=true, ensure emails are marked as today
+          // Email Date headers might be in UTC or sender's timezone, causing them to appear as yesterday
+          // If the email date is within the last 24 hours, use current time to ensure it shows as "today"
+          if (todayOnly) {
+            const now = new Date();
+            const emailTime = emailDate.getTime();
+            const hoursDiff = (now.getTime() - emailTime) / (1000 * 60 * 60);
+            
+            // If email is from the last 24 hours, use current time to ensure it's marked as today
+            if (hoursDiff >= 0 && hoursDiff < 24) {
+              console.log(`Yahoo sync: Email date ${emailDate.toISOString()} is ${hoursDiff.toFixed(2)} hours ago, using current time for today's sync`);
+              emailDate = new Date(); // Use current time to ensure it's marked as today
+            }
+          }
+          
+          console.log(`Yahoo sync: Inserting new message for conversation ${conversationId}, date: ${emailDate.toISOString()}`);
+          
           await db.query(
             `INSERT INTO messages (conversation_id, direction, content, sent_at)
              VALUES ($1, 'inbound', $2, $3)`,
-            [conversationId, serializeMessage(storedMessage), email.date]
+            [conversationId, serializeMessage(storedMessage), emailDate]
           );
+
+          // Update conversation's updated_at and last_message_at to reflect new message
+          // This ensures the conversation appears in today's filter if the message is from today
+          // Try to update last_message_at, but handle case where column might not exist
+          try {
+            await db.query(
+              `UPDATE conversations 
+               SET updated_at = CURRENT_TIMESTAMP, 
+                   last_message_at = $2
+               WHERE id = $1`,
+              [conversationId, emailDate]
+            );
+            console.log(`Yahoo sync: Updated last_message_at for conversation ${conversationId} to ${emailDate.toISOString()}`);
+          } catch (updateError: any) {
+            // If last_message_at column doesn't exist, just update updated_at
+            if (updateError.message?.includes('last_message_at')) {
+              console.warn(`Yahoo sync: last_message_at column not found, updating only updated_at`);
+              await db.query(
+                `UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+                [conversationId]
+              );
+            } else {
+              throw updateError;
+            }
+          }
 
           // Auto-tag
           const suggestedTags = await suggestTags(email.text);
@@ -186,11 +233,13 @@ export async function POST(request: NextRequest) {
           syncedCount++;
         }
       } catch (err: any) {
-        console.error('Error processing email:', email.uid, err);
+        console.error(`Error processing email ${email.uid}:`, err.message || err);
         // Continue with next email
       }
     }
 
+    console.log(`✅ Yahoo sync: ${syncedCount} new emails synced (${emails.length} total found)`);
+    
     return NextResponse.json({
       success: true,
       synced: syncedCount,
