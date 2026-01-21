@@ -47,20 +47,25 @@ This document tracks all implemented features and missing functionality for the 
 ### 2. **Appointment Calendar System**
 
 #### Calendar Features
-- ✅ **Calendar view**: Monthly calendar with appointment display
+- ✅ **Calendar view**: Week and month views with appointment display
 - ✅ **Appointment creation**: Create appointments with service selection
 - ✅ **Time slot management**: 
   - Service duration calculation
   - Automatic end time calculation
   - Slot availability checking
+  - Overlapping appointment detection (parallel display)
 - ✅ **Client information**: Link appointments to clients
 - ✅ **Appointment details**: Notes, service, client info
 - ✅ **Status management**: Scheduled, completed, cancelled, no-show
+- ✅ **Appointment preview**: Click appointment to view full details (Apple-style modal)
+- ✅ **Appointment edit**: Edit appointment time, status, and notes
+- ✅ **Appointment delete**: Delete appointments with confirmation
 - ✅ **Google Calendar export**: API endpoint for Google Calendar sync (not fully tested)
 
 **Files:**
-- `app/calendar/page.tsx` - Calendar UI
+- `app/calendar/page.tsx` - Calendar UI with preview/edit
 - `app/api/appointments/route.ts` - Appointments API
+- `app/api/appointments/[id]/route.ts` - Single appointment API (GET, PATCH, DELETE)
 - `lib/calendar.ts` - Calendar utilities
 - `lib/google-calendar.ts` - Google Calendar integration
 
@@ -80,17 +85,23 @@ This document tracks all implemented features and missing functionality for the 
 ### 4. **Dashboard & Analytics**
 
 #### Statistics Display
-- ✅ **Messages per day**: Chart showing message volume over time
-- ✅ **Appointments per day**: Chart showing appointment volume over time
+- ✅ **Messages per day**: Chart showing message volume over last 7 days
+- ✅ **Appointments today**: Beautiful Apple-style list of today's appointments
+  - Shows time range, client name, service, and status
+  - Color-coded status badges
+  - Empty state when no appointments
 - ✅ **Today's metrics**: 
   - Messages today
   - Appointments today
+  - Total clients count
 - ✅ **No-show rate**: Percentage of missed appointments
-- ✅ **Estimated revenue**: Calculated from completed appointments
+- ✅ **Estimated revenue**: Calculated from completed appointments (7 days)
+- ✅ **Date validation**: Safe date parsing to prevent errors
+- ✅ **Proper date filtering**: Accurate today's appointments filtering using date-fns
 
 **Files:**
-- `app/dashboard/page.tsx` - Dashboard UI
-- `app/api/dashboard/route.ts` - Dashboard data API
+- `app/dashboard/page.tsx` - Dashboard UI with appointments list
+- `app/api/dashboard/route.ts` - Dashboard data API with date validation
 
 ---
 
@@ -116,6 +127,11 @@ This document tracks all implemented features and missing functionality for the 
   - Filter by status (lead, active, inactive, VIP)
   - Filter by source (email, facebook, form, walk-in)
   - Sort by various fields
+- ✅ **Client pagination**: 
+  - Paginated client list (20 per page)
+  - Previous/Next navigation
+  - Shows page info (Page X of Y)
+  - Resets to page 1 when filters change
 - ✅ **Client tags**: Tag system for organization
 - ✅ **Client notes**: Internal notes per client
 - ✅ **Client status**: Lead, active, inactive, VIP
@@ -545,7 +561,111 @@ This document tracks all implemented features and missing functionality for the 
 
 ## 🎨 Recent Updates
 
-### Calendar & Appointment System Refactoring (Latest Session - January 2026)
+### Calendar Appointments Preview & Edit (Latest Session - January 2026)
+
+#### Appointment Preview & Edit Feature
+- ✅ **Appointment Preview Modal**: Click on any appointment to view full details
+  - Apple-inspired minimalist design with smooth animations
+  - Shows: Client name, service, date/time, email, phone, status, notes
+  - Status badges with color coding (scheduled, completed, cancelled, no-show)
+  - Close button with hover effects
+  
+- ✅ **Appointment Edit Functionality**:
+  - Edit button opens edit modal
+  - Can modify: Start time, end time, status, notes
+  - Validates date inputs and updates appointment via API
+  - Full CRUD support (GET, PATCH, DELETE endpoints)
+  
+- ✅ **Delete Appointment**: 
+  - Delete button with confirmation dialog
+  - Removes appointment from database
+  
+- ✅ **Apple-Style Design**:
+  - Smooth fade-in animations
+  - Backdrop blur effects
+  - Clean typography and spacing
+  - Color-coded status badges
+  - Subtle hover effects on interactive elements
+
+**Files:**
+- `app/calendar/page.tsx` - Added preview/edit modals and handlers
+- `app/calendar/page.module.css` - Apple-inspired modal styles
+- `app/api/appointments/[id]/route.ts` - Added GET endpoint for single appointment
+
+#### Dashboard Improvements & Fixes
+
+- ✅ **Fixed "Programări astăzi" Count**:
+  - Problem: Was not correctly filtering appointments for today due to timezone issues
+  - Solution: Use `startOfDay()` and `endOfDay()` from date-fns for accurate date comparison
+  - Now correctly counts only appointments that start today
+  
+- ✅ **Changed "Contacte adăugate astăzi" to "Total clienți"**:
+  - Now displays total number of clients in the system
+  - Uses `COUNT(*)` query for accurate count
+  - Reflects actual client count from clients page
+
+- ✅ **Fixed Messages Per Day Chart**:
+  - Problem: Chart wasn't showing days with 0 messages
+  - Solution: Initialize all 7 days with 0 before counting actual messages
+  - Now shows complete 7-day timeline even for days without messages
+
+- ✅ **Appointments Today - Apple Style List**:
+  - Replaced bar chart with minimalist appointment list
+  - Shows today's appointments in a clean, readable format
+  - Each appointment displays:
+    - Time range (HH:mm – HH:mm) in large, readable font
+    - Client name and service name
+    - Status badge with color coding
+  - Empty state message when no appointments today
+  - Smooth hover effects and transitions
+  - Fully responsive design
+
+- ✅ **Fixed Date Validation Errors**:
+  - Added `safeParseDate()` helper function using `isValid` from date-fns
+  - Prevents "Invalid time value" errors when dates are null/undefined/invalid
+  - All date operations now validate dates before use
+  - Improved error handling throughout dashboard API
+
+- ✅ **Fixed Undefined Status Errors**:
+  - Added checks for undefined status fields
+  - Default to 'scheduled' if status is missing
+  - Fixed CSS class name generation for status badges
+  - Handles underscore in status names (e.g., "no_show")
+
+**Files:**
+- `app/dashboard/page.tsx` - Updated dashboard UI with new features
+- `app/dashboard/page.module.css` - Apple-style appointments list styles
+- `app/api/dashboard/route.ts` - Fixed date filtering and added today's appointments list
+
+#### Contact List Pagination
+
+- ✅ **Added Pagination to Contact List**:
+  - API supports `page` and `limit` query parameters
+  - Default: 20 contacts per page
+  - Returns pagination metadata: page, limit, total, totalPages
+  - UI shows pagination controls: Previous/Next buttons
+  - Displays "Page X of Y (Total: Z)" information
+  - Pagination resets to page 1 when filters change
+
+**Files:**
+- `app/api/clients/route.ts` - Added pagination support
+- `app/clients/page.tsx` - Added pagination UI
+- `app/clients/page.module.css` - Pagination button styles
+
+#### Chart Display Fixes
+
+- ✅ **Fixed Bar Chart Layout**:
+  - Reorganized chart structure: Value → Bar → Label
+  - Fixed CSS flexbox layout for proper bar alignment
+  - Bars now correctly grow from bottom to top
+  - Minimum bar height ensures visibility for small values
+  - Improved spacing and typography
+
+**Files:**
+- `app/dashboard/page.tsx` - Fixed chart rendering order
+- `app/dashboard/page.module.css` - Improved bar chart CSS layout
+
+### Calendar & Appointment System Refactoring (Previous Session - January 2026)
 - ✅ **Fixed missing appointments in calendar**: Implemented proper JOIN handling in JSON storage parser
   - Added support for LEFT JOIN queries with table aliases
   - Fixed WHERE clause parser to handle table aliases (e.g., `a.user_id`, `a.start_time`)
@@ -588,6 +708,60 @@ This document tracks all implemented features and missing functionality for the 
 ---
 
 *Last Updated: January 2026*
-*Version: 1.2*
+*Version: 1.3*
+
+---
+
+## 📚 Session Documentation (January 2026)
+
+### Session Summary: Calendar Enhancements & Dashboard Improvements
+
+**Date**: January 2026  
+**Focus**: Calendar appointment management, dashboard refinements, and bug fixes
+
+#### Features Implemented
+
+1. **Calendar Appointment Preview & Edit**
+   - Full appointment details modal (Apple design)
+   - Edit appointment functionality
+   - Delete appointment with confirmation
+   - Smooth animations and transitions
+
+2. **Dashboard Enhancements**
+   - Fixed appointment counting for today
+   - Changed to show total clients instead of contacts added today
+   - Fixed messages per day chart to show all days
+   - Beautiful Apple-style appointments list for today
+
+3. **Contact List Pagination**
+   - Added pagination support (20 per page)
+   - Navigation controls in UI
+   - Maintains state when filtering/sorting
+
+4. **Bug Fixes**
+   - Date validation errors in dashboard API
+   - Undefined status errors in appointments
+   - Chart display issues
+   - Timezone issues with date comparisons
+
+#### Technical Improvements
+
+- Date validation with `safeParseDate()` helper
+- Improved error handling for invalid dates
+- Better CSS structure for charts
+- Apple-inspired design patterns
+- Responsive design improvements
+
+#### Files Modified
+
+- `app/calendar/page.tsx` - Added preview/edit modals
+- `app/calendar/page.module.css` - Apple-style modal styles
+- `app/api/appointments/[id]/route.ts` - Added GET endpoint
+- `app/dashboard/page.tsx` - Dashboard improvements
+- `app/dashboard/page.module.css` - New appointment list styles
+- `app/api/dashboard/route.ts` - Fixed date filtering logic
+- `app/api/clients/route.ts` - Added pagination
+- `app/clients/page.tsx` - Added pagination UI
+- `app/clients/page.module.css` - Pagination styles
 
 

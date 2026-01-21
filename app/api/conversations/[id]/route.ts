@@ -23,16 +23,40 @@ export async function GET(
       );
     }
 
-    // Get messages
-    const messagesResult = await db.query(
-      `SELECT * FROM messages WHERE conversation_id = $1 ORDER BY sent_at ASC`,
-      [conversationId]
-    );
+    // Get pagination parameters
+    const { searchParams } = request.nextUrl;
+    const limit = parseInt(searchParams.get('limit') || '50');
+    const offset = parseInt(searchParams.get('offset') || '0');
+    const beforeId = searchParams.get('beforeId'); // For cursor-based pagination (load older messages)
+
+    let messagesQuery = `SELECT * FROM messages WHERE conversation_id = $1`;
+    const queryParams: any[] = [conversationId];
+    let paramIndex = 2;
+
+    // If beforeId is provided, load messages before that ID (for infinite scroll loading older messages)
+    if (beforeId) {
+      messagesQuery += ` AND id < $${paramIndex}`;
+      queryParams.push(parseInt(beforeId));
+      paramIndex++;
+    }
+
+    messagesQuery += ` ORDER BY sent_at DESC LIMIT $${paramIndex}`;
+    queryParams.push(limit);
+    
+    if (offset > 0 && !beforeId) {
+      messagesQuery += ` OFFSET $${paramIndex + 1}`;
+      queryParams.push(offset);
+    }
+
+    const messagesResult = await db.query(messagesQuery, queryParams);
+    
+    // Reverse to get chronological order (oldest first)
+    const messages = (messagesResult.rows || []).reverse();
 
     // Parse messages using standardized format
     const { parseStoredMessage } = await import('@/lib/email-types');
     
-    const parsedMessages = (messagesResult.rows || []).map((msg: any) => {
+    const parsedMessages = messages.map((msg: any) => {
       const stored = parseStoredMessage(msg.content || '');
       
       return {
@@ -46,9 +70,15 @@ export async function GET(
       };
     });
 
+    // Check if there are more messages to load
+    const hasMore = parsedMessages.length === limit;
+    const oldestMessageId = parsedMessages.length > 0 ? parsedMessages[0].id : null;
+
     return NextResponse.json({
       conversation: conversationResult.rows[0],
       messages: parsedMessages,
+      hasMore,
+      oldestMessageId,
     });
   } catch (error: any) {
     console.error('Error fetching conversation:', error);

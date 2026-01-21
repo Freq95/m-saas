@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import DOMPurify from 'dompurify';
+import { format, isSameDay, isToday, isYesterday, startOfDay } from 'date-fns';
 import styles from './page.module.css';
 
 /**
@@ -156,11 +157,13 @@ interface Conversation {
   channel: string;
   contact_name: string;
   contact_email: string;
+  contact_phone?: string;
   subject: string;
   status: string;
   message_count: number;
   last_message_at: string;
   tags: string[];
+  unread_count?: number;
 }
 
 interface Message {
@@ -176,11 +179,23 @@ interface Message {
 
 export default function InboxPage() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [allConversations, setAllConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [allMessages, setAllMessages] = useState<{ [key: number]: Message[] }>({});
   const [newMessage, setNewMessage] = useState('');
   const [suggestedResponse, setSuggestedResponse] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [leftWidth, setLeftWidth] = useState(380);
+  const [isResizing, setIsResizing] = useState(false);
+  const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [oldestMessageId, setOldestMessageId] = useState<number | null>(null);
+  
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const conversationListRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchConversations();
@@ -188,10 +203,45 @@ export default function InboxPage() {
 
   useEffect(() => {
     if (selectedConversation) {
-      fetchMessages(selectedConversation.id);
+      // Reset messages when switching conversations
+      setMessages([]);
+      setHasMoreMessages(false);
+      setOldestMessageId(null);
+      fetchMessages(selectedConversation.id, true);
       fetchSuggestedResponse(selectedConversation.id);
     }
   }, [selectedConversation]);
+
+  // Filter conversations based on search
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setConversations(allConversations);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+    const filtered = allConversations.filter((conv) => {
+      // Search in contact name, email, phone
+      if (
+        conv.contact_name?.toLowerCase().includes(query) ||
+        conv.contact_email?.toLowerCase().includes(query) ||
+        conv.contact_phone?.toLowerCase().includes(query) ||
+        conv.subject?.toLowerCase().includes(query)
+      ) {
+        return true;
+      }
+
+      // Search in message content
+      const convMessages = allMessages[conv.id] || [];
+      return convMessages.some((msg) => {
+        const content = msg.content || msg.text || '';
+        const textContent = typeof content === 'string' ? content : JSON.stringify(content);
+        return textContent.toLowerCase().includes(query);
+      });
+    });
+
+    setConversations(filtered);
+  }, [searchQuery, allConversations, allMessages]);
 
   const fetchConversations = async () => {
     try {
@@ -199,31 +249,124 @@ export default function InboxPage() {
       const result = await response.json();
       console.log('Conversations response:', result);
       if (result.conversations && Array.isArray(result.conversations)) {
+        setAllConversations(result.conversations);
         setConversations(result.conversations);
+        
+        // Fetch messages for all conversations for search
+        for (const conv of result.conversations) {
+          try {
+            const msgResponse = await fetch(`/api/conversations/${conv.id}`);
+            const msgResult = await msgResponse.json();
+            if (msgResult.messages) {
+              setAllMessages((prev) => ({
+                ...prev,
+                [conv.id]: msgResult.messages,
+              }));
+            }
+          } catch (e) {
+            console.warn(`Failed to fetch messages for conversation ${conv.id}:`, e);
+          }
+        }
+        
         if (result.conversations.length > 0 && !selectedConversation) {
           setSelectedConversation(result.conversations[0]);
         }
       } else {
         console.warn('No conversations in response:', result);
+        setAllConversations([]);
         setConversations([]);
       }
     } catch (error) {
       console.error('Error fetching conversations:', error);
+      setAllConversations([]);
       setConversations([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchMessages = async (conversationId: number) => {
+  const fetchMessages = async (conversationId: number, isInitial = false, beforeId?: number) => {
     try {
-      const response = await fetch(`/api/conversations/${conversationId}`);
+      if (isInitial) {
+        setLoadingOlderMessages(false);
+      } else {
+        setLoadingOlderMessages(true);
+      }
+
+      const url = new URL(`/api/conversations/${conversationId}`, window.location.origin);
+      url.searchParams.set('limit', '50');
+      if (beforeId) {
+        url.searchParams.set('beforeId', beforeId.toString());
+      }
+
+      const response = await fetch(url.toString());
       const result = await response.json();
-      setMessages(result.messages);
+      const fetchedMessages = result.messages || [];
+      
+      if (isInitial) {
+        setMessages(fetchedMessages);
+      } else {
+        // Prepend older messages
+        setMessages((prev) => [...fetchedMessages, ...prev]);
+      }
+      
+      setHasMoreMessages(result.hasMore || false);
+      setOldestMessageId(result.oldestMessageId || null);
+      
+      // Store in allMessages for search (merge with existing)
+      setAllMessages((prev) => ({
+        ...prev,
+        [conversationId]: isInitial 
+          ? fetchedMessages 
+          : [...fetchedMessages, ...(prev[conversationId] || [])],
+      }));
     } catch (error) {
       console.error('Error fetching messages:', error);
+    } finally {
+      setLoadingOlderMessages(false);
     }
   };
+
+  // Handle infinite scroll - load older messages when scrolling near top
+  const handleMessagesScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+    const container = e.currentTarget;
+    const scrollTop = container.scrollTop;
+    
+    // Load more if scrolled within 200px of top and there are more messages
+    if (scrollTop < 200 && hasMoreMessages && !loadingOlderMessages && oldestMessageId && selectedConversation) {
+      fetchMessages(selectedConversation.id, false, oldestMessageId);
+    }
+  }, [hasMoreMessages, loadingOlderMessages, oldestMessageId, selectedConversation]);
+
+  // Handle resizable divider
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+      
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const newLeftWidth = e.clientX - containerRect.left;
+      
+      // Constrain within min/max bounds
+      const maxLeftWidth = containerRect.width - 300; // min right width
+      const constrainedWidth = Math.max(200, Math.min(newLeftWidth, maxLeftWidth));
+      
+      setLeftWidth(constrainedWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
 
   const fetchSuggestedResponse = async (conversationId: number) => {
     try {
@@ -247,11 +390,19 @@ export default function InboxPage() {
 
       if (response.ok) {
         setNewMessage('');
-        fetchMessages(selectedConversation.id);
+        // Reload messages to show the new one (fetch latest messages)
+        fetchMessages(selectedConversation.id, true);
         fetchConversations();
       }
     } catch (error) {
       console.error('Error sending message:', error);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
     }
   };
 
@@ -260,6 +411,70 @@ export default function InboxPage() {
       setNewMessage(suggestedResponse);
     }
   };
+
+  // Format date for message timestamp
+  const formatMessageTime = (date: Date | null) => {
+    // Validate date before using it
+    if (!date || isNaN(date.getTime())) {
+      return '';
+    }
+    
+    try {
+      return format(date, 'HH:mm');
+    } catch (error) {
+      console.warn('Error formatting message time:', error);
+      return '';
+    }
+  };
+
+  // Format date for date separator
+  const formatDateSeparator = (date: Date) => {
+    // Validate date before using it
+    if (!date || isNaN(date.getTime())) {
+      return '';
+    }
+    
+    try {
+      if (isToday(date)) {
+        return 'Astăzi';
+      } else if (isYesterday(date)) {
+        return 'Ieri';
+      } else {
+        return format(date, 'd MMMM yyyy');
+      }
+    } catch (error) {
+      console.warn('Error formatting date:', error);
+      return '';
+    }
+  };
+
+  // Group messages and add date separators
+  const groupedMessages = useMemo(() => {
+    if (!messages || messages.length === 0) return [];
+
+    const grouped: Array<{ type: 'date' | 'message'; date?: Date; message?: Message }> = [];
+    let lastDate: Date | null = null;
+
+    messages.forEach((msg, index) => {
+      if (!msg.sent_at) return; // Skip messages without sent_at
+      
+      const msgDate = new Date(msg.sent_at);
+      
+      // Skip if date is invalid
+      if (isNaN(msgDate.getTime())) return;
+
+      // Add date separator if this is a new day
+      if (!lastDate || !isSameDay(msgDate, lastDate)) {
+        grouped.push({ type: 'date', date: msgDate });
+        lastDate = msgDate;
+      }
+
+      // Add message
+      grouped.push({ type: 'message', message: msg });
+    });
+
+    return grouped;
+  }, [messages]);
 
   if (loading) {
     return <div className={styles.container}>Se încarcă...</div>;
@@ -279,49 +494,75 @@ export default function InboxPage() {
         </div>
       </nav>
 
-      <div className={styles.inbox}>
-        <div className={styles.conversationList}>
-          <h2 className={styles.sectionTitle}>Conversații</h2>
-          {conversations.length === 0 ? (
-            <div style={{ padding: '2rem', textAlign: 'center', color: '#666', fontSize: '0.875rem' }}>
-              Nu există conversații
-            </div>
-          ) : (
-            conversations.map((conv) => (
-            <div
-              key={conv.id}
-              className={`${styles.conversationItem} ${
-                selectedConversation?.id === conv.id ? styles.active : ''
-              }`}
-              onClick={() => setSelectedConversation(conv)}
-            >
-              <div className={styles.conversationHeader}>
-                <div className={styles.contactName}>{conv.contact_name || 'Fără nume'}</div>
-                <div className={styles.channel}>{conv.channel}</div>
+      <div ref={containerRef} className={styles.inbox}>
+        <div 
+          className={styles.conversationList}
+          style={{ width: `${leftWidth}px` }}
+        >
+          <div className={styles.searchContainer}>
+            <input
+              type="text"
+              placeholder="Caută conversații..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className={styles.searchInput}
+            />
+          </div>
+          <div 
+            ref={conversationListRef}
+            className={styles.conversationListContent}
+          >
+            {conversations.length === 0 ? (
+              <div className={styles.emptyConversations}>
+                {searchQuery ? 'Nu s-au găsit conversații' : 'Nu există conversații'}
               </div>
-              {conv.subject && (
-                <div className={styles.subject}>{conv.subject}</div>
-              )}
-              <div className={styles.tags}>
-                {conv.tags?.map((tag, idx) => (
-                  <span key={idx} className={styles.tag}>{tag}</span>
-                ))}
+            ) : (
+              conversations.map((conv) => (
+              <div
+                key={conv.id}
+                className={`${styles.conversationItem} ${
+                  selectedConversation?.id === conv.id ? styles.active : ''
+                }`}
+                onClick={() => setSelectedConversation(conv)}
+              >
+                <div className={styles.conversationHeader}>
+                  <div className={styles.contactName}>{conv.contact_name || 'Fără nume'}</div>
+                  {conv.unread_count && conv.unread_count > 0 && (
+                    <div className={styles.unreadBadge}>{conv.unread_count}</div>
+                  )}
+                </div>
+                <div className={styles.conversationMeta}>
+                  <span className={styles.channel}>{conv.channel}</span>
+                  {conv.last_message_at && (
+                    <span className={styles.lastMessageTime}>
+                      {(() => {
+                        try {
+                          const date = new Date(conv.last_message_at);
+                          if (!isNaN(date.getTime())) {
+                            if (isToday(date)) {
+                              return format(date, 'HH:mm');
+                            } else if (isYesterday(date)) {
+                              return 'Ieri';
+                            } else {
+                              return format(date, 'dd.MM');
+                            }
+                          }
+                        } catch (e) {}
+                        return '';
+                      })()}
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className={styles.meta}>
-                {conv.message_count || 0} mesaje • {conv.last_message_at ? (() => {
-                  try {
-                    const date = new Date(conv.last_message_at);
-                    if (!isNaN(date.getTime())) {
-                      return date.toLocaleDateString('ro-RO');
-                    }
-                  } catch (e) {}
-                  return conv.last_message_at ? String(conv.last_message_at).split('T')[0] : 'N/A';
-                })() : 'N/A'}
-              </div>
-            </div>
-            ))
-          )}
+              ))
+            )}
+          </div>
         </div>
+
+        <div
+          className={`${styles.divider} ${isResizing ? styles.resizing : ''}`}
+          onMouseDown={() => setIsResizing(true)}
+        />
 
         <div className={styles.thread}>
           {selectedConversation ? (
@@ -336,35 +577,68 @@ export default function InboxPage() {
                 <div className={styles.status}>{selectedConversation.status}</div>
               </div>
 
-              <div className={styles.messages}>
-                {messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`${styles.message} ${
-                      msg.direction === 'outbound' ? styles.outbound : styles.inbound
-                    } ${msg.html ? styles.messageHtmlEmail : styles.messageTextOnly}`}
-                  >
-                    <div className={styles.messageContent}>
-                      {msg.html ? (
-                        <EmailHtmlContent html={msg.html} />
-                      ) : (
-                        <div className={styles.messageText}>{msg.content || msg.text}</div>
-                      )}
-                      {msg.attachments && msg.attachments.length > 0 && (
-                        <div className={styles.messageAttachments}>
-                          {msg.attachments.map((att, idx) => (
-                            <div key={idx} className={styles.messageAttachment}>
-                              📎 {att.filename} ({Math.round(att.size / 1024)}KB)
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <div className={styles.messageTime}>
-                      {new Date(msg.sent_at).toLocaleString('ro-RO')}
-                    </div>
+              <div 
+                ref={messagesContainerRef}
+                className={styles.messages}
+                onScroll={handleMessagesScroll}
+              >
+                {loadingOlderMessages && (
+                  <div className={styles.loadingOlder}>
+                    Se încarcă mesaje mai vechi...
                   </div>
-                ))}
+                )}
+                {groupedMessages.map((item, index) => {
+                  if (item.type === 'date' && item.date) {
+                    return (
+                      <div key={`date-${index}`} className={styles.dateSeparator}>
+                        {formatDateSeparator(item.date)}
+                      </div>
+                    );
+                  }
+                  
+                  if (item.type === 'message' && item.message) {
+                    const msg = item.message;
+                    const isOutbound = msg.direction === 'outbound';
+                    
+                    // Validate date before using it
+                    let msgDate: Date | null = null;
+                    if (msg.sent_at) {
+                      const date = new Date(msg.sent_at);
+                      if (!isNaN(date.getTime())) {
+                        msgDate = date;
+                      }
+                    }
+                    
+                    return (
+                      <div key={msg.id}>
+                        {msg.html ? (
+                          <div className={styles.messageHtmlWrapper}>
+                            <EmailHtmlContent html={msg.html} />
+                          </div>
+                        ) : (
+                          <div className={`${styles.messageWrapper} ${isOutbound ? styles.outboundWrapper : styles.inboundWrapper}`}>
+                            <div className={`${styles.messageBubble} ${isOutbound ? styles.outboundBubble : styles.inboundBubble}`}>
+                              <div className={styles.messageText}>{msg.content || msg.text}</div>
+                              {msg.attachments && msg.attachments.length > 0 && (
+                                <div className={styles.messageAttachments}>
+                                  {msg.attachments.map((att, idx) => (
+                                    <div key={idx} className={styles.messageAttachment}>
+                                      📎 {att.filename} ({Math.round(att.size / 1024)}KB)
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              <div className={styles.messageTimestamp}>
+                                {formatMessageTime(msgDate)}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return null;
+                })}
               </div>
 
               {suggestedResponse && (
@@ -383,10 +657,11 @@ export default function InboxPage() {
                 <textarea
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyDown={handleKeyDown}
                   placeholder="Scrie un mesaj..."
-                  rows={3}
+                  rows={1}
                 />
-                <button onClick={sendMessage} className={styles.sendButton}>
+                <button onClick={sendMessage} className={styles.sendButton} disabled={!newMessage.trim()}>
                   Trimite
                 </button>
               </div>

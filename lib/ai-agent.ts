@@ -92,8 +92,19 @@ Nu face acțiuni autonome - doar sugerezi răspunsuri pe care utilizatorul le po
     });
 
     return completion.choices[0]?.message?.content || 'Nu pot genera un răspuns în acest moment.';
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error generating AI response:', error);
+    // Log more details for debugging
+    if (error.response) {
+      console.error('OpenAI API error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+      });
+    }
+    if (error.message) {
+      console.error('Error message:', error.message);
+    }
     throw new Error('Eroare la generarea răspunsului AI');
   }
 }

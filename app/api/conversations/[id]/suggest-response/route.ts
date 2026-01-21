@@ -73,12 +73,9 @@ export async function GET(
     } catch (aiError: any) {
       console.error('Error generating AI response:', aiError);
       
-      // Fallback to mock response if OpenAI fails
-      if (aiError.message?.includes('API key') || !process.env.OPENAI_API_KEY) {
-        suggestedResponse = 'Mulțumim pentru mesaj! Vă vom răspunde în cel mai scurt timp.';
-      } else {
-        throw aiError;
-      }
+      // Fallback to mock response if OpenAI fails for any reason
+      // This handles: missing API key, rate limits, network errors, etc.
+      suggestedResponse = 'Mulțumim pentru mesaj! Vă vom răspunde în cel mai scurt timp.';
     }
 
     return NextResponse.json({
