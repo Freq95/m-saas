@@ -1,0 +1,390 @@
+.container {
+  min-height: 100vh;
+  background: #121212;
+  display: flex;
+  flex-direction: column;
+}
+
+.nav {
+  background: #1a1a1a;
+  border-bottom: 1px solid #252525;
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #d4d4d4;
+  letter-spacing: -0.01em;
+}
+
+.navLinks {
+  display: flex;
+  gap: 2rem;
+}
+
+.navLinks a {
+  color: #737373;
+  font-weight: 400;
+  font-size: 0.9rem;
+  transition: color 0.2s ease;
+  position: relative;
+}
+
+.navLinks a:hover {
+  color: #d4d4d4;
+}
+
+.navLinks a.active {
+  color: #d4d4d4;
+}
+
+.navLinks a.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1rem;
+  left: 0;
+  right: 0;
+  height: 1.5px;
+  background: #d4d4d4;
+}
+
+.inbox {
+  flex: 1;
+  display: flex;
+  height: calc(100vh - 57px);
+}
+
+.conversationList {
+  width: 340px;
+  background: #1a1a1a;
+  border-right: 1px solid #252525;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.sectionTitle {
+  padding: 1.25rem 1.5rem;
+  font-size: 0.85rem;
+  border-bottom: 1px solid #252525;
+  color: #737373;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.conversationItem {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #252525;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.conversationItem:hover {
+  background: #1d1d1d;
+}
+
+.conversationItem.active {
+  background: #1d1d1d;
+  border-left: 2px solid #d4d4d4;
+}
+
+.conversationHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+
+.contactName {
+  font-weight: 500;
+  color: #d4d4d4;
+  font-size: 0.9rem;
+}
+
+.channel {
+  font-size: 0.7rem;
+  color: #737373;
+  background: #252525;
+  padding: 0.2rem 0.5rem;
+  border-radius: 3px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+}
+
+.subject {
+  font-size: 0.85rem;
+  color: #737373;
+  margin-bottom: 0.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tags {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+
+.tag {
+  font-size: 0.7rem;
+  padding: 0.2rem 0.5rem;
+  background: #252525;
+  color: #737373;
+  border-radius: 3px;
+  font-weight: 400;
+}
+
+.meta {
+  font-size: 0.75rem;
+  color: #737373;
+}
+
+.thread {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #121212;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.threadHeader {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #252525;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #1a1a1a;
+}
+
+.threadHeader h3 {
+  font-size: 1rem;
+  margin-bottom: 0.2rem;
+  color: #d4d4d4;
+  font-weight: 500;
+}
+
+.threadMeta {
+  font-size: 0.85rem;
+  color: #737373;
+}
+
+.status {
+  font-size: 0.75rem;
+  padding: 0.3rem 0.6rem;
+  background: #252525;
+  color: #737373;
+  border-radius: 3px;
+  text-transform: none;
+  font-weight: 400;
+  border: none;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-height: 0;
+  max-height: 100%;
+}
+
+.message {
+  max-width: 100%;
+  width: 100%;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.message.inbound {
+  align-self: stretch;
+  background: transparent;
+  border: none;
+  color: #d4d4d4;
+}
+
+.message.outbound {
+  align-self: stretch;
+  background: transparent;
+  border: none;
+  color: #121212;
+}
+
+.messageContent {
+  margin: 0;
+  padding: 0;
+  word-wrap: break-word;
+  width: 100%;
+  max-width: 100%;
+}
+
+.messageTextOnly {
+  padding: 0.75rem 1rem;
+  background: #1a1a1a;
+  border: 1px solid #252525;
+  border-radius: 4px;
+  max-width: 70%;
+}
+
+.messageTextOnly.outbound {
+  background: #d4d4d4;
+  color: #121212;
+  align-self: flex-end;
+}
+
+.messageHtmlEmail {
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.messageText {
+  white-space: pre-wrap;
+}
+
+.emailContainer {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.emailIframe {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  border-radius: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+}
+
+.messageAttachments {
+  margin-top: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.messageAttachment {
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 3px;
+  font-size: 0.8rem;
+  color: #737373;
+}
+
+.messageTime {
+  font-size: 0.75rem;
+  opacity: 0.6;
+  padding: 0.4rem 1rem;
+  background: transparent;
+}
+
+.suggestedResponse {
+  margin: 1rem 1.5rem;
+  padding: 1rem;
+  background: #1a1a1a;
+  border: 1px solid #252525;
+  border-radius: 4px;
+}
+
+.suggestedHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.6rem;
+  font-weight: 400;
+  color: #737373;
+  font-size: 0.8rem;
+}
+
+.useButton {
+  padding: 0.4rem 0.9rem;
+  background: #d4d4d4;
+  color: #121212;
+  border: none;
+  border-radius: 3px;
+  font-weight: 400;
+  font-size: 0.8rem;
+  transition: background 0.2s ease;
+}
+
+.useButton:hover {
+  background: #e4e4e4;
+}
+
+.suggestedText {
+  color: #d4d4d4;
+  line-height: 1.55;
+  font-size: 0.9rem;
+}
+
+.messageInput {
+  padding: 1.25rem 1.5rem;
+  border-top: 1px solid #252525;
+  display: flex;
+  gap: 0.9rem;
+  background: #1a1a1a;
+}
+
+.messageInput textarea {
+  flex: 1;
+  padding: 0.75rem;
+  border: 1px solid #252525;
+  border-radius: 4px;
+  resize: none;
+  font-size: 0.9rem;
+  color: #d4d4d4;
+  background: #121212;
+  transition: border-color 0.2s ease;
+}
+
+.messageInput textarea:focus {
+  border-color: #2d2d2d;
+}
+
+.sendButton {
+  padding: 0.75rem 1.75rem;
+  background: #d4d4d4;
+  color: #121212;
+  border: none;
+  border-radius: 4px;
+  font-weight: 400;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.sendButton:hover {
+  background: #e4e4e4;
+}
+
+.emptyState {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #737373;
+  font-size: 0.9rem;
+}

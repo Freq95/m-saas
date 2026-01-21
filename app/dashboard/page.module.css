@@ -1,0 +1,302 @@
+.container {
+  min-height: 100vh;
+  background: #121212;
+}
+
+.nav {
+  background: #1a1a1a;
+  border-bottom: 1px solid #252525;
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #d4d4d4;
+  letter-spacing: -0.01em;
+}
+
+.navLinks {
+  display: flex;
+  gap: 2rem;
+}
+
+.navLinks a {
+  color: #737373;
+  font-weight: 400;
+  font-size: 0.9rem;
+  transition: color 0.2s ease;
+  position: relative;
+}
+
+.navLinks a:hover {
+  color: #d4d4d4;
+}
+
+.navLinks a.active {
+  color: #d4d4d4;
+}
+
+.navLinks a.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1rem;
+  left: 0;
+  right: 0;
+  height: 1.5px;
+  background: #d4d4d4;
+}
+
+.main {
+  padding: 2rem 1.5rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.title {
+  font-size: 1.5rem;
+  margin-bottom: 1.75rem;
+  color: #d4d4d4;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.statCard {
+  background: #1a1a1a;
+  padding: 1.25rem 1.5rem;
+  border-radius: 6px;
+  border: 1px solid #252525;
+  transition: all 0.2s ease;
+}
+
+.statCard:hover {
+  border-color: #2d2d2d;
+  background: #1d1d1d;
+}
+
+.statLabel {
+  font-size: 0.8rem;
+  color: #737373;
+  margin-bottom: 0.5rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.statValue {
+  font-size: 1.75rem;
+  font-weight: 500;
+  color: #d4d4d4;
+  letter-spacing: -0.02em;
+}
+
+.charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+  gap: 1.25rem;
+}
+
+.chartCard {
+  background: #1a1a1a;
+  padding: 1.5rem;
+  border-radius: 6px;
+  border: 1px solid #252525;
+}
+
+.chartCard h3 {
+  font-size: 0.95rem;
+  margin-bottom: 1.25rem;
+  color: #d4d4d4;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.barChart {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  height: 180px;
+  padding: 0.5rem 0;
+}
+
+.barItem {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  height: 100%;
+}
+
+.barValue {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #d4d4d4;
+  order: 1;
+}
+
+.barContainer {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: 40px;
+  position: relative;
+  order: 2;
+}
+
+.bar {
+  width: 100%;
+  max-width: 100%;
+  background: #d4d4d4;
+  border-radius: 3px 3px 0 0;
+  transition: height 0.3s ease;
+  min-height: 4px;
+  align-self: flex-end;
+}
+
+.barLabel {
+  font-size: 0.75rem;
+  color: #737373;
+  text-align: center;
+  order: 3;
+  margin-top: 0.25rem;
+}
+
+.barValue {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #737373;
+}
+
+/* Appointments List - Apple Style */
+.appointmentsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.appointmentItem {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.appointmentItem:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: translateX(2px);
+}
+
+.appointmentTime {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 90px;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeStart,
+.timeEnd {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.timeSeparator {
+  font-size: 0.85rem;
+  color: #737373;
+  font-weight: 300;
+}
+
+.appointmentDetails {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.appointmentClient {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appointmentService {
+  font-size: 0.8rem;
+  color: #8e8e93;
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appointmentStatus {
+  padding: 0.35rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: capitalize;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.statusScheduled {
+  background: rgba(52, 199, 89, 0.15);
+  color: #34c759;
+  border: 1px solid rgba(52, 199, 89, 0.2);
+}
+
+.statusCompleted {
+  background: rgba(142, 142, 147, 0.15);
+  color: #8e8e93;
+  border: 1px solid rgba(142, 142, 147, 0.2);
+}
+
+.statusCancelled {
+  background: rgba(255, 59, 48, 0.15);
+  color: #ff3b30;
+  border: 1px solid rgba(255, 59, 48, 0.2);
+}
+
+.statusNo_show,
+.statusNoshow,
+.statusNoShow {
+  background: rgba(255, 149, 0, 0.15);
+  color: #ff9500;
+  border: 1px solid rgba(255, 149, 0, 0.2);
+}
+
+.emptyAppointments {
+  padding: 3rem 1rem;
+  text-align: center;
+}
+
+.emptyAppointments p {
+  color: #8e8e93;
+  font-size: 0.9rem;
+  margin: 0;
+}

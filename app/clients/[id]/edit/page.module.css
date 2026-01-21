@@ -1,0 +1,289 @@
+.container {
+  min-height: 100vh;
+  background: #121212;
+  display: flex;
+  flex-direction: column;
+}
+
+.nav {
+  background: #1a1a1a;
+  border-bottom: 1px solid #252525;
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #d4d4d4;
+  letter-spacing: -0.01em;
+}
+
+.navLinks {
+  display: flex;
+  gap: 2rem;
+}
+
+.navLinks a {
+  color: #737373;
+  font-weight: 400;
+  font-size: 0.9rem;
+  transition: color 0.2s ease;
+  position: relative;
+}
+
+.navLinks a:hover {
+  color: #d4d4d4;
+}
+
+.navLinks a.active {
+  color: #d4d4d4;
+}
+
+.navLinks a.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1rem;
+  left: 0;
+  right: 0;
+  height: 1.5px;
+  background: #d4d4d4;
+}
+
+.main {
+  flex: 1;
+  padding: 1.5rem;
+  max-width: 700px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.loading {
+  text-align: center;
+  padding: 3rem;
+  color: #737373;
+}
+
+.header {
+  margin-bottom: 1.5rem;
+}
+
+.backLink {
+  color: #d4d4d4;
+  text-decoration: none;
+  font-size: 0.85rem;
+  margin-bottom: 0.9rem;
+  display: inline-block;
+}
+
+.backLink:hover {
+  text-decoration: underline;
+}
+
+.header h1 {
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: #d4d4d4;
+  margin: 0.4rem 0 0 0;
+  letter-spacing: -0.01em;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.section {
+  background: #1a1a1a;
+  border: 1px solid #252525;
+  border-radius: 4px;
+  padding: 1.25rem;
+}
+
+.section h2 {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #d4d4d4;
+  margin: 0 0 1.25rem 0;
+  letter-spacing: -0.01em;
+}
+
+.field {
+  margin-bottom: 1.25rem;
+}
+
+.field:last-child {
+  margin-bottom: 0;
+}
+
+.field label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #737373;
+  margin-bottom: 0.4rem;
+}
+
+.required {
+  color: #d4d4d4;
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+  padding: 0.65rem;
+  background: #121212;
+  border: 1px solid #252525;
+  border-radius: 4px;
+  color: #d4d4d4;
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: border-color 0.2s ease;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: #2d2d2d;
+}
+
+.field textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.tagInput {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.tagInput input {
+  flex: 1;
+}
+
+.addTagButton {
+  padding: 0.65rem 1.2rem;
+  background: #252525;
+  border: 1px solid #2d2d2d;
+  border-radius: 4px;
+  color: #d4d4d4;
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+}
+
+.addTagButton:hover {
+  background: #2d2d2d;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #252525;
+  color: #d4d4d4;
+  padding: 0.3rem 0.6rem;
+  border-radius: 3px;
+  font-size: 0.8rem;
+}
+
+.removeTag {
+  background: none;
+  border: none;
+  color: #737373;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0;
+  width: 1rem;
+  height: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease;
+}
+
+.removeTag:hover {
+  color: #d4d4d4;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid #252525;
+}
+
+.cancelButton {
+  padding: 0.65rem 1.2rem;
+  background: transparent;
+  border: 1px solid #252525;
+  border-radius: 4px;
+  color: #737373;
+  text-decoration: none;
+  font-weight: 400;
+  transition: all 0.2s ease;
+  display: inline-block;
+  font-size: 0.9rem;
+}
+
+.cancelButton:hover {
+  background: #1d1d1d;
+  border-color: #2d2d2d;
+  color: #d4d4d4;
+}
+
+.submitButton {
+  padding: 0.65rem 1.2rem;
+  background: #d4d4d4;
+  border: none;
+  border-radius: 4px;
+  color: #121212;
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+}
+
+.submitButton:hover:not(:disabled) {
+  background: #e4e4e4;
+}
+
+.submitButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .main {
+    padding: 1rem;
+  }
+
+  .tagInput {
+    flex-direction: column;
+  }
+
+  .actions {
+    flex-direction: column-reverse;
+  }
+
+  .cancelButton,
+  .submitButton {
+    width: 100%;
+    text-align: center;
+  }
+}
