@@ -422,6 +422,7 @@ export default function CalendarPage() {
           <Link href="/inbox">Inbox</Link>
           <Link href="/calendar" className={styles.active}>Calendar</Link>
           <Link href="/clients">Clienți</Link>
+          <Link href="/settings/email">Setări</Link>
         </div>
       </nav>
 

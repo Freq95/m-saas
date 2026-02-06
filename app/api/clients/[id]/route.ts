@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { updateClientStats } from '@/lib/client-matching';
+import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
+import type { Conversation } from '@/lib/types';
 
 // GET /api/clients/[id] - Get client details with history
 export async function GET(
@@ -18,10 +20,7 @@ export async function GET(
     );
 
     if (clientResult.rows.length === 0) {
-      return NextResponse.json(
-        { error: 'Client not found' },
-        { status: 404 }
-      );
+      return createErrorResponse('Client not found', 404);
     }
 
     const client = clientResult.rows[0];
@@ -51,7 +50,7 @@ export async function GET(
 
     // Get messages count per conversation
     const conversationsWithCounts = await Promise.all(
-      conversationsResult.rows.map(async (conv: any) => {
+      conversationsResult.rows.map(async (conv: Conversation) => {
         const messagesResult = await db.query(
           `SELECT COUNT(*) as count FROM messages WHERE conversation_id = $1`,
           [conv.id]
@@ -63,7 +62,7 @@ export async function GET(
       })
     );
 
-    return NextResponse.json({
+    return createSuccessResponse({
       client: {
         ...client,
         tags: parsedTags,
@@ -71,12 +70,8 @@ export async function GET(
       appointments: appointmentsResult.rows || [],
       conversations: conversationsWithCounts,
     });
-  } catch (error: any) {
-    console.error('Error fetching client:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch client', details: error.message },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleApiError(error, 'Failed to fetch client');
   }
 }
 
@@ -90,11 +85,18 @@ export async function PATCH(
     const clientId = parseInt(params.id);
     const body = await request.json();
 
-    const { name, email, phone, status, tags, notes } = body;
+    // Validate input
+    const { updateClientSchema } = await import('@/lib/validation');
+    const validationResult = updateClientSchema.safeParse(body);
+    if (!validationResult.success) {
+      return createErrorResponse('Invalid input', 400, JSON.stringify(validationResult.error.errors));
+    }
+
+    const { name, email, phone, status, tags, notes } = validationResult.data;
 
     // Build update query
     const updates: string[] = [];
-    const updateParams: any[] = [];
+    const updateParams: (string | number | null)[] = [];
 
     if (name !== undefined) {
       updates.push(`name = $${updateParams.length + 1}`);
@@ -127,10 +129,7 @@ export async function PATCH(
     }
 
     if (updates.length === 0) {
-      return NextResponse.json(
-        { error: 'No fields to update' },
-        { status: 400 }
-      );
+      return createErrorResponse('No fields to update', 400);
     }
 
     updates.push(`updated_at = CURRENT_TIMESTAMP`);
@@ -148,15 +147,12 @@ export async function PATCH(
     );
 
     if (result.rows.length === 0) {
-      return NextResponse.json(
-        { error: 'Client not found' },
-        { status: 404 }
-      );
+      return createErrorResponse('Client not found', 404);
     }
 
     const updatedClient = result.rows[0];
 
-    return NextResponse.json({
+    return createSuccessResponse({
       client: {
         ...updatedClient,
         tags: typeof updatedClient.tags === 'string' 
@@ -164,12 +160,8 @@ export async function PATCH(
           : (updatedClient.tags || []),
       }
     });
-  } catch (error: any) {
-    console.error('Error updating client:', error);
-    return NextResponse.json(
-      { error: 'Failed to update client', details: error.message },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleApiError(error, 'Failed to update client');
   }
 }
 
@@ -188,13 +180,9 @@ export async function DELETE(
       [clientId]
     );
 
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error deleting client:', error);
-    return NextResponse.json(
-      { error: 'Failed to delete client', details: error.message },
-      { status: 500 }
-    );
+    return createSuccessResponse({ success: true });
+  } catch (error) {
+    return handleApiError(error, 'Failed to delete client');
   }
 }
 

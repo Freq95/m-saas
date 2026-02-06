@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { z } from 'zod';
+import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
 // Validation schema
 const updateReminderSchema = z.object({
@@ -18,6 +19,11 @@ export async function GET(
     const db = getDb();
     const reminderId = parseInt(params.id);
 
+    // Validate ID
+    if (isNaN(reminderId) || reminderId <= 0) {
+      return createErrorResponse('Invalid reminder ID', 400);
+    }
+
     const result = await db.query(
       `SELECT r.*, a.client_name, a.client_email, a.client_phone, a.start_time as appointment_time
        FROM reminders r
@@ -27,22 +33,12 @@ export async function GET(
     );
 
     if (result.rows.length === 0) {
-      return NextResponse.json(
-        { error: 'Reminder not found' },
-        { status: 404 }
-      );
+      return createErrorResponse('Reminder not found', 404);
     }
 
-    return NextResponse.json({ reminder: result.rows[0] });
-  } catch (error: any) {
-    console.error('Error fetching reminder:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to fetch reminder',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      },
-      { status: 500 }
-    );
+    return createSuccessResponse({ reminder: result.rows[0] });
+  } catch (error) {
+    return handleApiError(error, 'Failed to fetch reminder');
   }
 }
 
@@ -81,9 +77,14 @@ export async function PATCH(
       );
     }
 
+    // Validate ID
+    if (isNaN(reminderId) || reminderId <= 0) {
+      return createErrorResponse('Invalid reminder ID', 400);
+    }
+
     // Build update query
     const updates: string[] = [];
-    const updateParams: any[] = [];
+    const updateParams: (string | number | Date | null)[] = [];
     let paramIndex = 1;
 
     if (validationResult.data.status !== undefined) {
@@ -123,19 +124,12 @@ export async function PATCH(
       [reminderId]
     );
 
-    return NextResponse.json({
+    return createSuccessResponse({
       success: true,
       reminder: updatedResult.rows[0],
     });
-  } catch (error: any) {
-    console.error('Error updating reminder:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to update reminder',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleApiError(error, 'Failed to update reminder');
   }
 }
 
@@ -154,11 +148,13 @@ export async function DELETE(
       [reminderId]
     );
 
+    // Validate ID
+    if (isNaN(reminderId) || reminderId <= 0) {
+      return createErrorResponse('Invalid reminder ID', 400);
+    }
+
     if (existingResult.rows.length === 0) {
-      return NextResponse.json(
-        { error: 'Reminder not found' },
-        { status: 404 }
-      );
+      return createErrorResponse('Reminder not found', 404);
     }
 
     await db.query(
@@ -166,16 +162,9 @@ export async function DELETE(
       [reminderId]
     );
 
-    return NextResponse.json({ success: true, message: 'Reminder deleted' });
-  } catch (error: any) {
-    console.error('Error deleting reminder:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to delete reminder',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      },
-      { status: 500 }
-    );
+    return createSuccessResponse({ success: true, message: 'Reminder deleted' });
+  } catch (error) {
+    return handleApiError(error, 'Failed to delete reminder');
   }
 }
 

@@ -13,6 +13,8 @@ export default function Home() {
           <Link href="/dashboard">Dashboard</Link>
           <Link href="/inbox">Inbox</Link>
           <Link href="/calendar">Calendar</Link>
+          <Link href="/clients">Clients</Link>
+          <Link href="/settings/email">Settings</Link>
         </div>
       </nav>
       <main className={styles.main}>

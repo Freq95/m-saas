@@ -103,7 +103,7 @@ export async function findOrCreateClient(
   if (existingClient) {
     // Update missing information
     const updates: string[] = [];
-    const updateParams: any[] = [existingClient.id];
+    const updateParams: (string | number | null)[] = [existingClient.id];
     
     if (!existingClient.email && normalizedEmail) {
       updates.push(`email = $${updateParams.length + 1}`);
@@ -286,5 +286,128 @@ export async function linkAppointmentToClient(
   
   // Update client stats
   await updateClientStats(clientId);
+}
+
+/**
+ * Get client segments
+ * Returns clients grouped by segments: VIP, inactive, new, frequent
+ */
+export interface ClientSegments {
+  vip: Client[];
+  inactive: Client[];
+  new: Client[];
+  frequent: Client[];
+}
+
+export async function getClientSegments(
+  userId: number,
+  options: {
+    vipThreshold?: number; // Default: 1000 RON
+    inactiveDays?: number; // Default: 30 days
+    newDays?: number; // Default: 7 days
+    frequentAppointmentsPerMonth?: number; // Default: 2 appointments/month
+  } = {}
+): Promise<ClientSegments> {
+  const db = getDb();
+  
+  const vipThreshold = options.vipThreshold || 1000;
+  const inactiveDays = options.inactiveDays || 30;
+  const newDays = options.newDays || 7;
+  const frequentAppointmentsPerMonth = options.frequentAppointmentsPerMonth || 2;
+
+  const now = new Date();
+  const inactiveDate = new Date(now);
+  inactiveDate.setDate(inactiveDate.getDate() - inactiveDays);
+  
+  const newDate = new Date(now);
+  newDate.setDate(newDate.getDate() - newDays);
+
+  // VIP clients (total_spent > threshold)
+  const vipResult = await db.query(
+    `SELECT * FROM clients
+     WHERE user_id = $1 AND total_spent >= $2
+     ORDER BY total_spent DESC`,
+    [userId, vipThreshold]
+  );
+  const vip = vipResult.rows.map((row: Record<string, unknown>) => ({
+    ...row,
+    tags: typeof row.tags === 'string' ? JSON.parse(row.tags as string || '[]') : (row.tags || []),
+  })) as Client[];
+
+  // Inactive clients (no activity in X days)
+  const inactiveResult = await db.query(
+    `SELECT * FROM clients
+     WHERE user_id = $1
+     AND (
+       (last_appointment_date IS NULL OR last_appointment_date < $2)
+       AND (last_conversation_date IS NULL OR last_conversation_date < $2)
+     )
+     ORDER BY COALESCE(last_appointment_date, last_conversation_date, created_at) DESC`,
+    [userId, inactiveDate]
+  );
+  const inactive = inactiveResult.rows.map((row: Record<string, unknown>) => ({
+    ...row,
+    tags: typeof row.tags === 'string' ? JSON.parse(row.tags as string || '[]') : (row.tags || []),
+  })) as Client[];
+
+  // New clients (created in last X days)
+  const newResult = await db.query(
+    `SELECT * FROM clients
+     WHERE user_id = $1 AND created_at >= $2
+     ORDER BY created_at DESC`,
+    [userId, newDate]
+  );
+  const newClients = newResult.rows.map((row: Record<string, unknown>) => ({
+    ...row,
+    tags: typeof row.tags === 'string' ? JSON.parse(row.tags as string || '[]') : (row.tags || []),
+  })) as Client[];
+
+  // Frequent clients (X+ appointments per month on average)
+  // Calculate appointments per month for each client
+  const allClientsResult = await db.query(
+    `SELECT c.*, 
+            COUNT(a.id) as appointment_count,
+            MIN(a.start_time) as first_appointment,
+            MAX(a.start_time) as last_appointment
+     FROM clients c
+     LEFT JOIN appointments a ON c.id = a.client_id 
+       AND a.status IN ('scheduled', 'completed')
+     WHERE c.user_id = $1
+     GROUP BY c.id
+     HAVING COUNT(a.id) > 0`,
+    [userId]
+  );
+
+  const frequent: Client[] = [];
+  for (const row of allClientsResult.rows) {
+    const firstApp = row.first_appointment ? new Date(row.first_appointment) : null;
+    const lastApp = row.last_appointment ? new Date(row.last_appointment) : null;
+    
+    if (firstApp && lastApp) {
+      const monthsDiff = (lastApp.getTime() - firstApp.getTime()) / (1000 * 60 * 60 * 24 * 30);
+      if (monthsDiff > 0) {
+        const appointmentsPerMonth = row.appointment_count / monthsDiff;
+        if (appointmentsPerMonth >= frequentAppointmentsPerMonth) {
+          frequent.push({
+            ...row,
+            tags: typeof row.tags === 'string' ? JSON.parse(row.tags || '[]') : (row.tags || []),
+          } as Client);
+        }
+      } else if (row.appointment_count >= frequentAppointmentsPerMonth) {
+        // Same month, check if count is high enough
+        frequent.push({
+          ...row,
+          tags: typeof row.tags === 'string' ? JSON.parse(row.tags || '[]') : (row.tags || []),
+        } as Client);
+      }
+    }
+  }
+
+  return {
+    vip,
+    inactive,
+    new: newClients,
+    frequent,
+  };
 }
 

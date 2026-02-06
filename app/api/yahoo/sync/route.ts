@@ -1,84 +1,89 @@
 import { NextRequest, NextResponse } from 'next/server';
+
+export const dynamic = 'force-dynamic';
 import { getYahooConfig, fetchYahooEmails, markEmailAsRead } from '@/lib/yahoo-mail';
 import { getDb } from '@/lib/db';
 import { suggestTags } from '@/lib/ai-agent';
-import { getTodayInRomania } from '@/lib/timezone';
+import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
 // POST /api/yahoo/sync - Sync Yahoo Mail inbox
 export async function POST(request: NextRequest) {
   try {
-    const config = getYahooConfig();
-    
-    if (!config) {
-      return NextResponse.json(
-        { 
-          error: 'Yahoo Mail not configured. Set YAHOO_EMAIL and YAHOO_PASSWORD (or YAHOO_APP_PASSWORD) in .env',
-          synced: 0
-        },
-        { status: 400 }
-      );
-    }
-
     const body = await request.json();
     
     // Validate input
     const { yahooSyncSchema } = await import('@/lib/validation');
     const validationResult = yahooSyncSchema.safeParse(body);
     if (!validationResult.success) {
-      return NextResponse.json(
-        { 
-          error: 'Invalid input',
-          details: validationResult.error.errors,
-          synced: 0
-        },
-        { status: 400 }
-      );
+      return createErrorResponse('Invalid input', 400, JSON.stringify(validationResult.error.errors));
     }
 
     const { userId, todayOnly, since: sinceParam } = validationResult.data;
     
-    // If todayOnly is true, only sync emails from today (in Romania timezone)
+    // Get config from database (with env fallback)
+    const config = await getYahooConfig(userId);
+    
+    if (!config) {
+      return createErrorResponse(
+        'Yahoo Mail not configured. Please configure it in Settings > Email Integrations or set YAHOO_EMAIL and YAHOO_PASSWORD (or YAHOO_APP_PASSWORD) in .env',
+        400
+      );
+    }
+    
+    // If todayOnly is true, only sync emails from today
     let since: Date | undefined;
     if (todayOnly) {
-      // CRITICAL FIX: Use Romania timezone, not server local timezone
-      since = getTodayInRomania();
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      since = today;
     } else if (sinceParam) {
       since = typeof sinceParam === 'string' ? new Date(sinceParam) : sinceParam;
     }
 
     // Fetch emails from Yahoo
-    console.log('Yahoo sync: Fetching emails since:', since);
+    const { logger } = await import('@/lib/logger');
+    logger.info('Yahoo sync: Fetching emails', { since: since?.toISOString() });
     const emails = await fetchYahooEmails(config, since);
-    console.log(`Yahoo sync: Found ${emails.length} emails from Yahoo`);
+    logger.info('Yahoo sync: Found emails', { count: emails.length });
 
     const db = getDb();
     let syncedCount = 0;
+    let skippedCount = 0;
+    let errorCount = 0;
 
     // Process each email
     for (const email of emails) {
       try {
-        console.log('Yahoo sync: Processing email from:', email.from, 'subject:', email.subject);
+        logger.debug('Yahoo sync: Processing email', { from: email.from, subject: email.subject });
         
         // Extract contact info
         const emailMatch = email.from.match(/<(.+)>/);
         const emailAddress = emailMatch ? emailMatch[1] : email.from;
         const name = email.from.replace(/<.+>/, '').trim() || emailAddress.split('@')[0];
         
-        console.log('Yahoo sync: Extracted email:', emailAddress, 'name:', name);
+        logger.debug('Yahoo sync: Extracted contact info', { email: emailAddress, name });
 
-        // Find or create client
+        // Find or create client (non-blocking for inbox sync)
+        let client: { id: number } | null = null;
         const { findOrCreateClient, linkConversationToClient } = await import('@/lib/client-matching');
-        const client = await findOrCreateClient(
-          userId,
-          name,
-          emailAddress,
-          undefined,
-          'email'
-        );
+        try {
+          client = await findOrCreateClient(
+            userId,
+            name,
+            emailAddress,
+            undefined,
+            'email'
+          );
+        } catch (clientError) {
+          logger.warn('Yahoo sync: Failed to resolve client, continuing without client link', {
+            email: emailAddress,
+            error: clientError instanceof Error ? clientError.message : String(clientError),
+          });
+        }
 
         // Check if conversation exists
         const existingConv = await db.query(
-          `SELECT id FROM conversations 
+          `SELECT id, client_id FROM conversations 
            WHERE user_id = $1 AND channel = 'email' AND contact_email = $2 
            ORDER BY created_at DESC LIMIT 1`,
           [userId, emailAddress]
@@ -88,47 +93,32 @@ export async function POST(request: NextRequest) {
 
         if (existingConv.rows.length > 0) {
           conversationId = existingConv.rows[0].id;
-          // Link to client if not already linked
-          if (!existingConv.rows[0].client_id) {
-            await linkConversationToClient(conversationId, client.id);
-          }
         } else {
           // Create new conversation
           const convResult = await db.query(
-            `INSERT INTO conversations (user_id, channel, channel_id, contact_name, contact_email, subject, status, client_id)
-             VALUES ($1, 'email', $2, $3, $4, $5, 'open', $6)
+            `INSERT INTO conversations (user_id, channel, channel_id, contact_name, contact_email, subject, status, client_id, created_at, updated_at)
+             VALUES ($1, 'email', $2, $3, $4, $5, 'open', $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
              RETURNING id`,
-            [userId, email.messageId || email.uid.toString(), name, emailAddress, email.subject, client.id]
+            [userId, email.messageId || email.uid.toString(), name, emailAddress, email.subject, client?.id || null]
           );
           conversationId = convResult.rows[0].id;
         }
 
-        // Check if message already exists - use time range to handle timestamp precision differences
-        // This handles timestamp precision differences and timezone issues
-        let existingMsg: any = null;
-        
-        if (email.date) {
-          let emailDate: Date = email.date instanceof Date ? email.date : new Date(email.date);
-          if (isNaN(emailDate.getTime())) {
-            emailDate = new Date();
-          }
-          
-          // Use a 5-minute window to account for timestamp precision differences and timezone issues
-          // This is more lenient than before to ensure we don't miss messages
-          const dateStart = new Date(emailDate.getTime() - 300000); // 5 minutes before
-          const dateEnd = new Date(emailDate.getTime() + 300000);   // 5 minutes after
-          
-          const dateResult = await db.query(
-            `SELECT id, sent_at FROM messages 
-             WHERE conversation_id = $1 
-             AND sent_at >= $2 AND sent_at <= $3
+        // Check if message already exists (by messageId or UID)
+        let existingMsg: { id: number } | null = null;
+        if (email.messageId || email.uid) {
+          const msgCheck = await db.query(
+            `SELECT id FROM messages
+             WHERE conversation_id = $1
+             AND (
+               (external_id IS NOT NULL AND external_id = $2)
+               OR (source_uid IS NOT NULL AND source_uid = $3)
+             )
              ORDER BY sent_at DESC LIMIT 1`,
-            [conversationId, dateStart, dateEnd]
+            [conversationId, email.messageId || null, email.uid || null]
           );
-          
-          if (dateResult.rows.length > 0) {
-            existingMsg = dateResult.rows[0];
-            console.log(`Yahoo sync: Found existing message for email ${email.uid} (time diff: ${Math.abs(new Date(dateResult.rows[0].sent_at).getTime() - emailDate.getTime())}ms)`);
+          if (msgCheck.rows.length > 0) {
+            existingMsg = msgCheck.rows[0] as { id: number };
           }
         }
 
@@ -150,60 +140,32 @@ export async function POST(request: NextRequest) {
               contentType: att.contentType,
               size: att.size,
             })),
+            messageId: email.messageId,
+            uid: email.uid,
           };
           
-          // Ensure email.date is a valid Date object
-          let emailDate: Date = email.date instanceof Date ? email.date : new Date(email.date);
-          if (isNaN(emailDate.getTime())) {
-            console.warn(`Invalid email date for email ${email.uid}, using current date`);
-            emailDate = new Date();
-          }
-          
-          // CRITICAL FIX: If syncing with todayOnly=true, ensure emails are marked as today
-          // Email Date headers might be in UTC or sender's timezone, causing them to appear as yesterday
-          // If the email date is within the last 24 hours, use current time to ensure it shows as "today"
-          if (todayOnly) {
-            const now = new Date();
-            const emailTime = emailDate.getTime();
-            const hoursDiff = (now.getTime() - emailTime) / (1000 * 60 * 60);
-            
-            // If email is from the last 24 hours, use current time to ensure it's marked as today
-            if (hoursDiff >= 0 && hoursDiff < 24) {
-              console.log(`Yahoo sync: Email date ${emailDate.toISOString()} is ${hoursDiff.toFixed(2)} hours ago, using current time for today's sync`);
-              emailDate = new Date(); // Use current time to ensure it's marked as today
-            }
-          }
-          
-          console.log(`Yahoo sync: Inserting new message for conversation ${conversationId}, date: ${emailDate.toISOString()}`);
-          
+          const sentAt = email.date || new Date();
           await db.query(
-            `INSERT INTO messages (conversation_id, direction, content, sent_at)
-             VALUES ($1, 'inbound', $2, $3)`,
-            [conversationId, serializeMessage(storedMessage), emailDate]
+            `INSERT INTO messages (conversation_id, direction, content, sent_at, external_id, source_uid)
+             VALUES ($1, 'inbound', $2, $3, $4, $5)`,
+            [conversationId, serializeMessage(storedMessage), sentAt, email.messageId || null, email.uid || null]
           );
 
-          // Update conversation's updated_at and last_message_at to reflect new message
-          // This ensures the conversation appears in today's filter if the message is from today
-          // Try to update last_message_at, but handle case where column might not exist
-          try {
-            await db.query(
-              `UPDATE conversations 
-               SET updated_at = CURRENT_TIMESTAMP, 
-                   last_message_at = $2
-               WHERE id = $1`,
-              [conversationId, emailDate]
-            );
-            console.log(`Yahoo sync: Updated last_message_at for conversation ${conversationId} to ${emailDate.toISOString()}`);
-          } catch (updateError: any) {
-            // If last_message_at column doesn't exist, just update updated_at
-            if (updateError.message?.includes('last_message_at')) {
-              console.warn(`Yahoo sync: last_message_at column not found, updating only updated_at`);
-              await db.query(
-                `UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-                [conversationId]
-              );
-            } else {
-              throw updateError;
+          // Keep conversation fresh for sorting (even if message parsing fails later)
+          await db.query(
+            `UPDATE conversations SET updated_at = $1 WHERE id = $2`,
+            [sentAt, conversationId]
+          );
+
+          // Ensure conversation is linked to client if available and missing
+          if (client && !existingConv.rows[0]?.client_id) {
+            try {
+              await linkConversationToClient(conversationId, client.id);
+            } catch (linkError) {
+              logger.warn('Yahoo sync: Failed to link conversation to client', {
+                conversationId,
+                error: linkError instanceof Error ? linkError.message : String(linkError),
+              });
             }
           }
 
@@ -227,66 +189,75 @@ export async function POST(request: NextRequest) {
           try {
             await markEmailAsRead(config, email.uid);
           } catch (err) {
-            console.warn('Could not mark email as read:', err);
+            logger.warn('Could not mark email as read', { uid: email.uid, error: err instanceof Error ? err.message : String(err) });
           }
 
           syncedCount++;
+        } else {
+          skippedCount++;
         }
-      } catch (err: any) {
-        console.error(`Error processing email ${email.uid}:`, err.message || err);
+      } catch (err) {
+        errorCount++;
+        logger.error('Error processing email', err instanceof Error ? err : new Error(String(err)), { uid: email.uid });
         // Continue with next email
       }
     }
 
-    console.log(`✅ Yahoo sync: ${syncedCount} new emails synced (${emails.length} total found)`);
-    
-    return NextResponse.json({
+    // Update integration sync time if using database config
+    if (userId) {
+      try {
+        const { getEmailIntegrationById, updateIntegrationSyncTime } = await import('@/lib/email-integrations');
+        const integrations = await getEmailIntegrationById(0, userId); // We need to find by email
+        // Find integration by email
+        const { getUserEmailIntegrations } = await import('@/lib/email-integrations');
+        const userIntegrations = await getUserEmailIntegrations(userId);
+        const yahooIntegration = userIntegrations.find(i => i.provider === 'yahoo' && i.email === config.email);
+        if (yahooIntegration) {
+          await updateIntegrationSyncTime(yahooIntegration.id);
+        }
+      } catch (err) {
+        // Non-critical, just log
+        const { logger } = await import('@/lib/logger');
+        logger.warn('Failed to update integration sync time', { error: err });
+      }
+    }
+
+    return createSuccessResponse({
       success: true,
       synced: syncedCount,
+      skipped: skippedCount,
+      errors: errorCount,
       total: emails.length,
     });
-  } catch (error: any) {
-    console.error('Error syncing Yahoo Mail:', error);
-    return NextResponse.json(
-      { 
-        error: error.message || 'Failed to sync Yahoo Mail',
-        synced: 0
-      },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleApiError(error, 'Failed to sync Yahoo Mail');
   }
 }
 
 // GET /api/yahoo/sync - Test Yahoo connection
 export async function GET(request: NextRequest) {
   try {
-    const config = getYahooConfig();
+    const searchParams = request.nextUrl.searchParams;
+    const userId = parseInt(searchParams.get('userId') || '1');
+    
+    const config = await getYahooConfig(userId);
     
     if (!config) {
-      return NextResponse.json(
-        { 
-          connected: false,
-          error: 'Yahoo Mail not configured'
-        }
-      );
+      return createSuccessResponse({
+        connected: false,
+        error: 'Yahoo Mail not configured'
+      });
     }
 
     const { testYahooConnection } = await import('@/lib/yahoo-mail');
     const connected = await testYahooConnection(config);
 
-    return NextResponse.json({
+    return createSuccessResponse({
       connected,
       email: config.email,
     });
-  } catch (error: any) {
-    console.error('Error testing Yahoo connection:', error);
-    return NextResponse.json(
-      { 
-        connected: false,
-        error: error.message
-      },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleApiError(error, 'Failed to test Yahoo connection');
   }
 }
 

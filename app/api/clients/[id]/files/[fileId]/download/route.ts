@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import * as fs from 'fs';
 import * as path from 'path';
+import { handleApiError, createErrorResponse } from '@/lib/error-handler';
 
 // GET /api/clients/[id]/files/[fileId]/download - Download a file
 export async function GET(
@@ -11,29 +12,31 @@ export async function GET(
   try {
     const db = getDb();
     const fileId = parseInt(params.fileId);
-    const contactId = parseInt(params.id);
+    const clientId = parseInt(params.id);
 
-    // Get file info
-    const result = await db.query(
-      `SELECT * FROM contact_files WHERE id = $1 AND contact_id = $2`,
-      [fileId, contactId]
-    );
+    // Get file info - try client_files first, fallback to contact_files
+    let result;
+    try {
+      result = await db.query(
+        `SELECT * FROM client_files WHERE id = $1 AND client_id = $2`,
+        [fileId, clientId]
+      );
+    } catch (e) {
+      result = await db.query(
+        `SELECT * FROM contact_files WHERE id = $1 AND contact_id = $2`,
+        [fileId, clientId]
+      );
+    }
 
     if (result.rows.length === 0) {
-      return NextResponse.json(
-        { error: 'File not found' },
-        { status: 404 }
-      );
+      return createErrorResponse('File not found', 404);
     }
 
     const file = result.rows[0];
 
     // Check if file exists on disk
     if (!fs.existsSync(file.file_path)) {
-      return NextResponse.json(
-        { error: 'File not found on disk' },
-        { status: 404 }
-      );
+      return createErrorResponse('File not found on disk', 404);
     }
 
     // Read file
@@ -47,12 +50,8 @@ export async function GET(
         'Content-Length': file.file_size.toString(),
       },
     });
-  } catch (error: any) {
-    console.error('Error downloading file:', error);
-    return NextResponse.json(
-      { error: 'Failed to download file', details: error.message },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleApiError(error, 'Failed to download file');
   }
 }
 

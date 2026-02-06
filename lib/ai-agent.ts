@@ -113,6 +113,9 @@ Nu face acțiuni autonome - doar sugerezi răspunsuri pe care utilizatorul le po
  * Analyzes a message and suggests tags
  */
 export async function suggestTags(messageContent: string): Promise<string[]> {
+  if (!process.env.OPENAI_API_KEY) {
+    return [];
+  }
   const db = getDb();
   
   const prompt = `Analizează următoarea conversație și sugerează tag-uri relevante din lista: "Lead nou", "Întrebare preț", "Reprogramare", "Anulare".

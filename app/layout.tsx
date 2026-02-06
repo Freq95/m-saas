@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 
 export const metadata: Metadata = {
   title: 'OpsGenie pentru Micro-Servicii',
@@ -13,7 +14,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ro">
-      <body>{children}</body>
+      <body>
+        <ErrorBoundary>
+          {children}
+        </ErrorBoundary>
+      </body>
     </html>
   )
 }

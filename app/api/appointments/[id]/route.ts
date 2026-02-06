@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { updateClientStats } from '@/lib/client-matching';
+import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
 // GET /api/appointments/[id] - Get single appointment
 export async function GET(
@@ -24,19 +26,12 @@ export async function GET(
     );
 
     if (result.rows.length === 0) {
-      return NextResponse.json(
-        { error: 'Appointment not found' },
-        { status: 404 }
-      );
+      return createErrorResponse('Appointment not found', 404);
     }
 
-    return NextResponse.json({ appointment: result.rows[0] });
-  } catch (error: any) {
-    console.error('Error fetching appointment:', error);
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    );
+    return createSuccessResponse({ appointment: result.rows[0] });
+  } catch (error) {
+    return handleApiError(error, 'Failed to fetch appointment');
   }
 }
 
@@ -52,7 +47,7 @@ export async function PATCH(
     const { status, startTime, endTime, notes } = body;
 
     const updates: string[] = [];
-    const values: any[] = [];
+    const values: (string | number | Date | null)[] = [];
     let paramIndex = 1;
 
     if (status !== undefined) {
@@ -76,7 +71,7 @@ export async function PATCH(
     }
 
     if (updates.length === 0) {
-      return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+      return createErrorResponse('No fields to update', 400);
     }
 
     updates.push(`updated_at = CURRENT_TIMESTAMP`);
@@ -90,14 +85,16 @@ export async function PATCH(
     `;
 
     const result = await db.query(query, values);
+    const appointment = result.rows[0];
 
-    return NextResponse.json({ appointment: result.rows[0] });
-  } catch (error: any) {
-    console.error('Error updating appointment:', error);
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    );
+    // If status changed to 'completed', update client stats
+    if (status === 'completed' && appointment.client_id) {
+      await updateClientStats(appointment.client_id);
+    }
+
+    return createSuccessResponse({ appointment });
+  } catch (error) {
+    return handleApiError(error, 'Failed to update appointment');
   }
 }
 
@@ -112,13 +109,9 @@ export async function DELETE(
 
     await db.query('DELETE FROM appointments WHERE id = $1', [appointmentId]);
 
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error deleting appointment:', error);
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    );
+    return createSuccessResponse({ success: true });
+  } catch (error) {
+    return handleApiError(error, 'Failed to delete appointment');
   }
 }
 

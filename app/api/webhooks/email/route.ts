@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { suggestTags } from '@/lib/ai-agent';
+import { findOrCreateClient, linkConversationToClient } from '@/lib/client-matching';
+import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
+import { DEFAULT_USER_ID } from '@/lib/constants';
 
 // POST /api/webhooks/email - Webhook for receiving emails (Gmail/Outlook)
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId = 1, from, to, subject, text, html } = body;
+    const { userId = DEFAULT_USER_ID, from, to, subject, text, html } = body;
 
     // Extract contact info
     const emailMatch = from.match(/<(.+)>/);
@@ -15,9 +18,18 @@ export async function POST(request: NextRequest) {
 
     const db = getDb();
 
+    // Find or create client
+    const client = await findOrCreateClient(
+      userId,
+      name || email,
+      email,
+      undefined,
+      'email'
+    );
+
     // Check if conversation exists
     const existingConv = await db.query(
-      `SELECT id FROM conversations 
+      `SELECT id, client_id FROM conversations 
        WHERE user_id = $1 AND channel = 'email' AND contact_email = $2 
        ORDER BY created_at DESC LIMIT 1`,
       [userId, email]
@@ -27,22 +39,26 @@ export async function POST(request: NextRequest) {
 
     if (existingConv.rows.length > 0) {
       conversationId = existingConv.rows[0].id;
+      if (!existingConv.rows[0].client_id) {
+        await linkConversationToClient(conversationId, client.id);
+      }
     } else {
       // Create new conversation
       const convResult = await db.query(
-        `INSERT INTO conversations (user_id, channel, contact_name, contact_email, subject, status)
-         VALUES ($1, 'email', $2, $3, $4, 'open')
+        `INSERT INTO conversations (user_id, channel, contact_name, contact_email, subject, status, created_at, updated_at)
+         VALUES ($1, 'email', $2, $3, $4, 'open', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
          RETURNING id`,
         [userId, name, email, subject]
       );
       conversationId = convResult.rows[0].id;
+      await linkConversationToClient(conversationId, client.id);
     }
 
     // Add message
     const content = text || html?.replace(/<[^>]*>/g, '') || '';
     await db.query(
-      `INSERT INTO messages (conversation_id, direction, content)
-       VALUES ($1, 'inbound', $2)`,
+      `INSERT INTO messages (conversation_id, direction, content, sent_at)
+       VALUES ($1, 'inbound', $2, CURRENT_TIMESTAMP)`,
       [conversationId, content]
     );
 
@@ -62,13 +78,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({ success: true, conversationId });
-  } catch (error: any) {
-    console.error('Error processing email webhook:', error);
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    );
+    return createSuccessResponse({ success: true, conversationId });
+  } catch (error) {
+    return handleApiError(error, 'Failed to process email webhook');
   }
 }
 

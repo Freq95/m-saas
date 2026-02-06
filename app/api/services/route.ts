@@ -1,25 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 
 // GET /api/services - Get services
 export async function GET(request: NextRequest) {
   try {
     const db = getDb();
     const searchParams = request.nextUrl.searchParams;
-    const userId = searchParams.get('userId') || '1';
+    
+    // Validate query parameters
+    const { servicesQuerySchema } = await import('@/lib/validation');
+    const queryParams = {
+      userId: searchParams.get('userId') || '1',
+    };
+    
+    const validationResult = servicesQuerySchema.safeParse(queryParams);
+    if (!validationResult.success) {
+      return handleApiError(validationResult.error, 'Invalid query parameters');
+    }
+    
+    const { userId } = validationResult.data;
 
     const result = await db.query(
       `SELECT * FROM services WHERE user_id = $1 ORDER BY name ASC`,
       [userId]
     );
 
-    return NextResponse.json({ services: result.rows });
-  } catch (error: any) {
-    console.error('Error fetching services:', error);
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    );
+    return createSuccessResponse({ services: result.rows });
+  } catch (error) {
+    return handleApiError(error, 'Failed to fetch services');
   }
 }
 
@@ -51,16 +60,9 @@ export async function POST(request: NextRequest) {
       [userId, name, durationMinutes, price || null, description || null]
     );
 
-    return NextResponse.json({ service: result.rows[0] }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error creating service:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to create service',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      },
-      { status: 500 }
-    );
+    return createSuccessResponse({ service: result.rows[0] }, 201);
+  } catch (error) {
+    return handleApiError(error, 'Failed to create service');
   }
 }
 

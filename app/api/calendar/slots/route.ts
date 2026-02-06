@@ -1,13 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getAvailableSlots, getSuggestedSlots } from '@/lib/calendar';
+import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
 // GET /api/calendar/slots - Get available time slots
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const userId = searchParams.get('userId') || '1';
-    const date = searchParams.get('date');
+    
+    // Validate query parameters
+    const { calendarSlotsQuerySchema } = await import('@/lib/validation');
+    const queryParams = {
+      userId: searchParams.get('userId') || '1',
+      date: searchParams.get('date') || undefined,
+    };
+    
+    const validationResult = calendarSlotsQuerySchema.safeParse(queryParams);
+    if (!validationResult.success) {
+      return handleApiError(validationResult.error, 'Invalid query parameters');
+    }
+    
+    const { userId, date } = validationResult.data;
     const serviceId = searchParams.get('serviceId');
     const suggested = searchParams.get('suggested') === 'true';
 
@@ -27,8 +40,8 @@ export async function GET(request: NextRequest) {
 
     if (suggested) {
       // Get 2-3 suggested slots for next few days
-      const suggestions = await getSuggestedSlots(parseInt(userId), serviceDuration);
-      return NextResponse.json({
+      const suggestions = await getSuggestedSlots(userId, serviceDuration);
+      return createSuccessResponse({
         suggestions: suggestions.map(s => ({
           date: s.date.toISOString(),
           slots: s.slots.map(slot => ({
@@ -40,8 +53,8 @@ export async function GET(request: NextRequest) {
       });
     } else if (date) {
       // Get slots for specific date
-      const slots = await getAvailableSlots(parseInt(userId), new Date(date), serviceDuration);
-      return NextResponse.json({
+      const slots = await getAvailableSlots(userId, new Date(date), serviceDuration);
+      return createSuccessResponse({
         slots: slots.map(slot => ({
           start: slot.start.toISOString(),
           end: slot.end.toISOString(),
@@ -49,17 +62,13 @@ export async function GET(request: NextRequest) {
         })),
       });
     } else {
-      return NextResponse.json(
-        { error: 'Either date or suggested=true must be provided' },
-        { status: 400 }
+      return createErrorResponse(
+        'Either date or suggested=true must be provided',
+        400
       );
     }
-  } catch (error: any) {
-    console.error('Error fetching slots:', error);
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleApiError(error, 'Failed to fetch slots');
   }
 }
 

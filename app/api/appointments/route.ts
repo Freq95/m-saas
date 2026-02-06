@@ -2,16 +2,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { isSlotAvailable } from '@/lib/calendar';
 import { exportToGoogleCalendar } from '@/lib/google-calendar';
+import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 
 // GET /api/appointments - Get appointments
 export async function GET(request: NextRequest) {
   try {
     const db = getDb();
     const searchParams = request.nextUrl.searchParams;
-    const userId = searchParams.get('userId') || '1';
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
-    const status = searchParams.get('status');
+    
+    // Validate query parameters
+    const { appointmentsQuerySchema } = await import('@/lib/validation');
+    const queryParams = {
+      userId: searchParams.get('userId') || '1',
+      startDate: searchParams.get('startDate') || undefined,
+      endDate: searchParams.get('endDate') || undefined,
+      status: searchParams.get('status') || undefined,
+    };
+    
+    const validationResult = appointmentsQuerySchema.safeParse(queryParams);
+    if (!validationResult.success) {
+      return handleApiError(validationResult.error, 'Invalid query parameters');
+    }
+    
+    const { userId, startDate, endDate, status } = validationResult.data;
 
     let query = `
       SELECT a.*, s.name as service_name, s.duration_minutes, s.price as service_price
@@ -20,7 +33,7 @@ export async function GET(request: NextRequest) {
       WHERE a.user_id = $1
     `;
 
-    const params: any[] = [userId];
+    const params: (string | number)[] = [userId];
 
     if (startDate) {
       query += ` AND a.start_time >= $${params.length + 1}`;
@@ -41,13 +54,9 @@ export async function GET(request: NextRequest) {
 
     const result = await db.query(query, params);
 
-    return NextResponse.json({ appointments: result.rows });
-  } catch (error: any) {
-    console.error('Error fetching appointments:', error);
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    );
+    return createSuccessResponse({ appointments: result.rows });
+  } catch (error) {
+    return handleApiError(error, 'Failed to fetch appointments');
   }
 }
 
@@ -146,21 +155,15 @@ export async function POST(request: NextRequest) {
           appointment.googleCalendarEventId = eventId;
         }
       } catch (error) {
-        console.error('Failed to export to Google Calendar:', error);
+        const { logger } = await import('@/lib/logger');
+        logger.warn('Failed to export to Google Calendar', { error: error instanceof Error ? error.message : String(error), appointmentId: appointment.id });
         // Don't fail the appointment creation if Google export fails
       }
     }
 
-    return NextResponse.json({ appointment }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error creating appointment:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to create appointment',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      },
-      { status: 500 }
-    );
+    return createSuccessResponse({ appointment }, 201);
+  } catch (error) {
+    return handleApiError(error, 'Failed to create appointment');
   }
 }
 

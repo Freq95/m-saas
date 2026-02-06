@@ -1,0 +1,317 @@
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.container h1 {
+  margin-bottom: 0.5rem;
+  font-size: 2rem;
+  color: #fff;
+}
+
+.description {
+  color: #aaa;
+  margin-bottom: 2rem;
+  font-size: 0.95rem;
+}
+
+.integrationCard {
+  background: #1a1a1a;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border: 1px solid #2a2a2a;
+}
+
+.integrationHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+}
+
+.integrationHeader h2 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.25rem;
+  color: #fff;
+}
+
+.providerDescription {
+  color: #888;
+  font-size: 0.875rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.link {
+  color: #3b82f6;
+  text-decoration: underline;
+  margin-left: 0.25rem;
+}
+
+.link:hover {
+  color: #2563eb;
+}
+
+.statusConnected {
+  color: #4ade80;
+  font-weight: 500;
+  padding: 0.25rem 0.75rem;
+  background: rgba(74, 222, 128, 0.1);
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.statusDisconnected {
+  color: #f87171;
+  font-weight: 500;
+  padding: 0.25rem 0.75rem;
+  background: rgba(248, 113, 113, 0.1);
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.integrationDetails {
+  margin-top: 1rem;
+}
+
+.integrationDetails p {
+  margin: 0.5rem 0;
+  color: #ccc;
+  font-size: 0.95rem;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.connectButton,
+.testButton,
+.deleteButton,
+.saveButton,
+.cancelButton {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+  font-size: 0.95rem;
+}
+
+.connectButton {
+  background: #3b82f6;
+  color: white;
+}
+
+.connectButton:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.connectButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.testButton {
+  background: #10b981;
+  color: white;
+}
+
+.testButton:hover:not(:disabled) {
+  background: #059669;
+}
+
+.testButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.fetchButton {
+  background: #3b82f6;
+  color: white;
+}
+
+.fetchButton:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.fetchButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.deleteButton {
+  background: #ef4444;
+  color: white;
+}
+
+.deleteButton:hover {
+  background: #dc2626;
+}
+
+.saveButton {
+  background: #3b82f6;
+  color: white;
+}
+
+.saveButton:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.saveButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.cancelButton {
+  background: #4b5563;
+  color: white;
+}
+
+.cancelButton:hover {
+  background: #374151;
+}
+
+.form {
+  margin-top: 1rem;
+}
+
+.input {
+  width: 100%;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  color: white;
+  font-size: 1rem;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.formActions {
+  display: flex;
+  gap: 1rem;
+}
+
+.error {
+  background: #7f1d1d;
+  color: #fca5a5;
+  padding: 0.75rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+}
+
+.emailPreview {
+  margin-top: 1.5rem;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.emailHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #3a3a3a;
+}
+
+.emailHeader h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #fff;
+}
+
+.closeButton {
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.closeButton:hover {
+  background: #3a3a3a;
+  color: #fff;
+}
+
+.emailMeta {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #3a3a3a;
+}
+
+.emailMeta p {
+  margin: 0.5rem 0;
+  color: #ccc;
+  font-size: 0.9rem;
+}
+
+.emailMeta strong {
+  color: #fff;
+  margin-right: 0.5rem;
+}
+
+.emailContent {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.emailHtml {
+  color: #ccc;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.emailHtml :global(img) {
+  max-width: 100%;
+  height: auto;
+}
+
+.emailText {
+  color: #ccc;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.emailText pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: inherit;
+  color: #ccc;
+}
+
+/* Screen reader only class */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+

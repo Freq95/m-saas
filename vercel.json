@@ -1,9 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/yahoo-sync",
-      "schedule": "*/5 * * * *"
-    }
-  ]
-}
-

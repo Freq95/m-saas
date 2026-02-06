@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 
 // GET /api/services/[id] - Get a single service
 export async function GET(
@@ -22,13 +23,9 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ service: result.rows[0] });
-  } catch (error: any) {
-    console.error('Error fetching service:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch service', details: error.message },
-      { status: 500 }
-    );
+    return createSuccessResponse({ service: result.rows[0] });
+  } catch (error) {
+    return handleApiError(error, 'Failed to fetch service');
   }
 }
 
@@ -42,10 +39,23 @@ export async function PATCH(
     const serviceId = parseInt(params.id);
     const body = await request.json();
 
-    const { name, durationMinutes, price, description } = body;
+    // Validate input
+    const { updateServiceSchema } = await import('@/lib/validation');
+    const validationResult = updateServiceSchema.safeParse(body);
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { 
+          error: 'Invalid input',
+          details: validationResult.error.errors
+        },
+        { status: 400 }
+      );
+    }
+
+    const { name, durationMinutes, price, description } = validationResult.data;
 
     const updates: string[] = [];
-    const updateParams: any[] = [];
+    const updateParams: (string | number | null)[] = [];
 
     if (name !== undefined) {
       updates.push(`name = $${updateParams.length + 1}`);
@@ -95,13 +105,9 @@ export async function PATCH(
       );
     }
 
-    return NextResponse.json({ service: result.rows[0] });
-  } catch (error: any) {
-    console.error('Error updating service:', error);
-    return NextResponse.json(
-      { error: 'Failed to update service', details: error.message },
-      { status: 500 }
-    );
+    return createSuccessResponse({ service: result.rows[0] });
+  } catch (error) {
+    return handleApiError(error, 'Failed to update service');
   }
 }
 
@@ -136,13 +142,9 @@ export async function DELETE(
       [serviceId]
     );
 
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error deleting service:', error);
-    return NextResponse.json(
-      { error: 'Failed to delete service', details: error.message },
-      { status: 500 }
-    );
+    return createSuccessResponse({ success: true });
+  } catch (error) {
+    return handleApiError(error, 'Failed to delete service');
   }
 }
 

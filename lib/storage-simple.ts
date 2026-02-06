@@ -1,3 +1,25 @@
+/**
+ * Simple JSON-based storage system
+ * 
+ * LIMITATIONS:
+ * - No transaction support: Multiple operations cannot be atomic
+ * - No concurrent write protection: Race conditions possible under high load
+ * - Memory-based: Entire dataset loaded into memory (not suitable for large datasets)
+ * - Limited JOIN support: Complex queries may fail
+ * - No prepared statement protection: While using parameterized queries, the parser itself is vulnerable
+ * 
+ * RECOMMENDATION:
+ * - For production use, migrate to PostgreSQL or another proper database
+ * - This storage layer is suitable for development and small-scale deployments only
+ * 
+ * TRANSACTION SUPPORT:
+ * - This storage system does NOT support transactions
+ * - If you need atomic multi-step operations, you must:
+ *   1. Implement manual rollback logic
+ *   2. Use a proper database with transaction support
+ *   3. Accept that partial failures may leave data in inconsistent state
+ */
+
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -16,9 +38,13 @@ interface StorageData {
   google_calendar_sync: any[];
   clients: any[];
   tasks: any[];
-  contact_files: any[];
-  contact_custom_fields: any[];
-  contact_notes: any[];
+  client_files: any[];
+  client_notes: any[];
+  email_integrations: any[];
+  // Legacy support - will be migrated to client_* tables
+  contact_files?: any[];
+  contact_custom_fields?: any[];
+  contact_notes?: any[];
 }
 
 let data: StorageData = {
@@ -33,8 +59,13 @@ let data: StorageData = {
   google_calendar_sync: [],
   clients: [],
   tasks: [],
+  client_files: [],
+  client_notes: [],
+  email_integrations: [],
+  // Legacy support
   contact_files: [],
   contact_custom_fields: [],
+  contact_notes: [],
 };
 
 // Load data
@@ -43,6 +74,37 @@ function loadData() {
     if (fs.existsSync(DATA_FILE)) {
       const fileData = fs.readFileSync(DATA_FILE, 'utf-8');
       const parsed = JSON.parse(fileData);
+      // Migrate contact_* to client_* if needed
+      const clientFiles = parsed.client_files || [];
+      const clientNotes = parsed.client_notes || [];
+      const contactFiles = parsed.contact_files || [];
+      const contactNotes = parsed.contact_notes || [];
+      
+      // Merge legacy contact_* data into client_* (migrate contact_id to client_id)
+      const migratedFiles = [...clientFiles];
+      const migratedNotes = [...clientNotes];
+      
+      if (contactFiles.length > 0) {
+        contactFiles.forEach((file: any) => {
+          // If file has contact_id, migrate to client_id
+          if (file.contact_id && !file.client_id) {
+            migratedFiles.push({ ...file, client_id: file.contact_id });
+          } else {
+            migratedFiles.push(file);
+          }
+        });
+      }
+      
+      if (contactNotes.length > 0) {
+        contactNotes.forEach((note: any) => {
+          if (note.contact_id && !note.client_id) {
+            migratedNotes.push({ ...note, client_id: note.contact_id });
+          } else {
+            migratedNotes.push(note);
+          }
+        });
+      }
+      
       data = {
         users: parsed.users || [],
         conversations: parsed.conversations || [],
@@ -55,9 +117,13 @@ function loadData() {
         google_calendar_sync: parsed.google_calendar_sync || [],
         clients: parsed.clients || [],
         tasks: parsed.tasks || [],
-        contact_files: parsed.contact_files || [],
+        client_files: migratedFiles,
+        client_notes: migratedNotes,
+        email_integrations: parsed.email_integrations || [],
+        // Legacy support - keep for backward compatibility during migration
+        contact_files: contactFiles,
         contact_custom_fields: parsed.contact_custom_fields || [],
-        contact_notes: parsed.contact_notes || [],
+        contact_notes: contactNotes,
       };
     }
   } catch (error) {
@@ -140,7 +206,7 @@ export class JsonDb {
     
     // Handle WHERE
     if (sql.includes('WHERE')) {
-      const whereMatch = sql.match(/WHERE\s+(.+?)(?:\s+ORDER|\s+GROUP|\s+LIMIT|$)/i);
+      const whereMatch = sql.match(/WHERE\s+([\s\S]+?)(?:\s+ORDER|\s+GROUP|\s+LIMIT|$)/i);
       if (whereMatch) {
         const conditions = whereMatch[1];
         result = result.filter((item: any) => {
@@ -156,9 +222,15 @@ export class JsonDb {
         const columnWithAlias = orderMatch[1];
         const column = columnWithAlias.includes('.') ? columnWithAlias.split('.')[1] : columnWithAlias;
         const direction = orderMatch[2]?.toUpperCase() || 'ASC';
+        const normalize = (val: any) => {
+          if (val === null || val === undefined) return '';
+          if (typeof val === 'number') return val;
+          if (val instanceof Date) return val.toISOString();
+          return String(val);
+        };
         result.sort((a: any, b: any) => {
-          const aVal = a[column];
-          const bVal = b[column];
+          const aVal = normalize(a[column]);
+          const bVal = normalize(b[column]);
           if (direction === 'DESC') {
             return bVal > aVal ? 1 : bVal < aVal ? -1 : 0;
           }
@@ -181,6 +253,54 @@ export class JsonDb {
     const evaluateSingleCondition = (condition: string): boolean => {
       const trimmed = condition.trim();
       
+      const matchesLike = (value: string, pattern: string, caseInsensitive = false): boolean => {
+        const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regexPattern = `^${escaped.replace(/%/g, '.*').replace(/_/g, '.')}$`;
+        const flags = caseInsensitive ? 'i' : '';
+        const regex = new RegExp(regexPattern, flags);
+        return regex.test(value);
+      };
+
+      // Handle column LIKE $N / ILIKE $N
+      const likeParamMatch = trimmed.match(/(\w+\.?\w*)\s+(I?LIKE)\s+\$(\d+)/i);
+      if (likeParamMatch) {
+        const [, column, likeOp, paramIndex] = likeParamMatch;
+        const columnName = stripAlias(column);
+        const paramValue = params[parseInt(paramIndex) - 1];
+        const value = (item[columnName] ?? '').toString();
+        const pattern = (paramValue ?? '').toString();
+        return matchesLike(value, pattern, likeOp.toUpperCase() === 'ILIKE');
+      }
+
+      // Handle column LIKE 'literal' / ILIKE 'literal'
+      const likeLiteralMatch = trimmed.match(/(\w+\.?\w*)\s+(I?LIKE)\s+(['"])(.*?)\3/i);
+      if (likeLiteralMatch) {
+        const [, column, likeOp, , literalValue] = likeLiteralMatch;
+        const columnName = stripAlias(column);
+        const value = (item[columnName] ?? '').toString();
+        return matchesLike(value, literalValue, likeOp.toUpperCase() === 'ILIKE');
+      }
+
+      // Handle LOWER(column) = LOWER($N)
+      const lowerParamMatch = trimmed.match(/LOWER\((\w+)\)\s*=\s*LOWER\(\$(\d+)\)/i);
+      if (lowerParamMatch) {
+        const [, column, paramIndex] = lowerParamMatch;
+        const paramValue = params[parseInt(paramIndex) - 1];
+        const itemVal = (item[column] ?? '').toString().toLowerCase();
+        const compareVal = (paramValue ?? '').toString().toLowerCase();
+        return itemVal === compareVal;
+      }
+
+      // Handle LOWER(column) = $N
+      const lowerDirectParamMatch = trimmed.match(/LOWER\((\w+)\)\s*=\s*\$(\d+)/i);
+      if (lowerDirectParamMatch) {
+        const [, column, paramIndex] = lowerDirectParamMatch;
+        const paramValue = params[parseInt(paramIndex) - 1];
+        const itemVal = (item[column] ?? '').toString().toLowerCase();
+        const compareVal = (paramValue ?? '').toString().toLowerCase();
+        return itemVal === compareVal;
+      }
+
       // Handle column = $N (with optional table alias)
       const paramMatch = trimmed.match(/(\w+\.?\w*)\s*=\s*\$(\d+)/i);
       if (paramMatch) {
@@ -193,10 +313,41 @@ export class JsonDb {
           } else if (columnName === 'status') {
             if (item[columnName] !== paramValue) return false;
           } else {
-            if (item[columnName] !== paramValue) return false;
+            if (paramValue instanceof Date) {
+              const itemTime = new Date(item[columnName]).getTime();
+              if (isNaN(itemTime) || itemTime !== paramValue.getTime()) return false;
+            } else if (item[columnName] instanceof Date) {
+              const paramTime = new Date(paramValue as any).getTime();
+              if (isNaN(paramTime) || item[columnName].getTime() !== paramTime) return false;
+            } else {
+              if (item[columnName] !== paramValue) return false;
+            }
           }
         }
         return true;
+      }
+
+      // Handle column = 'literal' or column = "literal"
+      const literalMatch = trimmed.match(/(\w+\.?\w*)\s*=\s*(['"])(.*?)\2/i);
+      if (literalMatch) {
+        const [, column, , literalValue] = literalMatch;
+        const columnName = stripAlias(column);
+        return (item[columnName] ?? null) === literalValue;
+      }
+
+      // Handle column IS NULL / IS NOT NULL
+      const isNullMatch = trimmed.match(/(\w+\.?\w*)\s+IS\s+NULL/i);
+      if (isNullMatch) {
+        const [, column] = isNullMatch;
+        const columnName = stripAlias(column);
+        return item[columnName] === null || item[columnName] === undefined;
+      }
+
+      const isNotNullMatch = trimmed.match(/(\w+\.?\w*)\s+IS\s+NOT\s+NULL/i);
+      if (isNotNullMatch) {
+        const [, column] = isNotNullMatch;
+        const columnName = stripAlias(column);
+        return item[columnName] !== null && item[columnName] !== undefined;
       }
       
       // Handle column >= $N (with optional table alias)
@@ -276,7 +427,7 @@ export class JsonDb {
         return true;
       }
       
-      return true; // If no match, assume condition passes
+      return false; // If no match, fail-safe: condition does not pass
     };
     
     // Handle OR conditions: split by OR first, then by AND
@@ -392,7 +543,7 @@ export class JsonDb {
       
       // Apply WHERE conditions
       if (sql.includes('WHERE')) {
-        const whereMatch = sql.match(/WHERE\s+(.+?)(?:\s+ORDER|\s+GROUP|$)/i);
+        const whereMatch = sql.match(/WHERE\s+([\s\S]+?)(?:\s+ORDER|\s+GROUP|$)/i);
         if (whereMatch) {
           joinedData = joinedData.filter((item: any) => {
             return this.evaluateWhereCondition(whereMatch[1], item, params);
@@ -403,7 +554,7 @@ export class JsonDb {
       // No JOIN, just apply WHERE
       joinedData = mainData.filter((item: any) => {
         if (sql.includes('WHERE')) {
-          const whereMatch = sql.match(/WHERE\s+(.+?)(?:\s+ORDER|\s+GROUP|$)/i);
+          const whereMatch = sql.match(/WHERE\s+([\s\S]+?)(?:\s+ORDER|\s+GROUP|$)/i);
           if (whereMatch) {
             return this.evaluateWhereCondition(whereMatch[1], item, params);
           }
@@ -419,9 +570,15 @@ export class JsonDb {
         const columnWithAlias = orderMatch[1];
         const column = columnWithAlias.includes('.') ? columnWithAlias.split('.')[1] : columnWithAlias;
         const direction = orderMatch[2]?.toUpperCase() || 'ASC';
+        const normalize = (val: any) => {
+          if (val === null || val === undefined) return '';
+          if (typeof val === 'number') return val;
+          if (val instanceof Date) return val.toISOString();
+          return String(val);
+        };
         joinedData.sort((a: any, b: any) => {
-          const aVal = a[column];
-          const bVal = b[column];
+          const aVal = normalize(a[column]);
+          const bVal = normalize(b[column]);
           if (direction === 'DESC') {
             return bVal > aVal ? 1 : bVal < aVal ? -1 : 0;
           }
@@ -463,7 +620,7 @@ export class JsonDb {
       }).filter((item: any) => {
         // Apply WHERE conditions
         if (sql.includes('WHERE')) {
-          const whereMatch = sql.match(/WHERE\s+(.+?)(?:\s+GROUP|\s+ORDER|$)/i);
+          const whereMatch = sql.match(/WHERE\s+([\s\S]+?)(?:\s+GROUP|\s+ORDER|$)/i);
           if (whereMatch) {
             return this.evaluateWhereCondition(whereMatch[1], item, params);
           }
@@ -473,7 +630,7 @@ export class JsonDb {
     } else {
       joinedData = mainData.filter((item: any) => {
         if (sql.includes('WHERE')) {
-          const whereMatch = sql.match(/WHERE\s+(.+?)(?:\s+GROUP|\s+ORDER|$)/i);
+          const whereMatch = sql.match(/WHERE\s+([\s\S]+?)(?:\s+GROUP|\s+ORDER|$)/i);
           if (whereMatch) {
             return this.evaluateWhereCondition(whereMatch[1], item, params);
           }
@@ -529,7 +686,7 @@ export class JsonDb {
       
       // Handle WHERE
       if (sql.includes('WHERE')) {
-        const whereMatch = sql.match(/WHERE\s+(.+?)(?:\s+GROUP|\s+ORDER|$)/i);
+        const whereMatch = sql.match(/WHERE\s+([\s\S]+?)(?:\s+GROUP|\s+ORDER|$)/i);
         if (whereMatch) {
           result = result.filter((item: any) => {
             return this.evaluateWhereCondition(whereMatch[1], item, params);
@@ -573,7 +730,7 @@ export class JsonDb {
       
       // Handle WHERE
       if (sql.includes('WHERE')) {
-        const whereMatch = sql.match(/WHERE\s+(.+?)(?:\s+GROUP|\s+ORDER|$)/i);
+        const whereMatch = sql.match(/WHERE\s+([\s\S]+?)(?:\s+GROUP|\s+ORDER|$)/i);
         if (whereMatch) {
           result = result.filter((item: any) => {
             return this.evaluateWhereCondition(whereMatch[1], item, params);
@@ -601,7 +758,7 @@ export class JsonDb {
           }).filter((item: any) => {
             // Apply WHERE conditions on joined data
             if (sql.includes('WHERE')) {
-              const whereMatch = sql.match(/WHERE\s+(.+?)(?:\s+GROUP|\s+ORDER|$)/i);
+              const whereMatch = sql.match(/WHERE\s+([\s\S]+?)(?:\s+GROUP|\s+ORDER|$)/i);
               if (whereMatch) {
                 return this.evaluateWhereCondition(whereMatch[1], item, params);
               }
@@ -635,7 +792,7 @@ export class JsonDb {
       
       // Handle WHERE
       if (sql.includes('WHERE')) {
-        const whereMatch = sql.match(/WHERE\s+(.+?)(?:\s+GROUP|\s+ORDER|$)/i);
+        const whereMatch = sql.match(/WHERE\s+([\s\S]+?)(?:\s+GROUP|\s+ORDER|$)/i);
         if (whereMatch) {
           result = result.filter((item: any) => {
             return this.evaluateWhereCondition(whereMatch[1], item, params);
@@ -758,43 +915,113 @@ export class JsonDb {
   }
 
   private handleUpdate(sql: string, params: any[]): { rows: any[] } {
-    const updateMatch = sql.match(/UPDATE\s+(\w+)\s+SET\s+(.+?)(?:\s+WHERE|$)/i);
-    if (!updateMatch) return { rows: [] };
+    // Normalize SQL - remove extra whitespace and newlines for easier parsing
+    const normalizedSql = sql.replace(/\s+/g, ' ').trim();
+    
+    const updateMatch = normalizedSql.match(/UPDATE\s+(\w+)\s+SET\s+(.+?)(?:\s+WHERE|$)/i);
+    if (!updateMatch) {
+      console.error('UPDATE query did not match pattern:', sql);
+      return { rows: [] };
+    }
     
     const [, tableName, setClause] = updateMatch;
-    const whereMatch = sql.match(/WHERE\s+(.+?)(?:\s+RETURNING|$)/i);
+    const tableKey = tableName as keyof StorageData;
     
-    let tableData = data[tableName as keyof StorageData] as any[];
+    if (!data[tableKey]) {
+      return { rows: [] };
+    }
+    
+    let tableData = [...(data[tableKey] as any[])];
+    
+    // Handle WHERE clause
+    const whereMatch = normalizedSql.match(/WHERE\s+([\s\S]+?)(?:\s+RETURNING|$)/i);
+    let matchingItems: any[] = [];
     
     if (whereMatch) {
       const conditions = whereMatch[1];
-      tableData = tableData.filter((item: any) => {
-        const idMatch = conditions.match(/id\s*=\s*\$(\d+)/i);
-        if (idMatch) {
-          const paramIndex = parseInt(idMatch[1]) - 1;
-          return item.id === parseInt(params[paramIndex]);
-        }
-        return true;
+      matchingItems = tableData.filter((item: any) => {
+        return this.evaluateWhereCondition(conditions, item, params);
       });
+    } else {
+      matchingItems = tableData;
     }
     
-    const setParts = setClause.split(',').map(s => s.trim());
-    tableData.forEach((item: any) => {
+    if (matchingItems.length === 0) {
+      console.warn('UPDATE: No matching items found', { conditions: whereMatch?.[1], params });
+      return { rows: [] };
+    }
+    
+    // Parse SET clause - handle multiline and commas properly
+    // Split by comma, but be careful with nested structures
+    const setParts: string[] = [];
+    let currentPart = '';
+    let depth = 0;
+    
+    for (let i = 0; i < setClause.length; i++) {
+      const char = setClause[i];
+      if (char === '(') depth++;
+      else if (char === ')') depth--;
+      else if (char === ',' && depth === 0) {
+        if (currentPart.trim()) {
+          setParts.push(currentPart.trim());
+        }
+        currentPart = '';
+        continue;
+      }
+      currentPart += char;
+    }
+    if (currentPart.trim()) {
+      setParts.push(currentPart.trim());
+    }
+    
+    // Update matching items
+    matchingItems.forEach((item: any) => {
       setParts.forEach((setPart: string) => {
-        const [column, valueExpr] = setPart.split(/\s*=\s*/);
-        if (valueExpr.startsWith('$')) {
-          const paramIndex = parseInt(valueExpr.replace('$', '')) - 1;
-          item[column] = params[paramIndex];
-        } else if (valueExpr === 'CURRENT_TIMESTAMP') {
-          item[column] = new Date().toISOString();
+        const equalMatch = setPart.match(/(\w+)\s*=\s*(.+)/);
+        if (equalMatch) {
+          const [, column, valueExpr] = equalMatch;
+          const trimmedValue = valueExpr.trim();
+          
+          if (trimmedValue.startsWith('$')) {
+            const paramIndex = parseInt(trimmedValue.replace('$', '')) - 1;
+            if (paramIndex >= 0 && paramIndex < params.length) {
+              const value = params[paramIndex];
+              if (value === null || value === undefined) {
+                item[column] = null;
+              } else {
+                item[column] = value;
+              }
+            }
+          } else if (trimmedValue === 'CURRENT_TIMESTAMP') {
+            item[column] = new Date().toISOString();
+          } else if (trimmedValue === 'true' || trimmedValue === 'TRUE') {
+            item[column] = true;
+          } else if (trimmedValue === 'false' || trimmedValue === 'FALSE') {
+            item[column] = false;
+          } else if (trimmedValue === 'NULL' || trimmedValue === 'null') {
+            item[column] = null;
+          } else if (!isNaN(Number(trimmedValue))) {
+            item[column] = Number(trimmedValue);
+          } else if (trimmedValue.match(/^['"](.+)['"]$/)) {
+            // String literal
+            item[column] = trimmedValue.slice(1, -1);
+          }
         }
       });
+      
+      // Update the item in the original array
+      const index = tableData.findIndex((t: any) => t.id === item.id);
+      if (index >= 0) {
+        tableData[index] = item;
+      }
     });
     
+    // Save updated data
+    data[tableKey] = tableData as any;
     saveData();
     
-    if (sql.includes('RETURNING')) {
-      return { rows: tableData };
+    if (normalizedSql.includes('RETURNING')) {
+      return { rows: matchingItems };
     }
     
     return { rows: [] };
@@ -807,7 +1034,7 @@ export class JsonDb {
     const tableName = deleteMatch[1] as keyof StorageData;
     let tableData = data[tableName] as any[];
     
-    const whereMatch = sql.match(/WHERE\s+(.+)/i);
+    const whereMatch = sql.match(/WHERE\s+([\s\S]+)/i);
     if (whereMatch) {
       const conditions = whereMatch[1];
       const idMatch = conditions.match(/id\s*=\s*\$(\d+)/i);

@@ -52,6 +52,7 @@ export default function ClientProfilePage() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [files, setFiles] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
+  const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'activities' | 'appointments' | 'conversations' | 'tasks' | 'files'>('overview');
   const [activityFilter, setActivityFilter] = useState<'all' | 'notes' | 'emails' | 'tasks' | 'appointments'>('all');
@@ -65,6 +66,7 @@ export default function ClientProfilePage() {
 
   useEffect(() => {
     fetchClientData();
+    fetchStats();
   }, [clientId]);
 
   useEffect(() => {
@@ -124,6 +126,17 @@ export default function ClientProfilePage() {
       setFiles(result.files || []);
     } catch (error) {
       console.error('Error fetching files:', error);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      const response = await fetch(`/api/clients/${clientId}/stats`);
+      if (!response.ok) throw new Error('Failed to fetch stats');
+      const result = await response.json();
+      setStats(result.stats || null);
+    } catch (error) {
+      console.error('Error fetching stats:', error);
     }
   };
 
@@ -296,6 +309,7 @@ export default function ClientProfilePage() {
           <Link href="/inbox">Inbox</Link>
           <Link href="/calendar">Calendar</Link>
           <Link href="/clients" className={navStyles.active}>Clienți</Link>
+          <Link href="/settings/email">Setări</Link>
         </div>
       </nav>
       <div className={styles.container}>
@@ -310,6 +324,27 @@ export default function ClientProfilePage() {
               <span className={`${styles.badge} ${getStatusBadgeClass(client.status)}`}>
                 {client.status.toUpperCase()}
               </span>
+              {client.total_spent >= 1000 && (
+                <span className={`${styles.badge} ${styles.badgeVip}`}>
+                  VIP
+                </span>
+              )}
+              {client.last_appointment_date && (() => {
+                const lastApp = new Date(client.last_appointment_date);
+                const daysSince = Math.floor((Date.now() - lastApp.getTime()) / (1000 * 60 * 60 * 24));
+                if (daysSince > 30) {
+                  return <span className={`${styles.badge} ${styles.badgeInactive}`}>INACTIV</span>;
+                }
+                return null;
+              })()}
+              {(() => {
+                const created = new Date(client.first_contact_date);
+                const daysSince = Math.floor((Date.now() - created.getTime()) / (1000 * 60 * 60 * 24));
+                if (daysSince <= 7) {
+                  return <span className={`${styles.badge} ${styles.badgeLead}`}>NOU</span>;
+                }
+                return null;
+              })()}
               {client.email && <span className={styles.email}>{client.email}</span>}
               {client.phone && <span className={styles.phone}>{client.phone}</span>}
             </div>
@@ -421,6 +456,47 @@ export default function ClientProfilePage() {
                 </div>
               </div>
             </div>
+
+            {stats && (
+              <div className={styles.section}>
+                <h2>Statistici detaliate</h2>
+                <div className={styles.statsGrid}>
+                  <div className={styles.statItem}>
+                    <label>Valoare medie programare</label>
+                    <p>{formatCurrency(stats.average_appointment_value || 0)}</p>
+                  </div>
+                  <div className={styles.statItem}>
+                    <label>Frecvență vizite</label>
+                    <p>{stats.visit_frequency?.toFixed(1) || 0} / lună</p>
+                  </div>
+                  <div className={styles.statItem}>
+                    <label>Rată no-show</label>
+                    <p>{stats.no_show_rate?.toFixed(1) || 0}%</p>
+                  </div>
+                  <div className={styles.statItem}>
+                    <label>Programări finalizate</label>
+                    <p>{stats.completed_appointments || 0}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {stats && stats.preferred_services && stats.preferred_services.length > 0 && (
+              <div className={styles.section}>
+                <h2>Servicii preferate</h2>
+                <div className={styles.preferredServices}>
+                  {stats.preferred_services.map((service: any, idx: number) => (
+                    <div key={idx} className={styles.serviceItem}>
+                      <div className={styles.serviceName}>{service.name}</div>
+                      <div className={styles.serviceStats}>
+                        <span>{service.count} programări</span>
+                        <span>{formatCurrency(service.total_spent)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {client.tags && client.tags.length > 0 && (
               <div className={styles.section}>

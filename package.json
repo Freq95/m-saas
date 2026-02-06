@@ -5,7 +5,6 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "dev:with-cron": "node scripts/dev-with-cron.js",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -14,19 +13,14 @@
     "db:populate": "node scripts/populate-mock-data.js",
     "test:webhooks": "node scripts/test-webhooks.js",
     "yahoo:sync": "node scripts/sync-yahoo.js",
-    "yahoo:cron": "node scripts/sync-yahoo-cron.js",
     "test:yahoo": "node scripts/test-yahoo.js",
-    "yahoo:debug": "node scripts/test-yahoo-debug.js",
-    "test:supabase": "node scripts/test-supabase-connection.js",
-    "db:migrate:supabase": "node scripts/migrate-to-supabase.js"
+    "yahoo:debug": "node scripts/test-yahoo-debug.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.91.0",
     "@types/dompurify": "^3.2.0",
     "@types/imap": "^0.8.43",
     "bcryptjs": "^2.4.3",
     "date-fns": "^2.30.0",
-    "date-fns-tz": "^2.0.0",
     "dompurify": "^3.3.1",
     "dotenv": "^16.3.1",
     "googleapis": "^126.0.1",
@@ -50,7 +44,6 @@
     "@types/react-dom": "^18.2.18",
     "eslint": "^8.56.0",
     "eslint-config-next": "^14.0.4",
-    "node-cron": "^4.2.1",
     "typescript": "^5.3.3"
   }
 }

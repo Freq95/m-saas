@@ -2,61 +2,87 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import * as fs from 'fs';
 import * as path from 'path';
+import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
-const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'contacts');
+const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'clients');
 
 // Ensure upload directory exists
 if (!fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
-// GET /api/clients/[id]/files - Get files for a contact
+// GET /api/clients/[id]/files - Get files for a client
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const db = getDb();
-    const contactId = parseInt(params.id);
+    const clientId = parseInt(params.id);
 
-    const result = await db.query(
-      `SELECT * FROM contact_files WHERE contact_id = $1 ORDER BY created_at DESC`,
-      [contactId]
-    );
+    // Validate ID
+    if (isNaN(clientId) || clientId <= 0) {
+      return createErrorResponse('Invalid client ID', 400);
+    }
 
-    return NextResponse.json({ files: result.rows || [] });
-  } catch (error: any) {
-    console.error('Error fetching files:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch files', details: error.message },
-      { status: 500 }
-    );
+    // Try client_files first, fallback to contact_files for migration
+    let result;
+    try {
+      result = await db.query(
+        `SELECT * FROM client_files WHERE client_id = $1 ORDER BY created_at DESC`,
+        [clientId]
+      );
+    } catch (e) {
+      // Fallback to legacy contact_files
+      result = await db.query(
+        `SELECT * FROM contact_files WHERE contact_id = $1 ORDER BY created_at DESC`,
+        [clientId]
+      );
+    }
+
+    return createSuccessResponse({ files: result.rows || [] });
+  } catch (error) {
+    return handleApiError(error, 'Failed to fetch files');
   }
 }
 
-// POST /api/clients/[id]/files - Upload a file for a contact
+// POST /api/clients/[id]/files - Upload a file for a client
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const db = getDb();
-    const contactId = parseInt(params.id);
+    const clientId = parseInt(params.id);
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const description = formData.get('description') as string | null;
 
+    // Validate ID
+    if (isNaN(clientId) || clientId <= 0) {
+      return createErrorResponse('Invalid client ID', 400);
+    }
+
     if (!file) {
-      return NextResponse.json(
-        { error: 'No file provided' },
-        { status: 400 }
-      );
+      return createErrorResponse('No file provided', 400);
+    }
+
+    // Validate file size
+    const { MAX_FILE_SIZE, ALLOWED_FILE_TYPES } = await import('@/lib/constants');
+    if (file.size > MAX_FILE_SIZE) {
+      return createErrorResponse(`File size exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB limit`, 400);
+    }
+
+    // Validate file type (basic check)
+    const isValidType = ALLOWED_FILE_TYPES.some(type => file.type.startsWith(type));
+    if (!isValidType && file.type !== 'application/octet-stream') {
+      return createErrorResponse('File type not allowed', 400);
     }
 
     // Generate unique filename
     const timestamp = Date.now();
     const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const filename = `${contactId}_${timestamp}_${sanitizedName}`;
+    const filename = `${clientId}_${timestamp}_${sanitizedName}`;
     const filepath = path.join(UPLOAD_DIR, filename);
 
     // Save file
@@ -67,11 +93,11 @@ export async function POST(
     // Save file metadata to database
     const now = new Date().toISOString();
     const result = await db.query(
-      `INSERT INTO contact_files (contact_id, filename, original_filename, file_path, file_size, mime_type, description, created_at, updated_at)
+      `INSERT INTO client_files (client_id, filename, original_filename, file_path, file_size, mime_type, description, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
       [
-        contactId,
+        clientId,
         filename,
         file.name,
         filepath,
@@ -83,19 +109,15 @@ export async function POST(
       ]
     );
 
-    // Update contact's last_activity_date
+    // Update client's last_activity_date
     await db.query(
       `UPDATE clients SET last_activity_date = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-      [now, contactId]
+      [now, clientId]
     );
 
-    return NextResponse.json({ file: result.rows[0] }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error uploading file:', error);
-    return NextResponse.json(
-      { error: 'Failed to upload file', details: error.message },
-      { status: 500 }
-    );
+    return createSuccessResponse({ file: result.rows[0] }, 201);
+  } catch (error) {
+    return handleApiError(error, 'Failed to upload file');
   }
 }
 

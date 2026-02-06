@@ -82,6 +82,7 @@ export default function NewClientPage() {
           <Link href="/inbox">Inbox</Link>
           <Link href="/calendar">Calendar</Link>
           <Link href="/clients" className={navStyles.active}>Clienți</Link>
+          <Link href="/settings/email">Setări</Link>
         </div>
       </nav>
       <div className={styles.container}>

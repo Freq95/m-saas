@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { startOfDay, endOfDay, subDays, format, isValid } from 'date-fns';
+import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 
 // Helper function to safely parse dates
-function safeParseDate(dateValue: any): Date | null {
+function safeParseDate(dateValue: unknown): Date | null {
   if (!dateValue) return null;
-  const date = new Date(dateValue);
+  const date = new Date(dateValue as string);
   return isValid(date) ? date : null;
 }
 
@@ -14,8 +15,20 @@ export async function GET(request: NextRequest) {
   try {
     const db = getDb();
     const searchParams = request.nextUrl.searchParams;
-    const userId = parseInt(searchParams.get('userId') || '1');
-    const days = parseInt(searchParams.get('days') || '7');
+    
+    // Validate query parameters
+    const { dashboardQuerySchema } = await import('@/lib/validation');
+    const queryParams = {
+      userId: searchParams.get('userId') || '1',
+      days: searchParams.get('days') || '7',
+    };
+    
+    const validationResult = dashboardQuerySchema.safeParse(queryParams);
+    if (!validationResult.success) {
+      return handleApiError(validationResult.error, 'Invalid query parameters');
+    }
+    
+    const { userId, days } = validationResult.data;
 
     const today = new Date();
     const startDate = startOfDay(subDays(today, days - 1));
@@ -161,6 +174,70 @@ export async function GET(request: NextRequest) {
         return sum + (service?.price || 0);
       }, 0);
 
+    // Top clients (by total_spent)
+    const topClientsResult = await db.query(
+      `SELECT id, name, email, phone, total_spent, total_appointments, last_appointment_date
+       FROM clients
+       WHERE user_id = $1 AND total_spent > 0
+       ORDER BY total_spent DESC
+       LIMIT 5`,
+      [userId]
+    );
+    const topClients = topClientsResult.rows || [];
+
+    // New clients today
+    const todayStartStr = format(todayStart, 'yyyy-MM-dd');
+    const newClientsTodayResult = await db.query(
+      `SELECT COUNT(*) as count
+       FROM clients
+       WHERE user_id = $1 AND DATE(created_at) = $2`,
+      [userId, todayStartStr]
+    );
+    const newClientsToday = parseInt(newClientsTodayResult.rows[0]?.count || '0');
+
+    // New clients this week
+    const weekStart = startOfDay(subDays(today, 7));
+    const newClientsWeekResult = await db.query(
+      `SELECT COUNT(*) as count
+       FROM clients
+       WHERE user_id = $1 AND created_at >= $2`,
+      [userId, weekStart]
+    );
+    const newClientsWeek = parseInt(newClientsWeekResult.rows[0]?.count || '0');
+
+    // Inactive clients (no activity in 30+ days)
+    const thirtyDaysAgo = subDays(today, 30);
+    const inactiveClientsResult = await db.query(
+      `SELECT id, name, email, phone, last_appointment_date, last_conversation_date
+       FROM clients
+       WHERE user_id = $1
+       AND (
+         (last_appointment_date IS NULL OR last_appointment_date < $2)
+         AND (last_conversation_date IS NULL OR last_conversation_date < $2)
+       )
+       ORDER BY COALESCE(last_appointment_date, last_conversation_date, created_at) DESC
+       LIMIT 10`,
+      [userId, thirtyDaysAgo]
+    );
+    const inactiveClients = inactiveClientsResult.rows || [];
+
+    // Client growth (last 7 days)
+    const clientGrowth = [];
+    for (let i = 0; i < 7; i++) {
+      const date = subDays(today, 6 - i);
+      const dateStr = format(date, 'yyyy-MM-dd');
+      const growthResult = await db.query(
+        `SELECT COUNT(*) as count
+         FROM clients
+         WHERE user_id = $1 AND DATE(created_at) = $2`,
+        [userId, dateStr]
+      );
+      clientGrowth.push({
+        date: dateStr,
+        count: parseInt(growthResult.rows[0]?.count || '0'),
+      });
+    }
+
     return NextResponse.json({
       messagesPerDay,
       appointmentsPerDay,
@@ -172,11 +249,17 @@ export async function GET(request: NextRequest) {
       },
       noShowRate: Math.round(noShowRate * 10) / 10,
       estimatedRevenue: Math.round(estimatedRevenue * 100) / 100,
+      clients: {
+        topClients,
+        newClientsToday,
+        newClientsWeek,
+        inactiveClients,
+        growth: clientGrowth,
+      },
     });
-  } catch (error: any) {
-    console.error('Error fetching dashboard data:', error);
+  } catch (error) {
     // Return default structure even on error
-    return NextResponse.json({
+    return createSuccessResponse({
       messagesPerDay: [],
       appointmentsPerDay: [],
       today: {
@@ -187,6 +270,13 @@ export async function GET(request: NextRequest) {
       },
       noShowRate: 0,
       estimatedRevenue: 0,
+      clients: {
+        topClients: [],
+        newClientsToday: 0,
+        newClientsWeek: 0,
+        inactiveClients: [],
+        growth: [],
+      },
     });
   }
 }

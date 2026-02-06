@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+
+export const dynamic = 'force-dynamic';
 import { generateResponse } from '@/lib/ai-agent';
 import { getDb } from '@/lib/db';
 import { getSuggestedSlots } from '@/lib/calendar';
 import { parseStoredMessage } from '@/lib/email-types';
+import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
 // GET /api/conversations/[id]/suggest-response - Get AI suggested response
 export async function GET(
@@ -12,8 +15,26 @@ export async function GET(
   try {
     const db = getDb();
     const conversationId = parseInt(params.id);
+    
+    // Validate ID
+    if (isNaN(conversationId) || conversationId <= 0) {
+      return createErrorResponse('Invalid conversation ID', 400);
+    }
+    
     const searchParams = request.nextUrl.searchParams;
-    const userId = parseInt(searchParams.get('userId') || '1');
+    
+    // Validate query parameters
+    const { userIdQuerySchema } = await import('@/lib/validation');
+    const queryParams = {
+      userId: searchParams.get('userId') || '1',
+    };
+    
+    const validationResult = userIdQuerySchema.safeParse(queryParams);
+    if (!validationResult.success) {
+      return handleApiError(validationResult.error, 'Invalid query parameters');
+    }
+    
+    const { userId } = validationResult.data;
 
     // Get conversation
     const convResult = await db.query(
@@ -22,10 +43,7 @@ export async function GET(
     );
 
     if (convResult.rows.length === 0) {
-      return NextResponse.json(
-        { suggestedResponse: null, error: 'Conversation not found' },
-        { status: 404 }
-      );
+      return createErrorResponse('Conversation not found', 404);
     }
 
     const conversation = convResult.rows[0];
@@ -57,41 +75,40 @@ export async function GET(
           end: s.end.toISOString(),
         }));
     } catch (slotError) {
-      console.warn('Error fetching available slots:', slotError);
+      const { logger } = await import('@/lib/logger');
+      logger.warn('Error fetching available slots', { error: slotError instanceof Error ? slotError.message : String(slotError) });
       // Continue without slots - not critical
     }
 
     // Generate AI response using the real implementation
+    // If no API key is configured, skip AI call and return a safe fallback.
     let suggestedResponse: string;
-    try {
-      suggestedResponse = await generateResponse(
-        conversationId,
-        lastMessage || 'Salut!',
-        undefined, // businessInfo - could be enhanced later
-        availableSlots
-      );
-    } catch (aiError: any) {
-      console.error('Error generating AI response:', aiError);
-      
-      // Fallback to mock response if OpenAI fails for any reason
-      // This handles: missing API key, rate limits, network errors, etc.
+    if (!process.env.OPENAI_API_KEY) {
       suggestedResponse = 'Mulțumim pentru mesaj! Vă vom răspunde în cel mai scurt timp.';
+    } else {
+      try {
+        suggestedResponse = await generateResponse(
+          conversationId,
+          lastMessage || 'Salut!',
+          undefined, // businessInfo - could be enhanced later
+          availableSlots
+        );
+      } catch (aiError) {
+        const { logger } = await import('@/lib/logger');
+        logger.error('Error generating AI response', aiError instanceof Error ? aiError : new Error(String(aiError)), { conversationId });
+        
+        // Fallback to mock response if OpenAI fails for any reason
+        // This handles: missing API key, rate limits, network errors, etc.
+        suggestedResponse = 'Mulțumim pentru mesaj! Vă vom răspunde în cel mai scurt timp.';
+      }
     }
 
-    return NextResponse.json({
+    return createSuccessResponse({
       suggestedResponse,
       availableSlots,
     });
-  } catch (error: any) {
-    console.error('Error generating suggested response:', error);
-    return NextResponse.json(
-      { 
-        suggestedResponse: null, 
-        error: error.message || 'Failed to generate response',
-        availableSlots: []
-      },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleApiError(error, 'Failed to generate suggested response');
   }
 }
 

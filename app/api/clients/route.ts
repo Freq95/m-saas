@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { findOrCreateClient, Client } from '@/lib/client-matching';
+import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
+import type { Client as ClientType } from '@/lib/types';
 
 // GET /api/clients - Get all clients with filtering and sorting
 export async function GET(request: NextRequest) {
   try {
     const db = getDb();
     const searchParams = request.nextUrl.searchParams;
-    const userId = parseInt(searchParams.get('userId') || '1');
+    const { DEFAULT_USER_ID } = await import('@/lib/constants');
+    const userId = parseInt(searchParams.get('userId') || DEFAULT_USER_ID.toString());
     const search = searchParams.get('search') || '';
     const status = searchParams.get('status') || 'all';
     const source = searchParams.get('source') || 'all';
@@ -21,7 +24,7 @@ export async function GET(request: NextRequest) {
 
     // Build query
     let query = `SELECT * FROM clients WHERE user_id = $1`;
-    const params: any[] = [userId];
+    const params: (string | number)[] = [userId];
 
     // Add search filter
     if (search) {
@@ -63,12 +66,12 @@ export async function GET(request: NextRequest) {
     const clients = result.rows || [];
 
     // Parse tags from JSON string if needed
-    const clientsWithParsedTags = clients.map((client: any) => ({
+    const clientsWithParsedTags = clients.map((client: ClientType) => ({
       ...client,
       tags: typeof client.tags === 'string' ? JSON.parse(client.tags || '[]') : (client.tags || []),
     }));
 
-    return NextResponse.json({ 
+    return createSuccessResponse({ 
       clients: clientsWithParsedTags,
       pagination: {
         page,
@@ -77,12 +80,8 @@ export async function GET(request: NextRequest) {
         totalPages: Math.ceil(total / limit),
       }
     });
-  } catch (error: any) {
-    console.error('Error fetching clients:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch clients', details: error.message },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleApiError(error, 'Failed to fetch clients');
   }
 }
 
@@ -118,16 +117,14 @@ export async function POST(request: NextRequest) {
         source
       );
     } catch (error: any) {
-      console.error('Error in findOrCreateClient:', error);
-      return NextResponse.json(
-        { error: 'Failed to create client', details: error.message },
-        { status: 500 }
-      );
+      const { logger } = await import('@/lib/logger');
+      logger.error('Error in findOrCreateClient', error instanceof Error ? error : new Error(String(error)), { name, email, phone });
+      return handleApiError(error, 'Failed to create client');
     }
 
     // Update status, tags, and notes if provided
     const updates: string[] = [];
-    const updateParams: any[] = [];
+    const updateParams: (string | number | null)[] = [];
 
     if (status && status !== client.status) {
       updates.push(`status = $${updateParams.length + 1}`);
@@ -172,23 +169,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    return NextResponse.json({
+    return createSuccessResponse({
       client: {
         ...client,
         tags: typeof client.tags === 'string' 
           ? JSON.parse(client.tags || '[]') 
           : (client.tags || []),
       }
-    }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error creating client:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to create client',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      },
-      { status: 500 }
-    );
+    }, 201);
+  } catch (error) {
+    return handleApiError(error, 'Failed to create client');
   }
 }
 

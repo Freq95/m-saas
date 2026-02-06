@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { getYahooConfig, sendYahooEmail } from '@/lib/yahoo-mail';
+import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
 // POST /api/conversations/[id]/messages - Send message
 export async function POST(
@@ -16,13 +17,7 @@ export async function POST(
     const { createMessageSchema } = await import('@/lib/validation');
     const validationResult = createMessageSchema.safeParse(body);
     if (!validationResult.success) {
-      return NextResponse.json(
-        { 
-          error: 'Invalid input',
-          details: validationResult.error.errors
-        },
-        { status: 400 }
-      );
+      return createErrorResponse('Invalid input', 400, JSON.stringify(validationResult.error.errors));
     }
 
     const { content, direction } = validationResult.data;
@@ -34,10 +29,7 @@ export async function POST(
     );
 
     if (convResult.rows.length === 0) {
-      return NextResponse.json(
-        { error: 'Conversation not found' },
-        { status: 404 }
-      );
+      return createErrorResponse('Conversation not found', 404);
     }
 
     const conversation = convResult.rows[0];
@@ -55,7 +47,7 @@ export async function POST(
     // If it's an outbound email message, send via Yahoo
     if (direction === 'outbound' && conversation.channel === 'email' && conversation.contact_email) {
       try {
-        const yahooConfig = getYahooConfig();
+        const yahooConfig = await getYahooConfig(Number(conversation.user_id));
         if (yahooConfig) {
           await sendYahooEmail(
             yahooConfig,
@@ -64,8 +56,9 @@ export async function POST(
             content
           );
         }
-      } catch (emailError: any) {
-        console.error('Error sending email via Yahoo:', emailError);
+      } catch (emailError) {
+        const { logger } = await import('@/lib/logger');
+        logger.error('Error sending email via Yahoo', emailError instanceof Error ? emailError : new Error(String(emailError)), { conversationId });
         // Don't fail the request if email sending fails
       }
     }
@@ -76,15 +69,8 @@ export async function POST(
       [conversationId]
     );
 
-    return NextResponse.json({ message: newMessage }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error sending message:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to send message',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      },
-      { status: 500 }
-    );
+    return createSuccessResponse({ message: newMessage }, 201);
+  } catch (error) {
+    return handleApiError(error, 'Failed to send message');
   }
 }

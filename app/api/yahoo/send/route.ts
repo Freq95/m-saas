@@ -1,31 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getYahooConfig, sendYahooEmail } from '@/lib/yahoo-mail';
+import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
 // POST /api/yahoo/send - Send email via Yahoo
 export async function POST(request: NextRequest) {
   try {
-    const config = getYahooConfig();
+    const body = await request.json();
+    
+    // Get userId from body if provided, default to 1
+    const userId = body.userId || 1;
+    
+    // Get config from database (with env fallback)
+    const config = await getYahooConfig(userId);
     
     if (!config) {
-      return NextResponse.json(
-        { error: 'Yahoo Mail not configured. Set YAHOO_EMAIL and YAHOO_PASSWORD (or YAHOO_APP_PASSWORD) in .env' },
-        { status: 400 }
+      return createErrorResponse(
+        'Yahoo Mail not configured. Please configure it in Settings > Email Integrations or set YAHOO_EMAIL and YAHOO_PASSWORD (or YAHOO_APP_PASSWORD) in .env',
+        400
       );
     }
-
-    const body = await request.json();
     
     // Validate input
     const { yahooSendSchema } = await import('@/lib/validation');
     const validationResult = yahooSendSchema.safeParse(body);
     if (!validationResult.success) {
-      return NextResponse.json(
-        { 
-          error: 'Invalid input',
-          details: validationResult.error.errors
-        },
-        { status: 400 }
-      );
+      return createErrorResponse('Invalid input', 400, JSON.stringify(validationResult.error.errors));
     }
 
     const { to, subject, text, html } = validationResult.data;
@@ -33,19 +32,12 @@ export async function POST(request: NextRequest) {
     // Send email via Yahoo SMTP
     await sendYahooEmail(config, to, subject, text, html);
 
-    return NextResponse.json({
+    return createSuccessResponse({
       success: true,
       message: 'Email sent successfully',
     });
-  } catch (error: any) {
-    console.error('Error sending Yahoo email:', error);
-    return NextResponse.json(
-      { 
-        error: error.message || 'Failed to send email',
-        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleApiError(error, 'Failed to send email');
   }
 }
 

@@ -15,6 +15,16 @@ interface Appointment {
   status: string;
 }
 
+interface Client {
+  id: number;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  total_spent: number;
+  total_appointments: number;
+  last_appointment_date: string | null;
+}
+
 interface DashboardData {
   messagesPerDay: Array<{ date: string; count: number }>;
   appointmentsPerDay: Array<{ date: string; count: number }>;
@@ -26,6 +36,13 @@ interface DashboardData {
   };
   noShowRate: number;
   estimatedRevenue: number;
+  clients: {
+    topClients: Client[];
+    newClientsToday: number;
+    newClientsWeek: number;
+    inactiveClients: Client[];
+    growth: Array<{ date: string; count: number }>;
+  };
 }
 
 export default function DashboardPage() {
@@ -56,6 +73,13 @@ export default function DashboardPage() {
         },
         noShowRate: result.noShowRate || 0,
         estimatedRevenue: result.estimatedRevenue || 0,
+        clients: {
+          topClients: result.clients?.topClients || [],
+          newClientsToday: result.clients?.newClientsToday || 0,
+          newClientsWeek: result.clients?.newClientsWeek || 0,
+          inactiveClients: result.clients?.inactiveClients || [],
+          growth: result.clients?.growth || [],
+        },
       });
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -71,6 +95,13 @@ export default function DashboardPage() {
         },
         noShowRate: 0,
         estimatedRevenue: 0,
+        clients: {
+          topClients: [],
+          newClientsToday: 0,
+          newClientsWeek: 0,
+          inactiveClients: [],
+          growth: [],
+        },
       });
     } finally {
       setLoading(false);
@@ -96,6 +127,7 @@ export default function DashboardPage() {
           <Link href="/inbox">Inbox</Link>
           <Link href="/calendar">Calendar</Link>
           <Link href="/clients">Clienți</Link>
+          <Link href="/settings/email">Setări</Link>
         </div>
       </nav>
 
@@ -116,6 +148,11 @@ export default function DashboardPage() {
           <div className={styles.statCard}>
             <div className={styles.statLabel}>Total clienți</div>
             <div className={styles.statValue}>{data.today?.totalClients || 0}</div>
+          </div>
+
+          <div className={styles.statCard}>
+            <div className={styles.statLabel}>Clienți noi (săptămâna)</div>
+            <div className={styles.statValue}>{data.clients?.newClientsWeek || 0}</div>
           </div>
 
           <div className={styles.statCard}>
@@ -207,6 +244,79 @@ export default function DashboardPage() {
                   <p>Nu există programări pentru astăzi</p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.clientsSection}>
+          <h3 className={styles.sectionTitle}>Clienți</h3>
+          
+          <div className={styles.clientGrid}>
+            <div className={styles.clientCard}>
+              <h4>Top Clienți</h4>
+              {data.clients?.topClients && data.clients.topClients.length > 0 ? (
+                <div className={styles.clientList}>
+                  {data.clients.topClients.map((client) => (
+                    <Link key={client.id} href={`/clients/${client.id}`} className={styles.clientItem}>
+                      <div className={styles.clientName}>{client.name}</div>
+                      <div className={styles.clientStats}>
+                        <span>{((client.total_spent || 0)).toFixed(2)} lei</span>
+                        <span>{client.total_appointments || 0} programări</span>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className={styles.empty}>Nu există clienți cu cheltuieli</div>
+              )}
+            </div>
+
+            <div className={styles.clientCard}>
+              <h4>Clienți Inactivi (30+ zile)</h4>
+              {data.clients?.inactiveClients && data.clients.inactiveClients.length > 0 ? (
+                <div className={styles.clientList}>
+                  {data.clients.inactiveClients.slice(0, 5).map((client) => (
+                    <Link key={client.id} href={`/clients/${client.id}`} className={styles.clientItem}>
+                      <div className={styles.clientName}>{client.name}</div>
+                      <div className={styles.clientMeta}>
+                        {client.last_appointment_date 
+                          ? `Ultima vizită: ${format(new Date(client.last_appointment_date), 'dd MMM yyyy', { locale: ro })}`
+                          : 'Fără programări'}
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className={styles.empty}>Nu există clienți inactivi</div>
+              )}
+            </div>
+
+            <div className={styles.clientCard}>
+              <h4>Creștere Clienți (7 zile)</h4>
+              <div className={styles.growthChart}>
+                {data.clients?.growth && data.clients.growth.length > 0 ? (
+                  data.clients.growth.map((item, idx) => {
+                    const maxCount = Math.max(...data.clients.growth.map(g => g.count || 0), 1);
+                    const date = new Date(item.date);
+                    const dateStr = date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' });
+                    const barHeight = maxCount > 0 ? ((item.count || 0) / maxCount) * 100 : 0;
+                    return (
+                      <div key={idx} className={styles.growthBar}>
+                        <div className={styles.growthValue}>{item.count || 0}</div>
+                        <div className={styles.growthBarContainer}>
+                          <div
+                            className={styles.growthBarFill}
+                            style={{ height: `${barHeight}%` }}
+                          />
+                        </div>
+                        <div className={styles.growthLabel}>{dateStr}</div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className={styles.empty}>Nu există date</div>
+                )}
+              </div>
             </div>
           </div>
         </div>

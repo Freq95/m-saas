@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
+import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
 // GET /api/tasks/[id] - Get a single task
 export async function GET(
@@ -10,25 +11,23 @@ export async function GET(
     const db = getDb();
     const taskId = parseInt(params.id);
 
+    // Validate ID
+    if (isNaN(taskId) || taskId <= 0) {
+      return createErrorResponse('Invalid task ID', 400);
+    }
+
     const result = await db.query(
       `SELECT * FROM tasks WHERE id = $1`,
       [taskId]
     );
 
     if (result.rows.length === 0) {
-      return NextResponse.json(
-        { error: 'Task not found' },
-        { status: 404 }
-      );
+      return createErrorResponse('Task not found', 404);
     }
 
-    return NextResponse.json({ task: result.rows[0] });
-  } catch (error: any) {
-    console.error('Error fetching task:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch task', details: error.message },
-      { status: 500 }
-    );
+    return createSuccessResponse({ task: result.rows[0] });
+  } catch (error) {
+    return handleApiError(error, 'Failed to fetch task');
   }
 }
 
@@ -40,12 +39,25 @@ export async function PATCH(
   try {
     const db = getDb();
     const taskId = parseInt(params.id);
+    
+    // Validate ID
+    if (isNaN(taskId) || taskId <= 0) {
+      return createErrorResponse('Invalid task ID', 400);
+    }
+    
     const body = await request.json();
 
-    const { title, description, dueDate, status, priority } = body;
+    // Validate input
+    const { updateTaskSchema } = await import('@/lib/validation');
+    const validationResult = updateTaskSchema.safeParse(body);
+    if (!validationResult.success) {
+      return createErrorResponse('Invalid input', 400, JSON.stringify(validationResult.error.errors));
+    }
+
+    const { title, description, dueDate, status, priority } = validationResult.data;
 
     const updates: string[] = [];
-    const updateParams: any[] = [];
+    const updateParams: (string | number | Date | null)[] = [];
 
     if (title !== undefined) {
       updates.push(`title = $${updateParams.length + 1}`);
@@ -73,10 +85,7 @@ export async function PATCH(
     }
 
     if (updates.length === 0) {
-      return NextResponse.json(
-        { error: 'No fields to update' },
-        { status: 400 }
-      );
+      return createErrorResponse('No fields to update', 400);
     }
 
     updates.push(`updated_at = CURRENT_TIMESTAMP`);
@@ -94,19 +103,12 @@ export async function PATCH(
     );
 
     if (result.rows.length === 0) {
-      return NextResponse.json(
-        { error: 'Task not found' },
-        { status: 404 }
-      );
+      return createErrorResponse('Task not found', 404);
     }
 
-    return NextResponse.json({ task: result.rows[0] });
-  } catch (error: any) {
-    console.error('Error updating task:', error);
-    return NextResponse.json(
-      { error: 'Failed to update task', details: error.message },
-      { status: 500 }
-    );
+    return createSuccessResponse({ task: result.rows[0] });
+  } catch (error) {
+    return handleApiError(error, 'Failed to update task');
   }
 }
 
@@ -119,18 +121,19 @@ export async function DELETE(
     const db = getDb();
     const taskId = parseInt(params.id);
 
+    // Validate ID
+    if (isNaN(taskId) || taskId <= 0) {
+      return createErrorResponse('Invalid task ID', 400);
+    }
+
     await db.query(
       `DELETE FROM tasks WHERE id = $1`,
       [taskId]
     );
 
-    return NextResponse.json({ success: true });
-  } catch (error: any) {
-    console.error('Error deleting task:', error);
-    return NextResponse.json(
-      { error: 'Failed to delete task', details: error.message },
-      { status: 500 }
-    );
+    return createSuccessResponse({ success: true });
+  } catch (error) {
+    return handleApiError(error, 'Failed to delete task');
   }
 }
 

@@ -158,6 +158,37 @@
   color: #737373;
 }
 
+.syncButton {
+  margin-top: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: #252525;
+  color: #d4d4d4;
+  border: 1px solid #2d2d2d;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.syncButton:hover {
+  background: #2d2d2d;
+  border-color: #3d3d3d;
+}
+
+.syncButton:disabled {
+  background: #1f1f1f;
+  color: #737373;
+  cursor: not-allowed;
+  border-color: #252525;
+}
+
+.syncError {
+  margin-top: 0.4rem;
+  color: #f87171;
+  font-size: 0.75rem;
+}
+
 .emptyConversations {
   padding: 2rem;
   text-align: center;

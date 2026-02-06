@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { z } from 'zod';
+import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 
 // Validation schemas
 const createReminderSchema = z.object({
@@ -21,9 +22,21 @@ export async function GET(request: NextRequest) {
   try {
     const db = getDb();
     const searchParams = request.nextUrl.searchParams;
-    const userId = parseInt(searchParams.get('userId') || '1');
+    
+    // Validate query parameters
+    const { remindersQuerySchema } = await import('@/lib/validation');
+    const queryParams = {
+      userId: searchParams.get('userId') || '1',
+      status: searchParams.get('status') || undefined,
+    };
+    
+    const validationResult = remindersQuerySchema.safeParse(queryParams);
+    if (!validationResult.success) {
+      return handleApiError(validationResult.error, 'Invalid query parameters');
+    }
+    
+    const { userId, status } = validationResult.data;
     const appointmentId = searchParams.get('appointmentId');
-    const status = searchParams.get('status');
     const channel = searchParams.get('channel');
 
     let query = `
@@ -53,19 +66,12 @@ export async function GET(request: NextRequest) {
 
     const result = await db.query(query, params);
     
-    return NextResponse.json({ 
+    return createSuccessResponse({ 
       reminders: result.rows || [],
       count: result.rows?.length || 0
     });
-  } catch (error: any) {
-    console.error('Error fetching reminders:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to fetch reminders',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleApiError(error, 'Failed to fetch reminders');
   }
 }
 
@@ -120,19 +126,12 @@ export async function POST(request: NextRequest) {
       ]
     );
 
-    return NextResponse.json({ 
+    return createSuccessResponse({ 
       reminder: result.rows[0],
       success: true
-    }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error creating reminder:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to create reminder',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      },
-      { status: 500 }
-    );
+    }, 201);
+  } catch (error) {
+    return handleApiError(error, 'Failed to create reminder');
   }
 }
 

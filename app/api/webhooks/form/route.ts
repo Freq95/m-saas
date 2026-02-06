@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDb } from '@/lib/db';
 import { suggestTags } from '@/lib/ai-agent';
+import { findOrCreateClient, linkConversationToClient } from '@/lib/client-matching';
+import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 
 // POST /api/webhooks/form - Webhook for form submissions from website
 export async function POST(request: NextRequest) {
@@ -24,20 +26,32 @@ export async function POST(request: NextRequest) {
 
     const db = getDb();
 
+    // Find or create client
+    const client = await findOrCreateClient(
+      userId,
+      name || 'Anonim',
+      email,
+      phone,
+      'form'
+    );
+
     // Create conversation
     const convResult = await db.query(
-      `INSERT INTO conversations (user_id, channel, contact_name, contact_email, contact_phone, subject, status)
-       VALUES ($1, 'form', $2, $3, $4, $5, 'open')
+      `INSERT INTO conversations (user_id, channel, contact_name, contact_email, contact_phone, subject, status, client_id, created_at, updated_at)
+       VALUES ($1, 'form', $2, $3, $4, $5, 'open', $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
        RETURNING id`,
-      [userId, name || 'Anonim', email, phone, subject || 'Formular site']
+      [userId, name || 'Anonim', email, phone, subject || 'Formular site', client.id]
     );
 
     const conversationId = convResult.rows[0].id;
 
+    // Link conversation to client (update last_conversation_date)
+    await linkConversationToClient(conversationId, client.id);
+
     // Add message
     await db.query(
-      `INSERT INTO messages (conversation_id, direction, content)
-       VALUES ($1, 'inbound', $2)`,
+      `INSERT INTO messages (conversation_id, direction, content, sent_at)
+       VALUES ($1, 'inbound', $2, CURRENT_TIMESTAMP)`,
       [conversationId, message]
     );
 
@@ -52,13 +66,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ success: true, conversationId });
-  } catch (error: any) {
-    console.error('Error processing form webhook:', error);
-    return NextResponse.json(
-      { error: error.message },
-      { status: 500 }
-    );
+    return createSuccessResponse({ success: true, conversationId });
+  } catch (error) {
+    return handleApiError(error, 'Failed to process form webhook');
   }
 }
 

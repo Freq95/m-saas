@@ -27,6 +27,8 @@ export interface StoredEmailMessage {
   html?: string; // HTML version (if available)
   images?: EmailImage[];
   attachments?: EmailAttachment[];
+  messageId?: string;
+  uid?: number;
 }
 
 /**

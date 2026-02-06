@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+
+export const dynamic = 'force-dynamic';
 import { getDb } from '@/lib/db';
+import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
+import type { Message } from '@/lib/types';
 
 // GET /api/conversations/[id] - Get conversation with messages
 export async function GET(
@@ -30,7 +34,7 @@ export async function GET(
     const beforeId = searchParams.get('beforeId'); // For cursor-based pagination (load older messages)
 
     let messagesQuery = `SELECT * FROM messages WHERE conversation_id = $1`;
-    const queryParams: any[] = [conversationId];
+    const queryParams: (string | number)[] = [conversationId];
     let paramIndex = 2;
 
     // If beforeId is provided, load messages before that ID (for infinite scroll loading older messages)
@@ -56,7 +60,7 @@ export async function GET(
     // Parse messages using standardized format
     const { parseStoredMessage } = await import('@/lib/email-types');
     
-    const parsedMessages = messages.map((msg: any) => {
+    const parsedMessages = messages.map((msg: Message) => {
       const stored = parseStoredMessage(msg.content || '');
       
       return {
@@ -71,40 +75,17 @@ export async function GET(
     });
 
     // Check if there are more messages to load
-    // Since we reversed the messages, the first one (index 0) is the oldest
     const hasMore = parsedMessages.length === limit;
     const oldestMessageId = parsedMessages.length > 0 ? parsedMessages[0].id : null;
-    
-    // Also check if there are actually more messages in the database
-    let actuallyHasMore = hasMore;
-    if (hasMore && oldestMessageId) {
-      const checkMoreResult = await db.query(
-        `SELECT id FROM messages 
-         WHERE conversation_id = $1 AND id < $2 
-         ORDER BY sent_at DESC LIMIT 1`,
-        [conversationId, oldestMessageId]
-      );
-      // Update hasMore based on actual database check
-      actuallyHasMore = checkMoreResult.rows.length > 0;
-    }
 
-    return NextResponse.json({
+    return createSuccessResponse({
       conversation: conversationResult.rows[0],
       messages: parsedMessages,
-      hasMore: actuallyHasMore,
+      hasMore,
       oldestMessageId,
     });
-  } catch (error: any) {
-    console.error('Error fetching conversation:', error);
-    return NextResponse.json(
-      { 
-        conversation: null, 
-        messages: [],
-        error: 'Failed to fetch conversation',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleApiError(error, 'Failed to fetch conversation');
   }
 }
 
@@ -125,37 +106,55 @@ export async function PATCH(
     );
 
     if (existingConv.rows.length === 0) {
-      return NextResponse.json(
-        { error: 'Conversation not found' },
-        { status: 404 }
-      );
+      return createErrorResponse('Conversation not found', 404);
+    }
+
+    // Validate input
+    const { updateConversationSchema } = await import('@/lib/validation');
+    const validationResult = updateConversationSchema.safeParse(body);
+    if (!validationResult.success) {
+      return createErrorResponse('Invalid input', 400, JSON.stringify(validationResult.error.errors));
     }
 
     // Build update query dynamically based on provided fields
     const updates: string[] = [];
-    const updateParams: any[] = [];
-    let paramIndex = 1;
+    const updateParams: (string | number | null)[] = [];
 
-    // Allowed fields to update
-    const allowedFields: { [key: string]: string } = {
-      status: 'status',
-      contact_name: 'contact_name',
-      contact_email: 'contact_email',
-      contact_phone: 'contact_phone',
-      subject: 'subject',
-      client_id: 'client_id',
-    };
-
-    for (const [key, dbField] of Object.entries(allowedFields)) {
-      if (body[key] !== undefined) {
-        updates.push(`${dbField} = $${paramIndex + 1}`);
-        updateParams.push(body[key]);
-        paramIndex++;
-      }
+    // Allowed fields to update from validated data
+    const validatedData = validationResult.data;
+    
+    if (validatedData.status !== undefined) {
+      updates.push(`status = $${updateParams.length + 1}`);
+      updateParams.push(validatedData.status);
+    }
+    
+    if (validatedData.contactName !== undefined) {
+      updates.push(`contact_name = $${updateParams.length + 1}`);
+      updateParams.push(validatedData.contactName);
+    }
+    
+    if (validatedData.contactEmail !== undefined) {
+      updates.push(`contact_email = $${updateParams.length + 1}`);
+      updateParams.push(validatedData.contactEmail || null);
+    }
+    
+    if (validatedData.contactPhone !== undefined) {
+      updates.push(`contact_phone = $${updateParams.length + 1}`);
+      updateParams.push(validatedData.contactPhone || null);
+    }
+    
+    if (validatedData.subject !== undefined) {
+      updates.push(`subject = $${updateParams.length + 1}`);
+      updateParams.push(validatedData.subject || null);
+    }
+    
+    if (validatedData.clientId !== undefined) {
+      updates.push(`client_id = $${updateParams.length + 1}`);
+      updateParams.push(validatedData.clientId || null);
     }
 
     // Handle tags update
-    if (body.tags !== undefined && Array.isArray(body.tags)) {
+    if (validatedData.tags !== undefined && Array.isArray(validatedData.tags)) {
       // Remove existing tags
       await db.query(
         `DELETE FROM conversation_tags WHERE conversation_id = $1`,
@@ -166,8 +165,8 @@ export async function PATCH(
       const tagsResult = await db.query(`SELECT id, name FROM tags`);
       const allTags = tagsResult.rows || [];
       
-      for (const tagName of body.tags) {
-        const tag = allTags.find((t: any) => t.name.toLowerCase() === tagName.toLowerCase());
+      for (const tagName of validatedData.tags) {
+        const tag = allTags.find((t: { id: number; name: string }) => t.name.toLowerCase() === tagName.toLowerCase());
         if (tag) {
           await db.query(
             `INSERT INTO conversation_tags (conversation_id, tag_id)
@@ -183,9 +182,10 @@ export async function PATCH(
     if (updates.length > 0) {
       updates.push(`updated_at = CURRENT_TIMESTAMP`);
       updateParams.push(conversationId);
+      const whereParamIndex = updateParams.length;
 
       await db.query(
-        `UPDATE conversations SET ${updates.join(', ')} WHERE id = $${paramIndex + 1}`,
+        `UPDATE conversations SET ${updates.join(', ')} WHERE id = $${whereParamIndex}`,
         updateParams
       );
     }
@@ -203,26 +203,19 @@ export async function PATCH(
       `SELECT tag_id FROM conversation_tags WHERE conversation_id = $1`,
       [conversationId]
     );
-    const tagIds = convTagsResult.rows.map((r: any) => r.tag_id);
+    const tagIds = convTagsResult.rows.map((r: { tag_id: number }) => r.tag_id);
     const tags = allTags
-      .filter((t: any) => tagIds.includes(t.id))
-      .map((t: any) => t.name);
+      .filter((t: { id: number; name: string }) => tagIds.includes(t.id))
+      .map((t: { id: number; name: string }) => t.name);
 
-    return NextResponse.json({
+    return createSuccessResponse({
       success: true,
       conversation: {
         ...updatedResult.rows[0],
         tags,
       },
     });
-  } catch (error: any) {
-    console.error('Error updating conversation:', error);
-    return NextResponse.json(
-      { 
-        error: 'Failed to update conversation',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
-      },
-      { status: 500 }
-    );
+  } catch (error) {
+    return handleApiError(error, 'Failed to update conversation');
   }
 }

@@ -123,14 +123,24 @@ export default function ClientsPage() {
           <Link href="/inbox">Inbox</Link>
           <Link href="/calendar">Calendar</Link>
           <Link href="/clients" className={navStyles.active}>Clienți</Link>
+          <Link href="/settings/email">Setări</Link>
         </div>
       </nav>
       <div className={styles.container}>
         <div className={styles.header}>
           <h1>Clienți</h1>
-          <Link href="/clients/new" className={styles.addButton}>
-            + Adaugă Client
-          </Link>
+          <div className={styles.headerActions}>
+            <a
+              href="/api/clients/export?userId=1"
+              download
+              className={styles.exportButton}
+            >
+              📥 Export CSV
+            </a>
+            <Link href="/clients/new" className={styles.addButton}>
+              + Adaugă Client
+            </Link>
+          </div>
         </div>
 
       <div className={styles.filters}>

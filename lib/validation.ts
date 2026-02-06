@@ -127,3 +127,101 @@ export const formWebhookSchema = z.object({
   subject: z.string().max(500).optional(),
 });
 
+// Query parameter schemas
+export const userIdQuerySchema = z.object({
+  userId: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
+});
+
+export const appointmentsQuerySchema = z.object({
+  userId: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
+  status: z.enum(['scheduled', 'completed', 'cancelled', 'no-show']).optional(),
+});
+
+export const servicesQuerySchema = z.object({
+  userId: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
+});
+
+export const conversationsQuerySchema = z.object({
+  userId: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
+  status: z.enum(['all', 'open', 'closed', 'pending']).optional().default('all'),
+});
+
+export const dashboardQuerySchema = z.object({
+  userId: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
+  days: z.string().regex(/^\d+$/).transform(Number).optional().default('7'),
+});
+
+export const calendarSlotsQuerySchema = z.object({
+  userId: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
+  date: z.string().datetime().optional(),
+});
+
+export const tasksQuerySchema = z.object({
+  userId: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
+  contactId: z.string().regex(/^\d+$/).transform(Number).optional(),
+  status: z.enum(['open', 'completed', 'cancelled']).optional(),
+});
+
+export const remindersQuerySchema = z.object({
+  userId: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
+  status: z.enum(['pending', 'sent', 'failed']).optional(),
+});
+
+// Client note schema
+export const createNoteSchema = z.object({
+  userId: z.number().int().positive(),
+  content: z.string().min(1, 'Note content is required').max(5000),
+});
+
+// Task update schema
+export const updateTaskSchema = z.object({
+  title: z.string().min(1).max(255).optional(),
+  description: z.string().max(2000).optional(),
+  dueDate: z.string().datetime().optional().nullable(),
+  status: z.enum(['open', 'completed', 'cancelled']).optional(),
+  priority: z.enum(['low', 'medium', 'high']).optional(),
+});
+
+// Facebook webhook schema
+export const facebookWebhookSchema = z.object({
+  userId: z.number().int().positive().optional().default(1),
+  senderId: z.string().min(1, 'senderId is required'),
+  senderName: z.string().optional(),
+  message: z.string().min(1, 'Message is required'),
+  pageId: z.string().optional(),
+  senderEmail: emailSchema.optional(),
+  senderPhone: phoneSchema,
+});
+
+// Client ID param schema
+export const clientIdParamSchema = z.object({
+  id: z.string().regex(/^\d+$/).transform(Number),
+});
+
+// Reminder ID param schema
+export const reminderIdParamSchema = z.object({
+  id: z.string().regex(/^\d+$/).transform(Number),
+});
+
+// Email integration schemas
+export const createYahooIntegrationSchema = z.object({
+  userId: z.number().int().positive().optional().default(1),
+  email: emailSchema,
+  password: z.string().min(1, 'Password is required'),
+});
+
+export const updateEmailIntegrationSchema = z.object({
+  isActive: z.boolean().optional(),
+});
+
+export const testEmailIntegrationSchema = z.object({
+  integrationId: z.number().int().positive(),
+});
+
+// Route parameter validation schemas
+export const integrationIdParamSchema = z.object({
+  id: z.string().regex(/^\d+$/, 'Integration ID must be a number').transform((val) => parseInt(val, 10)),
+});
+

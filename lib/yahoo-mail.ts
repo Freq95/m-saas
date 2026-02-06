@@ -114,15 +114,36 @@ function extractAttachments(parsed: ParsedMail): EmailAttachment[] {
 }
 
 /**
- * Get Yahoo Mail configuration from environment
+ * Get Yahoo Mail configuration from database or environment (fallback)
+ * @param userId - User ID to fetch from database. If not provided, uses environment variables.
  */
-export function getYahooConfig(): YahooConfig | null {
+export async function getYahooConfig(userId?: number): Promise<YahooConfig | null> {
+  // Try database first if userId is provided
+  if (userId) {
+    try {
+      const { getEmailIntegrationConfig } = await import('./email-integrations');
+      const config = await getEmailIntegrationConfig(userId, 'yahoo');
+      
+      if (config && config.password) {
+        return {
+          email: config.email,
+          password: config.password,
+          appPassword: config.password, // Assume app password
+        };
+      }
+    } catch (error) {
+      // Fall through to environment variables if database lookup fails
+      const { logger } = await import('./logger');
+      logger.warn('Failed to get Yahoo config from database, falling back to environment', { error, userId });
+    }
+  }
+  
+  // Fallback to environment variables
   const email = process.env.YAHOO_EMAIL;
   const password = process.env.YAHOO_PASSWORD || process.env.YAHOO_APP_PASSWORD;
   const appPassword = process.env.YAHOO_APP_PASSWORD;
 
   if (!email || !password) {
-    console.warn('Yahoo Mail credentials not configured. Set YAHOO_EMAIL and YAHOO_PASSWORD (or YAHOO_APP_PASSWORD) in .env');
     return null;
   }
 
@@ -435,9 +456,10 @@ export async function sendYahooEmail(
 
 /**
  * Test Yahoo Mail connection
+ * Returns true if connection successful, throws error if connection fails
  */
 export async function testYahooConnection(config: YahooConfig): Promise<boolean> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const imap = new Imap({
       user: config.email,
       password: config.password,
@@ -447,14 +469,45 @@ export async function testYahooConnection(config: YahooConfig): Promise<boolean>
       tlsOptions: { rejectUnauthorized: false },
     });
 
-    imap.once('ready', () => {
+    const timeout = setTimeout(() => {
       imap.end();
-      resolve(true);
+      reject(new Error('Connection timeout - please check your internet connection'));
+    }, 15000); // 15 second timeout
+
+    imap.once('ready', () => {
+      clearTimeout(timeout);
+      // Just verify we can list mailboxes to confirm full authentication
+      imap.getBoxes((err, boxes) => {
+        imap.end();
+        if (err) {
+          // Even if listing boxes fails, if we got to 'ready', credentials are correct
+          // Some accounts might have restrictions, but connection is valid
+          resolve(true);
+        } else {
+          resolve(true);
+        }
+      });
     });
 
-    imap.once('error', (err) => {
-      console.error('Yahoo connection error:', err);
-      resolve(false);
+    imap.once('error', (err: Error) => {
+      clearTimeout(timeout);
+      imap.end();
+      
+      // Provide more specific error messages
+      const errorMsg = err.message.toLowerCase();
+      if (errorMsg.includes('invalid credentials') || 
+          errorMsg.includes('authentication failed') ||
+          errorMsg.includes('login failed') ||
+          errorMsg.includes('incorrect') ||
+          errorMsg.includes('invalid password')) {
+        reject(new Error('Invalid email or password. Please check your credentials and ensure you are using an App Password (not your regular password).'));
+      } else if (errorMsg.includes('econnrefused') || errorMsg.includes('enotfound') || errorMsg.includes('timeout')) {
+        reject(new Error('Cannot connect to Yahoo Mail servers. Please check your internet connection.'));
+      } else if (errorMsg.includes('econnreset') || errorMsg.includes('socket')) {
+        reject(new Error('Connection was reset. Please try again.'));
+      } else {
+        reject(new Error(`Connection failed: ${err.message}. Please verify your credentials are correct.`));
+      }
     });
 
     imap.connect();
