@@ -164,6 +164,7 @@ interface Conversation {
   status: string;
   message_count: number;
   last_message_at: string;
+  last_message_preview?: string;
   tags: string[];
   unread_count?: number;
 }
@@ -205,7 +206,7 @@ export default function InboxPage() {
 
   useEffect(() => {
     // Disabled auto-load to allow manual Yahoo sync testing.
-    const AUTO_LOAD_CONVERSATIONS = false;
+    const AUTO_LOAD_CONVERSATIONS = true;
     if (AUTO_LOAD_CONVERSATIONS) {
       fetchConversations();
       return;
@@ -232,8 +233,9 @@ export default function InboxPage() {
       setMessages([]);
       setHasMoreMessages(false);
       setOldestMessageId(null);
+      setSuggestedResponse(null);
       fetchMessages(selectedConversation.id, true);
-      fetchSuggestedResponse(selectedConversation.id);
+      // fetchSuggestedResponse(selectedConversation.id);
     }
   }, [selectedConversation]);
 
@@ -605,6 +607,11 @@ export default function InboxPage() {
                     </span>
                   )}
                 </div>
+                {conv.last_message_preview && (
+                  <div className={styles.lastMessagePreview}>
+                    {conv.last_message_preview}
+                  </div>
+                )}
               </div>
               ))
             )}

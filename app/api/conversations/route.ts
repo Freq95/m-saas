@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic';
 import { getDb } from '@/lib/db';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
+import { parseStoredMessage } from '@/lib/email-types';
 
 // GET /api/conversations - Get all conversations from storage
 export async function GET(request: NextRequest) {
@@ -59,6 +60,16 @@ export async function GET(request: NextRequest) {
         return dateB - dateA;
       });
 
+      let lastMessagePreview = '';
+      if (sortedMessages.length > 0) {
+        const stored = parseStoredMessage(sortedMessages[0].content || '');
+        const raw = stored.text || stored.html || '';
+        lastMessagePreview = raw
+          .replace(/<[^>]+>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
+
       const tagIds = allConvTags
         .filter((ct: any) => ct.conversation_id === conv.id)
         .map((ct: any) => ct.tag_id);
@@ -72,6 +83,7 @@ export async function GET(request: NextRequest) {
         last_message_at: sortedMessages.length > 0 
           ? (sortedMessages[0].sent_at || sortedMessages[0].created_at)
           : (conv.updated_at || conv.created_at),
+        last_message_preview: lastMessagePreview,
         tags: tags || [],
       };
     });
