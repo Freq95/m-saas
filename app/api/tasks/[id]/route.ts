@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { NextRequest } from 'next/server';
+import { getMongoDbOrThrow, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
 // GET /api/tasks/[id] - Get a single task
@@ -8,7 +8,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
     const taskId = parseInt(params.id);
 
     // Validate ID
@@ -16,16 +16,13 @@ export async function GET(
       return createErrorResponse('Invalid task ID', 400);
     }
 
-    const result = await db.query(
-      `SELECT * FROM tasks WHERE id = $1`,
-      [taskId]
-    );
+    const task = await db.collection('tasks').findOne({ id: taskId });
 
-    if (result.rows.length === 0) {
+    if (!task) {
       return createErrorResponse('Task not found', 404);
     }
 
-    return createSuccessResponse({ task: result.rows[0] });
+    return createSuccessResponse({ task: stripMongoId(task) });
   } catch (error) {
     return handleApiError(error, 'Failed to fetch task');
   }
@@ -37,14 +34,14 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
     const taskId = parseInt(params.id);
-    
+
     // Validate ID
     if (isNaN(taskId) || taskId <= 0) {
       return createErrorResponse('Invalid task ID', 400);
     }
-    
+
     const body = await request.json();
 
     // Validate input
@@ -55,58 +52,32 @@ export async function PATCH(
     }
 
     const { title, description, dueDate, status, priority } = validationResult.data;
+    const updates: Record<string, any> = {};
 
-    const updates: string[] = [];
-    const updateParams: (string | number | Date | null)[] = [];
+    if (title !== undefined) updates.title = title;
+    if (description !== undefined) updates.description = description;
+    if (dueDate !== undefined) updates.due_date = dueDate;
+    if (status !== undefined) updates.status = status;
+    if (priority !== undefined) updates.priority = priority;
 
-    if (title !== undefined) {
-      updates.push(`title = $${updateParams.length + 1}`);
-      updateParams.push(title);
-    }
-
-    if (description !== undefined) {
-      updates.push(`description = $${updateParams.length + 1}`);
-      updateParams.push(description);
-    }
-
-    if (dueDate !== undefined) {
-      updates.push(`due_date = $${updateParams.length + 1}`);
-      updateParams.push(dueDate);
-    }
-
-    if (status !== undefined) {
-      updates.push(`status = $${updateParams.length + 1}`);
-      updateParams.push(status);
-    }
-
-    if (priority !== undefined) {
-      updates.push(`priority = $${updateParams.length + 1}`);
-      updateParams.push(priority);
-    }
-
-    if (updates.length === 0) {
+    if (Object.keys(updates).length === 0) {
       return createErrorResponse('No fields to update', 400);
     }
 
-    updates.push(`updated_at = CURRENT_TIMESTAMP`);
-    updateParams.push(taskId);
+    updates.updated_at = new Date().toISOString();
 
-    await db.query(
-      `UPDATE tasks SET ${updates.join(', ')} WHERE id = $${updateParams.length}`,
-      updateParams
+    await db.collection('tasks').updateOne(
+      { id: taskId },
+      { $set: updates }
     );
 
-    // Reload task
-    const result = await db.query(
-      `SELECT * FROM tasks WHERE id = $1`,
-      [taskId]
-    );
-
-    if (result.rows.length === 0) {
+    const task = await db.collection('tasks').findOne({ id: taskId });
+    if (!task) {
       return createErrorResponse('Task not found', 404);
     }
 
-    return createSuccessResponse({ task: result.rows[0] });
+    invalidateMongoCache();
+    return createSuccessResponse({ task: stripMongoId(task) });
   } catch (error) {
     return handleApiError(error, 'Failed to update task');
   }
@@ -118,7 +89,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
     const taskId = parseInt(params.id);
 
     // Validate ID
@@ -126,14 +97,11 @@ export async function DELETE(
       return createErrorResponse('Invalid task ID', 400);
     }
 
-    await db.query(
-      `DELETE FROM tasks WHERE id = $1`,
-      [taskId]
-    );
+    await db.collection('tasks').deleteOne({ id: taskId });
+    invalidateMongoCache();
 
     return createSuccessResponse({ success: true });
   } catch (error) {
     return handleApiError(error, 'Failed to delete task');
   }
 }
-

@@ -92,8 +92,16 @@ class Logger {
     this.log('warn', message, context);
   }
 
-  error(message: string, error?: Error, context?: Record<string, unknown>) {
-    this.log('error', message, context, error);
+  error(
+    message: string,
+    errorOrContext?: Error | Record<string, unknown>,
+    context?: Record<string, unknown>
+  ) {
+    if (errorOrContext instanceof Error) {
+      this.log('error', message, context, errorOrContext);
+      return;
+    }
+    this.log('error', message, errorOrContext, undefined);
   }
 }
 

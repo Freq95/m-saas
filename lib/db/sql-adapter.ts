@@ -1,32 +1,9 @@
 /**
- * Simple JSON-based storage system
- * 
- * LIMITATIONS:
- * - No transaction support: Multiple operations cannot be atomic
- * - No concurrent write protection: Race conditions possible under high load
- * - Memory-based: Entire dataset loaded into memory (not suitable for large datasets)
- * - Limited JOIN support: Complex queries may fail
- * - No prepared statement protection: While using parameterized queries, the parser itself is vulnerable
- * 
- * RECOMMENDATION:
- * - For production use, migrate to PostgreSQL or another proper database
- * - This storage layer is suitable for development and small-scale deployments only
- * 
- * TRANSACTION SUPPORT:
- * - This storage system does NOT support transactions
- * - If you need atomic multi-step operations, you must:
- *   1. Implement manual rollback logic
- *   2. Use a proper database with transaction support
- *   3. Accept that partial failures may leave data in inconsistent state
+ * In-memory SQL adapter used to execute the app's SQL-like queries
+ * against a provided data snapshot. This adapter does not persist data.
  */
 
-import * as fs from 'fs';
-import * as path from 'path';
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-const DATA_FILE = path.join(DATA_DIR, 'data.json');
-
-interface StorageData {
+export interface StorageData {
   users: any[];
   conversations: any[];
   messages: any[];
@@ -68,86 +45,13 @@ let data: StorageData = {
   contact_notes: [],
 };
 
-// Load data
-function loadData() {
-  try {
-    if (fs.existsSync(DATA_FILE)) {
-      const fileData = fs.readFileSync(DATA_FILE, 'utf-8');
-      const parsed = JSON.parse(fileData);
-      // Migrate contact_* to client_* if needed
-      const clientFiles = parsed.client_files || [];
-      const clientNotes = parsed.client_notes || [];
-      const contactFiles = parsed.contact_files || [];
-      const contactNotes = parsed.contact_notes || [];
-      
-      // Merge legacy contact_* data into client_* (migrate contact_id to client_id)
-      const migratedFiles = [...clientFiles];
-      const migratedNotes = [...clientNotes];
-      
-      if (contactFiles.length > 0) {
-        contactFiles.forEach((file: any) => {
-          // If file has contact_id, migrate to client_id
-          if (file.contact_id && !file.client_id) {
-            migratedFiles.push({ ...file, client_id: file.contact_id });
-          } else {
-            migratedFiles.push(file);
-          }
-        });
-      }
-      
-      if (contactNotes.length > 0) {
-        contactNotes.forEach((note: any) => {
-          if (note.contact_id && !note.client_id) {
-            migratedNotes.push({ ...note, client_id: note.contact_id });
-          } else {
-            migratedNotes.push(note);
-          }
-        });
-      }
-      
-      data = {
-        users: parsed.users || [],
-        conversations: parsed.conversations || [],
-        messages: parsed.messages || [],
-        tags: parsed.tags || [],
-        conversation_tags: parsed.conversation_tags || [],
-        services: parsed.services || [],
-        appointments: parsed.appointments || [],
-        reminders: parsed.reminders || [],
-        google_calendar_sync: parsed.google_calendar_sync || [],
-        clients: parsed.clients || [],
-        tasks: parsed.tasks || [],
-        client_files: migratedFiles,
-        client_notes: migratedNotes,
-        email_integrations: parsed.email_integrations || [],
-        // Legacy support - keep for backward compatibility during migration
-        contact_files: contactFiles,
-        contact_custom_fields: parsed.contact_custom_fields || [],
-        contact_notes: contactNotes,
-      };
-    }
-  } catch (error) {
-    console.error('Error loading data:', error);
-  }
-}
-
-// Save data
-function saveData() {
-  try {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
-    fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
-  } catch (error) {
-    console.error('Error saving data:', error);
-  }
-}
-
-// Initialize
-loadData();
-
 // Simple query handler
-export class JsonDb {
+export class SqlDb {
+  private data: StorageData;
+
+  constructor(dataRef?: StorageData) {
+    this.data = dataRef || data;
+  }
   async query(sql: string, params: any[] = []): Promise<{ rows: any[] }> {
     const sqlUpper = sql.toUpperCase().trim();
     
@@ -200,9 +104,9 @@ export class JsonDb {
     if (!fromMatch) return { rows: [] };
     
     const tableName = fromMatch[1] as keyof StorageData;
-    if (!data[tableName]) return { rows: [] };
+    if (!this.data[tableName]) return { rows: [] };
     
-    let result = [...data[tableName]];
+    let result = [...this.data[tableName]];
     
     // Handle WHERE
     if (sql.includes('WHERE')) {
@@ -497,9 +401,9 @@ export class JsonDb {
     
     const mainTable = fromMatch[1] as keyof StorageData;
     const mainAlias = fromMatch[2] || mainTable;
-    if (!data[mainTable]) return { rows: [] };
+    if (!this.data[mainTable]) return { rows: [] };
     
-    let mainData = [...data[mainTable]];
+    let mainData = [...this.data[mainTable]];
     
     // Handle LEFT JOIN or JOIN
     let joinedData: any[] = [];
@@ -509,7 +413,7 @@ export class JsonDb {
     
     if (joinMatch) {
       const [, joinTable, joinAlias, leftTable, leftCol, rightTable, rightCol] = joinMatch;
-      const joinTableData = data[joinTable as keyof StorageData] || [];
+      const joinTableData = this.data[joinTable as keyof StorageData] || [];
       const isLeftJoin = !!leftJoinMatch;
       
       // Perform join
@@ -596,16 +500,16 @@ export class JsonDb {
     if (!fromMatch) return { rows: [] };
     
     const mainTable = fromMatch[1] as keyof StorageData;
-    if (!data[mainTable]) return { rows: [] };
+    if (!this.data[mainTable]) return { rows: [] };
     
-    let mainData = [...data[mainTable]];
+    let mainData = [...this.data[mainTable]];
     
     // Handle JOIN
     let joinedData: any[] = [];
     const joinMatch = sql.match(/JOIN\s+(\w+)\s+(\w+)\s+ON\s+(\w+)\.(\w+)\s*=\s*(\w+)\.(\w+)/i);
     if (joinMatch) {
       const [, joinTable, joinAlias, leftTable, leftCol, rightTable, rightCol] = joinMatch;
-      const joinTableData = data[joinTable as keyof StorageData] || [];
+      const joinTableData = this.data[joinTable as keyof StorageData] || [];
       
       // Perform join
       joinedData = mainData.map((mainItem: any) => {
@@ -680,9 +584,9 @@ export class JsonDb {
       if (!fromMatch) return { rows: [{ count: '0' }] };
       
       const tableName = fromMatch[1] as keyof StorageData;
-      if (!data[tableName]) return { rows: [{ count: '0' }] };
+      if (!this.data[tableName]) return { rows: [{ count: '0' }] };
       
-      let result = [...data[tableName]];
+      let result = [...this.data[tableName]];
       
       // Handle WHERE
       if (sql.includes('WHERE')) {
@@ -699,7 +603,7 @@ export class JsonDb {
         const joinMatch = sql.match(/JOIN\s+(\w+)\s+(\w+)\s+ON\s+(\w+)\.(\w+)\s*=\s*(\w+)\.(\w+)/i);
         if (joinMatch) {
           const [, joinTable, joinAlias, leftTable, leftCol, rightTable, rightCol] = joinMatch;
-          const joinTableData = data[joinTable as keyof StorageData] || [];
+          const joinTableData = this.data[joinTable as keyof StorageData] || [];
           
           result = result.filter((mainItem: any) => {
             return joinTableData.some((j: any) => {
@@ -724,9 +628,9 @@ export class JsonDb {
       if (!fromMatch) return { rows: [{ [alias]: '0' }] };
       
       const tableName = fromMatch[1] as keyof StorageData;
-      if (!data[tableName]) return { rows: [{ [alias]: '0' }] };
+      if (!this.data[tableName]) return { rows: [{ [alias]: '0' }] };
       
-      let result = [...data[tableName]];
+      let result = [...this.data[tableName]];
       
       // Handle WHERE
       if (sql.includes('WHERE')) {
@@ -744,7 +648,7 @@ export class JsonDb {
         joinMatch = sql.match(/JOIN\s+(\w+)\s+(\w+)\s+ON\s+(\w+)\.(\w+)\s*=\s*(\w+)\.(\w+)/i);
         if (joinMatch) {
           const [, joinTable, joinAlias, leftTable, leftCol, rightTable, rightCol] = joinMatch;
-          const joinTableData = data[joinTable as keyof StorageData] || [];
+          const joinTableData = this.data[joinTable as keyof StorageData] || [];
           
           result = result.map((mainItem: any) => {
             const joinItem = joinTableData.find((j: any) => {
@@ -756,7 +660,7 @@ export class JsonDb {
             });
             return { ...mainItem, ...joinItem };
           }).filter((item: any) => {
-            // Apply WHERE conditions on joined data
+            // Apply WHERE conditions on joined this.data
             if (sql.includes('WHERE')) {
               const whereMatch = sql.match(/WHERE\s+([\s\S]+?)(?:\s+GROUP|\s+ORDER|$)/i);
               if (whereMatch) {
@@ -786,9 +690,9 @@ export class JsonDb {
       if (!fromMatch) return { rows: [{ no_shows: '0', total: '0' }] };
       
       const tableName = fromMatch[1] as keyof StorageData;
-      if (!data[tableName]) return { rows: [{ no_shows: '0', total: '0' }] };
+      if (!this.data[tableName]) return { rows: [{ no_shows: '0', total: '0' }] };
       
-      let result = [...data[tableName]];
+      let result = [...this.data[tableName]];
       
       // Handle WHERE
       if (sql.includes('WHERE')) {
@@ -826,9 +730,9 @@ export class JsonDb {
     const [, tableName, columns, values] = insertMatch;
     const tableKey = tableName as keyof StorageData;
     
-    // Ensure table exists in data
-    if (!data[tableKey]) {
-      data[tableKey] = [] as any;
+    // Ensure table exists in this.data
+    if (!this.data[tableKey]) {
+      this.data[tableKey] = [] as any;
     }
     
     const columnList = columns.split(',').map(c => c.trim());
@@ -903,8 +807,8 @@ export class JsonDb {
       }
     });
     
-    (data[tableKey] as any[]).push(newItem);
-    saveData();
+    (this.data[tableKey] as any[]).push(newItem);
+    // Persistence is handled by the caller (Mongo write-through).
     
     // Handle RETURNING - always return the new item if RETURNING is present
     if (normalizedSql.includes('RETURNING')) {
@@ -927,11 +831,11 @@ export class JsonDb {
     const [, tableName, setClause] = updateMatch;
     const tableKey = tableName as keyof StorageData;
     
-    if (!data[tableKey]) {
+    if (!this.data[tableKey]) {
       return { rows: [] };
     }
     
-    let tableData = [...(data[tableKey] as any[])];
+    let tableData = [...(this.data[tableKey] as any[])];
     
     // Handle WHERE clause
     const whereMatch = normalizedSql.match(/WHERE\s+([\s\S]+?)(?:\s+RETURNING|$)/i);
@@ -1016,9 +920,9 @@ export class JsonDb {
       }
     });
     
-    // Save updated data
-    data[tableKey] = tableData as any;
-    saveData();
+    // Save updated this.data
+    this.data[tableKey] = tableData as any;
+    // Persistence is handled by the caller (Mongo write-through).
     
     if (normalizedSql.includes('RETURNING')) {
       return { rows: matchingItems };
@@ -1032,7 +936,7 @@ export class JsonDb {
     if (!deleteMatch) return { rows: [] };
     
     const tableName = deleteMatch[1] as keyof StorageData;
-    let tableData = data[tableName] as any[];
+    let tableData = this.data[tableName] as any[];
     
     const whereMatch = sql.match(/WHERE\s+([\s\S]+)/i);
     if (whereMatch) {
@@ -1047,27 +951,21 @@ export class JsonDb {
       tableData = [];
     }
     
-    data[tableName] = tableData as any;
-    saveData();
+    this.data[tableName] = tableData as any;
+    // Persistence is handled by the caller (Mongo write-through).
     
     return { rows: [] };
   }
 
   private getNextId(table: keyof StorageData): number {
-    const tableData = data[table] as any[];
+    const tableData = this.data[table] as any[];
     if (tableData.length === 0) return 1;
     return Math.max(...tableData.map((item: any) => item.id || 0)) + 1;
   }
 }
 
-let dbInstance: JsonDb | null = null;
-
-export function getDb(): JsonDb {
-  if (!dbInstance) {
-    dbInstance = new JsonDb();
-  }
-  return dbInstance;
+export function createSqlDb(dataRef?: StorageData): SqlDb {
+  return new SqlDb(dataRef);
 }
 
-export { loadData, saveData };
 

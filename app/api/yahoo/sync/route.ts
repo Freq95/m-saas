@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 import { getYahooConfig, fetchYahooEmails, markEmailAsRead } from '@/lib/yahoo-mail';
-import { getDb } from '@/lib/db';
+import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache } from '@/lib/db/mongo-utils';
 import { suggestTags } from '@/lib/ai-agent';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
@@ -10,7 +10,7 @@ import { handleApiError, createSuccessResponse, createErrorResponse } from '@/li
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
+
     // Validate input
     const { yahooSyncSchema } = await import('@/lib/validation');
     const validationResult = yahooSyncSchema.safeParse(body);
@@ -19,17 +19,17 @@ export async function POST(request: NextRequest) {
     }
 
     const { userId, todayOnly, since: sinceParam } = validationResult.data;
-    
+
     // Get config from database (with env fallback)
     const config = await getYahooConfig(userId);
-    
+
     if (!config) {
       return createErrorResponse(
         'Yahoo Mail not configured. Please configure it in Settings > Email Integrations or set YAHOO_EMAIL and YAHOO_PASSWORD (or YAHOO_APP_PASSWORD) in .env',
         400
       );
     }
-    
+
     // If todayOnly is true, only sync emails from today
     let since: Date | undefined;
     if (todayOnly) {
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     const emails = await fetchYahooEmails(config, since);
     logger.info('Yahoo sync: Found emails', { count: emails.length });
 
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
     let syncedCount = 0;
     let skippedCount = 0;
     let errorCount = 0;
@@ -55,12 +55,12 @@ export async function POST(request: NextRequest) {
     for (const email of emails) {
       try {
         logger.debug('Yahoo sync: Processing email', { from: email.from, subject: email.subject });
-        
+
         // Extract contact info
         const emailMatch = email.from.match(/<(.+)>/);
         const emailAddress = emailMatch ? emailMatch[1] : email.from;
         const name = email.from.replace(/<.+>/, '').trim() || emailAddress.split('@')[0];
-        
+
         logger.debug('Yahoo sync: Extracted contact info', { email: emailAddress, name });
 
         // Find or create client (non-blocking for inbox sync)
@@ -81,51 +81,55 @@ export async function POST(request: NextRequest) {
           });
         }
 
-        // Check if conversation exists
-        const existingConv = await db.query(
-          `SELECT id, client_id FROM conversations 
-           WHERE user_id = $1 AND channel = 'email' AND contact_email = $2 
-           ORDER BY created_at DESC LIMIT 1`,
-          [userId, emailAddress]
-        );
+        const existingConv = await db
+          .collection('conversations')
+          .find({ user_id: userId, channel: 'email', contact_email: emailAddress })
+          .sort({ created_at: -1 })
+          .limit(1)
+          .next();
 
         let conversationId: number;
+        let existingClientId: number | null = null;
 
-        if (existingConv.rows.length > 0) {
-          conversationId = existingConv.rows[0].id;
+        if (existingConv) {
+          conversationId = existingConv.id;
+          existingClientId = existingConv.client_id || null;
         } else {
-          // Create new conversation
-          const convResult = await db.query(
-            `INSERT INTO conversations (user_id, channel, channel_id, contact_name, contact_email, subject, status, client_id, created_at, updated_at)
-             VALUES ($1, 'email', $2, $3, $4, $5, 'open', $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-             RETURNING id`,
-            [userId, email.messageId || email.uid.toString(), name, emailAddress, email.subject, client?.id || null]
-          );
-          conversationId = convResult.rows[0].id;
+          const now = new Date().toISOString();
+          conversationId = await getNextNumericId('conversations');
+          await db.collection('conversations').insertOne({
+            _id: conversationId,
+            id: conversationId,
+            user_id: userId,
+            channel: 'email',
+            channel_id: email.messageId || email.uid?.toString() || '',
+            contact_name: name,
+            contact_email: emailAddress,
+            subject: email.subject || null,
+            status: 'open',
+            client_id: client?.id || null,
+            created_at: now,
+            updated_at: now,
+          });
         }
 
         // Check if message already exists (by messageId or UID)
         let existingMsg: { id: number } | null = null;
         if (email.messageId || email.uid) {
-          const msgCheck = await db.query(
-            `SELECT id FROM messages
-             WHERE conversation_id = $1
-             AND (
-               (external_id IS NOT NULL AND external_id = $2)
-               OR (source_uid IS NOT NULL AND source_uid = $3)
-             )
-             ORDER BY sent_at DESC LIMIT 1`,
-            [conversationId, email.messageId || null, email.uid || null]
-          );
-          if (msgCheck.rows.length > 0) {
-            existingMsg = msgCheck.rows[0] as { id: number };
-          }
+          existingMsg = await db
+            .collection('messages')
+            .findOne({
+              conversation_id: conversationId,
+              $or: [
+                email.messageId ? { external_id: email.messageId } : undefined,
+                email.uid ? { source_uid: email.uid } : undefined,
+              ].filter(Boolean),
+            });
         }
 
         if (!existingMsg) {
-          // Store message using standardized format
           const { serializeMessage } = await import('@/lib/email-types');
-          
+
           const storedMessage = {
             text: email.cleanText || email.text || '',
             html: email.html,
@@ -143,22 +147,29 @@ export async function POST(request: NextRequest) {
             messageId: email.messageId,
             uid: email.uid,
           };
-          
-          const sentAt = email.date || new Date();
-          await db.query(
-            `INSERT INTO messages (conversation_id, direction, content, sent_at, external_id, source_uid)
-             VALUES ($1, 'inbound', $2, $3, $4, $5)`,
-            [conversationId, serializeMessage(storedMessage), sentAt, email.messageId || null, email.uid || null]
-          );
 
-          // Keep conversation fresh for sorting (even if message parsing fails later)
-          await db.query(
-            `UPDATE conversations SET updated_at = $1 WHERE id = $2`,
-            [sentAt, conversationId]
+          const sentAt = email.date || new Date();
+          const messageId = await getNextNumericId('messages');
+          await db.collection('messages').insertOne({
+            _id: messageId,
+            id: messageId,
+            conversation_id: conversationId,
+            direction: 'inbound',
+            content: serializeMessage(storedMessage),
+            sent_at: sentAt.toISOString(),
+            created_at: sentAt.toISOString(),
+            external_id: email.messageId || null,
+            source_uid: email.uid || null,
+          });
+
+          // Keep conversation fresh for sorting
+          await db.collection('conversations').updateOne(
+            { id: conversationId },
+            { $set: { updated_at: sentAt.toISOString() } }
           );
 
           // Ensure conversation is linked to client if available and missing
-          if (client && !existingConv.rows[0]?.client_id) {
+          if (client && !existingClientId) {
             try {
               await linkConversationToClient(conversationId, client.id);
             } catch (linkError) {
@@ -172,16 +183,25 @@ export async function POST(request: NextRequest) {
           // Auto-tag
           const suggestedTags = await suggestTags(email.text);
           if (suggestedTags.length > 0) {
-            for (const tagName of suggestedTags) {
-              const tagResult = await db.query('SELECT id FROM tags WHERE LOWER(name) = LOWER($1)', [tagName]);
-              if (tagResult.rows.length > 0) {
-                await db.query(
-                  `INSERT INTO conversation_tags (conversation_id, tag_id)
-                   VALUES ($1, $2)
-                   ON CONFLICT DO NOTHING`,
-                  [conversationId, tagResult.rows[0].id]
-                );
+            const allTags = await db.collection('tags').find({}).toArray();
+            const tagsByName = new Map<string, any>();
+            for (const tag of allTags) {
+              if (typeof tag.name === 'string') {
+                tagsByName.set(tag.name.toLowerCase(), tag);
               }
+            }
+
+            const newConvTags = suggestedTags
+              .map((tagName) => tagsByName.get(tagName.toLowerCase()))
+              .filter(Boolean)
+              .map((tag: any) => ({
+                _id: `${conversationId}:${tag.id}`,
+                conversation_id: conversationId,
+                tag_id: tag.id,
+              }));
+
+            if (newConvTags.length > 0) {
+              await db.collection('conversation_tags').insertMany(newConvTags, { ordered: false });
             }
           }
 
@@ -216,12 +236,12 @@ export async function POST(request: NextRequest) {
           await updateIntegrationSyncTime(yahooIntegration.id);
         }
       } catch (err) {
-        // Non-critical, just log
         const { logger } = await import('@/lib/logger');
         logger.warn('Failed to update integration sync time', { error: err });
       }
     }
 
+    invalidateMongoCache();
     return createSuccessResponse({
       success: true,
       synced: syncedCount,
@@ -239,13 +259,13 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const userId = parseInt(searchParams.get('userId') || '1');
-    
+
     const config = await getYahooConfig(userId);
-    
+
     if (!config) {
       return createSuccessResponse({
         connected: false,
-        error: 'Yahoo Mail not configured'
+        error: 'Yahoo Mail not configured',
       });
     }
 
@@ -260,4 +280,3 @@ export async function GET(request: NextRequest) {
     return handleApiError(error, 'Failed to test Yahoo connection');
   }
 }
-

@@ -1,75 +1,54 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
-import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
+import { getMongoDbOrThrow, parseTags } from '@/lib/db/mongo-utils';
+import { handleApiError } from '@/lib/error-handler';
 
 // GET /api/clients/export - Export clients to CSV
 export async function GET(request: NextRequest) {
   try {
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
     const searchParams = request.nextUrl.searchParams;
-    
+
     // Validate query parameters
     const { userIdQuerySchema } = await import('@/lib/validation');
     const { DEFAULT_USER_ID } = await import('@/lib/constants');
     const queryParams = {
       userId: searchParams.get('userId') || DEFAULT_USER_ID.toString(),
     };
-    
+
     const validationResult = userIdQuerySchema.safeParse(queryParams);
     if (!validationResult.success) {
       return handleApiError(validationResult.error, 'Invalid query parameters');
     }
-    
+
     const { userId } = validationResult.data;
 
-    // Get all clients for user
-    const result = await db.query(
-      `SELECT 
-        id,
-        name,
-        email,
-        phone,
-        source,
-        status,
-        tags,
-        total_spent,
-        total_appointments,
-        last_appointment_date,
-        last_conversation_date,
-        first_contact_date,
-        created_at
-       FROM clients
-       WHERE user_id = $1
-       ORDER BY name ASC`,
-      [userId]
-    );
+    const clients = await db
+      .collection('clients')
+      .find({ user_id: userId })
+      .sort({ name: 1 })
+      .toArray();
 
-    const clients = result.rows || [];
-
-    // Convert to CSV
     const headers = [
       'ID',
       'Nume',
       'Email',
       'Telefon',
-      'Sursă',
+      'Sursa',
       'Status',
       'Tag-uri',
       'Total cheltuit (RON)',
-      'Programări totale',
-      'Ultima vizită',
-      'Ultima conversație',
+      'Programari totale',
+      'Ultima vizita',
+      'Ultima conversatie',
       'Prima contactare',
-      'Data creării',
+      'Data crearii',
     ];
 
     const csvRows = [headers.join(',')];
 
     for (const client of clients) {
-      const tags = typeof client.tags === 'string' 
-        ? JSON.parse(client.tags || '[]') 
-        : (client.tags || []);
-      
+      const tags = parseTags(client.tags);
+
       const row = [
         client.id,
         `"${(client.name || '').replace(/"/g, '""')}"`,
@@ -80,7 +59,7 @@ export async function GET(request: NextRequest) {
         `"${tags.join('; ').replace(/"/g, '""')}"`,
         (client.total_spent || 0).toFixed(2),
         client.total_appointments || 0,
-        client.last_appointment_date 
+        client.last_appointment_date
           ? new Date(client.last_appointment_date).toLocaleDateString('ro-RO')
           : '',
         client.last_conversation_date
@@ -109,4 +88,3 @@ export async function GET(request: NextRequest) {
     return handleApiError(error, 'Failed to export clients');
   }
 }
-

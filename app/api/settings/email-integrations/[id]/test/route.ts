@@ -15,7 +15,7 @@ export async function POST(
     // Validate route parameter
     const paramValidation = integrationIdParamSchema.safeParse({ id: params.id });
     if (!paramValidation.success) {
-      return createErrorResponse('Invalid integration ID', 400, paramValidation.error.errors);
+      return createErrorResponse('Invalid integration ID', 400, JSON.stringify(paramValidation.error.errors));
     }
     
     const integrationId = paramValidation.data.id;

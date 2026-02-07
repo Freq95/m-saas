@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     
     const validationResult = createYahooIntegrationSchema.safeParse(body);
     if (!validationResult.success) {
-      return createErrorResponse('Invalid input', 400, validationResult.error.errors);
+      return createErrorResponse('Invalid input', 400, JSON.stringify(validationResult.error.errors));
     }
     
     const { userId, email, password } = validationResult.data;

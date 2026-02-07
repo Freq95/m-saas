@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { NextRequest } from 'next/server';
+import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getAvailableSlots, getSuggestedSlots } from '@/lib/calendar';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
@@ -7,34 +7,31 @@ import { handleApiError, createSuccessResponse, createErrorResponse } from '@/li
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    
+
     // Validate query parameters
     const { calendarSlotsQuerySchema } = await import('@/lib/validation');
     const queryParams = {
       userId: searchParams.get('userId') || '1',
       date: searchParams.get('date') || undefined,
     };
-    
+
     const validationResult = calendarSlotsQuerySchema.safeParse(queryParams);
     if (!validationResult.success) {
       return handleApiError(validationResult.error, 'Invalid query parameters');
     }
-    
+
     const { userId, date } = validationResult.data;
     const serviceId = searchParams.get('serviceId');
     const suggested = searchParams.get('suggested') === 'true';
 
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
 
     // Get service duration
     let serviceDuration = 60; // default
     if (serviceId) {
-      const serviceResult = await db.query(
-        'SELECT duration_minutes FROM services WHERE id = $1',
-        [serviceId]
-      );
-      if (serviceResult.rows.length > 0) {
-        serviceDuration = serviceResult.rows[0].duration_minutes;
+      const serviceDoc = await db.collection('services').findOne({ id: Number(serviceId) });
+      if (serviceDoc?.duration_minutes) {
+        serviceDuration = serviceDoc.duration_minutes;
       }
     }
 
@@ -71,4 +68,3 @@ export async function GET(request: NextRequest) {
     return handleApiError(error, 'Failed to fetch slots');
   }
 }
-

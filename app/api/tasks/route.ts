@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { NextRequest } from 'next/server';
+import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
 // GET /api/tasks - Get tasks for a client or user
 export async function GET(request: NextRequest) {
   try {
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
     const searchParams = request.nextUrl.searchParams;
-    
+
     // Validate query parameters
     const { tasksQuerySchema } = await import('@/lib/validation');
     const queryParams = {
@@ -15,36 +15,32 @@ export async function GET(request: NextRequest) {
       contactId: searchParams.get('contactId') || undefined,
       status: searchParams.get('status') || undefined,
     };
-    
+
     const validationResult = tasksQuerySchema.safeParse(queryParams);
     if (!validationResult.success) {
       return handleApiError(validationResult.error, 'Invalid query parameters');
     }
-    
+
     const { userId, contactId, status } = validationResult.data;
 
-    let query = 'SELECT * FROM tasks WHERE 1=1';
-    const params: (string | number)[] = [];
-
+    const filter: Record<string, any> = {};
     if (contactId) {
-      query += ` AND (client_id = $${params.length + 1} OR contact_id = $${params.length + 1})`;
-      params.push(contactId);
+      filter.$or = [{ client_id: contactId }, { contact_id: contactId }];
     }
-
     if (userId) {
-      query += ` AND user_id = $${params.length + 1}`;
-      params.push(userId);
+      filter.user_id = userId;
     }
-    
     if (status) {
-      query += ` AND status = $${params.length + 1}`;
-      params.push(status);
+      filter.status = status;
     }
 
-    query += ' ORDER BY due_date ASC, created_at DESC';
+    const tasks = await db
+      .collection('tasks')
+      .find(filter)
+      .sort({ due_date: 1, created_at: -1 })
+      .toArray();
 
-    const result = await db.query(query, params);
-    return createSuccessResponse({ tasks: result.rows || [] });
+    return createSuccessResponse({ tasks: tasks.map(stripMongoId) });
   } catch (error) {
     return handleApiError(error, 'Failed to fetch tasks');
   }
@@ -53,7 +49,7 @@ export async function GET(request: NextRequest) {
 // POST /api/tasks - Create a new task
 export async function POST(request: NextRequest) {
   try {
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
     const body = await request.json();
 
     const { userId, contactId, title, description, dueDate, status, priority } = body;
@@ -63,27 +59,27 @@ export async function POST(request: NextRequest) {
     }
 
     const now = new Date().toISOString();
-    // Use client_id instead of contact_id (support both for migration)
-    const result = await db.query(
-      `INSERT INTO tasks (user_id, client_id, contact_id, title, description, due_date, status, priority, created_at, updated_at)
-       VALUES ($1, $2, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING *`,
-      [
-        userId,
-        contactId || null,
-        title,
-        description || null,
-        dueDate || null,
-        status || 'open',
-        priority || 'medium',
-        now,
-        now,
-      ]
-    );
+    const taskId = await getNextNumericId('tasks');
+    const taskDoc = {
+      _id: taskId,
+      id: taskId,
+      user_id: userId,
+      client_id: contactId || null,
+      contact_id: contactId || null,
+      title,
+      description: description || null,
+      due_date: dueDate || null,
+      status: status || 'open',
+      priority: priority || 'medium',
+      created_at: now,
+      updated_at: now,
+    };
 
-    return createSuccessResponse({ task: result.rows[0] }, 201);
+    await db.collection('tasks').insertOne(taskDoc);
+    invalidateMongoCache();
+
+    return createSuccessResponse({ task: stripMongoId(taskDoc) }, 201);
   } catch (error) {
     return handleApiError(error, 'Failed to create task');
   }
 }
-

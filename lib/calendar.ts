@@ -1,4 +1,4 @@
-import { getDb } from './db';
+import { getMongoDbOrThrow } from './db/mongo-utils';
 import { format, addMinutes, startOfDay, endOfDay } from 'date-fns';
 import { ro } from 'date-fns/locale';
 
@@ -24,23 +24,25 @@ export async function getAvailableSlots(
   serviceDuration: number,
   workingHours: { start: string; end: string } = { start: '09:00', end: '18:00' }
 ): Promise<TimeSlot[]> {
-  const db = getDb();
+  const db = await getMongoDbOrThrow();
   
   const dayStart = startOfDay(date);
   const dayEnd = endOfDay(date);
   
   // Get all appointments for the day
-  const appointmentsResult = await db.query(
-    `SELECT start_time, end_time 
-     FROM appointments 
-     WHERE user_id = $1 
-       AND start_time >= $2 
-       AND start_time < $3 
-       AND status = 'scheduled'`,
-    [userId, dayStart, dayEnd]
-  );
+  const appointments = await db
+    .collection('appointments')
+    .find({
+      user_id: userId,
+      status: 'scheduled',
+      start_time: {
+        $gte: dayStart.toISOString(),
+        $lt: dayEnd.toISOString(),
+      },
+    })
+    .toArray();
 
-  const bookedSlots = appointmentsResult.rows.map((row: any) => ({
+  const bookedSlots = appointments.map((row: any) => ({
     start: new Date(row.start_time),
     end: new Date(row.end_time),
   }));
@@ -61,7 +63,7 @@ export async function getAvailableSlots(
     
     if (slotEnd <= dayEndTime) {
       // Check if this slot overlaps with any booked appointment
-      const isAvailable = !bookedSlots.some(booked => {
+      const isAvailable = !bookedSlots.some((booked: any) => {
         return (
           (slotStart >= booked.start && slotStart < booked.end) ||
           (slotEnd > booked.start && slotEnd <= booked.end) ||
@@ -171,7 +173,7 @@ export async function isSlotAvailable(
   startTime: Date,
   endTime: Date
 ): Promise<boolean> {
-  const db = getDb();
+  const db = await getMongoDbOrThrow();
   
   // Calculate search window: check appointments on the same day
   // This ensures we catch all potentially overlapping appointments without complex SQL
@@ -184,17 +186,17 @@ export async function isSlotAvailable(
   // Fetch all scheduled appointments for this user on the same day(s)
   // Using simple WHERE conditions: user_id, status, and date range
   // No complex OR conditions that might have parsing issues
-  const result = await db.query(
-    `SELECT start_time, end_time 
-     FROM appointments 
-     WHERE user_id = $1 
-       AND status = $2
-       AND start_time >= $3
-       AND start_time <= $4`,
-    [userId, 'scheduled', searchWindowStart.toISOString(), searchWindowEnd.toISOString()]
-  );
-
-  const appointments = result.rows || [];
+  const appointments = await db
+    .collection('appointments')
+    .find({
+      user_id: userId,
+      status: 'scheduled',
+      start_time: {
+        $gte: searchWindowStart.toISOString(),
+        $lte: searchWindowEnd.toISOString(),
+      },
+    })
+    .toArray();
   
   // Also check appointments that start on previous days but end during our window
   // This catches appointments that span multiple days or start before our window
@@ -203,23 +205,27 @@ export async function isSlotAvailable(
     dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
     dayBeforeStart.setHours(0, 0, 0, 0);
     
-    const result2 = await db.query(
-      `SELECT start_time, end_time 
-       FROM appointments 
-       WHERE user_id = $1 
-         AND status = $2
-         AND start_time >= $3
-         AND start_time < $4
-         AND end_time >= $4`,
-      [userId, 'scheduled', dayBeforeStart.toISOString(), searchWindowStart.toISOString()]
-    );
-    
-    appointments.push(...(result2.rows || []));
+    const extraAppointments = await db
+      .collection('appointments')
+      .find({
+        user_id: userId,
+        status: 'scheduled',
+        start_time: {
+          $gte: dayBeforeStart.toISOString(),
+          $lt: searchWindowStart.toISOString(),
+        },
+        end_time: {
+          $gte: searchWindowStart.toISOString(),
+        },
+      })
+      .toArray();
+
+    appointments.push(...extraAppointments);
   }
 
   // Remove duplicates by converting to a Set using a unique key
-  const uniqueAppointments = Array.from(
-    new Map(appointments.map(apt => [`${apt.start_time}-${apt.end_time}`, apt])).values()
+  const uniqueAppointments: any[] = Array.from(
+    new Map(appointments.map((apt: any) => [`${apt.start_time}-${apt.end_time}`, apt])).values()
   );
 
   // Check overlap in JavaScript - more reliable than complex SQL

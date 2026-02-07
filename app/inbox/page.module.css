@@ -1,48 +1,50 @@
 .container {
   height: 100vh;
   max-height: 100vh;
-  background: #121212;
+  background: transparent;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .nav {
-  background: #1a1a1a;
-  border-bottom: 1px solid #252525;
-  padding: 1rem 1.5rem;
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-4) var(--space-6);
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-shrink: 0;
+  backdrop-filter: blur(var(--blur-md));
+  -webkit-backdrop-filter: blur(var(--blur-md));
 }
 
 .logo {
   font-size: 1.1rem;
   font-weight: 500;
-  color: #d4d4d4;
+  color: var(--color-text);
   letter-spacing: -0.01em;
 }
 
 .navLinks {
   display: flex;
-  gap: 2rem;
+  gap: var(--space-6);
 }
 
 .navLinks a {
-  color: #737373;
+  color: var(--color-text-soft);
   font-weight: 400;
   font-size: 0.9rem;
-  transition: color 0.2s ease;
+  transition: color var(--transition-fast);
   position: relative;
 }
 
 .navLinks a:hover {
-  color: #d4d4d4;
+  color: var(--color-text);
 }
 
 .navLinks a.active {
-  color: #d4d4d4;
+  color: var(--color-text);
 }
 
 .navLinks a.active::after {
@@ -52,7 +54,7 @@
   left: 0;
   right: 0;
   height: 1.5px;
-  background: #d4d4d4;
+  background: var(--gradient-accent);
 }
 
 .inbox {
@@ -64,7 +66,7 @@
 }
 
 .conversationList {
-  background: #1a1a1a;
+  background: var(--color-bg-elevated);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -73,11 +75,14 @@
   position: relative;
   align-items: stretch;
   align-self: stretch;
+  border-right: 1px solid var(--color-border);
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
 }
 
 .divider {
   width: 4px;
-  background: #252525;
+  background: var(--color-surface-muted);
   cursor: col-resize;
   flex-shrink: 0;
   position: relative;
@@ -86,11 +91,11 @@
 }
 
 .divider:hover {
-  background: #3d3d3d;
+  background: rgba(148, 163, 184, 0.3);
 }
 
 .divider.resizing {
-  background: #4d4d4d;
+  background: rgba(77, 163, 255, 0.65);
 }
 
 .divider::before {
@@ -105,8 +110,8 @@
 
 .searchContainer {
   padding: 0.5rem;
-  background: #1a1a1a;
-  border-bottom: 1px solid #252525;
+  background: var(--color-bg-elevated);
+  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 
@@ -117,7 +122,7 @@
   min-height: 0;
   position: relative;
   scrollbar-width: thin;
-  scrollbar-color: #3d3d3d #1a1a1a;
+  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -126,61 +131,67 @@
 }
 
 .conversationListContent::-webkit-scrollbar-track {
-  background: #1a1a1a;
+  background: var(--color-bg-elevated);
 }
 
 .conversationListContent::-webkit-scrollbar-thumb {
-  background: #3d3d3d;
-  border-radius: 4px;
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: var(--radius-sm);
 }
 
 .conversationListContent::-webkit-scrollbar-thumb:hover {
-  background: #4d4d4d;
+  background: rgba(148, 163, 184, 0.55);
 }
 
 .searchInput {
   width: 100%;
   padding: 0.6rem 1rem;
-  background: #252525;
-  border: none;
-  border-radius: 8px;
-  color: #d4d4d4;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
   font-size: 0.875rem;
   outline: none;
-  transition: background 0.2s ease;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
 .searchInput:focus {
-  background: #2d2d2d;
+  background: var(--color-surface-strong);
+  border-color: var(--color-border-strong);
 }
 
 .searchInput::placeholder {
-  color: #737373;
+  color: var(--color-text-soft);
 }
 
 .syncButton {
   margin-top: 0.5rem;
   width: 100%;
   padding: 0.5rem 0.75rem;
-  background: #252525;
-  color: #d4d4d4;
-  border: 1px solid #2d2d2d;
-  border-radius: 8px;
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
   font-size: 0.85rem;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease;
+  transition: transform var(--transition-fast), filter var(--transition-fast), border-color var(--transition-fast);
+  font-weight: 600;
+  box-shadow: 0 10px 20px rgba(45, 136, 255, 0.24);
 }
 
 .syncButton:hover {
-  background: #2d2d2d;
-  border-color: #3d3d3d;
+  filter: brightness(1.07);
+  transform: translateY(-1px);
+  border-color: var(--color-border-strong);
 }
 
 .syncButton:disabled {
-  background: #1f1f1f;
-  color: #737373;
+  background: rgba(77, 163, 255, 0.08);
+  color: var(--color-text-soft);
   cursor: not-allowed;
-  border-color: #252525;
+  border-color: var(--color-border);
+  box-shadow: none;
+  transform: none;
 }
 
 .syncError {
@@ -192,26 +203,29 @@
 .emptyConversations {
   padding: 2rem;
   text-align: center;
-  color: #737373;
+  color: var(--color-text-soft);
   font-size: 0.875rem;
 }
 
 .conversationItem {
   padding: 0.75rem 1rem;
-  border-bottom: 1px solid #252525;
+  border-bottom: 1px solid var(--color-border);
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  border-radius: var(--radius-sm);
+  margin: 2px 6px;
 }
 
 .conversationItem:hover {
-  background: #1f1f1f;
+  background: rgba(77, 163, 255, 0.08);
 }
 
 .conversationItem.active {
-  background: #2d2d2d;
+  background: rgba(77, 163, 255, 0.14);
+  border-color: rgba(148, 163, 184, 0.3);
 }
 
 .conversationHeader {
@@ -223,7 +237,7 @@
 
 .contactName {
   font-weight: 500;
-  color: #d4d4d4;
+  color: var(--color-text);
   font-size: 0.9375rem;
   flex: 1;
   overflow: hidden;
@@ -261,13 +275,13 @@
 
 .channel {
   font-size: 0.8125rem;
-  color: #737373;
+  color: var(--color-text-soft);
   text-transform: capitalize;
 }
 
 .lastMessageTime {
   font-size: 0.75rem;
-  color: #737373;
+  color: var(--color-text-soft);
   white-space: nowrap;
 }
 
@@ -275,7 +289,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: #121212;
+  background: transparent;
   min-width: 0;
   height: 100%;
   overflow: hidden;
@@ -285,35 +299,37 @@
 
 .threadHeader {
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid #252525;
+  border-bottom: 1px solid var(--color-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #1a1a1a;
+  background: var(--color-bg-elevated);
   flex-shrink: 0;
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
 }
 
 .threadHeader h3 {
   font-size: 1rem;
   margin-bottom: 0.2rem;
-  color: #d4d4d4;
+  color: var(--color-text);
   font-weight: 500;
 }
 
 .threadMeta {
   font-size: 0.85rem;
-  color: #737373;
+  color: var(--color-text-soft);
 }
 
 .status {
   font-size: 0.75rem;
   padding: 0.3rem 0.6rem;
-  background: #252525;
-  color: #737373;
-  border-radius: 3px;
+  background: var(--color-surface-muted);
+  color: var(--color-text-soft);
+  border-radius: 999px;
   text-transform: none;
   font-weight: 400;
-  border: none;
+  border: 1px solid rgba(77, 163, 255, 0.24);
 }
 
 .messages {
@@ -325,14 +341,14 @@
   flex-direction: column;
   gap: 0.125rem;
   min-height: 0;
-  background: #121212;
+  background: transparent;
   scroll-behavior: smooth;
 }
 
 .loadingOlder {
   text-align: center;
   padding: 1rem;
-  color: #737373;
+  color: var(--color-text-soft);
   font-size: 0.875rem;
 }
 
@@ -341,7 +357,7 @@
   margin: 1rem 0;
   padding: 0.375rem 0.75rem;
   font-size: 0.75rem;
-  color: #737373;
+  color: var(--color-text-soft);
   background: rgba(255, 255, 255, 0.05);
   border-radius: 7px;
   align-self: center;
@@ -367,7 +383,7 @@
   max-width: 65%;
   min-width: 0;
   padding: 0.375rem 0.5rem 0.25rem 0.5rem;
-  border-radius: 7.5px;
+  border-radius: var(--radius-md);
   word-wrap: break-word;
   position: relative;
   display: flex;
@@ -376,15 +392,18 @@
 }
 
 .inboundBubble {
-  background: #1a1a1a;
+  background: var(--color-bg-elevated);
   border-top-left-radius: 0;
-  color: #d4d4d4;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
 }
 
 .outboundBubble {
-  background: #d4d4d4;
+  background: var(--gradient-accent);
   border-top-right-radius: 0;
-  color: #121212;
+  color: var(--color-accent-contrast);
+  border: 1px solid rgba(77, 163, 255, 0.4);
+  box-shadow: 0 8px 20px rgba(45, 136, 255, 0.22);
 }
 
 .messageText {
@@ -399,9 +418,9 @@
   max-width: 100%;
   margin: 0.5rem 0;
   padding: 0;
-  background: #121212;
-  border-top: 1px solid #252525;
-  border-bottom: 1px solid #252525;
+  background: transparent;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .messageHtmlWrapper .emailContainer {
@@ -417,7 +436,7 @@
 
 .messageTimestamp {
   font-size: 0.6875rem;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(230, 237, 248, 0.62);
   align-self: flex-end;
   margin-top: 0.125rem;
   padding-left: 0.5rem;
@@ -425,7 +444,7 @@
 }
 
 .outboundBubble .messageTimestamp {
-  color: rgba(0, 0, 0, 0.6);
+  color: rgba(6, 19, 36, 0.62);
 }
 
 .emailContainer {
@@ -453,20 +472,23 @@
 
 .messageAttachment {
   padding: 0.5rem;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 4px;
+  background: rgba(77, 163, 255, 0.1);
+  border-radius: var(--radius-sm);
   font-size: 0.8125rem;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--color-text-muted);
+  border: 1px solid rgba(77, 163, 255, 0.16);
 }
 
 
 .suggestedResponse {
   margin: 1rem 1.5rem;
   padding: 1rem;
-  background: #1a1a1a;
-  border: 1px solid #252525;
-  border-radius: 4px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
   flex-shrink: 0;
+  backdrop-filter: blur(var(--blur-md));
+  -webkit-backdrop-filter: blur(var(--blur-md));
 }
 
 .suggestedHeader {
@@ -475,55 +497,59 @@
   align-items: center;
   margin-bottom: 0.6rem;
   font-weight: 400;
-  color: #737373;
+  color: var(--color-text-soft);
   font-size: 0.8rem;
 }
 
 .useButton {
   padding: 0.4rem 0.9rem;
-  background: #d4d4d4;
-  color: #121212;
+  background: var(--gradient-accent);
+  color: var(--color-accent-contrast);
   border: none;
-  border-radius: 3px;
+  border-radius: var(--radius-sm);
   font-weight: 400;
   font-size: 0.8rem;
-  transition: background 0.2s ease;
+  transition: filter var(--transition-fast), transform var(--transition-fast);
+  font-weight: 600;
 }
 
 .useButton:hover {
-  background: #e4e4e4;
+  filter: brightness(1.07);
+  transform: translateY(-1px);
 }
 
 .suggestedText {
-  color: #d4d4d4;
+  color: var(--color-text);
   line-height: 1.55;
   font-size: 0.9rem;
 }
 
 .messageInput {
   padding: 0.5rem;
-  border-top: 1px solid #252525;
+  border-top: 1px solid var(--color-border);
   display: flex;
   gap: 0.5rem;
-  background: #1a1a1a;
+  background: var(--color-bg-elevated);
   align-items: flex-end;
   flex-shrink: 0;
   z-index: 10;
   position: sticky;
   bottom: 0;
   width: 100%;
+  backdrop-filter: blur(var(--blur-sm));
+  -webkit-backdrop-filter: blur(var(--blur-sm));
 }
 
 .messageInput textarea {
   flex: 1;
   padding: 0.625rem 0.875rem;
-  border: none;
-  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   resize: none;
   font-size: 0.9375rem;
-  color: #d4d4d4;
-  background: #252525;
-  transition: background 0.2s ease;
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
   font-family: inherit;
   line-height: 1.4;
   max-height: 100px;
@@ -531,43 +557,48 @@
 }
 
 .messageInput textarea:focus {
-  background: #2d2d2d;
-  outline: none;
+  background: var(--color-surface-strong);
+  border-color: var(--color-border-strong);
 }
 
 .messageInput textarea::placeholder {
-  color: #737373;
+  color: var(--color-text-soft);
 }
 
 .sendButton {
   padding: 0.625rem 1.25rem;
-  background: #d4d4d4;
-  color: #121212;
+  background: var(--gradient-accent);
+  color: var(--color-accent-contrast);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-weight: 500;
   font-size: 0.9375rem;
-  transition: background 0.2s ease;
+  transition: filter var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
   cursor: pointer;
   white-space: nowrap;
+  box-shadow: 0 10px 20px rgba(45, 136, 255, 0.24);
 }
 
 .sendButton:hover {
-  background: #e4e4e4;
+  filter: brightness(1.07);
+  transform: translateY(-1px);
 }
 
 .sendButton:active {
-  background: #c4c4c4;
+  transform: translateY(0);
 }
 
 .sendButton:disabled {
-  background: #2d2d2d;
-  color: #737373;
+  background: var(--color-surface-muted);
+  color: var(--color-text-soft);
   cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 .sendButton:disabled:hover {
-  background: #2d2d2d;
+  filter: none;
+  transform: none;
 }
 
 .emptyState {
@@ -575,6 +606,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #737373;
+  color: var(--color-text-soft);
   font-size: 0.9rem;
 }
+

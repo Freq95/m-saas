@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { getDb } from './db';
+import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache } from './db/mongo-utils';
 
 let oauth2Client: any = null;
 
@@ -34,28 +34,27 @@ export async function exportToGoogleCalendar(
     return null;
   }
 
-  const db = getDb();
-  
-  // Get appointment details
-  const appointmentResult = await db.query(
-    `SELECT a.*, s.name as service_name, s.duration_minutes
-     FROM appointments a
-     LEFT JOIN services s ON a.service_id = s.id
-     WHERE a.id = $1 AND a.user_id = $2`,
-    [appointmentId, userId]
-  );
+  const db = await getMongoDbOrThrow();
 
-  if (appointmentResult.rows.length === 0) {
+  // Get appointment details
+  const appointment = await db.collection('appointments').findOne({
+    id: appointmentId,
+    user_id: userId,
+  });
+
+  if (!appointment) {
     throw new Error('Appointment not found');
   }
 
-  const appointment = appointmentResult.rows[0];
-  
+  const service = appointment.service_id
+    ? await db.collection('services').findOne({ id: appointment.service_id })
+    : null;
+
   oauth2Client.setCredentials({ access_token: accessToken });
   const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
   const event = {
-    summary: appointment.service_name || 'Programare',
+    summary: service?.name || 'Programare',
     description: appointment.notes || '',
     start: {
       dateTime: new Date(appointment.start_time).toISOString(),
@@ -74,15 +73,32 @@ export async function exportToGoogleCalendar(
       requestBody: event,
     });
 
-    const eventId = response.data.id;
-    
+    const eventId = response.data.id || null;
+    if (!eventId) {
+      return null;
+    }
+
     // Save sync record
-    await db.query(
-      `INSERT INTO google_calendar_sync (user_id, appointment_id, calendar_event_id)
-       VALUES ($1, $2, $3)
-       ON CONFLICT DO NOTHING`,
-      [userId, appointmentId, eventId]
-    );
+    const existing = await db.collection('google_calendar_sync').findOne({
+      user_id: userId,
+      appointment_id: appointmentId,
+      calendar_event_id: eventId,
+    });
+
+    if (!existing) {
+      const syncId = await getNextNumericId('google_calendar_sync');
+      const now = new Date().toISOString();
+      await db.collection('google_calendar_sync').insertOne({
+        _id: syncId,
+      id: syncId,
+      user_id: userId,
+      appointment_id: appointmentId,
+      calendar_event_id: eventId as string,
+        created_at: now,
+        updated_at: now,
+      });
+      invalidateMongoCache();
+    }
 
     return eventId;
   } catch (error) {
@@ -104,11 +120,10 @@ export function getAuthUrl(): string {
   }
 
   const scopes = ['https://www.googleapis.com/auth/calendar.events'];
-  
+
   return oauth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: scopes,
     prompt: 'consent',
   });
 }
-

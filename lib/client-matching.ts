@@ -3,7 +3,7 @@
  * Handles finding or creating clients based on contact information
  */
 
-import { getDb } from './db';
+import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, parseTags, stripMongoId } from './db/mongo-utils';
 
 export interface Client {
   id: number;
@@ -17,11 +17,37 @@ export interface Client {
   notes: string | null;
   total_spent: number;
   total_appointments: number;
-  last_appointment_date: Date | null;
-  last_conversation_date: Date | null;
-  first_contact_date: Date;
-  created_at: Date;
-  updated_at: Date;
+  last_appointment_date: string | null;
+  last_conversation_date: string | null;
+  first_contact_date: string;
+  created_at: string;
+  updated_at: string;
+  last_activity_date?: string | null;
+}
+
+function normalizePhone(phone?: string): string | null {
+  if (!phone) return null;
+  let cleaned = phone.trim().replace(/[^\d+]/g, '');
+
+  if (cleaned.startsWith('0040')) {
+    cleaned = '+40' + cleaned.substring(4);
+  } else if (cleaned.startsWith('40') && !cleaned.startsWith('+40')) {
+    cleaned = '+40' + cleaned.substring(2);
+  } else if (cleaned.startsWith('0') && cleaned.length > 1) {
+    cleaned = '+40' + cleaned.substring(1);
+  } else if (!cleaned.startsWith('+') && cleaned.length > 0) {
+    cleaned = '+40' + cleaned;
+  }
+
+  return cleaned || null;
+}
+
+function normalizeClientDoc(doc: any): Client {
+  const normalized = stripMongoId(doc) as Client;
+  return {
+    ...normalized,
+    tags: parseTags(normalized.tags),
+  };
 }
 
 /**
@@ -39,152 +65,92 @@ export async function findOrCreateClient(
   phone?: string,
   source: string = 'unknown'
 ): Promise<Client> {
-  const db = getDb();
-  
-  // Normalize email and phone
+  const db = await getMongoDbOrThrow();
+
   const normalizedEmail = email?.toLowerCase().trim() || null;
-  
-  // Improved phone normalization - handles various formats
-  let normalizedPhone: string | null = null;
-  if (phone) {
-    // Remove all non-digit characters except +
-    let cleaned = phone.trim().replace(/[^\d+]/g, '');
-    
-    // Handle Romanian phone numbers
-    // +40, 0040, 0 prefix -> normalize to +40
-    if (cleaned.startsWith('0040')) {
-      cleaned = '+40' + cleaned.substring(4);
-    } else if (cleaned.startsWith('40') && !cleaned.startsWith('+40')) {
-      cleaned = '+40' + cleaned.substring(2);
-    } else if (cleaned.startsWith('0') && cleaned.length > 1) {
-      cleaned = '+40' + cleaned.substring(1);
-    } else if (!cleaned.startsWith('+') && cleaned.length > 0) {
-      // If no country code, assume Romanian
-      cleaned = '+40' + cleaned;
-    }
-    
-    normalizedPhone = cleaned || null;
-  }
-  
+  const normalizedPhone = normalizePhone(phone);
   const normalizedName = name.trim();
-  
-  // Try to find existing client
+
   let existingClient: Client | null = null;
-  
-  // Priority 1: Match by email (if provided)
+
   if (normalizedEmail) {
-    const emailResult = await db.query(
-      `SELECT * FROM clients 
-       WHERE user_id = $1 AND LOWER(email) = LOWER($2) 
-       LIMIT 1`,
-      [userId, normalizedEmail]
-    );
-    
-    if (emailResult.rows.length > 0) {
-      existingClient = emailResult.rows[0] as Client;
+    const escaped = normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const client = await db.collection('clients').findOne({
+      user_id: userId,
+      email: { $regex: `^${escaped}$`, $options: 'i' },
+    });
+    if (client) {
+      existingClient = normalizeClientDoc(client);
     }
   }
-  
-  // Priority 2: Match by phone (if email match failed and phone provided)
+
   if (!existingClient && normalizedPhone) {
-    const phoneResult = await db.query(
-      `SELECT * FROM clients 
-       WHERE user_id = $1 AND phone = $2 
-       LIMIT 1`,
-      [userId, normalizedPhone]
-    );
-    
-    if (phoneResult.rows.length > 0) {
-      existingClient = phoneResult.rows[0] as Client;
+    const client = await db.collection('clients').findOne({
+      user_id: userId,
+      phone: normalizedPhone,
+    });
+    if (client) {
+      existingClient = normalizeClientDoc(client);
     }
   }
-  
-  // If found, update if needed and return
+
   if (existingClient) {
-    // Update missing information
-    const updates: string[] = [];
-    const updateParams: (string | number | null)[] = [existingClient.id];
-    
+    const updates: Record<string, unknown> = {};
+
     if (!existingClient.email && normalizedEmail) {
-      updates.push(`email = $${updateParams.length + 1}`);
-      updateParams.push(normalizedEmail);
+      updates.email = normalizedEmail;
     }
-    
+
     if (!existingClient.phone && normalizedPhone) {
-      updates.push(`phone = $${updateParams.length + 1}`);
-      updateParams.push(normalizedPhone);
+      updates.phone = normalizedPhone;
     }
-    
+
     if (existingClient.name !== normalizedName) {
-      updates.push(`name = $${updateParams.length + 1}`);
-      updateParams.push(normalizedName);
+      updates.name = normalizedName;
     }
-    
-    if (updates.length > 0) {
-      updates.push(`updated_at = CURRENT_TIMESTAMP`);
-      await db.query(
-        `UPDATE clients SET ${updates.join(', ')} WHERE id = $1`,
-        updateParams
+
+    if (Object.keys(updates).length > 0) {
+      updates.updated_at = new Date().toISOString();
+      await db.collection('clients').updateOne(
+        { id: existingClient.id },
+        { $set: updates }
       );
-      
-      // Reload client
-      const updatedResult = await db.query(
-        `SELECT * FROM clients WHERE id = $1`,
-        [existingClient.id]
-      );
-      if (updatedResult.rows.length > 0) {
-        existingClient = updatedResult.rows[0] as Client;
+      invalidateMongoCache();
+      const updated = await db.collection('clients').findOne({ id: existingClient.id });
+      if (updated) {
+        existingClient = normalizeClientDoc(updated);
       }
     }
-    
+
     return existingClient;
   }
-  
-  // Create new client
-  const now = new Date();
-  const tagsJson = JSON.stringify([]);
-  
-  try {
-    const newClientResult = await db.query(
-      `INSERT INTO clients 
-       (user_id, name, email, phone, source, status, tags, total_spent, total_appointments, 
-        last_appointment_date, last_conversation_date, first_contact_date, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-       RETURNING *`,
-      [
-        userId, 
-        normalizedName, 
-        normalizedEmail, 
-        normalizedPhone, 
-        source, 
-        'lead', 
-        tagsJson, 
-        0, 
-        0, 
-        null, 
-        null, 
-        now, 
-        now, 
-        now
-      ]
-    );
-    
-    if (!newClientResult.rows || newClientResult.rows.length === 0) {
-      throw new Error('Failed to create client: no rows returned');
-    }
-    
-    return newClientResult.rows[0] as Client;
-  } catch (error: any) {
-    console.error('Error creating client in database:', error);
-    console.error('Query params:', {
-      userId, 
-      normalizedName, 
-      normalizedEmail, 
-      normalizedPhone, 
-      source
-    });
-    throw error;
-  }
+
+  const now = new Date().toISOString();
+  const newClientId = await getNextNumericId('clients');
+  const newClientDoc = {
+    _id: newClientId,
+    id: newClientId,
+    user_id: userId,
+    name: normalizedName,
+    email: normalizedEmail,
+    phone: normalizedPhone,
+    source,
+    status: 'lead',
+    tags: JSON.stringify([]),
+    notes: null,
+    total_spent: 0,
+    total_appointments: 0,
+    last_appointment_date: null,
+    last_conversation_date: null,
+    first_contact_date: now,
+    created_at: now,
+    updated_at: now,
+    last_activity_date: now,
+  };
+
+  await db.collection('clients').insertOne(newClientDoc);
+  invalidateMongoCache();
+  return normalizeClientDoc(newClientDoc);
 }
 
 /**
@@ -192,64 +158,61 @@ export async function findOrCreateClient(
  * Call this when appointments are created/completed
  */
 export async function updateClientStats(clientId: number): Promise<void> {
-  const db = getDb();
-  
-  // Get client
-  const clientResult = await db.query(
-    `SELECT * FROM clients WHERE id = $1`,
-    [clientId]
+  const db = await getMongoDbOrThrow();
+
+  const client = await db.collection('clients').findOne({ id: clientId });
+  if (!client) return;
+
+  const [appointments, services, conversations] = await Promise.all([
+    db.collection('appointments').find({ client_id: clientId }).toArray(),
+    db.collection('services').find({}).toArray(),
+    db.collection('conversations').find({ client_id: clientId }).toArray(),
+  ]);
+
+  const serviceById = new Map<number, any>(
+    services.map((service: any) => [service.id, service])
   );
-  
-  if (clientResult.rows.length === 0) return;
-  
-  // Calculate total spent from completed appointments
-  const spentResult = await db.query(
-    `SELECT COALESCE(SUM(s.price), 0) as total
-     FROM appointments a
-     JOIN services s ON a.service_id = s.id
-     WHERE a.client_id = $1 AND a.status = 'completed'`,
-    [clientId]
+
+  const completedAppointments = appointments.filter((apt: any) => apt.status === 'completed');
+  const totalSpent = completedAppointments.reduce((sum: number, apt: any) => {
+    const service = serviceById.get(apt.service_id);
+    const price = typeof service?.price === 'number' ? service.price : 0;
+    return sum + price;
+  }, 0);
+
+  const totalAppointments = appointments.filter((apt: any) => ['scheduled', 'completed'].includes(apt.status)).length;
+
+  const lastAppointmentDate = appointments
+    .filter((apt: any) => ['scheduled', 'completed'].includes(apt.status))
+    .map((apt: any) => apt.start_time)
+    .filter(Boolean)
+    .sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime())[0] || null;
+
+  const lastConversationDate = conversations
+    .map((conv: any) => conv.updated_at || conv.created_at)
+    .filter(Boolean)
+    .sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime())[0] || null;
+
+  const activityCandidates = [lastAppointmentDate, lastConversationDate].filter(Boolean) as string[];
+  const lastActivityDate = activityCandidates.length > 0
+    ? activityCandidates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]
+    : null;
+
+  await db.collection('clients').updateOne(
+    { id: clientId },
+    {
+      $set: {
+        total_spent: totalSpent,
+        total_appointments: totalAppointments,
+        last_appointment_date: lastAppointmentDate,
+        last_conversation_date: lastConversationDate,
+        last_activity_date: lastActivityDate,
+        updated_at: new Date().toISOString(),
+      },
+    }
   );
-  const totalSpent = parseFloat(spentResult.rows[0]?.total || '0');
-  
-  // Count total appointments
-  const countResult = await db.query(
-    `SELECT COUNT(*) as count
-     FROM appointments
-     WHERE client_id = $1 AND status IN ('scheduled', 'completed')`,
-    [clientId]
-  );
-  const totalAppointments = parseInt(countResult.rows[0]?.count || '0');
-  
-  // Get last appointment date
-  const lastAppResult = await db.query(
-    `SELECT MAX(start_time) as last_date
-     FROM appointments
-     WHERE client_id = $1 AND status IN ('scheduled', 'completed')`,
-    [clientId]
-  );
-  const lastAppointmentDate = lastAppResult.rows[0]?.last_date || null;
-  
-  // Get last conversation date
-  const lastConvResult = await db.query(
-    `SELECT MAX(updated_at) as last_date
-     FROM conversations
-     WHERE client_id = $1`,
-    [clientId]
-  );
-  const lastConversationDate = lastConvResult.rows[0]?.last_date || null;
-  
-  // Update client
-  await db.query(
-    `UPDATE clients SET
-     total_spent = $1,
-     total_appointments = $2,
-     last_appointment_date = $3,
-     last_conversation_date = $4,
-     updated_at = CURRENT_TIMESTAMP
-     WHERE id = $5`,
-    [totalSpent, totalAppointments, lastAppointmentDate, lastConversationDate, clientId]
-  );
+
+  invalidateMongoCache();
 }
 
 /**
@@ -259,14 +222,13 @@ export async function linkConversationToClient(
   conversationId: number,
   clientId: number
 ): Promise<void> {
-  const db = getDb();
-  
-  await db.query(
-    `UPDATE conversations SET client_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-    [clientId, conversationId]
+  const db = await getMongoDbOrThrow();
+
+  await db.collection('conversations').updateOne(
+    { id: conversationId },
+    { $set: { client_id: clientId, updated_at: new Date().toISOString() } }
   );
-  
-  // Update last_conversation_date
+
   await updateClientStats(clientId);
 }
 
@@ -277,14 +239,13 @@ export async function linkAppointmentToClient(
   appointmentId: number,
   clientId: number
 ): Promise<void> {
-  const db = getDb();
-  
-  await db.query(
-    `UPDATE appointments SET client_id = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-    [clientId, appointmentId]
+  const db = await getMongoDbOrThrow();
+
+  await db.collection('appointments').updateOne(
+    { id: appointmentId },
+    { $set: { client_id: clientId, updated_at: new Date().toISOString() } }
   );
-  
-  // Update client stats
+
   await updateClientStats(clientId);
 }
 
@@ -308,8 +269,8 @@ export async function getClientSegments(
     frequentAppointmentsPerMonth?: number; // Default: 2 appointments/month
   } = {}
 ): Promise<ClientSegments> {
-  const db = getDb();
-  
+  const db = await getMongoDbOrThrow();
+
   const vipThreshold = options.vipThreshold || 1000;
   const inactiveDays = options.inactiveDays || 30;
   const newDays = options.newDays || 7;
@@ -318,88 +279,71 @@ export async function getClientSegments(
   const now = new Date();
   const inactiveDate = new Date(now);
   inactiveDate.setDate(inactiveDate.getDate() - inactiveDays);
-  
+
   const newDate = new Date(now);
   newDate.setDate(newDate.getDate() - newDays);
 
-  // VIP clients (total_spent > threshold)
-  const vipResult = await db.query(
-    `SELECT * FROM clients
-     WHERE user_id = $1 AND total_spent >= $2
-     ORDER BY total_spent DESC`,
-    [userId, vipThreshold]
-  );
-  const vip = vipResult.rows.map((row: Record<string, unknown>) => ({
-    ...row,
-    tags: typeof row.tags === 'string' ? JSON.parse(row.tags as string || '[]') : (row.tags || []),
-  })) as Client[];
+  const clients: Client[] = (await db.collection('clients').find({ user_id: userId }).toArray())
+    .map(normalizeClientDoc);
 
-  // Inactive clients (no activity in X days)
-  const inactiveResult = await db.query(
-    `SELECT * FROM clients
-     WHERE user_id = $1
-     AND (
-       (last_appointment_date IS NULL OR last_appointment_date < $2)
-       AND (last_conversation_date IS NULL OR last_conversation_date < $2)
-     )
-     ORDER BY COALESCE(last_appointment_date, last_conversation_date, created_at) DESC`,
-    [userId, inactiveDate]
-  );
-  const inactive = inactiveResult.rows.map((row: Record<string, unknown>) => ({
-    ...row,
-    tags: typeof row.tags === 'string' ? JSON.parse(row.tags as string || '[]') : (row.tags || []),
-  })) as Client[];
+  const vip = clients
+    .filter((client: Client) => client.total_spent >= vipThreshold)
+    .sort((a: Client, b: Client) => b.total_spent - a.total_spent);
 
-  // New clients (created in last X days)
-  const newResult = await db.query(
-    `SELECT * FROM clients
-     WHERE user_id = $1 AND created_at >= $2
-     ORDER BY created_at DESC`,
-    [userId, newDate]
-  );
-  const newClients = newResult.rows.map((row: Record<string, unknown>) => ({
-    ...row,
-    tags: typeof row.tags === 'string' ? JSON.parse(row.tags as string || '[]') : (row.tags || []),
-  })) as Client[];
+  const inactive = clients
+    .filter((client: Client) => {
+      const lastAppointment = client.last_appointment_date ? new Date(client.last_appointment_date) : null;
+      const lastConversation = client.last_conversation_date ? new Date(client.last_conversation_date) : null;
+      const appointmentOk = !lastAppointment || lastAppointment < inactiveDate;
+      const conversationOk = !lastConversation || lastConversation < inactiveDate;
+      return appointmentOk && conversationOk;
+    })
+    .sort((a: Client, b: Client) => {
+      const dateA = new Date(a.last_appointment_date || a.last_conversation_date || a.created_at).getTime();
+      const dateB = new Date(b.last_appointment_date || b.last_conversation_date || b.created_at).getTime();
+      return dateB - dateA;
+    });
 
-  // Frequent clients (X+ appointments per month on average)
-  // Calculate appointments per month for each client
-  const allClientsResult = await db.query(
-    `SELECT c.*, 
-            COUNT(a.id) as appointment_count,
-            MIN(a.start_time) as first_appointment,
-            MAX(a.start_time) as last_appointment
-     FROM clients c
-     LEFT JOIN appointments a ON c.id = a.client_id 
-       AND a.status IN ('scheduled', 'completed')
-     WHERE c.user_id = $1
-     GROUP BY c.id
-     HAVING COUNT(a.id) > 0`,
-    [userId]
-  );
+  const newClients = clients
+    .filter((client: Client) => new Date(client.created_at) >= newDate)
+    .sort((a: Client, b: Client) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  const appointmentRows = await db.collection('appointments').find({
+    user_id: userId,
+    status: { $in: ['scheduled', 'completed'] },
+    client_id: { $ne: null },
+  }).toArray();
+
+  const statsByClient = new Map<number, { count: number; first: string; last: string }>();
+  for (const apt of appointmentRows) {
+    if (!apt.client_id || !apt.start_time) continue;
+    const clientStats = statsByClient.get(apt.client_id) || {
+      count: 0,
+      first: apt.start_time,
+      last: apt.start_time,
+    };
+    clientStats.count += 1;
+    if (new Date(apt.start_time) < new Date(clientStats.first)) {
+      clientStats.first = apt.start_time;
+    }
+    if (new Date(apt.start_time) > new Date(clientStats.last)) {
+      clientStats.last = apt.start_time;
+    }
+    statsByClient.set(apt.client_id, clientStats);
+  }
 
   const frequent: Client[] = [];
-  for (const row of allClientsResult.rows) {
-    const firstApp = row.first_appointment ? new Date(row.first_appointment) : null;
-    const lastApp = row.last_appointment ? new Date(row.last_appointment) : null;
-    
-    if (firstApp && lastApp) {
-      const monthsDiff = (lastApp.getTime() - firstApp.getTime()) / (1000 * 60 * 60 * 24 * 30);
-      if (monthsDiff > 0) {
-        const appointmentsPerMonth = row.appointment_count / monthsDiff;
-        if (appointmentsPerMonth >= frequentAppointmentsPerMonth) {
-          frequent.push({
-            ...row,
-            tags: typeof row.tags === 'string' ? JSON.parse(row.tags || '[]') : (row.tags || []),
-          } as Client);
-        }
-      } else if (row.appointment_count >= frequentAppointmentsPerMonth) {
-        // Same month, check if count is high enough
-        frequent.push({
-          ...row,
-          tags: typeof row.tags === 'string' ? JSON.parse(row.tags || '[]') : (row.tags || []),
-        } as Client);
-      }
+  for (const client of clients) {
+    const stats = statsByClient.get(client.id);
+    if (!stats || stats.count === 0) continue;
+
+    const firstApp = new Date(stats.first);
+    const lastApp = new Date(stats.last);
+    const monthsDiff = (lastApp.getTime() - firstApp.getTime()) / (1000 * 60 * 60 * 24 * 30);
+    const appointmentsPerMonth = monthsDiff > 0 ? stats.count / monthsDiff : stats.count;
+
+    if (appointmentsPerMonth >= frequentAppointmentsPerMonth) {
+      frequent.push(client);
     }
   }
 
@@ -410,4 +354,3 @@ export async function getClientSegments(
     frequent,
   };
 }
-

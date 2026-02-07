@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getMongoDbOrThrow, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
 import * as fs from 'fs';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
@@ -9,54 +9,36 @@ export async function PATCH(
   { params }: { params: { id: string; fileId: string } }
 ) {
   try {
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
     const fileId = parseInt(params.fileId);
     const body = await request.json();
 
     const { description } = body;
 
-    // Get file info - try client_files first, fallback to contact_files
-    let result;
-    try {
-      result = await db.query(
-        `SELECT * FROM client_files WHERE id = $1`,
-        [fileId]
-      );
-    } catch (e) {
-      result = await db.query(
-        `SELECT * FROM contact_files WHERE id = $1`,
-        [fileId]
-      );
+    let file = await db.collection('client_files').findOne({ id: fileId });
+    let collectionName = 'client_files';
+
+    if (!file) {
+      file = await db.collection('contact_files').findOne({ id: fileId });
+      collectionName = 'contact_files';
     }
 
-    if (result.rows.length === 0) {
+    if (!file) {
       return NextResponse.json(
         { error: 'File not found' },
         { status: 404 }
       );
     }
 
-    // Update description - try client_files first
-    let updateResult;
-    try {
-      updateResult = await db.query(
-        `UPDATE client_files 
-         SET description = $1, updated_at = CURRENT_TIMESTAMP 
-         WHERE id = $2
-         RETURNING *`,
-        [description || null, fileId]
-      );
-    } catch (e) {
-      updateResult = await db.query(
-        `UPDATE contact_files 
-         SET description = $1, updated_at = CURRENT_TIMESTAMP 
-         WHERE id = $2
-         RETURNING *`,
-        [description || null, fileId]
-      );
-    }
+    const now = new Date().toISOString();
+    await db.collection(collectionName).updateOne(
+      { id: fileId },
+      { $set: { description: description || null, updated_at: now } }
+    );
 
-    return createSuccessResponse({ file: updateResult.rows[0] });
+    const updated = await db.collection(collectionName).findOne({ id: fileId });
+    invalidateMongoCache();
+    return createSuccessResponse({ file: updated ? stripMongoId(updated) : stripMongoId(file) });
   } catch (error) {
     return handleApiError(error, 'Failed to update file');
   }
@@ -68,50 +50,31 @@ export async function DELETE(
   { params }: { params: { id: string; fileId: string } }
 ) {
   try {
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
     const fileId = parseInt(params.fileId);
 
-    // Get file info - try client_files first, fallback to contact_files
-    let result;
-    try {
-      result = await db.query(
-        `SELECT * FROM client_files WHERE id = $1`,
-        [fileId]
-      );
-    } catch (e) {
-      result = await db.query(
-        `SELECT * FROM contact_files WHERE id = $1`,
-        [fileId]
-      );
+    let file = await db.collection('client_files').findOne({ id: fileId });
+    let collectionName = 'client_files';
+
+    if (!file) {
+      file = await db.collection('contact_files').findOne({ id: fileId });
+      collectionName = 'contact_files';
     }
 
-    if (result.rows.length === 0) {
+    if (!file) {
       return createErrorResponse('File not found', 404);
     }
 
-    const file = result.rows[0];
-
     // Delete file from disk
-    if (fs.existsSync(file.file_path)) {
+    if (file.file_path && fs.existsSync(file.file_path)) {
       fs.unlinkSync(file.file_path);
     }
 
-    // Delete from database - try client_files first
-    try {
-      await db.query(
-        `DELETE FROM client_files WHERE id = $1`,
-        [fileId]
-      );
-    } catch (e) {
-      await db.query(
-        `DELETE FROM contact_files WHERE id = $1`,
-        [fileId]
-      );
-    }
+    await db.collection(collectionName).deleteOne({ id: fileId });
 
+    invalidateMongoCache();
     return createSuccessResponse({ success: true });
   } catch (error) {
     return handleApiError(error, 'Failed to delete file');
   }
 }
-

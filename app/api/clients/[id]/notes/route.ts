@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { NextRequest } from 'next/server';
+import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
 // GET /api/clients/[id]/notes - Get notes for a client
@@ -8,7 +8,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
 
     // Validate ID
@@ -16,22 +16,21 @@ export async function GET(
       return createErrorResponse('Invalid client ID', 400);
     }
 
-    // Try client_notes first, fallback to contact_notes for migration
-    let result;
-    try {
-      result = await db.query(
-        `SELECT * FROM client_notes WHERE client_id = $1 ORDER BY created_at DESC`,
-        [clientId]
-      );
-    } catch (e) {
-      // Fallback to legacy contact_notes
-      result = await db.query(
-        `SELECT * FROM contact_notes WHERE contact_id = $1 ORDER BY created_at DESC`,
-        [clientId]
-      );
+    let notes = await db
+      .collection('client_notes')
+      .find({ client_id: clientId })
+      .sort({ created_at: -1 })
+      .toArray();
+
+    if (notes.length === 0) {
+      notes = await db
+        .collection('contact_notes')
+        .find({ contact_id: clientId })
+        .sort({ created_at: -1 })
+        .toArray();
     }
 
-    return createSuccessResponse({ notes: result.rows || [] });
+    return createSuccessResponse({ notes: notes.map(stripMongoId) });
   } catch (error) {
     return handleApiError(error, 'Failed to fetch notes');
   }
@@ -43,14 +42,14 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
-    
+
     // Validate ID
     if (isNaN(clientId) || clientId <= 0) {
       return createErrorResponse('Invalid client ID', 400);
     }
-    
+
     const body = await request.json();
 
     // Validate input
@@ -63,22 +62,28 @@ export async function POST(
     const { userId, content } = validationResult.data;
 
     const now = new Date().toISOString();
-    const result = await db.query(
-      `INSERT INTO client_notes (client_id, user_id, content, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [clientId, userId, content, now, now]
-    );
+    const noteId = await getNextNumericId('client_notes');
+    const noteDoc = {
+      _id: noteId,
+      id: noteId,
+      client_id: clientId,
+      user_id: userId,
+      content,
+      created_at: now,
+      updated_at: now,
+    };
+
+    await db.collection('client_notes').insertOne(noteDoc);
 
     // Update client's last_activity_date
-    await db.query(
-      `UPDATE clients SET last_activity_date = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-      [now, clientId]
+    await db.collection('clients').updateOne(
+      { id: clientId },
+      { $set: { last_activity_date: now, updated_at: now } }
     );
 
-    return createSuccessResponse({ note: result.rows[0] }, 201);
+    invalidateMongoCache();
+    return createSuccessResponse({ note: stripMongoId(noteDoc) }, 201);
   } catch (error) {
     return handleApiError(error, 'Failed to create note');
   }
 }
-

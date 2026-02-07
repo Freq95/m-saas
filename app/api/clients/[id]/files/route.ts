@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { NextRequest } from 'next/server';
+import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
 import * as fs from 'fs';
 import * as path from 'path';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
@@ -17,7 +17,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
 
     // Validate ID
@@ -25,22 +25,21 @@ export async function GET(
       return createErrorResponse('Invalid client ID', 400);
     }
 
-    // Try client_files first, fallback to contact_files for migration
-    let result;
-    try {
-      result = await db.query(
-        `SELECT * FROM client_files WHERE client_id = $1 ORDER BY created_at DESC`,
-        [clientId]
-      );
-    } catch (e) {
-      // Fallback to legacy contact_files
-      result = await db.query(
-        `SELECT * FROM contact_files WHERE contact_id = $1 ORDER BY created_at DESC`,
-        [clientId]
-      );
+    let files = await db
+      .collection('client_files')
+      .find({ client_id: clientId })
+      .sort({ created_at: -1 })
+      .toArray();
+
+    if (files.length === 0) {
+      files = await db
+        .collection('contact_files')
+        .find({ contact_id: clientId })
+        .sort({ created_at: -1 })
+        .toArray();
     }
 
-    return createSuccessResponse({ files: result.rows || [] });
+    return createSuccessResponse({ files: files.map(stripMongoId) });
   } catch (error) {
     return handleApiError(error, 'Failed to fetch files');
   }
@@ -52,7 +51,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
     const formData = await request.formData();
     const file = formData.get('file') as File;
@@ -90,34 +89,33 @@ export async function POST(
     const buffer = Buffer.from(bytes);
     fs.writeFileSync(filepath, buffer);
 
-    // Save file metadata to database
     const now = new Date().toISOString();
-    const result = await db.query(
-      `INSERT INTO client_files (client_id, filename, original_filename, file_path, file_size, mime_type, description, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING *`,
-      [
-        clientId,
-        filename,
-        file.name,
-        filepath,
-        file.size,
-        file.type,
-        description || null,
-        now,
-        now,
-      ]
-    );
+    const fileId = await getNextNumericId('client_files');
+    const fileDoc = {
+      _id: fileId,
+      id: fileId,
+      client_id: clientId,
+      filename,
+      original_filename: file.name,
+      file_path: filepath,
+      file_size: file.size,
+      mime_type: file.type,
+      description: description || null,
+      created_at: now,
+      updated_at: now,
+    };
+
+    await db.collection('client_files').insertOne(fileDoc);
 
     // Update client's last_activity_date
-    await db.query(
-      `UPDATE clients SET last_activity_date = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-      [now, clientId]
+    await db.collection('clients').updateOne(
+      { id: clientId },
+      { $set: { last_activity_date: now, updated_at: now } }
     );
 
-    return createSuccessResponse({ file: result.rows[0] }, 201);
+    invalidateMongoCache();
+    return createSuccessResponse({ file: stripMongoId(fileDoc) }, 201);
   } catch (error) {
     return handleApiError(error, 'Failed to upload file');
   }
 }
-

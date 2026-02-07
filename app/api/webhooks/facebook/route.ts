@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { NextRequest } from 'next/server';
+import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache } from '@/lib/db/mongo-utils';
 import { suggestTags } from '@/lib/ai-agent';
 import { findOrCreateClient, linkConversationToClient } from '@/lib/client-matching';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
@@ -8,7 +8,7 @@ import { handleApiError, createSuccessResponse, createErrorResponse } from '@/li
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
+
     // Validate input
     const { facebookWebhookSchema } = await import('@/lib/validation');
     const validationResult = facebookWebhookSchema.safeParse(body);
@@ -16,9 +16,9 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Invalid input', 400, JSON.stringify(validationResult.error.errors));
     }
 
-    const { userId, senderId, senderName, message, pageId, senderEmail, senderPhone } = validationResult.data;
+    const { userId, senderId, senderName, message, senderEmail, senderPhone } = validationResult.data;
 
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
 
     // Find or create client (use senderId as identifier if no email/phone)
     const client = await findOrCreateClient(
@@ -29,61 +29,78 @@ export async function POST(request: NextRequest) {
       'facebook'
     );
 
-    // Check if conversation exists
-    const existingConv = await db.query(
-      `SELECT id, client_id FROM conversations 
-       WHERE user_id = $1 AND channel = 'facebook' AND channel_id = $2 
-       ORDER BY created_at DESC LIMIT 1`,
-      [userId, senderId]
-    );
+    const existingConv = await db
+      .collection('conversations')
+      .find({ user_id: userId, channel: 'facebook', channel_id: senderId })
+      .sort({ created_at: -1 })
+      .limit(1)
+      .next();
 
     let conversationId: number;
 
-    if (existingConv.rows.length > 0) {
-      conversationId = existingConv.rows[0].id;
-      // Link to client if not already linked
-      if (!existingConv.rows[0].client_id) {
+    if (existingConv) {
+      conversationId = existingConv.id;
+      if (!existingConv.client_id) {
         await linkConversationToClient(conversationId, client.id);
       }
     } else {
-      // Create new conversation
-        const convResult = await db.query(
-          `INSERT INTO conversations (user_id, channel, channel_id, contact_name, status, client_id, created_at, updated_at)
-           VALUES ($1, 'facebook', $2, $3, 'open', $4, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-           RETURNING id`,
-          [userId, senderId, senderName || 'Utilizator Facebook', client.id]
-        );
-      conversationId = convResult.rows[0].id;
-      // Link conversation to client
+      const now = new Date().toISOString();
+      conversationId = await getNextNumericId('conversations');
+      await db.collection('conversations').insertOne({
+        _id: conversationId,
+        id: conversationId,
+        user_id: userId,
+        channel: 'facebook',
+        channel_id: senderId,
+        contact_name: senderName || 'Utilizator Facebook',
+        status: 'open',
+        client_id: client.id,
+        created_at: now,
+        updated_at: now,
+      });
       await linkConversationToClient(conversationId, client.id);
     }
 
-    // Add message
-    await db.query(
-      `INSERT INTO messages (conversation_id, direction, content, sent_at)
-       VALUES ($1, 'inbound', $2, CURRENT_TIMESTAMP)`,
-      [conversationId, message]
-    );
+    const now = new Date().toISOString();
+    const messageId = await getNextNumericId('messages');
+    await db.collection('messages').insertOne({
+      _id: messageId,
+      id: messageId,
+      conversation_id: conversationId,
+      direction: 'inbound',
+      content: message,
+      sent_at: now,
+      created_at: now,
+    });
 
     // Auto-tag
     const suggestedTags = await suggestTags(message);
     if (suggestedTags.length > 0) {
-      for (const tagName of suggestedTags) {
-        const tagResult = await db.query('SELECT id FROM tags WHERE LOWER(name) = LOWER($1)', [tagName]);
-        if (tagResult.rows.length > 0) {
-          await db.query(
-            `INSERT INTO conversation_tags (conversation_id, tag_id)
-             VALUES ($1, $2)
-             ON CONFLICT DO NOTHING`,
-            [conversationId, tagResult.rows[0].id]
-          );
+      const allTags = await db.collection('tags').find({}).toArray();
+      const tagsByName = new Map<string, any>();
+      for (const tag of allTags) {
+        if (typeof tag.name === 'string') {
+          tagsByName.set(tag.name.toLowerCase(), tag);
         }
+      }
+
+      const newConvTags = suggestedTags
+        .map((tagName) => tagsByName.get(tagName.toLowerCase()))
+        .filter(Boolean)
+        .map((tag: any) => ({
+          _id: `${conversationId}:${tag.id}`,
+          conversation_id: conversationId,
+          tag_id: tag.id,
+        }));
+
+      if (newConvTags.length > 0) {
+        await db.collection('conversation_tags').insertMany(newConvTags, { ordered: false });
       }
     }
 
+    invalidateMongoCache();
     return createSuccessResponse({ success: true, conversationId });
   } catch (error) {
     return handleApiError(error, 'Failed to process Facebook webhook');
   }
 }
-

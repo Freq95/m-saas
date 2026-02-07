@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 
 // GET /api/clients/[id]/activities - Get activity timeline for a client
 export async function GET(
@@ -7,7 +7,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
     const searchParams = request.nextUrl.searchParams;
     const type = searchParams.get('type'); // 'all' | 'notes' | 'emails' | 'tasks' | 'appointments'
@@ -16,74 +16,65 @@ export async function GET(
 
     // Get notes
     if (!type || type === 'all' || type === 'notes') {
-      try {
-        // Try client_notes first, fallback to contact_notes
-        let notesResult;
-        try {
-          notesResult = await db.query(
-            `SELECT 
-              id,
-              'note' as activity_type,
-              content as title,
-              content as description,
-              created_at,
-              created_at as activity_date,
-              user_id
-             FROM client_notes 
-             WHERE client_id = $1`,
-            [clientId]
-          );
-        } catch (e) {
-          notesResult = await db.query(
-            `SELECT 
-              id,
-              'note' as activity_type,
-              content as title,
-              content as description,
-              created_at,
-              created_at as activity_date,
-              user_id
-             FROM contact_notes 
-             WHERE contact_id = $1`,
-            [clientId]
-          );
-        }
-        activities.push(...notesResult.rows.map((n: any) => ({
-          ...n,
-          activity_type: 'note',
-        })));
-      } catch (e) {
-        // Table might not exist, skip
+      let notes = await db
+        .collection('client_notes')
+        .find({ client_id: clientId })
+        .toArray();
+
+      if (notes.length === 0) {
+        notes = await db
+          .collection('contact_notes')
+          .find({ contact_id: clientId })
+          .toArray();
       }
+
+      activities.push(...notes.map((note: any) => ({
+        ...stripMongoId(note),
+        activity_type: 'note',
+        title: note.content,
+        description: note.content,
+        activity_date: note.created_at,
+      })));
     }
 
     // Get emails (from conversations)
     if (!type || type === 'all' || type === 'emails') {
-      const conversationsResult = await db.query(
-        `SELECT * FROM conversations WHERE client_id = $1 AND channel = 'email' ORDER BY updated_at DESC`,
-        [clientId]
-      );
-      
-      // Get message counts and latest message for each conversation
-      for (const conv of conversationsResult.rows) {
-        const messagesResult = await db.query(
-          `SELECT * FROM messages WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 1`,
-          [conv.id]
-        );
-        const messageCountResult = await db.query(
-          `SELECT COUNT(*) as count FROM messages WHERE conversation_id = $1`,
-          [conv.id]
-        );
-        
-        const latestMessage = messagesResult.rows[0];
-        const messageCount = parseInt(messageCountResult.rows[0]?.count || '0');
-        const activityDate = latestMessage?.created_at || conv.updated_at || conv.created_at;
-        
+      const conversations = await db
+        .collection('conversations')
+        .find({ client_id: clientId, channel: 'email' })
+        .sort({ updated_at: -1 })
+        .toArray();
+
+      const conversationIds = conversations.map((conv: any) => conv.id);
+      const messageCounts = new Map<number, number>();
+      const latestMessage = new Map<number, any>();
+
+      if (conversationIds.length > 0) {
+        const messages = await db
+          .collection('messages')
+          .find({ conversation_id: { $in: conversationIds } })
+          .sort({ created_at: -1 })
+          .toArray();
+
+        for (const message of messages) {
+          const currentCount = messageCounts.get(message.conversation_id) || 0;
+          messageCounts.set(message.conversation_id, currentCount + 1);
+          if (!latestMessage.has(message.conversation_id)) {
+            latestMessage.set(message.conversation_id, message);
+          }
+        }
+      }
+
+      for (const conv of conversations) {
+        const latest = latestMessage.get(conv.id);
+        const messageCount = messageCounts.get(conv.id) || 0;
+        const activityDate = latest?.created_at || conv.updated_at || conv.created_at;
+
         activities.push({
           id: conv.id,
           activity_type: 'email',
           title: conv.subject || 'No subject',
-          description: latestMessage?.content || '',
+          description: latest?.content || '',
           activity_date: activityDate,
           created_at: conv.created_at,
           user_id: conv.user_id,
@@ -95,56 +86,43 @@ export async function GET(
 
     // Get appointments
     if (!type || type === 'all' || type === 'appointments') {
-      const appointmentsResult = await db.query(
-        `SELECT 
-          a.id,
-          'appointment' as activity_type,
-          COALESCE(s.name, 'Appointment') as title,
-          a.notes as description,
-          a.start_time as activity_date,
-          a.created_at,
-          a.user_id,
-          a.status,
-          s.price as service_price
-         FROM appointments a
-         LEFT JOIN services s ON a.service_id = s.id
-         WHERE a.client_id = $1
-         ORDER BY a.start_time DESC`,
-        [clientId]
+      const [appointments, services] = await Promise.all([
+        db.collection('appointments').find({ client_id: clientId }).sort({ start_time: -1 }).toArray(),
+        db.collection('services').find({}).toArray(),
+      ]);
+
+      const serviceById = new Map<number, any>(
+        services.map((service: any) => [service.id, service])
       );
-      activities.push(...appointmentsResult.rows.map((a: any) => ({
-        ...a,
-        activity_type: 'appointment',
-      })));
+
+      activities.push(...appointments.map((appointment: any) => {
+        const service = serviceById.get(appointment.service_id);
+        return {
+          ...stripMongoId(appointment),
+          activity_type: 'appointment',
+          title: service?.name || 'Appointment',
+          description: appointment.notes,
+          activity_date: appointment.start_time,
+          service_price: service?.price,
+        };
+      }));
     }
 
     // Get tasks
     if (!type || type === 'all' || type === 'tasks') {
-      try {
-        // Tasks use client_id (or contact_id for legacy)
-        const tasksResult = await db.query(
-          `SELECT 
-            id,
-            'task' as activity_type,
-            title,
-            description,
-            due_date as activity_date,
-            created_at,
-            user_id,
-            status,
-            priority
-           FROM tasks 
-           WHERE client_id = $1 OR contact_id = $1
-           ORDER BY due_date DESC, created_at DESC`,
-          [clientId]
-        );
-        activities.push(...tasksResult.rows.map((t: any) => ({
-          ...t,
-          activity_type: 'task',
-        })));
-      } catch (e) {
-        // Table might not exist, skip
-      }
+      const tasks = await db
+        .collection('tasks')
+        .find({
+          $or: [{ client_id: clientId }, { contact_id: clientId }],
+        })
+        .sort({ due_date: -1, created_at: -1 })
+        .toArray();
+
+      activities.push(...tasks.map((task: any) => ({
+        ...stripMongoId(task),
+        activity_type: 'task',
+        activity_date: task.due_date,
+      })));
     }
 
     // Sort all activities by activity_date (most recent first)
@@ -160,4 +138,3 @@ export async function GET(
     return handleApiError(error, 'Failed to fetch activities');
   }
 }
-

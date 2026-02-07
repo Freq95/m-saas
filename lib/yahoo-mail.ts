@@ -4,7 +4,7 @@
  */
 
 import Imap from 'imap';
-import { simpleParser, ParsedMail } from 'mailparser';
+import { simpleParser } from 'mailparser';
 import nodemailer from 'nodemailer';
 
 interface YahooConfig {
@@ -64,7 +64,7 @@ function cleanText(text: string): string {
  * Extract images from parsed email
  * Inline images (CID) are handled separately, this extracts external images from HTML
  */
-function extractImagesFromHtml(html: string, parsed: ParsedMail): EmailImage[] {
+function extractImagesFromHtml(html: string, parsed: any): EmailImage[] {
   const images: EmailImage[] = [];
   
   if (!html) return images;
@@ -89,7 +89,7 @@ function extractImagesFromHtml(html: string, parsed: ParsedMail): EmailImage[] {
 /**
  * Extract attachments from parsed email
  */
-function extractAttachments(parsed: ParsedMail): EmailAttachment[] {
+function extractAttachments(parsed: any): EmailAttachment[] {
   const attachments: EmailAttachment[] = [];
   
   if (!parsed.attachments) return attachments;
@@ -227,7 +227,7 @@ export async function fetchYahooEmails(
               });
 
               stream.on('end', () => {
-                simpleParser(bodyBuffer, (err, parsed) => {
+                simpleParser(bodyBuffer, (err: any, parsed: any) => {
                   if (err) {
                     console.error('Yahoo IMAP: Error parsing email:', err);
                     parsingComplete = true;

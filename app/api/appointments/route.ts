@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
 import { isSlotAvailable } from '@/lib/calendar';
 import { exportToGoogleCalendar } from '@/lib/google-calendar';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
+import { getAppointmentsData } from '@/lib/server/calendar';
 
 // GET /api/appointments - Get appointments
 export async function GET(request: NextRequest) {
   try {
-    const db = getDb();
     const searchParams = request.nextUrl.searchParams;
-    
+
     // Validate query parameters
     const { appointmentsQuerySchema } = await import('@/lib/validation');
     const queryParams = {
@@ -18,43 +18,16 @@ export async function GET(request: NextRequest) {
       endDate: searchParams.get('endDate') || undefined,
       status: searchParams.get('status') || undefined,
     };
-    
+
     const validationResult = appointmentsQuerySchema.safeParse(queryParams);
     if (!validationResult.success) {
       return handleApiError(validationResult.error, 'Invalid query parameters');
     }
-    
+
     const { userId, startDate, endDate, status } = validationResult.data;
+    const appointments = await getAppointmentsData({ userId, startDate, endDate, status });
 
-    let query = `
-      SELECT a.*, s.name as service_name, s.duration_minutes, s.price as service_price
-      FROM appointments a
-      LEFT JOIN services s ON a.service_id = s.id
-      WHERE a.user_id = $1
-    `;
-
-    const params: (string | number)[] = [userId];
-
-    if (startDate) {
-      query += ` AND a.start_time >= $${params.length + 1}`;
-      params.push(startDate);
-    }
-
-    if (endDate) {
-      query += ` AND a.start_time <= $${params.length + 1}`;
-      params.push(endDate);
-    }
-
-    if (status) {
-      query += ` AND a.status = $${params.length + 1}`;
-      params.push(status);
-    }
-
-    query += ` ORDER BY a.start_time ASC`;
-
-    const result = await db.query(query, params);
-
-    return createSuccessResponse({ appointments: result.rows });
+    return createSuccessResponse({ appointments });
   } catch (error) {
     return handleApiError(error, 'Failed to fetch appointments');
   }
@@ -63,17 +36,17 @@ export async function GET(request: NextRequest) {
 // POST /api/appointments - Create appointment
 export async function POST(request: NextRequest) {
   try {
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
     const body = await request.json();
-    
+
     // Validate input
     const { createAppointmentSchema } = await import('@/lib/validation');
     const validationResult = createAppointmentSchema.safeParse(body);
     if (!validationResult.success) {
       return NextResponse.json(
-        { 
+        {
           error: 'Invalid input',
-          details: validationResult.error.errors
+          details: validationResult.error.errors,
         },
         { status: 400 }
       );
@@ -94,24 +67,20 @@ export async function POST(request: NextRequest) {
     } = validationResult.data;
 
     const start = typeof startTime === 'string' ? new Date(startTime) : startTime;
-    
+
     // Calculate end time if not provided
     let end: Date;
     if (endTime) {
       end = typeof endTime === 'string' ? new Date(endTime) : endTime;
     } else {
-      // Get service duration to calculate end time
-      const serviceResult = await db.query(
-        `SELECT duration_minutes FROM services WHERE id = $1`,
-        [serviceId]
-      );
-      const durationMinutes = serviceResult.rows[0]?.duration_minutes || 60;
+      const serviceDoc = await db.collection('services').findOne({ id: serviceId });
+      const durationMinutes = serviceDoc?.duration_minutes || 60;
       end = new Date(start);
       end.setMinutes(end.getMinutes() + durationMinutes);
     }
 
     // Check if slot is available
-    const available = await isSlotAvailable(parseInt(userId), start, end);
+    const available = await isSlotAvailable(Number(userId), start, end);
     if (!available) {
       return NextResponse.json(
         { error: 'Time slot is not available' },
@@ -129,25 +98,39 @@ export async function POST(request: NextRequest) {
       conversationId ? 'conversation' : 'walk-in'
     );
 
-    // Create appointment
-    const result = await db.query(
-      `INSERT INTO appointments 
-       (user_id, conversation_id, service_id, client_id, client_name, client_email, client_phone, start_time, end_time, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       RETURNING *`,
-      [userId, conversationId, serviceId, client.id, clientName, clientEmail, clientPhone, start, end, notes]
-    );
+    const now = new Date().toISOString();
+    const appointmentId = await getNextNumericId('appointments');
+    const appointmentDoc = {
+      _id: appointmentId,
+      id: appointmentId,
+      user_id: userId,
+      conversation_id: conversationId || null,
+      service_id: serviceId,
+      client_id: client.id,
+      client_name: clientName,
+      client_email: clientEmail || null,
+      client_phone: clientPhone || null,
+      start_time: start.toISOString(),
+      end_time: end.toISOString(),
+      status: 'scheduled',
+      notes: notes || null,
+      reminder_sent: false,
+      created_at: now,
+      updated_at: now,
+    };
 
-    const appointment = result.rows[0];
+    await db.collection('appointments').insertOne(appointmentDoc);
 
     // Link appointment to client and update stats
-    await linkAppointmentToClient(appointment.id, client.id);
+    await linkAppointmentToClient(appointmentId, client.id);
+
+    const appointment = stripMongoId(appointmentDoc) as any;
 
     // Export to Google Calendar if requested
     if (exportToGoogle && googleAccessToken) {
       try {
         const eventId = await exportToGoogleCalendar(
-          parseInt(userId),
+          Number(userId),
           appointment.id,
           googleAccessToken
         );
@@ -161,9 +144,9 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    invalidateMongoCache();
     return createSuccessResponse({ appointment }, 201);
   } catch (error) {
     return handleApiError(error, 'Failed to create appointment');
   }
 }
-

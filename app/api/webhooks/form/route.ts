@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
-import { suggestTags } from '@/lib/ai-agent';
+import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache } from '@/lib/db/mongo-utils';
 import { findOrCreateClient, linkConversationToClient } from '@/lib/client-matching';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 
@@ -8,15 +7,15 @@ import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    
+
     // Validate input
     const { formWebhookSchema } = await import('@/lib/validation');
     const validationResult = formWebhookSchema.safeParse(body);
     if (!validationResult.success) {
       return NextResponse.json(
-        { 
+        {
           error: 'Invalid input',
-          details: validationResult.error.errors
+          details: validationResult.error.errors,
         },
         { status: 400 }
       );
@@ -24,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     const { userId, name, email, phone, message, subject } = validationResult.data;
 
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
 
     // Find or create client
     const client = await findOrCreateClient(
@@ -35,40 +34,56 @@ export async function POST(request: NextRequest) {
       'form'
     );
 
-    // Create conversation
-    const convResult = await db.query(
-      `INSERT INTO conversations (user_id, channel, contact_name, contact_email, contact_phone, subject, status, client_id, created_at, updated_at)
-       VALUES ($1, 'form', $2, $3, $4, $5, 'open', $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-       RETURNING id`,
-      [userId, name || 'Anonim', email, phone, subject || 'Formular site', client.id]
-    );
-
-    const conversationId = convResult.rows[0].id;
+    const now = new Date().toISOString();
+    const conversationId = await getNextNumericId('conversations');
+    await db.collection('conversations').insertOne({
+      _id: conversationId,
+      id: conversationId,
+      user_id: userId,
+      channel: 'form',
+      contact_name: name || 'Anonim',
+      contact_email: email || null,
+      contact_phone: phone || null,
+      subject: subject || 'Formular site',
+      status: 'open',
+      client_id: client.id,
+      created_at: now,
+      updated_at: now,
+    });
 
     // Link conversation to client (update last_conversation_date)
     await linkConversationToClient(conversationId, client.id);
 
     // Add message
-    await db.query(
-      `INSERT INTO messages (conversation_id, direction, content, sent_at)
-       VALUES ($1, 'inbound', $2, CURRENT_TIMESTAMP)`,
-      [conversationId, message]
-    );
+    const messageId = await getNextNumericId('messages');
+    await db.collection('messages').insertOne({
+      _id: messageId,
+      id: messageId,
+      conversation_id: conversationId,
+      direction: 'inbound',
+      content: message,
+      sent_at: now,
+      created_at: now,
+    });
 
     // Auto-tag as "Lead nou"
-    const tagResult = await db.query('SELECT id FROM tags WHERE LOWER(name) = LOWER($1)', ['Lead nou']);
-    if (tagResult.rows.length > 0) {
-      await db.query(
-        `INSERT INTO conversation_tags (conversation_id, tag_id)
-         VALUES ($1, $2)
-         ON CONFLICT DO NOTHING`,
-        [conversationId, tagResult.rows[0].id]
+    const tag = await db.collection('tags').findOne({ name: { $regex: '^Lead nou$', $options: 'i' } });
+    if (tag) {
+      await db.collection('conversation_tags').updateOne(
+        { _id: `${conversationId}:${tag.id}` },
+        {
+          $setOnInsert: {
+            conversation_id: conversationId,
+            tag_id: tag.id,
+          },
+        },
+        { upsert: true }
       );
     }
 
+    invalidateMongoCache();
     return createSuccessResponse({ success: true, conversationId });
   } catch (error) {
     return handleApiError(error, 'Failed to process form webhook');
   }
 }
-

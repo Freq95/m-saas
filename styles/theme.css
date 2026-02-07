@@ -1,0 +1,51 @@
+:root {
+  --font-sans: 'Satoshi', 'Avenir Next', 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+
+  --color-bg: #06080d;
+  --color-bg-elevated: rgba(13, 18, 30, 0.78);
+  --color-surface: rgba(17, 24, 39, 0.64);
+  --color-surface-strong: rgba(17, 24, 39, 0.86);
+  --color-surface-muted: rgba(30, 41, 59, 0.45);
+  --color-border: rgba(148, 163, 184, 0.2);
+  --color-border-strong: rgba(148, 163, 184, 0.3);
+  --color-text: #e6edf8;
+  --color-text-muted: #9fb0cb;
+  --color-text-soft: #7f93b2;
+  --color-accent: #4da3ff;
+  --color-accent-strong: #2d88ff;
+  --color-accent-contrast: #061324;
+  --color-danger: #f87171;
+  --color-success: #34d399;
+
+  --gradient-app: radial-gradient(900px 500px at 10% -5%, rgba(45, 136, 255, 0.2), transparent 65%),
+    radial-gradient(700px 460px at 90% 0%, rgba(77, 163, 255, 0.16), transparent 65%),
+    linear-gradient(180deg, #04060b 0%, #070b14 55%, #091022 100%);
+  --gradient-accent: linear-gradient(135deg, #1b63db 0%, #4da3ff 100%);
+
+  --radius-xs: 8px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+
+  --shadow-sm: 0 6px 18px rgba(2, 7, 18, 0.24);
+  --shadow-md: 0 14px 34px rgba(2, 7, 18, 0.35);
+  --shadow-lg: 0 24px 48px rgba(2, 7, 18, 0.45);
+
+  --blur-sm: 8px;
+  --blur-md: 14px;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-7: 2rem;
+  --space-8: 2.5rem;
+  --space-9: 3rem;
+
+  --max-content-width: 1240px;
+  --focus-ring: 0 0 0 2px rgba(6, 8, 13, 0.95), 0 0 0 4px rgba(77, 163, 255, 0.85);
+  --transition-fast: 200ms ease-out;
+  --transition-base: 300ms ease-out;
+}

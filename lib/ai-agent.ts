@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { getDb } from './db';
+import { getMongoDbOrThrow } from './db/mongo-utils';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -25,19 +25,17 @@ export async function generateResponse(
   businessInfo?: ConversationContext['businessInfo'],
   availableSlots?: ConversationContext['availableSlots']
 ): Promise<string> {
-  const db = getDb();
-  
-  // Get conversation history
-  const messagesResult = await db.query(
-    `SELECT direction, content, sent_at 
-     FROM messages 
-     WHERE conversation_id = $1 
-     ORDER BY sent_at DESC 
-     LIMIT 10`,
-    [conversationId]
-  );
+  const db = await getMongoDbOrThrow();
 
-  const conversationHistory = messagesResult.rows
+  // Get conversation history
+  const messagesResult = await db
+    .collection('messages')
+    .find({ conversation_id: conversationId })
+    .sort({ sent_at: -1, created_at: -1, id: -1 })
+    .limit(10)
+    .toArray();
+
+  const conversationHistory = messagesResult
     .reverse()
     .map((msg: any) => ({
       role: msg.direction === 'inbound' ? 'user' : 'assistant',
@@ -45,14 +43,14 @@ export async function generateResponse(
     }));
 
   // Build system prompt
-  let systemPrompt = `Ești un asistent AI pentru un business de servicii (salon, cabinet, atelier). 
-Răspunde în română, profesional și prietenos. 
-Nu face acțiuni autonome - doar sugerezi răspunsuri pe care utilizatorul le poate aproba.`;
+  let systemPrompt = `Esti un asistent AI pentru un business de servicii (salon, cabinet, atelier).
+Raspunde in romana, profesional si prietenos.
+Nu face actiuni autonome - doar sugerezi raspunsuri pe care utilizatorul le poate aproba.`;
 
   if (businessInfo) {
-    systemPrompt += `\n\nInformații despre business:`;
+    systemPrompt += `\n\nInformatii despre business:`;
     if (businessInfo.name) systemPrompt += `\nNume: ${businessInfo.name}`;
-    if (businessInfo.address) systemPrompt += `\nAdresă: ${businessInfo.address}`;
+    if (businessInfo.address) systemPrompt += `\nAdresa: ${businessInfo.address}`;
     if (businessInfo.workingHours) systemPrompt += `\nProgram: ${businessInfo.workingHours}`;
     if (businessInfo.services && businessInfo.services.length > 0) {
       systemPrompt += `\nServicii disponibile:`;
@@ -77,7 +75,7 @@ Nu face acțiuni autonome - doar sugerezi răspunsuri pe care utilizatorul le po
     });
   }
 
-  systemPrompt += `\n\nIMPORTANT: Sugerează un răspuns scurt, clar și profesional. Dacă clientul întreabă despre programare, propune orele disponibile.`;
+  systemPrompt += `\n\nIMPORTANT: Sugereaza un raspuns scurt, clar si profesional. Daca clientul intreaba despre programare, propune orele disponibile.`;
 
   try {
     const completion = await openai.chat.completions.create({
@@ -91,7 +89,7 @@ Nu face acțiuni autonome - doar sugerezi răspunsuri pe care utilizatorul le po
       max_tokens: 500,
     });
 
-    return completion.choices[0]?.message?.content || 'Nu pot genera un răspuns în acest moment.';
+    return completion.choices[0]?.message?.content || 'Nu pot genera un raspuns in acest moment.';
   } catch (error: any) {
     console.error('Error generating AI response:', error);
     // Log more details for debugging
@@ -105,7 +103,7 @@ Nu face acțiuni autonome - doar sugerezi răspunsuri pe care utilizatorul le po
     if (error.message) {
       console.error('Error message:', error.message);
     }
-    throw new Error('Eroare la generarea răspunsului AI');
+    throw new Error('Eroare la generarea raspunsului AI');
   }
 }
 
@@ -116,10 +114,9 @@ export async function suggestTags(messageContent: string): Promise<string[]> {
   if (!process.env.OPENAI_API_KEY) {
     return [];
   }
-  const db = getDb();
-  
-  const prompt = `Analizează următoarea conversație și sugerează tag-uri relevante din lista: "Lead nou", "Întrebare preț", "Reprogramare", "Anulare".
-Răspunde doar cu tag-urile relevante, separate prin virgulă, sau "nicio" dacă nu se aplică.
+
+  const prompt = `Analizeaza urmatoarea conversatie si sugereaza tag-uri relevante din lista: "Lead nou", "Intrebare pret", "Reprogramare", "Anulare".
+Raspunde doar cu tag-urile relevante, separate prin virgula, sau "nicio" daca nu se aplica.
 
 Mesaj: "${messageContent}"`;
 
@@ -127,7 +124,7 @@ Mesaj: "${messageContent}"`;
     const completion = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
       messages: [
-        { role: 'system', content: 'Ești un sistem de clasificare pentru mesaje. Răspunde doar cu tag-uri sau "nicio".' },
+        { role: 'system', content: 'Esti un sistem de clasificare pentru mesaje. Raspunde doar cu tag-uri sau "nicio".' },
         { role: 'user', content: prompt },
       ],
       temperature: 0.3,
@@ -135,14 +132,14 @@ Mesaj: "${messageContent}"`;
     });
 
     const response = completion.choices[0]?.message?.content?.toLowerCase() || '';
-    
+
     if (response.includes('nicio') || response.trim() === '') {
       return [];
     }
 
     const suggestedTags: string[] = [];
-    const allTags = ['lead nou', 'întrebare preț', 'reprogramare', 'anulare'];
-    
+    const allTags = ['lead nou', 'intrebare pret', 'reprogramare', 'anulare'];
+
     allTags.forEach(tag => {
       if (response.includes(tag.toLowerCase())) {
         suggestedTags.push(tag);
@@ -155,4 +152,3 @@ Mesaj: "${messageContent}"`;
     return [];
   }
 }
-

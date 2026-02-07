@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 import { generateResponse } from '@/lib/ai-agent';
-import { getDb } from '@/lib/db';
+import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getSuggestedSlots } from '@/lib/calendar';
 import { parseStoredMessage } from '@/lib/email-types';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
@@ -13,53 +13,46 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
     const conversationId = parseInt(params.id);
-    
+
     // Validate ID
     if (isNaN(conversationId) || conversationId <= 0) {
       return createErrorResponse('Invalid conversation ID', 400);
     }
-    
+
     const searchParams = request.nextUrl.searchParams;
-    
+
     // Validate query parameters
     const { userIdQuerySchema } = await import('@/lib/validation');
     const queryParams = {
       userId: searchParams.get('userId') || '1',
     };
-    
+
     const validationResult = userIdQuerySchema.safeParse(queryParams);
     if (!validationResult.success) {
       return handleApiError(validationResult.error, 'Invalid query parameters');
     }
-    
+
     const { userId } = validationResult.data;
 
     // Get conversation
-    const convResult = await db.query(
-      `SELECT * FROM conversations WHERE id = $1`,
-      [conversationId]
-    );
-
-    if (convResult.rows.length === 0) {
+    const convDoc = await db.collection('conversations').findOne({ id: conversationId });
+    if (!convDoc) {
       return createErrorResponse('Conversation not found', 404);
     }
 
-    const conversation = convResult.rows[0];
-
     // Get last message from conversation
-    const messagesResult = await db.query(
-      `SELECT * FROM messages 
-       WHERE conversation_id = $1 
-       ORDER BY sent_at DESC 
-       LIMIT 1`,
-      [conversationId]
-    );
+    const lastMessageDoc = await db
+      .collection('messages')
+      .find({ conversation_id: conversationId })
+      .sort({ sent_at: -1, created_at: -1, id: -1 })
+      .limit(1)
+      .next();
 
     let lastMessage = '';
-    if (messagesResult.rows.length > 0) {
-      const stored = parseStoredMessage(messagesResult.rows[0].content || '');
+    if (lastMessageDoc) {
+      const stored = parseStoredMessage(lastMessageDoc.content || '');
       lastMessage = stored.text || stored.html || '';
     }
 
@@ -84,7 +77,7 @@ export async function GET(
     // If no API key is configured, skip AI call and return a safe fallback.
     let suggestedResponse: string;
     if (!process.env.OPENAI_API_KEY) {
-      suggestedResponse = 'Mulțumim pentru mesaj! Vă vom răspunde în cel mai scurt timp.';
+      suggestedResponse = 'Multumim pentru mesaj! Va vom raspunde in cel mai scurt timp.';
     } else {
       try {
         suggestedResponse = await generateResponse(
@@ -96,10 +89,10 @@ export async function GET(
       } catch (aiError) {
         const { logger } = await import('@/lib/logger');
         logger.error('Error generating AI response', aiError instanceof Error ? aiError : new Error(String(aiError)), { conversationId });
-        
+
         // Fallback to mock response if OpenAI fails for any reason
         // This handles: missing API key, rate limits, network errors, etc.
-        suggestedResponse = 'Mulțumim pentru mesaj! Vă vom răspunde în cel mai scurt timp.';
+        suggestedResponse = 'Multumim pentru mesaj! Va vom raspunde in cel mai scurt timp.';
       }
     }
 
@@ -111,4 +104,3 @@ export async function GET(
     return handleApiError(error, 'Failed to generate suggested response');
   }
 }
-

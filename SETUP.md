@@ -4,7 +4,7 @@
 
 - Node.js 18+ installed
 - OpenAI API key (for AI agent features)
-- No database setup required - uses JSON file storage
+- MongoDB (Atlas or local)
 
 ## Installation Steps
 
@@ -22,21 +22,20 @@ Edit `.env` and fill in:
 - `OPENAI_API_KEY` - Your OpenAI API key (required for AI features)
 - Other optional integrations (email, Facebook, SMS, Google Calendar)
 
-3. **Initialize JSON storage:**
+3. **Configure MongoDB:**
+Set `MONGODB_URI` (and optionally `MONGODB_DB`) in `.env`.
+
+4. **Initialize MongoDB collections + indexes:**
 ```bash
-npm run db:migrate
+npm run db:init:mongo
 ```
 
-This creates a `data/` directory with `data.json` file containing default tags.
-
-4. **Seed sample data (optional):**
+5. **Migrate JSON data into Mongo (if applicable):**
 ```bash
-npm run db:seed
+npm run db:migrate:mongo
 ```
 
-This adds a test user, sample services, and a sample conversation.
-
-5. **Start development server:**
+6. **Start development server:**
 ```bash
 npm run dev
 ```

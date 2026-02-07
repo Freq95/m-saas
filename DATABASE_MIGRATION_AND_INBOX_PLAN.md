@@ -1,4 +1,4 @@
-﻿# m-saas: Database Migration + Inbox Deep Dive Plan
+# m-saas: Database Migration + Inbox Deep Dive Plan
 
 Date: 2026-02-06
 Scope: Split plan for (A) migration from JSON/local storage to database and (B) Inbox feature cleanup + fixes.
@@ -9,18 +9,18 @@ Target MVP: Operator-only (appointments, inbox, tasks, client profile).
 # A) Migration From JSON / Local Storage to Database
 
 ## A1) Current Storage Summary
-- Current storage is JSON file with a custom SQL parser (not production-safe).
-- It is single-process, non-transactional, and brittle for complex queries.
+- Current storage is MongoDB-backed with a SQL-like in-memory adapter.
+- JSON file storage has been removed; SQL adapter remains for compatibility.
 
 Key files:
-- `lib/storage-simple.ts`
-- `lib/db.ts`
-- `scripts/migrate.js`
+- `lib/db/sql-adapter.ts`
+- `lib/db/index.ts`
+- `lib/db/mongo.ts`
 
 ## A2) Target Database Recommendation
-- PostgreSQL (reliable relational storage, supports indexing, constraints, reporting).
-- ORM: Prisma or direct SQL via `node-postgres`.
-- Migrations: Prisma Migrate or a plain SQL migrations folder.
+- MongoDB (document storage, flexible schema, strong indexing).
+- Driver: official `mongodb` Node.js driver.
+- Migrations: JS-based index/collection init scripts.
 
 ## A3) Migration Strategy (Phased, Low Risk)
 
@@ -34,12 +34,12 @@ Deliverables:
 - Data mapping document (JSON -> SQL tables).
 
 ### Phase A1 — Build DB Schema + ETL Script
-- Create SQL schema (tables, constraints, indexes).
-- Write ETL to load JSON data into DB.
+- Define collection mapping + indexes.
+- Write ETL to load JSON data into MongoDB.
 - Ensure ETL is idempotent and repeatable.
 
 Deliverables:
-- `migrations/*.sql` or Prisma schema.
+- `migrations/*.js` (MongoDB collections + indexes).
 - `scripts/migrate-json-to-db.ts` (ETL).
 
 ### Phase A2 — Dual-Read, Then Cutover
@@ -48,12 +48,12 @@ Deliverables:
 - Validate row counts, spot-check data.
 
 Deliverables:
-- Updated `lib/db.ts` and data access layer.
+- Updated `lib/db/index.ts` and data access layer.
 - Validation report (counts, integrity).
 
 ### Phase A3 — Full Cutover + Cleanup
 - Remove JSON storage code.
-- Remove custom SQL parser.
+- Replace the SQL adapter with native Mongo queries.
 - Update scripts and docs.
 
 Deliverables:
@@ -61,7 +61,7 @@ Deliverables:
 - Updated `SETUP.md` and environment docs.
 
 ## A4) Minimal Schema (Operator-Only MVP)
-Tables:
+Collections:
 - users
 - clients
 - conversations
@@ -92,11 +92,31 @@ Tables:
 - Create/update/delete works end-to-end.
 
 ## A7) Files to Touch
-- Replace: `lib/storage-simple.ts`, `lib/db.ts`
+- Replace: `lib/db/sql-adapter.ts`, `lib/db/index.ts`
 - Update: `app/api/**` data access
 - Add: `migrations/*` or `prisma/schema.prisma`
 - Add: `scripts/migrate-json-to-db.ts`
 - Update: `SETUP.md`, `README.md`
+
+## A8) Phase 3 Complete (Mongo-Native Cutover)
+Status: Complete (runtime API/lib consumers migrated to Mongo-native access).
+
+### Commands used
+PowerShell (from `d:\m-saas`):
+
+```powershell
+npx tsc --noEmit
+$env:MIGRATE_DRY_RUN='1'; npm run db:migrate:mongo
+npm run db:validate:mongo
+```
+
+### Verification outcome
+- `npx tsc --noEmit`: pass.
+- `npm run db:migrate:mongo` with dry-run env flag: pass.
+- `npm run db:validate:mongo`: pass.
+- Validation report path: `reports/mongo_validation_report.md`.
+- Legacy SQL entrypoint is quarantined by design (`lib/db/index.ts` throws).
+- Legacy migration script is quarantined by design: `scripts/migrate-clients.js`.
 
 ---
 
@@ -195,7 +215,7 @@ Phase 3:
 ---
 
 # Open Questions
-- Which database provider (self-hosted Postgres, Supabase, Neon, etc.)?
+- Which MongoDB provider (Atlas, self-hosted, etc.)?
 - Do you want dual-write period or immediate cutover?
 - Are inbound messages only email for now or should we stub WhatsApp/Facebook/SMS?
 
@@ -205,3 +225,4 @@ Phase 3:
 Confirm DB provider and desired migration approach. Then I can:
 - Generate schema + ETL script
 - Implement the inbox fixes/refactor
+

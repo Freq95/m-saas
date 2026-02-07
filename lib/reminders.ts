@@ -1,6 +1,6 @@
-import { getDb } from './db';
-import { addHours, isBefore, format } from 'date-fns';
+import { addHours, format } from 'date-fns';
 import { ro } from 'date-fns/locale';
+import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache } from './db/mongo-utils';
 
 interface ReminderChannel {
   type: 'sms' | 'whatsapp' | 'email';
@@ -11,44 +11,56 @@ interface ReminderChannel {
  * Check and send reminders for appointments 24 hours in advance
  */
 export async function processReminders() {
-  const db = getDb();
-  
+  const db = await getMongoDbOrThrow();
+
   // Get appointments that need reminders (24h before, not yet sent)
   const now = new Date();
   const reminderTime = addHours(now, 24);
-  
-  const appointmentsResult = await db.query(
-    `SELECT a.id, a.start_time, a.client_name, a.client_phone, a.client_email, 
-            s.name as service_name, u.name as business_name
-     FROM appointments a
-     LEFT JOIN services s ON a.service_id = s.id
-     LEFT JOIN users u ON a.user_id = u.id
-     WHERE a.status = 'scheduled'
-       AND a.reminder_sent = FALSE
-       AND a.start_time >= $1
-       AND a.start_time <= $2`,
-    [now, reminderTime]
-  );
 
-  for (const appointment of appointmentsResult.rows) {
+  const [appointments, services, users] = await Promise.all([
+    db.collection('appointments').find({
+      status: 'scheduled',
+      reminder_sent: false,
+      start_time: {
+        $gte: now.toISOString(),
+        $lte: reminderTime.toISOString(),
+      },
+    }).toArray(),
+    db.collection('services').find({}).toArray(),
+    db.collection('users').find({}).toArray(),
+  ]);
+
+  const serviceById = new Map<number, any>(services.map((s: any) => [s.id, s]));
+  const userById = new Map<number, any>(users.map((u: any) => [u.id, u]));
+
+  for (const appointment of appointments) {
+    const service = serviceById.get(appointment.service_id);
+    const user = userById.get(appointment.user_id);
     const appointmentTime = new Date(appointment.start_time);
     const timeStr = format(appointmentTime, "EEEE, d MMMM 'la' HH:mm", { locale: ro });
-    
-    const message = `Bună ${appointment.client_name}! Reamintire programare mâine la ora ${format(appointmentTime, 'HH:mm')}${appointment.service_name ? ` pentru ${appointment.service_name}` : ''}. Vă așteptăm!`;
+
+    const message = `Buna ${appointment.client_name}! Reamintire programare maine la ora ${format(appointmentTime, 'HH:mm')}${service?.name ? ` pentru ${service.name}` : ''}. Va asteptam!`;
 
     // Try to send via WhatsApp/SMS if phone is available
     if (appointment.client_phone) {
       try {
         const sent = await sendSMS(appointment.client_phone, message);
         if (sent) {
-          await db.query(
-            `INSERT INTO reminders (appointment_id, channel, sent_at, status)
-             VALUES ($1, 'sms', CURRENT_TIMESTAMP, 'sent')`,
-            [appointment.id]
-          );
-          await db.query(
-            `UPDATE appointments SET reminder_sent = TRUE WHERE id = $1`,
-            [appointment.id]
+          const reminderId = await getNextNumericId('reminders');
+          const sentAt = new Date().toISOString();
+          await db.collection('reminders').insertOne({
+            _id: reminderId,
+            id: reminderId,
+            appointment_id: appointment.id,
+            channel: 'sms',
+            sent_at: sentAt,
+            status: 'sent',
+            created_at: sentAt,
+            updated_at: sentAt,
+          });
+          await db.collection('appointments').updateOne(
+            { id: appointment.id },
+            { $set: { reminder_sent: true, updated_at: sentAt } }
           );
           continue;
         }
@@ -61,27 +73,53 @@ export async function processReminders() {
     if (appointment.client_email) {
       try {
         const sent = await sendEmail(appointment.client_email, 'Reamintire programare', message);
+        const reminderId = await getNextNumericId('reminders');
+        const sentAt = new Date().toISOString();
+
         if (sent) {
-          await db.query(
-            `INSERT INTO reminders (appointment_id, channel, sent_at, status)
-             VALUES ($1, 'email', CURRENT_TIMESTAMP, 'sent')`,
-            [appointment.id]
+          await db.collection('reminders').insertOne({
+            _id: reminderId,
+            id: reminderId,
+            appointment_id: appointment.id,
+            channel: 'email',
+            sent_at: sentAt,
+            status: 'sent',
+            created_at: sentAt,
+            updated_at: sentAt,
+          });
+          await db.collection('appointments').updateOne(
+            { id: appointment.id },
+            { $set: { reminder_sent: true, updated_at: sentAt } }
           );
-          await db.query(
-            `UPDATE appointments SET reminder_sent = TRUE WHERE id = $1`,
-            [appointment.id]
-          );
+        } else {
+          await db.collection('reminders').insertOne({
+            _id: reminderId,
+            id: reminderId,
+            appointment_id: appointment.id,
+            channel: 'email',
+            status: 'failed',
+            created_at: sentAt,
+            updated_at: sentAt,
+          });
         }
       } catch (error) {
         console.error(`Failed to send email reminder for appointment ${appointment.id}:`, error);
-        await db.query(
-          `INSERT INTO reminders (appointment_id, channel, status)
-           VALUES ($1, 'email', 'failed')`,
-          [appointment.id]
-        );
+        const reminderId = await getNextNumericId('reminders');
+        const sentAt = new Date().toISOString();
+        await db.collection('reminders').insertOne({
+          _id: reminderId,
+          id: reminderId,
+          appointment_id: appointment.id,
+          channel: 'email',
+          status: 'failed',
+          created_at: sentAt,
+          updated_at: sentAt,
+        });
       }
     }
   }
+
+  invalidateMongoCache();
 }
 
 /**
@@ -111,7 +149,7 @@ async function sendSMS(phone: string, message: string): Promise<boolean> {
  */
 async function sendEmail(to: string, subject: string, message: string): Promise<boolean> {
   const nodemailer = require('nodemailer');
-  
+
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
     console.warn('Email not configured, skipping email reminder');
     return false;
@@ -141,4 +179,3 @@ async function sendEmail(to: string, subject: string, message: string): Promise<
     return false;
   }
 }
-

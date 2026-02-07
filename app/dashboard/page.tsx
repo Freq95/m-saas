@@ -1,10 +1,10 @@
-'use client';
-
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { ro } from 'date-fns/locale';
 import styles from './page.module.css';
+import { getDashboardData } from '@/lib/server/dashboard';
+
+export const revalidate = 30;
 
 interface Appointment {
   id: number;
@@ -45,89 +45,21 @@ interface DashboardData {
   };
 }
 
-export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
-    try {
-      const response = await fetch('/api/dashboard?userId=1&days=7');
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const result = await response.json();
-      
-      // Ensure all required fields exist with defaults
-      setData({
-        messagesPerDay: result.messagesPerDay || [],
-        appointmentsPerDay: result.appointmentsPerDay || [],
-        today: {
-          messages: result.today?.messages || 0,
-          appointments: result.today?.appointments || 0,
-          totalClients: result.today?.totalClients || 0,
-          appointmentsList: result.today?.appointmentsList || [],
-        },
-        noShowRate: result.noShowRate || 0,
-        estimatedRevenue: result.estimatedRevenue || 0,
-        clients: {
-          topClients: result.clients?.topClients || [],
-          newClientsToday: result.clients?.newClientsToday || 0,
-          newClientsWeek: result.clients?.newClientsWeek || 0,
-          inactiveClients: result.clients?.inactiveClients || [],
-          growth: result.clients?.growth || [],
-        },
-      });
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      // Set default data on error
-      setData({
-        messagesPerDay: [],
-        appointmentsPerDay: [],
-        today: {
-          messages: 0,
-          appointments: 0,
-          totalClients: 0,
-          appointmentsList: [],
-        },
-        noShowRate: 0,
-        estimatedRevenue: 0,
-        clients: {
-          topClients: [],
-          newClientsToday: 0,
-          newClientsWeek: 0,
-          inactiveClients: [],
-          growth: [],
-        },
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return <div className={styles.container}>Se încarcă...</div>;
-  }
-
-  if (!data) {
-    return <div className={styles.container}>Eroare la încărcarea datelor</div>;
-  }
+export default async function DashboardPage() {
+  const data: DashboardData = await getDashboardData(1, 7);
 
   return (
     <div className={styles.container}>
       <nav className={styles.nav}>
-        <Link href="/">
+        <Link href="/" prefetch>
           <h1 className={styles.logo}>OpsGenie</h1>
         </Link>
         <div className={styles.navLinks}>
-          <Link href="/dashboard" className={styles.active}>Dashboard</Link>
-          <Link href="/inbox">Inbox</Link>
-          <Link href="/calendar">Calendar</Link>
-          <Link href="/clients">Clienți</Link>
-          <Link href="/settings/email">Setări</Link>
+          <Link href="/dashboard" className={styles.active} prefetch>Dashboard</Link>
+          <Link href="/inbox" prefetch>Inbox</Link>
+          <Link href="/calendar" prefetch>Calendar</Link>
+          <Link href="/clients" prefetch>Clienți</Link>
+          <Link href="/settings/email" prefetch>Setări</Link>
         </div>
       </nav>
 
@@ -214,10 +146,10 @@ export default function DashboardPage() {
                   const startTime = new Date(apt.start_time);
                   const endTime = new Date(apt.end_time);
                   const status = apt.status || 'scheduled';
-                  const statusClass = status 
+                  const statusClass = status
                     ? styles[`status${status.charAt(0).toUpperCase() + status.slice(1).replace('_', '')}`] || ''
                     : '';
-                  
+
                   return (
                     <div key={apt.id} className={styles.appointmentItem}>
                       <div className={styles.appointmentTime}>
@@ -250,7 +182,7 @@ export default function DashboardPage() {
 
         <div className={styles.clientsSection}>
           <h3 className={styles.sectionTitle}>Clienți</h3>
-          
+
           <div className={styles.clientGrid}>
             <div className={styles.clientCard}>
               <h4>Top Clienți</h4>
@@ -279,7 +211,7 @@ export default function DashboardPage() {
                     <Link key={client.id} href={`/clients/${client.id}`} className={styles.clientItem}>
                       <div className={styles.clientName}>{client.name}</div>
                       <div className={styles.clientMeta}>
-                        {client.last_appointment_date 
+                        {client.last_appointment_date
                           ? `Ultima vizită: ${format(new Date(client.last_appointment_date), 'dd MMM yyyy', { locale: ro })}`
                           : 'Fără programări'}
                       </div>
@@ -324,4 +256,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
 import { z } from 'zod';
+import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 
 // Validation schemas
@@ -11,64 +11,65 @@ const createReminderSchema = z.object({
   scheduledAt: z.string().datetime().optional(),
 });
 
-const updateReminderSchema = z.object({
-  status: z.enum(['pending', 'sent', 'failed']).optional(),
-  channel: z.enum(['sms', 'whatsapp', 'email']).optional(),
-  sentAt: z.string().datetime().optional(),
-});
-
 // GET /api/reminders - Get all reminders
 export async function GET(request: NextRequest) {
   try {
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
     const searchParams = request.nextUrl.searchParams;
-    
+
     // Validate query parameters
     const { remindersQuerySchema } = await import('@/lib/validation');
     const queryParams = {
       userId: searchParams.get('userId') || '1',
       status: searchParams.get('status') || undefined,
     };
-    
+
     const validationResult = remindersQuerySchema.safeParse(queryParams);
     if (!validationResult.success) {
       return handleApiError(validationResult.error, 'Invalid query parameters');
     }
-    
+
     const { userId, status } = validationResult.data;
     const appointmentId = searchParams.get('appointmentId');
     const channel = searchParams.get('channel');
 
-    let query = `
-      SELECT r.*, a.client_name, a.client_email, a.client_phone, a.start_time as appointment_time
-      FROM reminders r
-      LEFT JOIN appointments a ON r.appointment_id = a.id
-      WHERE a.user_id = $1
-    `;
-    const params: any[] = [userId];
+    const appointmentFilter: Record<string, any> = { user_id: userId };
+    if (appointmentId) appointmentFilter.id = parseInt(appointmentId);
 
-    if (appointmentId) {
-      query += ` AND r.appointment_id = $${params.length + 1}`;
-      params.push(parseInt(appointmentId));
+    const appointments = await db.collection('appointments').find(appointmentFilter).toArray();
+    const appointmentIds = appointments.map((a: any) => a.id);
+
+    if (appointmentIds.length === 0) {
+      return createSuccessResponse({ reminders: [], count: 0 });
     }
 
-    if (status) {
-      query += ` AND r.status = $${params.length + 1}`;
-      params.push(status);
-    }
+    const reminderFilter: Record<string, any> = {
+      appointment_id: { $in: appointmentIds },
+    };
+    if (status) reminderFilter.status = status;
+    if (channel) reminderFilter.channel = channel;
 
-    if (channel) {
-      query += ` AND r.channel = $${params.length + 1}`;
-      params.push(channel);
-    }
+    const reminders = await db
+      .collection('reminders')
+      .find(reminderFilter)
+      .sort({ created_at: -1 })
+      .toArray();
 
-    query += ` ORDER BY r.created_at DESC`;
+    const apptMap = new Map<number, any>(appointments.map((a: any) => [a.id, a]));
+    const enriched = reminders.map((r: any) => {
+      const appointment = apptMap.get(r.appointment_id);
+      return {
+        ...stripMongoId(r),
+        client_name: appointment?.client_name || null,
+        client_email: appointment?.client_email || null,
+        client_phone: appointment?.client_phone || null,
+        appointment_time: appointment?.start_time || null,
+      };
+    });
 
-    const result = await db.query(query, params);
-    
-    return createSuccessResponse({ 
-      reminders: result.rows || [],
-      count: result.rows?.length || 0
+    return createSuccessResponse({
+      reminders: enriched,
+      count: enriched.length,
     });
   } catch (error) {
     return handleApiError(error, 'Failed to fetch reminders');
@@ -78,16 +79,16 @@ export async function GET(request: NextRequest) {
 // POST /api/reminders - Create a new reminder
 export async function POST(request: NextRequest) {
   try {
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
     const body = await request.json();
-    
+
     // Validate input
     const validationResult = createReminderSchema.safeParse(body);
     if (!validationResult.success) {
       return NextResponse.json(
-        { 
+        {
           error: 'Invalid input',
-          details: validationResult.error.errors
+          details: validationResult.error.errors,
         },
         { status: 400 }
       );
@@ -95,43 +96,40 @@ export async function POST(request: NextRequest) {
 
     const { appointmentId, channel, message, scheduledAt } = validationResult.data;
 
-    // Verify appointment exists and belongs to user
-    const appointmentResult = await db.query(
-      `SELECT a.*, u.id as user_id 
-       FROM appointments a
-       LEFT JOIN users u ON a.user_id = u.id
-       WHERE a.id = $1`,
-      [appointmentId]
-    );
+    // Verify appointment exists
+    const appointment = await db.collection('appointments').findOne({ id: appointmentId });
 
-    if (appointmentResult.rows.length === 0) {
+    if (!appointment) {
       return NextResponse.json(
         { error: 'Appointment not found' },
         { status: 404 }
       );
     }
 
-    const appointment = appointmentResult.rows[0];
-
     // Create reminder
-    const result = await db.query(
-      `INSERT INTO reminders (appointment_id, channel, message, status, scheduled_at, created_at)
-       VALUES ($1, $2, $3, 'pending', $4, CURRENT_TIMESTAMP)
-       RETURNING *`,
-      [
-        appointmentId,
-        channel,
-        message || null,
-        scheduledAt ? new Date(scheduledAt) : null
-      ]
-    );
+    const now = new Date().toISOString();
+    const reminderId = await getNextNumericId('reminders');
+    const reminderDoc = {
+      _id: reminderId,
+      id: reminderId,
+      appointment_id: appointmentId,
+      channel,
+      message: message || null,
+      status: 'pending',
+      scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : null,
+      sent_at: null,
+      created_at: now,
+      updated_at: now,
+    };
 
-    return createSuccessResponse({ 
-      reminder: result.rows[0],
-      success: true
+    await db.collection('reminders').insertOne(reminderDoc);
+    invalidateMongoCache();
+
+    return createSuccessResponse({
+      reminder: stripMongoId(reminderDoc),
+      success: true,
     }, 201);
   } catch (error) {
     return handleApiError(error, 'Failed to create reminder');
   }
 }
-

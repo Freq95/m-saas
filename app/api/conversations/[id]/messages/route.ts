@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { NextRequest } from 'next/server';
+import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
 import { getYahooConfig, sendYahooEmail } from '@/lib/yahoo-mail';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
@@ -9,10 +9,10 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const db = getDb();
+    const db = await getMongoDbOrThrow();
     const conversationId = parseInt(params.id);
     const body = await request.json();
-    
+
     // Validate input
     const { createMessageSchema } = await import('@/lib/validation');
     const validationResult = createMessageSchema.safeParse(body);
@@ -23,26 +23,28 @@ export async function POST(
     const { content, direction } = validationResult.data;
 
     // Get conversation to check channel
-    const convResult = await db.query(
-      `SELECT * FROM conversations WHERE id = $1`,
-      [conversationId]
-    );
+    const conversationDoc = await db.collection('conversations').findOne({ id: conversationId });
 
-    if (convResult.rows.length === 0) {
+    if (!conversationDoc) {
       return createErrorResponse('Conversation not found', 404);
     }
 
-    const conversation = convResult.rows[0];
+    const conversation = stripMongoId(conversationDoc);
+    const now = new Date().toISOString();
 
     // Save message to database
-    const messageResult = await db.query(
-      `INSERT INTO messages (conversation_id, direction, content, sent_at)
-       VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
-       RETURNING *`,
-      [conversationId, direction, content]
-    );
+    const messageId = await getNextNumericId('messages');
+    const newMessage = {
+      _id: messageId,
+      id: messageId,
+      conversation_id: conversationId,
+      direction,
+      content,
+      sent_at: now,
+      created_at: now,
+    };
 
-    const newMessage = messageResult.rows[0];
+    await db.collection('messages').insertOne(newMessage);
 
     // If it's an outbound email message, send via Yahoo
     if (direction === 'outbound' && conversation.channel === 'email' && conversation.contact_email) {
@@ -64,12 +66,13 @@ export async function POST(
     }
 
     // Update conversation updated_at
-    await db.query(
-      `UPDATE conversations SET updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
-      [conversationId]
+    await db.collection('conversations').updateOne(
+      { id: conversationId },
+      { $set: { updated_at: now } }
     );
 
-    return createSuccessResponse({ message: newMessage }, 201);
+    invalidateMongoCache();
+    return createSuccessResponse({ message: stripMongoId(newMessage) }, 201);
   } catch (error) {
     return handleApiError(error, 'Failed to send message');
   }

@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { NextRequest } from 'next/server';
+import { getMongoDbOrThrow, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
 import { updateClientStats } from '@/lib/client-matching';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
@@ -9,27 +9,32 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const db = getDb();
-    const appointmentId = params.id;
+    const db = await getMongoDbOrThrow();
+    const appointmentId = Number(params.id);
 
-    const result = await db.query(
-      `SELECT a.*, 
-              c.name as client_name, 
-              c.email as client_email, 
-              c.phone as client_phone,
-              s.name as service_name 
-       FROM appointments a
-       LEFT JOIN clients c ON a.client_id = c.id
-       LEFT JOIN services s ON a.service_id = s.id
-       WHERE a.id = $1`,
-      [appointmentId]
-    );
+    if (Number.isNaN(appointmentId)) {
+      return createErrorResponse('Invalid appointment ID', 400);
+    }
 
-    if (result.rows.length === 0) {
+    const appointmentDoc = await db.collection('appointments').findOne({ id: appointmentId });
+    if (!appointmentDoc) {
       return createErrorResponse('Appointment not found', 404);
     }
 
-    return createSuccessResponse({ appointment: result.rows[0] });
+    const [clientDoc, serviceDoc] = await Promise.all([
+      appointmentDoc.client_id ? db.collection('clients').findOne({ id: appointmentDoc.client_id }) : null,
+      appointmentDoc.service_id ? db.collection('services').findOne({ id: appointmentDoc.service_id }) : null,
+    ]);
+
+    const appointment = {
+      ...stripMongoId(appointmentDoc),
+      client_name: clientDoc?.name || appointmentDoc.client_name,
+      client_email: clientDoc?.email || appointmentDoc.client_email,
+      client_phone: clientDoc?.phone || appointmentDoc.client_phone,
+      service_name: serviceDoc?.name || null,
+    };
+
+    return createSuccessResponse({ appointment });
   } catch (error) {
     return handleApiError(error, 'Failed to fetch appointment');
   }
@@ -41,58 +46,58 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const db = getDb();
-    const appointmentId = params.id;
+    const db = await getMongoDbOrThrow();
+    const appointmentId = Number(params.id);
     const body = await request.json();
     const { status, startTime, endTime, notes } = body;
 
-    const updates: string[] = [];
-    const values: (string | number | Date | null)[] = [];
-    let paramIndex = 1;
+    if (Number.isNaN(appointmentId)) {
+      return createErrorResponse('Invalid appointment ID', 400);
+    }
+
+    const updates: Record<string, unknown> = {};
 
     if (status !== undefined) {
-      updates.push(`status = $${paramIndex++}`);
-      values.push(status);
+      updates.status = status;
     }
 
     if (startTime) {
-      updates.push(`start_time = $${paramIndex++}`);
-      values.push(new Date(startTime));
+      const startDate = typeof startTime === 'string' ? new Date(startTime) : startTime;
+      updates.start_time = startDate.toISOString();
     }
 
     if (endTime) {
-      updates.push(`end_time = $${paramIndex++}`);
-      values.push(new Date(endTime));
+      const endDate = typeof endTime === 'string' ? new Date(endTime) : endTime;
+      updates.end_time = endDate.toISOString();
     }
 
     if (notes !== undefined) {
-      updates.push(`notes = $${paramIndex++}`);
-      values.push(notes);
+      updates.notes = notes;
     }
 
-    if (updates.length === 0) {
+    if (Object.keys(updates).length === 0) {
       return createErrorResponse('No fields to update', 400);
     }
 
-    updates.push(`updated_at = CURRENT_TIMESTAMP`);
-    values.push(appointmentId);
+    updates.updated_at = new Date().toISOString();
 
-    const query = `
-      UPDATE appointments 
-      SET ${updates.join(', ')}
-      WHERE id = $${paramIndex}
-      RETURNING *
-    `;
+    await db.collection('appointments').updateOne(
+      { id: appointmentId },
+      { $set: updates }
+    );
 
-    const result = await db.query(query, values);
-    const appointment = result.rows[0];
-
-    // If status changed to 'completed', update client stats
-    if (status === 'completed' && appointment.client_id) {
-      await updateClientStats(appointment.client_id);
+    const appointmentDoc = await db.collection('appointments').findOne({ id: appointmentId });
+    if (!appointmentDoc) {
+      return createErrorResponse('Appointment not found', 404);
     }
 
-    return createSuccessResponse({ appointment });
+    // If status changed to 'completed', update client stats
+    if (status === 'completed' && appointmentDoc.client_id) {
+      await updateClientStats(appointmentDoc.client_id);
+    }
+
+    invalidateMongoCache();
+    return createSuccessResponse({ appointment: stripMongoId(appointmentDoc) });
   } catch (error) {
     return handleApiError(error, 'Failed to update appointment');
   }
@@ -104,14 +109,18 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const db = getDb();
-    const appointmentId = params.id;
+    const db = await getMongoDbOrThrow();
+    const appointmentId = Number(params.id);
 
-    await db.query('DELETE FROM appointments WHERE id = $1', [appointmentId]);
+    if (Number.isNaN(appointmentId)) {
+      return createErrorResponse('Invalid appointment ID', 400);
+    }
 
+    await db.collection('appointments').deleteOne({ id: appointmentId });
+
+    invalidateMongoCache();
     return createSuccessResponse({ success: true });
   } catch (error) {
     return handleApiError(error, 'Failed to delete appointment');
   }
 }
-
