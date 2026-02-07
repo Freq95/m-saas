@@ -2,40 +2,45 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #121212;
+  background: transparent;
 }
 
 .nav {
-  background: #1a1a1a;
-  border-bottom: 1px solid #252525;
-  padding: 1rem 1.5rem;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(6, 10, 18, 0.72);
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-4) var(--space-6);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  backdrop-filter: blur(var(--blur-md));
+  -webkit-backdrop-filter: blur(var(--blur-md));
 }
 
 .logo {
-  font-size: 1.1rem;
-  font-weight: 500;
-  color: #d4d4d4;
-  letter-spacing: -0.01em;
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
 }
 
 .navLinks {
   display: flex;
-  gap: 2rem;
+  gap: var(--space-6);
 }
 
 .navLinks a {
-  color: #737373;
-  font-weight: 400;
-  font-size: 0.9rem;
-  transition: color 0.2s ease;
+  color: var(--color-text-soft);
+  font-weight: 500;
+  font-size: 0.92rem;
+  transition: color var(--transition-fast);
   position: relative;
 }
 
 .navLinks a:hover {
-  color: #d4d4d4;
+  color: var(--color-text);
 }
 
 .main {
@@ -43,46 +48,77 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 3rem 1.5rem;
+  padding: var(--space-9) var(--space-6);
 }
 
 .hero {
   text-align: center;
-  max-width: 600px;
+  max-width: 700px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(var(--blur-md));
+  -webkit-backdrop-filter: blur(var(--blur-md));
 }
 
 .hero h2 {
-  font-size: 2rem;
-  margin-bottom: 0.9rem;
-  color: #d4d4d4;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  line-height: 1.3;
+  font-size: clamp(2rem, 3.6vw, 2.7rem);
+  margin-bottom: var(--space-4);
+  color: var(--color-text);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
 }
 
 .hero p {
   font-size: 1rem;
-  color: #737373;
-  margin-bottom: 2rem;
-  line-height: 1.55;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-7);
+  line-height: 1.65;
 }
 
 .actions {
   display: flex;
-  gap: 0.9rem;
+  gap: var(--space-3);
   justify-content: center;
+  flex-wrap: wrap;
 }
 
 .primaryButton {
-  background: #d4d4d4;
-  color: #121212;
-  padding: 0.75rem 1.75rem;
-  border-radius: 4px;
-  font-weight: 400;
-  font-size: 0.9rem;
-  transition: all 0.2s ease;
+  background: var(--gradient-accent);
+  color: var(--color-accent-contrast);
+  padding: 0.8rem 1.8rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(77, 163, 255, 0.35);
+  font-weight: 650;
+  font-size: 0.92rem;
+  transition: transform var(--transition-fast), filter var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: 0 12px 24px rgba(45, 136, 255, 0.24);
 }
 
 .primaryButton:hover {
-  background: #e4e4e4;
+  filter: brightness(1.07);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 900px) {
+  .nav {
+    padding: var(--space-4);
+    gap: var(--space-4);
+  }
+
+  .navLinks {
+    gap: var(--space-4);
+    overflow-x: auto;
+  }
+
+  .main {
+    padding: var(--space-7) var(--space-4);
+  }
+
+  .hero {
+    padding: var(--space-6) var(--space-5);
+  }
 }

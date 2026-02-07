@@ -1,244 +1,239 @@
 .container {
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: var(--space-7) var(--space-5);
 }
 
 .container h1 {
-  margin-bottom: 0.5rem;
-  font-size: 2rem;
-  color: #fff;
+  margin-bottom: var(--space-2);
+  font-size: clamp(1.75rem, 2.5vw, 2.1rem);
+  color: var(--color-text);
+  letter-spacing: -0.02em;
 }
 
 .description {
-  color: #aaa;
-  margin-bottom: 2rem;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-7);
   font-size: 0.95rem;
 }
 
 .integrationCard {
-  background: #1a1a1a;
-  border-radius: 8px;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-  border: 1px solid #2a2a2a;
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  margin-bottom: var(--space-5);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(var(--blur-md));
+  -webkit-backdrop-filter: blur(var(--blur-md));
 }
 
 .integrationHeader {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 1rem;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
 }
 
 .integrationHeader h2 {
-  margin: 0 0 0.5rem 0;
-  font-size: 1.25rem;
-  color: #fff;
+  margin: 0 0 var(--space-2) 0;
+  font-size: 1.22rem;
+  color: var(--color-text);
 }
 
 .providerDescription {
-  color: #888;
+  color: var(--color-text-soft);
   font-size: 0.875rem;
   margin: 0;
   line-height: 1.5;
 }
 
 .link {
-  color: #3b82f6;
+  color: var(--color-accent);
   text-decoration: underline;
   margin-left: 0.25rem;
 }
 
 .link:hover {
-  color: #2563eb;
+  color: var(--color-accent-strong);
 }
 
 .statusConnected {
-  color: #4ade80;
-  font-weight: 500;
-  padding: 0.25rem 0.75rem;
-  background: rgba(74, 222, 128, 0.1);
-  border-radius: 4px;
-  font-size: 0.875rem;
+  color: #6ee7b7;
+  font-weight: 600;
+  padding: 0.28rem 0.75rem;
+  background: rgba(52, 211, 153, 0.14);
+  border-radius: 999px;
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  font-size: 0.82rem;
 }
 
 .statusDisconnected {
-  color: #f87171;
-  font-weight: 500;
-  padding: 0.25rem 0.75rem;
-  background: rgba(248, 113, 113, 0.1);
-  border-radius: 4px;
-  font-size: 0.875rem;
+  color: #fca5a5;
+  font-weight: 600;
+  padding: 0.28rem 0.75rem;
+  background: rgba(248, 113, 113, 0.14);
+  border-radius: 999px;
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  font-size: 0.82rem;
 }
 
 .integrationDetails {
-  margin-top: 1rem;
+  margin-top: var(--space-4);
 }
 
 .integrationDetails p {
-  margin: 0.5rem 0;
-  color: #ccc;
-  font-size: 0.95rem;
+  margin: var(--space-2) 0;
+  color: var(--color-text-muted);
+  font-size: 0.94rem;
 }
 
 .actions {
   display: flex;
-  gap: 1rem;
-  margin-top: 1rem;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  flex-wrap: wrap;
 }
 
 .connectButton,
 .testButton,
+.fetchButton,
 .deleteButton,
 .saveButton,
 .cancelButton {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 6px;
+  padding: 0.72rem 1.3rem;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  font-weight: 500;
-  transition: all 0.2s;
-  font-size: 0.95rem;
+  font-weight: 650;
+  transition: transform var(--transition-fast), filter var(--transition-fast), box-shadow var(--transition-fast);
+  font-size: 0.92rem;
 }
 
-.connectButton {
-  background: #3b82f6;
-  color: white;
+.connectButton,
+.saveButton,
+.fetchButton {
+  background: var(--gradient-accent);
+  color: var(--color-accent-contrast);
+  border: 1px solid rgba(77, 163, 255, 0.35);
+  box-shadow: 0 10px 20px rgba(45, 136, 255, 0.24);
 }
 
-.connectButton:hover:not(:disabled) {
-  background: #2563eb;
-}
-
-.connectButton:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.connectButton:hover:not(:disabled),
+.saveButton:hover:not(:disabled),
+.fetchButton:hover:not(:disabled) {
+  filter: brightness(1.07);
+  transform: translateY(-1px);
 }
 
 .testButton {
-  background: #10b981;
-  color: white;
+  background: rgba(52, 211, 153, 0.18);
+  color: #6ee7b7;
+  border: 1px solid rgba(52, 211, 153, 0.35);
 }
 
 .testButton:hover:not(:disabled) {
-  background: #059669;
-}
-
-.testButton:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.fetchButton {
-  background: #3b82f6;
-  color: white;
-}
-
-.fetchButton:hover:not(:disabled) {
-  background: #2563eb;
-}
-
-.fetchButton:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
+  filter: brightness(1.08);
+  transform: translateY(-1px);
 }
 
 .deleteButton {
-  background: #ef4444;
-  color: white;
+  background: rgba(248, 113, 113, 0.16);
+  color: #fca5a5;
+  border: 1px solid rgba(248, 113, 113, 0.34);
 }
 
 .deleteButton:hover {
-  background: #dc2626;
-}
-
-.saveButton {
-  background: #3b82f6;
-  color: white;
-}
-
-.saveButton:hover:not(:disabled) {
-  background: #2563eb;
-}
-
-.saveButton:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
+  filter: brightness(1.08);
+  transform: translateY(-1px);
 }
 
 .cancelButton {
-  background: #4b5563;
-  color: white;
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
 }
 
 .cancelButton:hover {
-  background: #374151;
+  background: var(--color-surface-strong);
+}
+
+.connectButton:disabled,
+.testButton:disabled,
+.fetchButton:disabled,
+.saveButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 .form {
-  margin-top: 1rem;
+  margin-top: var(--space-4);
 }
 
 .input {
   width: 100%;
-  padding: 0.75rem;
-  margin-bottom: 1rem;
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
-  border-radius: 6px;
-  color: white;
+  padding: 0.76rem;
+  margin-bottom: var(--space-4);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
   font-size: 1rem;
   box-sizing: border-box;
 }
 
 .input:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-strong);
 }
 
 .formActions {
   display: flex;
-  gap: 1rem;
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
 .error {
-  background: #7f1d1d;
+  background: rgba(127, 29, 29, 0.34);
   color: #fca5a5;
+  border: 1px solid rgba(248, 113, 113, 0.24);
   padding: 0.75rem;
-  border-radius: 6px;
-  margin-bottom: 1rem;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
   font-size: 0.9rem;
 }
 
 .emailPreview {
-  margin-top: 1.5rem;
-  background: #2a2a2a;
-  border: 1px solid #3a3a3a;
-  border-radius: 8px;
-  padding: 1.5rem;
+  margin-top: var(--space-6);
+  background: rgba(9, 16, 34, 0.62);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
 }
 
 .emailHeader {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
-  padding-bottom: 0.75rem;
-  border-bottom: 1px solid #3a3a3a;
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .emailHeader h3 {
   margin: 0;
-  font-size: 1.1rem;
-  color: #fff;
+  font-size: 1.05rem;
+  color: var(--color-text);
 }
 
 .closeButton {
   background: transparent;
   border: none;
-  color: #888;
-  font-size: 1.5rem;
+  color: var(--color-text-soft);
+  font-size: 1.45rem;
   cursor: pointer;
   padding: 0;
   width: 24px;
@@ -246,29 +241,29 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  transition: all 0.2s;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
 }
 
 .closeButton:hover {
-  background: #3a3a3a;
-  color: #fff;
+  background: var(--color-surface-muted);
+  color: var(--color-text);
 }
 
 .emailMeta {
-  margin-bottom: 1rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid #3a3a3a;
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .emailMeta p {
-  margin: 0.5rem 0;
-  color: #ccc;
+  margin: var(--space-2) 0;
+  color: var(--color-text-muted);
   font-size: 0.9rem;
 }
 
 .emailMeta strong {
-  color: #fff;
+  color: var(--color-text);
   margin-right: 0.5rem;
 }
 
@@ -277,8 +272,9 @@
   overflow-y: auto;
 }
 
-.emailHtml {
-  color: #ccc;
+.emailHtml,
+.emailText {
+  color: var(--color-text-muted);
   font-size: 0.9rem;
   line-height: 1.6;
 }
@@ -288,21 +284,14 @@
   height: auto;
 }
 
-.emailText {
-  color: #ccc;
-  font-size: 0.9rem;
-  line-height: 1.6;
-}
-
 .emailText pre {
   margin: 0;
   white-space: pre-wrap;
   word-wrap: break-word;
   font-family: inherit;
-  color: #ccc;
+  color: var(--color-text-muted);
 }
 
-/* Screen reader only class */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -315,3 +304,18 @@
   border-width: 0;
 }
 
+@media (max-width: 768px) {
+  .container {
+    padding: var(--space-6) var(--space-4);
+  }
+
+  .integrationHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .actions,
+  .formActions {
+    flex-direction: column;
+  }
+}
