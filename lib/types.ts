@@ -32,6 +32,7 @@ export interface Message {
   conversation_id: number;
   direction: 'inbound' | 'outbound';
   content: string;
+  is_read?: boolean;
   sent_at: string | null;
   created_at: string;
 }

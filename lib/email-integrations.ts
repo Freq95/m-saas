@@ -17,6 +17,7 @@ export interface EmailIntegration {
   encrypted_access_token?: string;
   is_active: boolean;
   last_sync_at: string | null;
+  last_synced_uid?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -165,6 +166,7 @@ export async function saveEmailIntegration(
       encrypted_access_token: encryptedAccessToken,
       is_active: true,
       last_sync_at: null,
+      last_synced_uid: null,
       created_at: now,
       updated_at: now,
     };
@@ -200,6 +202,7 @@ export async function getUserEmailIntegrations(userId: number): Promise<EmailInt
         email: integration.email,
         is_active: integration.is_active,
         last_sync_at: integration.last_sync_at || null,
+        last_synced_uid: integration.last_synced_uid ?? null,
         created_at: integration.created_at,
         updated_at: integration.updated_at,
       } as EmailIntegration;

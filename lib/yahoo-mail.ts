@@ -105,8 +105,7 @@ function extractAttachments(parsed: any): EmailAttachment[] {
       contentType: attachment.contentType || 'application/octet-stream',
       size: attachment.size || 0,
       contentId: attachment.cid,
-      // Don't store content in memory for large attachments
-      // content: attachment.content,
+      content: attachment.content,
     });
   }
   
@@ -159,7 +158,8 @@ export async function getYahooConfig(userId?: number): Promise<YahooConfig | nul
  */
 export async function fetchYahooEmails(
   config: YahooConfig,
-  since?: Date
+  since?: Date,
+  sinceUid?: number
 ): Promise<EmailMessage[]> {
   return new Promise((resolve, reject) => {
     const imap = new Imap({
@@ -180,11 +180,13 @@ export async function fetchYahooEmails(
           return reject(err);
         }
 
-        // Search for emails since a date (include both read and unread)
-        // If since is provided, get all emails from that date, not just unread
-        const searchCriteria = since 
-          ? [['SINCE', since]]  // All emails since date (read + unread)
-          : ['UNSEEN'];  // Only unread if no date specified
+        // Prefer UID cursor for incremental sync (fast path).
+        // Fallback to date search for initial sync.
+        const searchCriteria = sinceUid && sinceUid > 0
+          ? [['UID', `${sinceUid + 1}:*`]]
+          : (since
+            ? [['SINCE', since]]  // All emails since date (read + unread)
+            : ['UNSEEN']);        // Only unread if no date/cursor specified
 
         console.log('Yahoo IMAP: Searching with criteria:', searchCriteria);
         imap.search(searchCriteria, (err, results) => {

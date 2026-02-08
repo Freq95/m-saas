@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
       conversation_id: conversationId,
       direction: 'inbound',
       content: message,
+      is_read: false,
       sent_at: now,
       created_at: now,
     });

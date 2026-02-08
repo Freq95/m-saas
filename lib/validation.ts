@@ -107,6 +107,8 @@ export const yahooSyncSchema = z.object({
   userId: z.number().int().positive().optional().default(1),
   todayOnly: z.boolean().optional().default(false),
   since: dateTimeSchema.optional(),
+  enableAiTagging: z.boolean().optional().default(false),
+  markAsRead: z.boolean().optional().default(false),
 });
 
 // Yahoo send schema

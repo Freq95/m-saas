@@ -1,6 +1,9 @@
 .container {
   min-height: 100vh;
-  background: transparent;
+  background:
+    radial-gradient(1200px 560px at 10% -20%, color-mix(in srgb, var(--color-accent) 10%, transparent), transparent 62%),
+    radial-gradient(900px 500px at 92% -8%, color-mix(in srgb, var(--color-success) 8%, transparent), transparent 60%),
+    var(--color-bg);
   display: flex;
   flex-direction: column;
 }
@@ -66,14 +69,107 @@
   overflow-x: auto;
 }
 
+.hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.2rem;
+  margin-bottom: 1rem;
+  padding: 1.1rem 1.25rem;
+  border-radius: calc(var(--radius-lg) + 4px);
+  border: 1px solid color-mix(in srgb, var(--color-border) 82%, white 18%);
+  background:
+    linear-gradient(140deg, color-mix(in srgb, var(--color-surface) 84%, white 16%), color-mix(in srgb, var(--color-surface-muted) 72%, white 28%));
+  box-shadow: 0 16px 42px color-mix(in srgb, var(--color-bg) 70%, transparent);
+}
+
+.eyebrow {
+  margin: 0 0 0.4rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-soft);
+  font-weight: 600;
+}
+
+.heroTitle {
+  margin: 0;
+  font-size: clamp(1.4rem, 2.8vw, 2rem);
+  letter-spacing: -0.03em;
+  color: var(--color-text);
+  font-weight: 630;
+}
+
+.heroSubtitle {
+  margin: 0.45rem 0 0;
+  color: var(--color-text-soft);
+  font-size: 0.93rem;
+}
+
+.heroMetrics {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.metricPill {
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface) 72%, white 28%);
+  border-radius: 14px;
+  padding: 0.52rem 0.68rem;
+  min-width: 104px;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.metricPill span {
+  font-size: 0.7rem;
+  color: var(--color-text-soft);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.metricPill strong {
+  font-size: 1rem;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+}
+
+.primaryAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 14px;
+  padding: 0.78rem 1rem;
+  background: var(--gradient-accent);
+  color: var(--color-accent-contrast);
+  font-weight: 630;
+  font-size: 0.86rem;
+  letter-spacing: -0.01em;
+  transition: transform var(--transition-fast), filter var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.primaryAction:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+  box-shadow: var(--shadow-md);
+}
+
 .calendarHeader {
-  margin-bottom: 1.25rem;
+  margin-bottom: 1rem;
 }
 
 .headerControls {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 0.9rem;
+  padding: 0.75rem;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 86%, white 14%);
+  background: color-mix(in srgb, var(--color-bg-elevated) 88%, white 12%);
+  box-shadow: var(--shadow-sm);
 }
 
 .headerControls button {
@@ -94,15 +190,18 @@
 }
 
 .headerControls h2 {
-  font-size: 1.2rem;
+  font-size: 1.04rem;
   color: var(--color-text);
   min-width: 280px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
+  font-weight: 580;
+  letter-spacing: -0.02em;
+  margin: 0;
+  text-align: center;
 }
 
 .todayButton {
   margin-left: auto;
+  background: var(--color-surface);
 }
 
 .viewSwitcher {
@@ -113,8 +212,8 @@
 
 .viewButton,
 .viewActive {
-  padding: 0.5rem 0.9rem;
-  background: var(--color-surface-muted);
+  padding: 0.48rem 0.82rem;
+  background: color-mix(in srgb, var(--color-surface) 72%, white 28%);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font-size: 0.85rem;
@@ -131,24 +230,24 @@
 }
 
 .viewActive {
-  background: var(--gradient-accent);
-  border-color: var(--color-border-strong);
-  color: var(--color-accent-contrast);
+  background: color-mix(in srgb, var(--color-accent) 20%, white 80%);
+  border-color: color-mix(in srgb, var(--color-accent) 46%, var(--color-border-strong));
+  color: color-mix(in srgb, var(--color-accent) 62%, black 38%);
 }
 
 .calendar {
   display: flex;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  background: color-mix(in srgb, var(--color-surface) 92%, white 8%);
+  border: 1px solid color-mix(in srgb, var(--color-border) 84%, white 16%);
+  border-radius: calc(var(--radius-lg) + 2px);
+  box-shadow: 0 20px 36px color-mix(in srgb, var(--color-bg) 70%, transparent);
   backdrop-filter: blur(var(--blur-md));
   -webkit-backdrop-filter: blur(var(--blur-md));
   overflow: hidden;
 }
 
 .timeColumn {
-  width: 70px;
+  width: 76px;
   border-right: 1px solid var(--color-border);
   background: transparent;
 }
@@ -174,7 +273,7 @@
 }
 
 .dayHeader {
-  padding: 0.9rem;
+  padding: 0.85rem 0.7rem;
   text-align: center;
   border-bottom: 1px solid var(--color-border);
   background: transparent;
@@ -211,25 +310,47 @@
   background: color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 
+.slot:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 55%, transparent);
+}
+
 .appointment {
   position: absolute;
-  background: var(--gradient-accent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 70%, white 30%), color-mix(in srgb, var(--color-accent) 82%, black 18%));
   color: var(--color-accent-contrast);
-  padding: 0.4rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.7rem;
+  padding: 0.42rem 0.45rem;
+  border-radius: 10px;
+  font-size: 0.68rem;
   z-index: 10;
   overflow: hidden;
   font-weight: 400;
   box-sizing: border-box;
   margin: 0 2px;
   cursor: pointer;
-  transition: opacity var(--transition-fast);
+  transition: opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
   min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 55%, white 45%);
+  box-shadow: 0 8px 14px color-mix(in srgb, var(--color-accent) 20%, transparent);
 }
 
 .appointment:hover {
-  opacity: 0.9;
+  opacity: 0.95;
+  transform: translateY(-1px);
+}
+
+.appointment:focus-visible,
+.monthAppointment:focus-visible,
+.monthDay:focus-visible,
+.closeButton:focus-visible,
+.editButton:focus-visible,
+.deleteButton:focus-visible,
+.saveButton:focus-visible,
+.cancelButton:focus-visible,
+.headerControls button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .appointment.scheduled {
@@ -398,10 +519,10 @@
 
 /* Month View Styles */
 .monthCalendar {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  background: color-mix(in srgb, var(--color-surface) 92%, white 8%);
+  border: 1px solid color-mix(in srgb, var(--color-border) 84%, white 16%);
+  border-radius: calc(var(--radius-lg) + 2px);
+  box-shadow: 0 20px 36px color-mix(in srgb, var(--color-bg) 70%, transparent);
   backdrop-filter: blur(var(--blur-md));
   -webkit-backdrop-filter: blur(var(--blur-md));
   overflow: hidden;
@@ -438,12 +559,13 @@
   border-bottom: 1px solid var(--color-border);
   padding: 0.5rem;
   cursor: pointer;
-  transition: background var(--transition-fast);
+  transition: background var(--transition-fast), transform var(--transition-fast);
   position: relative;
 }
 
 .monthDay:hover {
   background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  transform: translateY(-1px);
 }
 
 .monthDay:last-child,
@@ -687,6 +809,25 @@
   transform: translateY(0);
 }
 
+.createSheet {
+  max-width: 560px;
+}
+
+.deleteSheet {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem;
+  width: min(92vw, 480px);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+}
+
+.sheetDescription {
+  margin: 0.5rem 0 0;
+  color: var(--color-text-soft);
+  line-height: 1.5;
+}
+
 .statusBadge {
   display: inline-block;
   padding: 0.35rem 0.75rem;
@@ -719,5 +860,121 @@
   background: color-mix(in srgb, var(--color-danger) 14%, var(--color-accent) 8%);
   color: color-mix(in srgb, var(--color-danger) 42%, white);
   border: 1px solid color-mix(in srgb, var(--color-danger) 34%, var(--color-accent) 16%);
+}
+
+@media (max-width: 1100px) {
+  .main {
+    padding: var(--space-4);
+  }
+
+  .hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .heroMetrics {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .headerControls {
+    flex-wrap: wrap;
+    gap: 0.7rem;
+  }
+
+  .headerControls h2 {
+    min-width: 220px;
+    font-size: 1.05rem;
+  }
+
+  .todayButton {
+    margin-left: 0;
+  }
+
+  .viewSwitcher {
+    margin-left: 0;
+  }
+
+  .dayColumn {
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 840px) {
+  .nav {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.8rem;
+    padding: var(--space-4);
+  }
+
+  .navLinks {
+    width: 100%;
+    overflow-x: auto;
+    gap: var(--space-4);
+    padding-bottom: 0.2rem;
+  }
+
+  .calendar {
+    min-width: 860px;
+  }
+
+  .metricPill {
+    min-width: 92px;
+  }
+
+  .primaryAction {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .monthDay {
+    min-height: 96px;
+    padding: 0.35rem;
+  }
+
+  .monthAppointment {
+    font-size: 0.66rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero {
+    padding: 1rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .heroTitle {
+    font-size: 1.45rem;
+  }
+
+  .heroSubtitle {
+    font-size: 0.86rem;
+  }
+
+  .modal {
+    width: 100%;
+    max-width: none;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    margin-top: auto;
+    max-height: 85vh;
+  }
+
+  .createSheet {
+    padding-bottom: 1rem;
+  }
+
+  .deleteSheet {
+    width: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    margin-top: auto;
+  }
+
+  .modalActions {
+    position: sticky;
+    bottom: 0;
+    background: var(--color-surface);
+    padding-top: 0.8rem;
+  }
 }
 

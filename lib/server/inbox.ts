@@ -69,9 +69,14 @@ export async function getConversationsData(userId: number, status: InboxStatus =
       .filter((t: any) => tagIds.includes(t.id))
       .map((t: any) => t.name);
 
+    const unreadCount = messages.filter(
+      (m: any) => m.direction === 'inbound' && m.is_read === false
+    ).length;
+
     return {
       ...conv,
       message_count: messages.length,
+      has_unread: unreadCount > 0,
       last_message_at: sortedMessages.length > 0
         ? (sortedMessages[0].sent_at || sortedMessages[0].created_at)
         : (conv.updated_at || conv.created_at),

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import DOMPurify from 'dompurify';
+import createDOMPurify from 'dompurify';
 import { format, isSameDay, isToday, isYesterday } from 'date-fns';
 import styles from './page.module.css';
 import { DEFAULT_USER_ID } from '@/lib/constants';
@@ -15,9 +15,7 @@ import { DEFAULT_USER_ID } from '@/lib/constants';
 function EmailHtmlContent({ html }: { html: string }) {
   const [iframeHeight, setIframeHeight] = useState<number | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  // Sanitize HTML with permissive config for emails
-  const sanitized = DOMPurify.sanitize(html, {
+  const sanitizeConfig = {
     WHOLE_DOCUMENT: true, // Preserve html/head/body structure
     ADD_TAGS: ['style', 'meta', 'link'], // Allow style tags and meta tags
     ADD_ATTR: [
@@ -41,7 +39,16 @@ function EmailHtmlContent({ html }: { html: string }) {
     ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
     ALLOW_DATA_ATTR: true,
     KEEP_CONTENT: true,
-  });
+  };
+
+  // On server render, skip DOMPurify; sanitize safely in browser where window exists.
+  const sanitized = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return html;
+    }
+    const purifier = createDOMPurify(window);
+    return purifier.sanitize(html, sanitizeConfig);
+  }, [html]);
 
   // Extract body content from sanitized HTML
   let bodyContent = sanitized;
@@ -160,13 +167,14 @@ interface Conversation {
   contact_name: string;
   contact_email: string;
   contact_phone?: string;
+  client_id?: number | null;
   subject: string;
   status: string;
   message_count: number;
   last_message_at: string;
   last_message_preview?: string;
   tags: string[];
-  unread_count?: number;
+  has_unread?: boolean;
 }
 
 interface Message {
@@ -177,7 +185,7 @@ interface Message {
   html?: string;
   sent_at: string;
   images?: Array<{ url?: string; cid?: string; data?: string; contentType: string }>;
-  attachments?: Array<{ filename: string; contentType: string; size: number }>;
+  attachments?: Array<{ id?: number; filename: string; contentType: string; size: number; persisted?: boolean }>;
 }
 
 interface InboxPageClientProps {
@@ -220,9 +228,11 @@ export default function InboxPageClient({
   const [oldestMessageId, setOldestMessageId] = useState<number | null>(initialOldestMessageId);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [savingAttachmentId, setSavingAttachmentId] = useState<number | null>(null);
+  const [savingInlineImageKey, setSavingInlineImageKey] = useState<string | null>(null);
+  const [updatingReadState, setUpdatingReadState] = useState(false);
   
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const conversationListRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const initialMessagesRef = useRef<Message[] | null>(initialMessages);
   const initialMessagesConversationIdRef = useRef<number | null>(initialSelectedConversation?.id ?? initialSelectedConversationId);
@@ -250,7 +260,7 @@ export default function InboxPageClient({
     if (Number.isNaN(id)) return;
     const match = allConversations.find((c) => c.id === id);
     if (match) {
-      setSelectedConversation(match);
+      handleSelectConversation(match);
     }
   }, [conversationParam, allConversations, selectedConversation]);
 
@@ -299,30 +309,6 @@ export default function InboxPageClient({
 
     setConversations(filtered);
   }, [searchQuery, allConversations]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-    const root = conversationListRef.current || null;
-    const revealItems = Array.from(document.querySelectorAll('[data-reveal="inbox-item"]'));
-    if (revealItems.length === 0) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('is-visible');
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      { root, threshold: 0.12 }
-    );
-
-    revealItems.forEach((item) => observer.observe(item));
-    return () => observer.disconnect();
-  }, [conversations]);
 
   const fetchConversations = async () => {
     try {
@@ -409,13 +395,13 @@ export default function InboxPageClient({
     }
   };
 
-  // Handle infinite scroll - load older messages when scrolling near top
+  // Handle infinite scroll - load older messages when scrolling near bottom
   const handleMessagesScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     const container = e.currentTarget;
-    const scrollTop = container.scrollTop;
+    const remainingToBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
     
-    // Load more if scrolled within 200px of top and there are more messages
-    if (scrollTop < 200 && hasMoreMessages && !loadingOlderMessages && oldestMessageId && selectedConversation) {
+    // Load more if scrolled within 200px of bottom and there are more messages
+    if (remainingToBottom < 200 && hasMoreMessages && !loadingOlderMessages && oldestMessageId && selectedConversation) {
       fetchMessages(selectedConversation.id, false, oldestMessageId);
     }
   }, [hasMoreMessages, loadingOlderMessages, oldestMessageId, selectedConversation]);
@@ -506,6 +492,230 @@ export default function InboxPageClient({
     }
   };
 
+  const applyUnreadStateLocally = (conversationId: number, hasUnread: boolean) => {
+    const patchConversation = (conv: Conversation) =>
+      conv.id === conversationId ? { ...conv, has_unread: hasUnread } : conv;
+
+    setAllConversations((prev) => prev.map(patchConversation));
+    setConversations((prev) => prev.map(patchConversation));
+    setSelectedConversation((prev) =>
+      prev && prev.id === conversationId ? { ...prev, has_unread: hasUnread } : prev
+    );
+  };
+
+  const updateConversationReadState = async (
+    conversationId: number,
+    read: boolean,
+    options?: { silent?: boolean }
+  ) => {
+    try {
+      if (!options?.silent) {
+        setUpdatingReadState(true);
+      }
+      const response = await fetch(`/api/conversations/${conversationId}/read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ read }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update read state');
+      }
+      applyUnreadStateLocally(conversationId, Boolean(result.hasUnread));
+    } catch (error) {
+      console.error('Failed to update read state:', error);
+      if (!options?.silent) {
+        alert(error instanceof Error ? error.message : 'Failed to update read state');
+      }
+    } finally {
+      if (!options?.silent) {
+        setUpdatingReadState(false);
+      }
+    }
+  };
+
+  const handleSelectConversation = (conversation: Conversation) => {
+    setSelectedConversation(conversation);
+    if (conversation.has_unread) {
+      updateConversationReadState(conversation.id, true, { silent: true });
+    }
+  };
+
+  const handleSaveAttachment = async (attachment: { id?: number; persisted?: boolean }) => {
+    if (!selectedConversation) return;
+    if (!attachment.id || !attachment.persisted) {
+      alert('Acest attachment nu are fisierul sursa disponibil pentru salvare.');
+      return;
+    }
+
+    const payload: Record<string, unknown> = {};
+    if (selectedConversation.client_id && selectedConversation.client_id > 0) {
+      payload.clientId = selectedConversation.client_id;
+    } else {
+      const existingClientId = window.prompt(
+        'Conversatia nu este link-uita. Introdu ID client existent sau lasa gol pentru creare automata.'
+      );
+      if (existingClientId && existingClientId.trim()) {
+        const parsed = parseInt(existingClientId.trim(), 10);
+        if (Number.isNaN(parsed) || parsed <= 0) {
+          alert('Client ID invalid.');
+          return;
+        }
+        payload.clientId = parsed;
+      } else {
+        payload.createClient = true;
+      }
+    }
+
+    try {
+      setSavingAttachmentId(attachment.id);
+      const response = await fetch(
+        `/api/conversations/${selectedConversation.id}/attachments/${attachment.id}/save`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to save attachment');
+      }
+
+      alert('Attachment salvat in profilul clientului.');
+      await fetchConversations();
+    } catch (error) {
+      console.error('Error saving attachment:', error);
+      alert(error instanceof Error ? error.message : 'Eroare la salvarea attachment-ului');
+    } finally {
+      setSavingAttachmentId(null);
+    }
+  };
+
+  const handleSaveInlineImage = async (
+    messageId: number,
+    imageIndex: number,
+    image: { data?: string; url?: string }
+  ) => {
+    if (!selectedConversation) return;
+    if (!image.data && !(image.url && image.url.startsWith('data:'))) {
+      alert('Datele imaginii inline nu sunt disponibile pentru salvare.');
+      return;
+    }
+
+    const payload: Record<string, unknown> = { messageId, imageIndex };
+    if (selectedConversation.client_id && selectedConversation.client_id > 0) {
+      payload.clientId = selectedConversation.client_id;
+    } else {
+      const existingClientId = window.prompt(
+        'Conversatia nu este link-uita. Introdu ID client existent sau lasa gol pentru creare automata.'
+      );
+      if (existingClientId && existingClientId.trim()) {
+        const parsed = parseInt(existingClientId.trim(), 10);
+        if (Number.isNaN(parsed) || parsed <= 0) {
+          alert('Client ID invalid.');
+          return;
+        }
+        payload.clientId = parsed;
+      } else {
+        payload.createClient = true;
+      }
+    }
+
+    const saveKey = `${messageId}:${imageIndex}`;
+    try {
+      setSavingInlineImageKey(saveKey);
+      const response = await fetch(
+        `/api/conversations/${selectedConversation.id}/images/save`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to save inline image');
+      }
+
+      alert('Imagine salvata in profilul clientului.');
+      await fetchConversations();
+    } catch (error) {
+      console.error('Error saving inline image:', error);
+      alert(error instanceof Error ? error.message : 'Eroare la salvarea imaginii inline');
+    } finally {
+      setSavingInlineImageKey(null);
+    }
+  };
+
+  const renderAttachments = (
+    attachments?: Array<{ id?: number; filename: string; contentType: string; size: number; persisted?: boolean }>
+  ) => {
+    if (!attachments || attachments.length === 0) {
+      return null;
+    }
+
+    return (
+      <div className={styles.messageAttachments}>
+        {attachments.map((att, idx) => (
+          <div key={`${att.id || att.filename}-${idx}`} className={styles.messageAttachment}>
+            <div className={styles.attachmentMeta}>
+              Attachment: {att.filename} ({Math.round((att.size || 0) / 1024)}KB)
+            </div>
+            {att.id && att.persisted ? (
+              <button
+                type="button"
+                className={styles.attachmentSaveButton}
+                onClick={() => handleSaveAttachment(att)}
+                disabled={savingAttachmentId === att.id}
+              >
+                {savingAttachmentId === att.id ? 'Se salveaza...' : 'Salveaza la client'}
+              </button>
+            ) : (
+              <button type="button" className={styles.attachmentSaveButton} disabled>
+                Salveaza la client
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderInlineImages = (
+    messageId: number,
+    images?: Array<{ url?: string; cid?: string; data?: string; contentType: string }>
+  ) => {
+    if (!images || images.length === 0) {
+      return null;
+    }
+
+    return (
+      <div className={styles.messageAttachments}>
+        {images.map((image, idx) => {
+          const canSave = Boolean(image.data || (image.url && image.url.startsWith('data:')));
+          const saveKey = `${messageId}:${idx}`;
+          return (
+            <div key={saveKey} className={styles.messageAttachment}>
+              <div className={styles.attachmentMeta}>
+                Inline image #{idx + 1}
+              </div>
+              <button
+                type="button"
+                className={styles.attachmentSaveButton}
+                onClick={() => handleSaveInlineImage(messageId, idx, image)}
+                disabled={!canSave || savingInlineImageKey === saveKey}
+              >
+                {savingInlineImageKey === saveKey ? 'Se salveaza...' : 'Salveaza imagine la client'}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -562,7 +772,7 @@ export default function InboxPageClient({
     const grouped: Array<{ type: 'date' | 'message'; date?: Date; message?: Message }> = [];
     let lastDate: Date | null = null;
 
-    messages.forEach((msg, index) => {
+    [...messages].reverse().forEach((msg) => {
       if (!msg.sent_at) return; // Skip messages without sent_at
       
       const msgDate = new Date(msg.sent_at);
@@ -627,10 +837,7 @@ export default function InboxPageClient({
               <div className={styles.syncError}>{syncError}</div>
             )}
           </div>
-          <div 
-            ref={conversationListRef}
-            className={styles.conversationListContent}
-          >
+          <div className={styles.conversationListContent}>
             {conversations.length === 0 ? (
               <div className={styles.emptyConversations}>
                 {searchQuery ? 'Nu s-au găsit conversații' : 'Nu există conversații'}
@@ -641,14 +848,13 @@ export default function InboxPageClient({
                 key={conv.id}
                 className={`${styles.conversationItem} ${
                   selectedConversation?.id === conv.id ? styles.active : ''
-                } reveal-on-scroll`}
-                data-reveal="inbox-item"
-                onClick={() => setSelectedConversation(conv)}
+                }`}
+                onClick={() => handleSelectConversation(conv)}
               >
                 <div className={styles.conversationHeader}>
                   <div className={styles.contactName}>{conv.contact_name || 'Fără nume'}</div>
-                  {conv.unread_count && conv.unread_count > 0 && (
-                    <div className={styles.unreadBadge}>{conv.unread_count}</div>
+                  {conv.has_unread && (
+                    <div className={styles.unreadBadge} aria-label="Unread conversation" />
                   )}
                 </div>
                 <div className={styles.conversationMeta}>
@@ -699,7 +905,24 @@ export default function InboxPageClient({
                     {selectedConversation.contact_email} • {selectedConversation.channel}
                   </div>
                 </div>
-                <div className={styles.status}>{selectedConversation.status}</div>
+                <div className={styles.threadHeaderActions}>
+                  <button
+                    type="button"
+                    className={styles.readToggleButton}
+                    onClick={() =>
+                      updateConversationReadState(
+                        selectedConversation.id,
+                        selectedConversation.has_unread === true
+                      )
+                    }
+                    disabled={updatingReadState}
+                  >
+                    {selectedConversation.has_unread
+                      ? 'Mark as read'
+                      : 'Mark as unread'}
+                  </button>
+                  <div className={styles.status}>{selectedConversation.status}</div>
+                </div>
               </div>
 
               <div 
@@ -735,24 +958,19 @@ export default function InboxPageClient({
                     }
                     
                     return (
-                      <div key={msg.id}>
+                      <div key={msg.id} className={styles.messageItem}>
                         {msg.html ? (
                           <div className={styles.messageHtmlWrapper}>
+                            {renderAttachments(msg.attachments)}
+                            {renderInlineImages(msg.id, msg.images)}
                             <EmailHtmlContent html={msg.html} />
                           </div>
                         ) : (
                           <div className={`${styles.messageWrapper} ${isOutbound ? styles.outboundWrapper : styles.inboundWrapper}`}>
                             <div className={`${styles.messageBubble} ${isOutbound ? styles.outboundBubble : styles.inboundBubble}`}>
                               <div className={styles.messageText}>{msg.content || msg.text}</div>
-                              {msg.attachments && msg.attachments.length > 0 && (
-                                <div className={styles.messageAttachments}>
-                                  {msg.attachments.map((att, idx) => (
-                                    <div key={idx} className={styles.messageAttachment}>
-                                      📎 {att.filename} ({Math.round(att.size / 1024)}KB)
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
+                              {renderAttachments(msg.attachments)}
+                              {renderInlineImages(msg.id, msg.images)}
                               <div className={styles.messageTimestamp}>
                                 {formatMessageTime(msgDate)}
                               </div>

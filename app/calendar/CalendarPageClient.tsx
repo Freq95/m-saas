@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { format, startOfWeek, addDays, addWeeks, subWeeks, addMonths, subMonths, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth } from 'date-fns';
 import { ro } from 'date-fns/locale';
 import styles from './page.module.css';
+import { useToast } from '@/lib/useToast';
+import { ToastContainer } from '@/components/Toast';
 
 interface Appointment {
   id: number;
@@ -47,6 +49,7 @@ export default function CalendarPageClient({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<{ start: Date; end: Date } | null>(null);
@@ -65,6 +68,7 @@ export default function CalendarPageClient({
   });
 
   const skipAppointmentsFetch = useRef(true);
+  const toast = useToast();
 
   useEffect(() => {
     if (skipAppointmentsFetch.current) {
@@ -78,6 +82,20 @@ export default function CalendarPageClient({
     if (initialServices.length > 0) return;
     fetchServices();
   }, [initialServices.length]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowCreateModal(false);
+        setShowEditModal(false);
+        setShowPreviewModal(false);
+        setShowDeleteConfirm(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   const fetchAppointments = async () => {
     try {
@@ -126,7 +144,7 @@ export default function CalendarPageClient({
 
   const createAppointment = async () => {
     if (!selectedSlot || !formData.clientName || !formData.serviceId) {
-      alert('Completează toate câmpurile obligatorii (nume client și serviciu)');
+      toast.warning('Completeaza toate campurile obligatorii (nume client si serviciu).');
       return;
     }
 
@@ -163,13 +181,14 @@ export default function CalendarPageClient({
           notes: '',
         });
         fetchAppointments();
+        toast.success('Programarea a fost creata.');
       } else {
         const errorData = await response.json();
-        alert(`Eroare: ${errorData.error || 'Nu s-a putut crea programarea'}`);
+        toast.error(errorData.error || 'Nu s-a putut crea programarea.');
       }
     } catch (error) {
       console.error('Error creating appointment:', error);
-      alert('Eroare la crearea programării. Verifică consola pentru detalii.');
+      toast.error('Eroare la crearea programarii.');
     }
   };
 
@@ -251,20 +270,24 @@ export default function CalendarPageClient({
         setSelectedAppointment(null);
         setEditFormData({ startTime: '', endTime: '', status: '', notes: '' });
         fetchAppointments();
+        toast.success('Programarea a fost actualizata.');
       } else {
         const errorData = await response.json();
-        alert(`Eroare: ${errorData.error || 'Nu s-a putut actualiza programarea'}`);
+        toast.error(errorData.error || 'Nu s-a putut actualiza programarea.');
       }
     } catch (error) {
       console.error('Error updating appointment:', error);
-      alert('Eroare la actualizarea programării.');
+      toast.error('Eroare la actualizarea programarii.');
     }
   };
 
-  const deleteAppointment = async () => {
+  const deleteAppointment = () => {
     if (!selectedAppointment) return;
-    
-    if (!confirm('Sigur vrei să ștergi această programare?')) return;
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteAppointment = async () => {
+    if (!selectedAppointment) return;
 
     try {
       const response = await fetch(`/api/appointments/${selectedAppointment.id}`, {
@@ -273,15 +296,17 @@ export default function CalendarPageClient({
 
       if (response.ok) {
         setShowPreviewModal(false);
+        setShowDeleteConfirm(false);
         setSelectedAppointment(null);
         fetchAppointments();
+        toast.success('Programarea a fost stearsa.');
       } else {
         const errorData = await response.json();
-        alert(`Eroare: ${errorData.error || 'Nu s-a putut șterge programarea'}`);
+        toast.error(errorData.error || 'Nu s-a putut sterge programarea.');
       }
     } catch (error) {
       console.error('Error deleting appointment:', error);
-      alert('Eroare la ștergerea programării.');
+      toast.error('Eroare la stergerea programarii.');
     }
   };
 
@@ -442,6 +467,42 @@ export default function CalendarPageClient({
     handleSlotClick(day);
   };
 
+  const handleQuickCreate = () => {
+    const now = new Date();
+    const slotStart = new Date(now);
+    const roundedMinutes = Math.ceil(slotStart.getMinutes() / 15) * 15;
+    slotStart.setMinutes(roundedMinutes, 0, 0);
+
+    if (slotStart.getHours() < 8) {
+      slotStart.setHours(8, 0, 0, 0);
+    }
+
+    if (slotStart.getHours() >= 19) {
+      slotStart.setDate(slotStart.getDate() + 1);
+      slotStart.setHours(8, 0, 0, 0);
+    }
+
+    const selectedService = services.find(s => s.id.toString() === formData.serviceId);
+    const durationMinutes = selectedService?.duration_minutes || 60;
+    const slotEnd = new Date(slotStart);
+    slotEnd.setMinutes(slotEnd.getMinutes() + durationMinutes);
+
+    setSelectedDate(slotStart);
+    setSelectedSlot({ start: slotStart, end: slotEnd });
+    setShowCreateModal(true);
+  };
+
+  const rangeLabel = viewType === 'week'
+    ? `${format(weekStart, "d MMMM", { locale: ro })} - ${format(addDays(weekStart, 6), "d MMMM yyyy", { locale: ro })}`
+    : (() => {
+        const monthYear = format(currentDate, "MMMM yyyy", { locale: ro });
+        return monthYear.charAt(0).toUpperCase() + monthYear.slice(1);
+      })();
+
+  const today = new Date();
+  const appointmentsToday = appointments.filter((apt) => isSameDay(new Date(apt.start_time), today));
+  const scheduledToday = appointmentsToday.filter((apt) => apt.status === 'scheduled').length;
+
   return (
     <div className={styles.container}>
       <nav className={styles.nav}>
@@ -452,62 +513,71 @@ export default function CalendarPageClient({
           <Link href="/dashboard" prefetch>Dashboard</Link>
           <Link href="/inbox" prefetch>Inbox</Link>
           <Link href="/calendar" className={styles.active} prefetch>Calendar</Link>
-          <Link href="/clients" prefetch>Clienți</Link>
-          <Link href="/settings/email" prefetch>Setări</Link>
+          <Link href="/clients" prefetch>Clienti</Link>
+          <Link href="/settings/email" prefetch>Setari</Link>
         </div>
       </nav>
 
       <main className={styles.main}>
+        <section className={styles.hero}>
+          <div>
+            <p className={styles.eyebrow}>Dental Operations</p>
+            <h2 className={styles.heroTitle}>Calendar</h2>
+            <p className={styles.heroSubtitle}>Programari clare, rapide si predictibile pentru cabinet.</p>
+          </div>
+          <div className={styles.heroMetrics}>
+            <div className={styles.metricPill}>
+              <span>Astazi</span>
+              <strong>{appointmentsToday.length}</strong>
+            </div>
+            <div className={styles.metricPill}>
+              <span>Programate</span>
+              <strong>{scheduledToday}</strong>
+            </div>
+            <button type="button" className={styles.primaryAction} onClick={handleQuickCreate}>
+              + Programare rapida
+            </button>
+          </div>
+        </section>
+
         <div className={styles.calendarHeader}>
           <div className={styles.headerControls}>
-            <button 
-              onClick={() => viewType === 'week' 
+            <button
+              type="button"
+              onClick={() => viewType === 'week'
                 ? setCurrentDate(subWeeks(currentDate, 1))
                 : setCurrentDate(subMonths(currentDate, 1))
               }
             >
-              ←
+              &lt;
             </button>
-            <h2>
-              {viewType === 'week' 
-                ? `${format(weekStart, "d MMMM", { locale: ro })} - ${format(addDays(weekStart, 6), "d MMMM yyyy", { locale: ro })}`
-                : (() => {
-                    const monthYear = format(currentDate, "MMMM yyyy", { locale: ro });
-                    return monthYear.charAt(0).toUpperCase() + monthYear.slice(1);
-                  })()
-              }
-            </h2>
-            <button 
+            <h2>{rangeLabel}</h2>
+            <button
+              type="button"
               onClick={() => viewType === 'week'
                 ? setCurrentDate(addWeeks(currentDate, 1))
                 : setCurrentDate(addMonths(currentDate, 1))
               }
             >
-              →
+              &gt;
             </button>
             <button onClick={() => setCurrentDate(new Date())} className={styles.todayButton}>
-              Astăzi
+              Astazi
             </button>
             <div className={styles.viewSwitcher}>
               <button
                 type="button"
-                onClick={() => {
-                  console.log('Setting view to week');
-                  setViewType('week');
-                }}
+                onClick={() => setViewType('week')}
                 className={viewType === 'week' ? styles.viewActive : styles.viewButton}
               >
-                Săptămână
+                Saptamana
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  console.log('Setting view to month');
-                  setViewType('month');
-                }}
+                onClick={() => setViewType('month')}
                 className={viewType === 'month' ? styles.viewActive : styles.viewButton}
               >
-                Lună
+                Luna
               </button>
             </div>
           </div>
@@ -553,6 +623,15 @@ export default function CalendarPageClient({
                       key={hour}
                       className={styles.slot}
                       onClick={() => handleSlotClick(day, hour)}
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Creeaza programare pe ${format(day, "d MMMM", { locale: ro })} la ${hour}:00`}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          handleSlotClick(day, hour);
+                        }
+                      }}
                     />
                   ))}
                   {/* Render appointments at day level */}
@@ -585,6 +664,16 @@ export default function CalendarPageClient({
                           setSelectedAppointment(apt);
                           setShowPreviewModal(true);
                         }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            setSelectedAppointment(apt);
+                            setShowPreviewModal(true);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Programare ${apt.client_name}, ${apt.service_name}`}
                       >
                         <div className={styles.appointmentTitle}>{apt.client_name}</div>
                         <div className={styles.appointmentService}>{apt.service_name}</div>
@@ -599,7 +688,7 @@ export default function CalendarPageClient({
         ) : (
           <div className={styles.monthCalendar} key="month-view">
             <div className={styles.monthWeekDays}>
-              {['Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri', 'Sâmbătă', 'Duminică'].map(day => (
+              {['Luni', 'Marti', 'Miercuri', 'Joi', 'Vineri', 'Sambata', 'Duminica'].map(day => (
                 <div key={day} className={styles.monthWeekDay}>
                   {day}
                 </div>
@@ -616,6 +705,15 @@ export default function CalendarPageClient({
                     key={day.toISOString()}
                     className={`${styles.monthDay} ${!isCurrentMonth ? styles.monthDayOther : ''} ${isToday ? styles.monthDayToday : ''}`}
                     onClick={() => handleDayClick(day)}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Creeaza programare pe ${format(day, "d MMMM yyyy", { locale: ro })}`}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        handleDayClick(day);
+                      }
+                    }}
                   >
                     <div className={styles.monthDayNumber}>
                       {format(day, 'd')}
@@ -630,6 +728,15 @@ export default function CalendarPageClient({
                             setSelectedAppointment(apt);
                             setShowPreviewModal(true);
                           }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              event.preventDefault();
+                              setSelectedAppointment(apt);
+                              setShowPreviewModal(true);
+                            }
+                          }}
+                          role="button"
+                          tabIndex={0}
                           title={`${apt.client_name} - ${apt.service_name}`}
                         >
                           {format(new Date(apt.start_time), 'HH:mm', { locale: ro })} - {apt.client_name}
@@ -658,7 +765,13 @@ export default function CalendarPageClient({
             setSelectedAppointment(null);
           }}
         >
-          <div className={styles.previewModal} onClick={(e) => e.stopPropagation()}>
+          <div
+            className={styles.previewModal}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Detalii programare"
+          >
             <div className={styles.previewHeader}>
               <div>
                 <h2 className={styles.previewTitle}>{selectedAppointment.client_name}</h2>
@@ -671,35 +784,35 @@ export default function CalendarPageClient({
                   setSelectedAppointment(null);
                 }}
               >
-                ×
+                x
               </button>
             </div>
 
             <div className={styles.previewContent}>
               <div className={styles.previewSection}>
                 <div className={styles.previewRow}>
-                  <span className={styles.previewLabel}>📅 Data și ora</span>
+                  <span className={styles.previewLabel}>Data si ora</span>
                   <span className={styles.previewValue}>
                     {format(new Date(selectedAppointment.start_time), "EEEE, d MMMM yyyy 'la' HH:mm", { locale: ro })} - {format(new Date(selectedAppointment.end_time), 'HH:mm', { locale: ro })}
                   </span>
                 </div>
                 <div className={styles.previewRow}>
-                  <span className={styles.previewLabel}>📧 Email</span>
+                  <span className={styles.previewLabel}>Email</span>
                   <span className={styles.previewValue}>{selectedAppointment.client_email || 'N/A'}</span>
                 </div>
                 <div className={styles.previewRow}>
-                  <span className={styles.previewLabel}>📞 Telefon</span>
+                  <span className={styles.previewLabel}>Telefon</span>
                   <span className={styles.previewValue}>{selectedAppointment.client_phone || 'N/A'}</span>
                 </div>
                 <div className={styles.previewRow}>
-                  <span className={styles.previewLabel}>📝 Status</span>
+                  <span className={styles.previewLabel}>Status</span>
                   <span className={`${styles.statusBadge} ${styles[selectedAppointment.status]}`}>
                     {selectedAppointment.status}
                   </span>
                 </div>
                 {selectedAppointment.notes && (
                   <div className={styles.previewRow}>
-                    <span className={styles.previewLabel}>📄 Note</span>
+                    <span className={styles.previewLabel}>Note</span>
                     <span className={styles.previewValue}>{selectedAppointment.notes}</span>
                   </div>
                 )}
@@ -711,13 +824,13 @@ export default function CalendarPageClient({
                 className={styles.editButton}
                 onClick={handleEditAppointment}
               >
-                Editează
+                Editeaza
               </button>
               <button 
                 className={styles.deleteButton}
                 onClick={deleteAppointment}
               >
-                Șterge
+                Sterge
               </button>
             </div>
           </div>
@@ -733,11 +846,17 @@ export default function CalendarPageClient({
             setSelectedAppointment(null);
           }}
         >
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h3>Editează programare</h3>
+          <div
+            className={styles.modal}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Editare programare"
+          >
+            <h3>Editeaza programare</h3>
             <div className={styles.modalContent}>
               <div className={styles.modalField}>
-                <label>Data și ora început *</label>
+                <label>Data si ora inceput *</label>
                 <input
                   type="datetime-local"
                   value={editFormData.startTime}
@@ -747,7 +866,7 @@ export default function CalendarPageClient({
               </div>
 
               <div className={styles.modalField}>
-                <label>Data și ora sfârșit *</label>
+                <label>Data si ora sfarsit *</label>
                 <input
                   type="datetime-local"
                   value={editFormData.endTime}
@@ -788,10 +907,10 @@ export default function CalendarPageClient({
                 }} 
                 className={styles.cancelButton}
               >
-                Anulează
+                Anuleaza
               </button>
               <button onClick={updateAppointment} className={styles.saveButton}>
-                Salvează
+                Salveaza
               </button>
             </div>
           </div>
@@ -800,11 +919,17 @@ export default function CalendarPageClient({
 
       {showCreateModal && selectedSlot && (
         <div className={styles.modalOverlay} onClick={() => setShowCreateModal(false)}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <h3>Crează programare</h3>
+          <div
+            className={`${styles.modal} ${styles.createSheet}`}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Creare programare"
+          >
+            <h3>Creeaza programare</h3>
             <div className={styles.modalContent}>
               <div className={styles.modalField}>
-                <label>Dată și oră</label>
+                <label>Data si ora</label>
                 <div>
                   {format(selectedSlot.start, "EEEE, d MMMM yyyy 'la' HH:mm", { locale: ro })}
                   {formData.serviceId && (() => {
@@ -872,16 +997,47 @@ export default function CalendarPageClient({
 
             <div className={styles.modalActions}>
               <button onClick={() => setShowCreateModal(false)} className={styles.cancelButton}>
-                Anulează
+                Anuleaza
               </button>
               <button onClick={createAppointment} className={styles.saveButton}>
-                Salvează
+                Salveaza
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {showDeleteConfirm && selectedAppointment && (
+        <div className={styles.modalOverlay} onClick={() => setShowDeleteConfirm(false)}>
+          <div
+            className={styles.deleteSheet}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirmare stergere"
+          >
+            <h3>Stergere programare</h3>
+            <p className={styles.sheetDescription}>
+              Sigur vrei sa stergi programarea pentru <strong>{selectedAppointment.client_name}</strong>?
+            </p>
+            <div className={styles.modalActions}>
+              <button type="button" onClick={() => setShowDeleteConfirm(false)} className={styles.cancelButton}>
+                Renunta
+              </button>
+              <button type="button" onClick={confirmDeleteAppointment} className={styles.deleteButton}>
+                Sterge
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ToastContainer toasts={toast.toasts} onClose={toast.removeToast} />
     </div>
   );
 }
+
+
+
+
 

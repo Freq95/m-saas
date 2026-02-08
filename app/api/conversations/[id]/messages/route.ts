@@ -40,6 +40,7 @@ export async function POST(
       conversation_id: conversationId,
       direction,
       content,
+      is_read: direction === 'outbound',
       sent_at: now,
       created_at: now,
     };

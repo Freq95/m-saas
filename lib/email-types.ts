@@ -4,10 +4,12 @@
  */
 
 export interface EmailAttachment {
+  id?: number;
   filename: string;
   contentType: string;
   size: number;
   contentId?: string;
+  persisted?: boolean;
 }
 
 export interface EmailImage {

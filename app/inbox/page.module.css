@@ -246,15 +246,12 @@
 }
 
 .unreadBadge {
-  background: #25d366;
-  color: #ffffff;
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.15rem 0.5rem;
-  border-radius: 10px;
-  min-width: 20px;
-  text-align: center;
-  line-height: 1.4;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #fb923c;
+  box-shadow: 0 0 0 2px rgba(251, 146, 60, 0.24);
+  flex-shrink: 0;
 }
 
 .conversationMeta {
@@ -321,6 +318,27 @@
   color: var(--color-text-soft);
 }
 
+.threadHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.readToggleButton {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.55rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.readToggleButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .status {
   font-size: 0.75rem;
   padding: 0.3rem 0.6rem;
@@ -343,6 +361,12 @@
   min-height: 0;
   background: transparent;
   scroll-behavior: smooth;
+}
+
+.messageItem {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  padding-bottom: 0.35rem;
+  margin-bottom: 0.35rem;
 }
 
 .loadingOlder {
@@ -477,8 +501,35 @@
   font-size: 0.8125rem;
   color: var(--color-text-muted);
   border: 1px solid rgba(77, 163, 255, 0.16);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 
+.attachmentMeta {
+  word-break: break-word;
+}
+
+.attachmentSaveButton {
+  border: 1px solid rgba(77, 163, 255, 0.35);
+  background: var(--gradient-accent);
+  color: var(--color-accent-contrast);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.55rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.attachmentSaveButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: var(--color-surface-muted);
+  color: var(--color-text-soft);
+  border-color: var(--color-border);
+}
 
 .suggestedResponse {
   margin: 1rem 1.5rem;
