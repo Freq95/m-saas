@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import createDOMPurify from 'dompurify';
 import { format, isSameDay, isToday, isYesterday } from 'date-fns';
@@ -799,18 +798,6 @@ export default function InboxPageClient({
 
   return (
     <div className={styles.container}>
-      <nav className={styles.nav}>
-        <Link href="/" prefetch>
-          <h1 className={styles.logo}>OpsGenie</h1>
-        </Link>
-        <div className={styles.navLinks}>
-          <Link href="/dashboard" prefetch>Dashboard</Link>
-          <Link href="/inbox" className={styles.active} prefetch>Inbox</Link>
-          <Link href="/calendar" prefetch>Calendar</Link>
-          <Link href="/clients" prefetch>Clienți</Link>
-          <Link href="/settings/email" prefetch>Setări</Link>
-        </div>
-      </nav>
 
       <div ref={containerRef} className={styles.inbox}>
         <div 

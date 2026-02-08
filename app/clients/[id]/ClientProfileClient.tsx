@@ -323,18 +323,6 @@ export default function ClientProfileClient({
 
   return (
     <div className={navStyles.container}>
-      <nav className={navStyles.nav}>
-        <Link href="/" prefetch>
-          <h1 className={navStyles.logo}>OpsGenie</h1>
-        </Link>
-        <div className={navStyles.navLinks}>
-          <Link href="/dashboard" prefetch>Dashboard</Link>
-          <Link href="/inbox" prefetch>Inbox</Link>
-          <Link href="/calendar" prefetch>Calendar</Link>
-          <Link href="/clients" className={navStyles.active} prefetch>Clienți</Link>
-          <Link href="/settings/email" prefetch>Setări</Link>
-        </div>
-      </nav>
       <div className={styles.container}>
         <div className={styles.header}>
           <Link href="/clients" className={styles.backLink} prefetch>

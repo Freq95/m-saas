@@ -1,9 +1,6 @@
 .container {
   min-height: 100vh;
-  background:
-    radial-gradient(1200px 560px at 10% -20%, color-mix(in srgb, var(--color-accent) 10%, transparent), transparent 62%),
-    radial-gradient(900px 500px at 92% -8%, color-mix(in srgb, var(--color-success) 8%, transparent), transparent 60%),
-    var(--color-bg);
+  background: transparent;
   display: flex;
   flex-direction: column;
 }

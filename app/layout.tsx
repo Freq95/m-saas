@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 import '../styles/theme.css'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
+import RouteTransition from '@/components/RouteTransition'
+import AppTopNav from '@/components/AppTopNav'
 
 export const metadata: Metadata = {
   title: 'OpsGenie pentru Micro-Servicii',
@@ -17,7 +19,8 @@ export default function RootLayout({
     <html lang="ro">
       <body>
         <ErrorBoundary>
-          {children}
+          <AppTopNav />
+          <RouteTransition>{children}</RouteTransition>
         </ErrorBoundary>
       </body>
     </html>

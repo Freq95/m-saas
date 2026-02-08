@@ -5,7 +5,6 @@ import DOMPurify from 'dompurify';
 import { DEFAULT_USER_ID } from '@/lib/constants';
 import { emailSchema } from '@/lib/validation';
 import { fetchWithRetry } from '@/lib/retry';
-import Navigation from '@/components/Navigation';
 import { useToast } from '@/lib/useToast';
 import { ToastContainer } from '@/components/Toast';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -301,7 +300,6 @@ function EmailSettingsPageContent({ initialIntegrations }: EmailSettingsPageCont
   if (loading) {
     return (
       <div className={navStyles.container}>
-        <Navigation activePath="/settings/email" />
         <div className={styles.container}>
           <div role="status" aria-live="polite" aria-label="Loading integrations">
             Loading...
@@ -342,7 +340,6 @@ function EmailSettingsPageContent({ initialIntegrations }: EmailSettingsPageCont
 
   return (
     <div className={navStyles.container}>
-      <Navigation activePath="/settings/email" />
       <div className={styles.container}>
         <h1>Email Integrations</h1>
         <p className={styles.description}>

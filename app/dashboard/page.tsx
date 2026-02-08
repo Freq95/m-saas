@@ -50,18 +50,6 @@ export default async function DashboardPage() {
 
   return (
     <div className={styles.container}>
-      <nav className={styles.nav}>
-        <Link href="/" prefetch>
-          <h1 className={styles.logo}>OpsGenie</h1>
-        </Link>
-        <div className={styles.navLinks}>
-          <Link href="/dashboard" className={styles.active} prefetch>Dashboard</Link>
-          <Link href="/inbox" prefetch>Inbox</Link>
-          <Link href="/calendar" prefetch>Calendar</Link>
-          <Link href="/clients" prefetch>Clienți</Link>
-          <Link href="/settings/email" prefetch>Setări</Link>
-        </div>
-      </nav>
 
       <main className={styles.main}>
         <h2 className={styles.title}>Dashboard</h2>
@@ -256,3 +244,4 @@ export default async function DashboardPage() {
     </div>
   );
 }
+

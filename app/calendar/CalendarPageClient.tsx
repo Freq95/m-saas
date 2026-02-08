@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
 import { format, startOfWeek, addDays, addWeeks, subWeeks, addMonths, subMonths, isSameDay, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth } from 'date-fns';
 import { ro } from 'date-fns/locale';
 import styles from './page.module.css';
@@ -505,18 +504,6 @@ export default function CalendarPageClient({
 
   return (
     <div className={styles.container}>
-      <nav className={styles.nav}>
-        <Link href="/" prefetch>
-          <h1 className={styles.logo}>OpsGenie</h1>
-        </Link>
-        <div className={styles.navLinks}>
-          <Link href="/dashboard" prefetch>Dashboard</Link>
-          <Link href="/inbox" prefetch>Inbox</Link>
-          <Link href="/calendar" className={styles.active} prefetch>Calendar</Link>
-          <Link href="/clients" prefetch>Clienti</Link>
-          <Link href="/settings/email" prefetch>Setari</Link>
-        </div>
-      </nav>
 
       <main className={styles.main}>
         <section className={styles.hero}>
