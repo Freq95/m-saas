@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 
+// Cleanup classification: feature-flagged (advanced scheduling domain, no core UI dependency).
 // GET /api/resources - List all resources for a user
 export async function GET(request: NextRequest) {
   try {

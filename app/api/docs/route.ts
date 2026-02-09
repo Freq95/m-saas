@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 
 /**
  * OpenAPI/Swagger API Documentation
- * GET /api/docs - Returns OpenAPI 3.0 specification
+ * GET /api/docs - Returns minimal maintained OpenAPI 3.0 specification.
+ * Note: Advanced scheduling/experimental routes are intentionally excluded.
  */
 export async function GET() {
   const openApiSpec = {
@@ -10,8 +11,10 @@ export async function GET() {
     info: {
       title: 'm-saas API',
       version: '1.0.0',
-      description: 'API for managing conversations, appointments, clients, and services',
+      description:
+        'Minimal maintained API surface for core CRM flows (clients, appointments, services, conversations, dashboard).',
     },
+    'x-docs-scope': 'minimal-maintained-surface',
     servers: [
       {
         url: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',

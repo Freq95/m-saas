@@ -1,5 +1,5 @@
 import { MongoClient, type Db } from 'mongodb';
-import type { StorageData } from './sql-adapter';
+import type { StorageData } from './storage-data';
 
 const DEFAULT_DB_NAME = 'm-saas';
 const COLLECTIONS: Array<keyof StorageData> = [

@@ -30,6 +30,10 @@ yarn-error.log*
 # Data files (JSON storage)
 data/
 
+# Runtime uploads
+uploads/*
+!uploads/.gitkeep
+
 # Vercel
 .vercel
 

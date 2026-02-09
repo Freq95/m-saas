@@ -3,6 +3,7 @@ import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { checkAppointmentConflict } from '@/lib/calendar-conflicts';
 import type { RecurrenceRule } from '@/lib/types/calendar';
 
+// Cleanup classification: feature-flagged (advanced scheduling domain, no core UI dependency).
 // POST /api/appointments/recurring - Create recurring appointments
 export async function POST(request: NextRequest) {
   try {

@@ -7,8 +7,8 @@ import { z } from 'zod';
 
 // Common validation patterns
 export const emailSchema = z.string().email('Invalid email format').toLowerCase().trim();
-export const phoneSchema = z.string().regex(/^[\d\s\+\-\(\)]+$/, 'Invalid phone format').optional();
-export const dateTimeSchema = z.string().datetime().or(z.date());
+const phoneSchema = z.string().regex(/^[\d\s\+\-\(\)]+$/, 'Invalid phone format').optional();
+const dateTimeSchema = z.string().datetime().or(z.date());
 
 // Conversation schemas
 export const createConversationSchema = z.object({
@@ -51,17 +51,6 @@ export const createAppointmentSchema = z.object({
   notes: z.string().max(2000).optional(),
   exportToGoogle: z.boolean().optional().default(false),
   googleAccessToken: z.string().optional(),
-});
-
-export const updateAppointmentSchema = z.object({
-  serviceId: z.number().int().positive().optional(),
-  clientName: z.string().min(1).max(255).optional(),
-  clientEmail: emailSchema.optional(),
-  clientPhone: phoneSchema,
-  startTime: dateTimeSchema.optional(),
-  endTime: dateTimeSchema.optional(),
-  status: z.enum(['scheduled', 'completed', 'cancelled', 'no_show']).optional(),
-  notes: z.string().max(2000).optional(),
 });
 
 // Client schemas
@@ -197,29 +186,11 @@ export const facebookWebhookSchema = z.object({
   senderPhone: phoneSchema,
 });
 
-// Client ID param schema
-export const clientIdParamSchema = z.object({
-  id: z.string().regex(/^\d+$/).transform(Number),
-});
-
-// Reminder ID param schema
-export const reminderIdParamSchema = z.object({
-  id: z.string().regex(/^\d+$/).transform(Number),
-});
-
 // Email integration schemas
 export const createYahooIntegrationSchema = z.object({
   userId: z.number().int().positive().optional().default(1),
   email: emailSchema,
   password: z.string().min(1, 'Password is required'),
-});
-
-export const updateEmailIntegrationSchema = z.object({
-  isActive: z.boolean().optional(),
-});
-
-export const testEmailIntegrationSchema = z.object({
-  integrationId: z.number().int().positive(),
 });
 
 // Route parameter validation schemas

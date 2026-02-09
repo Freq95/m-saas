@@ -38,10 +38,7 @@ cp .env.example .env
 # 3. Initialize MongoDB collections
 npm run db:init:mongo
 
-# 4. Seed test data (optional)
-npm run db:seed
-
-# 5. Start development server
+# 4. Start development server
 npm run dev
 ```
 
@@ -83,6 +80,7 @@ Application available at: **http://localhost:3000**
 |----------|---------|
 | **[STATUS.md](STATUS.md)** | Current status, features checklist, recent sessions, next steps |
 | **[GUIDE.md](GUIDE.md)** | Setup guide, API reference, integrations, architecture |
+| **[API_SURFACE_STATUS.md](API_SURFACE_STATUS.md)** | Endpoint status classification (core vs feature-flagged) |
 | **[archived/](archived/)** | Historical documents, session logs, analysis reports |
 
 ---
@@ -130,15 +128,16 @@ m-saas/
 # Development
 npm run dev              # Start dev server
 npm run build            # Build for production
+npm run typecheck        # TypeScript checks (no emit)
+npm run check:unused-exports # Unused exports scan
 
 # Database
 npm run db:init:mongo    # Initialize MongoDB collections
 npm run db:migrate:mongo # Migrate JSON to MongoDB
-npm run db:seed          # Seed test data
 
 # Testing
 npm run test:webhooks    # Test webhook endpoints
-npm run db:populate      # Populate with mock data
+npm run test:yahoo       # Test Yahoo sync endpoint
 ```
 
 ---

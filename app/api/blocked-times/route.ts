@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 
+// Cleanup classification: feature-flagged (advanced scheduling domain, no core UI dependency).
 // GET /api/blocked-times - Get blocked times for a date range
 export async function GET(request: NextRequest) {
   try {

@@ -92,7 +92,10 @@ export async function PATCH(
         return createErrorResponse(
           'Time slot conflicts with existing appointment or blocked time',
           409,
-          { conflicts: conflictCheck.conflicts, suggestions: conflictCheck.suggestions }
+          JSON.stringify({
+            conflicts: conflictCheck.conflicts,
+            suggestions: conflictCheck.suggestions,
+          })
         );
       }
 
