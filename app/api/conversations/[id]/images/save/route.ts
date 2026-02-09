@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
 import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { findOrCreateClient, linkConversationToClient } from '@/lib/client-matching';
-import { parseStoredMessage } from '@/lib/email-types';
+import { parseStoredMessage, serializeMessage } from '@/lib/email-types';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -123,6 +123,71 @@ export async function POST(
       await linkConversationToClient(conversationId, targetClientId);
     }
 
+    const markImageAsSaved = async (savedClientId: number, savedFileId: number, savedAt: string) => {
+      const updatedStored = {
+        ...stored,
+        images: images.map((img: any, idx: number) => {
+          if (idx !== imageIndex) {
+            return img;
+          }
+          return {
+            ...img,
+            last_saved_client_id: savedClientId,
+            last_saved_client_file_id: savedFileId,
+            last_saved_at: savedAt,
+          };
+        }),
+      };
+
+      await db.collection('messages').updateOne(
+        { id: messageId, conversation_id: conversationId },
+        {
+          $set: {
+            content: serializeMessage(updatedStored),
+            updated_at: savedAt,
+          },
+        }
+      );
+    };
+
+    if (
+      targetImage.last_saved_client_id === targetClientId &&
+      typeof targetImage.last_saved_client_file_id === 'number'
+    ) {
+      const existingByLastSaved = await db.collection('client_files').findOne({
+        id: targetImage.last_saved_client_file_id,
+        client_id: targetClientId,
+      });
+      if (existingByLastSaved) {
+        const now = new Date().toISOString();
+        await markImageAsSaved(targetClientId, existingByLastSaved.id, now);
+        return createSuccessResponse({
+          success: true,
+          alreadySaved: true,
+          clientId: targetClientId,
+          file: stripMongoId(existingByLastSaved),
+        });
+      }
+    }
+
+    const existingDuplicate = await db.collection('client_files').findOne({
+      client_id: targetClientId,
+      source_type: 'conversation_inline_image',
+      source_conversation_id: conversationId,
+      source_message_id: messageId,
+      source_image_index: imageIndex,
+    });
+    if (existingDuplicate) {
+      const now = new Date().toISOString();
+      await markImageAsSaved(targetClientId, existingDuplicate.id, now);
+      return createSuccessResponse({
+        success: true,
+        alreadySaved: true,
+        clientId: targetClientId,
+        file: stripMongoId(existingDuplicate),
+      });
+    }
+
     const extension = extensionFromMimeType(mimeType);
     const originalFilename = `inline-image-${messageId}-${imageIndex + 1}.${extension}`;
     const storedFilename = `${targetClientId}_${Date.now()}_${originalFilename}`;
@@ -142,6 +207,10 @@ export async function POST(
       file_size: imageBuffer.length,
       mime_type: mimeType,
       description: `Saved inline image from conversation #${conversationId}`,
+      source_type: 'conversation_inline_image',
+      source_conversation_id: conversationId,
+      source_message_id: messageId,
+      source_image_index: imageIndex,
       created_at: now,
       updated_at: now,
     };
@@ -151,6 +220,8 @@ export async function POST(
       { id: targetClientId },
       { $set: { last_activity_date: now, updated_at: now } }
     );
+
+    await markImageAsSaved(targetClientId, fileId, now);
 
     invalidateMongoCache();
     return createSuccessResponse({
@@ -162,4 +233,3 @@ export async function POST(
     return handleApiError(error, 'Failed to save inline image to client');
   }
 }
-

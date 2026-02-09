@@ -9,7 +9,7 @@ type InboxPageProps = {
 };
 
 export default async function InboxPage({ searchParams }: InboxPageProps) {
-  const conversations = await getConversationsData(DEFAULT_USER_ID, 'all');
+  const conversations = await getConversationsData(DEFAULT_USER_ID);
 
   let selectedConversationId: number | null = null;
   if (searchParams?.conversation) {

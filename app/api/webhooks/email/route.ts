@@ -51,7 +51,6 @@ export async function POST(request: NextRequest) {
         contact_name: name,
         contact_email: email,
         subject: subject || null,
-        status: 'open',
         created_at: now,
         updated_at: now,
       });

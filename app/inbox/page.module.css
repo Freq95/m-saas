@@ -289,17 +289,6 @@
   cursor: not-allowed;
 }
 
-.status {
-  font-size: 0.75rem;
-  padding: 0.3rem 0.6rem;
-  background: var(--color-surface-muted);
-  color: var(--color-text-soft);
-  border-radius: 999px;
-  text-transform: none;
-  font-weight: 400;
-  border: 1px solid rgba(77, 163, 255, 0.24);
-}
-
 .messages {
   flex: 1;
   overflow-y: auto;
@@ -461,6 +450,12 @@
   word-break: break-word;
 }
 
+.attachmentStatus {
+  font-size: 0.72rem;
+  color: var(--color-text-soft);
+  white-space: nowrap;
+}
+
 .attachmentSaveButton {
   border: 1px solid rgba(77, 163, 255, 0.35);
   background: var(--gradient-accent);
@@ -479,6 +474,136 @@
   background: var(--color-surface-muted);
   color: var(--color-text-soft);
   border-color: var(--color-border);
+}
+
+.saveModalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+  padding: 1rem;
+}
+
+.saveModal {
+  width: min(820px, 100%);
+  max-height: 88vh;
+  overflow: auto;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.saveModalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.saveModalHeader h4 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+.modalCloseButton {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+  padding: 0.3rem 0.55rem;
+  cursor: pointer;
+}
+
+.saveModalSection {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: rgba(77, 163, 255, 0.05);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.saveModalLabel {
+  font-size: 0.78rem;
+  color: var(--color-text-soft);
+  font-weight: 600;
+}
+
+.clientList,
+.saveItemList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.clientOption {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.84rem;
+  color: var(--color-text);
+}
+
+.saveItemRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 0.5rem;
+}
+
+.saveItemMeta {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  color: var(--color-text);
+  font-size: 0.82rem;
+}
+
+.saveItemStatus,
+.modalHint {
+  font-size: 0.74rem;
+  color: var(--color-text-soft);
+}
+
+.saveStateIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.saveStateUnsaved {
+  color: #f59e0b;
+}
+
+.saveStateSaved {
+  color: #22c55e;
+}
+
+.saveStateDisabled {
+  color: var(--color-text-soft);
+  opacity: 0.6;
+}
+
+.saveModalActions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 0.6rem;
 }
 
 .suggestedResponse {

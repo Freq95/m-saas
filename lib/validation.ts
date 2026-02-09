@@ -23,7 +23,6 @@ export const createConversationSchema = z.object({
 });
 
 export const updateConversationSchema = z.object({
-  status: z.enum(['open', 'closed', 'pending']).optional(),
   contactName: z.string().min(1).max(255).optional(),
   contactEmail: emailSchema.optional(),
   contactPhone: phoneSchema,
@@ -136,7 +135,6 @@ export const servicesQuerySchema = z.object({
 
 export const conversationsQuerySchema = z.object({
   userId: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
-  status: z.enum(['all', 'open', 'closed', 'pending']).optional().default('all'),
 });
 
 export const dashboardQuerySchema = z.object({

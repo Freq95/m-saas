@@ -11,6 +11,7 @@ interface AppointmentPreviewModalProps {
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onQuickStatusChange?: (status: string) => void;
 }
 
 export function AppointmentPreviewModal({
@@ -19,6 +20,7 @@ export function AppointmentPreviewModal({
   onClose,
   onEdit,
   onDelete,
+  onQuickStatusChange,
 }: AppointmentPreviewModalProps) {
   if (!isOpen || !appointment) return null;
 
@@ -71,6 +73,47 @@ export function AppointmentPreviewModal({
               </div>
             )}
           </div>
+
+          {onQuickStatusChange && appointment.status !== 'completed' && (
+            <div className={styles.quickActionsSection}>
+              <p className={styles.quickActionsLabel}>Actiuni rapide:</p>
+              <div className={styles.quickActionButtons}>
+                {appointment.status !== 'completed' && (
+                  <button
+                    className={`${styles.quickActionButton} ${styles.quickActionCompleted}`}
+                    onClick={() => {
+                      onQuickStatusChange('completed');
+                      onClose();
+                    }}
+                  >
+                    ✓ Completeaza
+                  </button>
+                )}
+                {appointment.status !== 'cancelled' && (
+                  <button
+                    className={`${styles.quickActionButton} ${styles.quickActionCancelled}`}
+                    onClick={() => {
+                      onQuickStatusChange('cancelled');
+                      onClose();
+                    }}
+                  >
+                    ✕ Anuleaza
+                  </button>
+                )}
+                {appointment.status !== 'no-show' && (
+                  <button
+                    className={`${styles.quickActionButton} ${styles.quickActionNoShow}`}
+                    onClick={() => {
+                      onQuickStatusChange('no-show');
+                      onClose();
+                    }}
+                  >
+                    ⚠ Absent
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className={styles.previewActions}>

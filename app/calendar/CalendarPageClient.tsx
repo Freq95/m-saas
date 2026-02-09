@@ -5,7 +5,8 @@ import { isSameDay } from 'date-fns';
 import styles from './page.module.css';
 import { useToast } from '@/lib/useToast';
 import { ToastContainer } from '@/components/Toast';
-import { useCalendar, useAppointments } from './hooks';
+import { useCalendar, useAppointmentsSWR as useAppointments, useProviders, useResources } from './hooks';
+import { useDragAndDrop } from './hooks/useDragAndDrop';
 import {
   CalendarHeader,
   WeekView,
@@ -14,6 +15,7 @@ import {
   AppointmentPreviewModal,
   EditAppointmentModal,
   DeleteConfirmModal,
+  ConflictWarningModal,
 } from './components';
 import { useCalendarNavigation } from './hooks/useCalendarNavigation';
 
@@ -59,12 +61,39 @@ export default function CalendarPageClient({
     resourceId: state.selectedResource?.id,
   });
 
+  // Fetch providers and resources
+  const { providers } = useProviders(1);
+  const { resources } = useResources(1);
+
   const [services, setServices] = useState<Service[]>(initialServices);
   const [loadingServices, setLoadingServices] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [conflictData, setConflictData] = useState<{
+    conflicts: any[];
+    suggestions: any[];
+  }>({ conflicts: [], suggestions: [] });
+
+  // Drag-and-drop functionality
+  const { draggedAppointment, handleDragStart, handleDragEnd, handleDrop } = useDragAndDrop(
+    async (appointmentId, newStartTime, newEndTime) => {
+      const success = await updateAppointment(appointmentId, {
+        startTime: newStartTime.toISOString(),
+        endTime: newEndTime.toISOString(),
+      });
+
+      if (success) {
+        toast.success('Programarea a fost mutata.');
+      } else {
+        toast.error('Nu s-a putut muta programarea. Verifica conflictele.');
+      }
+
+      return success;
+    }
+  );
 
   // Fetch services if not provided initially
   useEffect(() => {
@@ -152,6 +181,14 @@ export default function CalendarPageClient({
     clientPhone: string;
     serviceId: string;
     notes: string;
+    isRecurring?: boolean;
+    recurrence?: {
+      frequency: 'daily' | 'weekly' | 'monthly';
+      interval: number;
+      endType: 'date' | 'count';
+      endDate?: string;
+      count?: number;
+    };
   }) => {
     if (!state.selectedSlot || !formData.clientName || !formData.serviceId) {
       toast.warning('Completeaza toate campurile obligatorii (nume client si serviciu).');
@@ -163,22 +200,67 @@ export default function CalendarPageClient({
     const calculatedEndTime = new Date(state.selectedSlot.start);
     calculatedEndTime.setMinutes(calculatedEndTime.getMinutes() + durationMinutes);
 
-    const success = await createAppointment({
-      serviceId: parseInt(formData.serviceId),
-      clientName: formData.clientName,
-      clientEmail: formData.clientEmail,
-      clientPhone: formData.clientPhone,
-      startTime: state.selectedSlot.start.toISOString(),
-      endTime: calculatedEndTime.toISOString(),
-      notes: formData.notes,
-    });
+    // Handle recurring appointments
+    if (formData.isRecurring && formData.recurrence) {
+      try {
+        const response = await fetch('/api/appointments/recurring', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            serviceId: parseInt(formData.serviceId),
+            clientName: formData.clientName,
+            clientEmail: formData.clientEmail,
+            clientPhone: formData.clientPhone,
+            startTime: state.selectedSlot.start.toISOString(),
+            endTime: calculatedEndTime.toISOString(),
+            notes: formData.notes,
+            recurrence: {
+              frequency: formData.recurrence.frequency,
+              interval: formData.recurrence.interval,
+              ...(formData.recurrence.endType === 'count'
+                ? { count: formData.recurrence.count }
+                : { endDate: formData.recurrence.endDate }),
+            },
+          }),
+        });
 
-    if (success) {
-      setShowCreateModal(false);
-      actions.clearSelection();
-      toast.success('Programarea a fost creata.');
+        const result = await response.json();
+
+        if (response.ok) {
+          setShowCreateModal(false);
+          actions.clearSelection();
+          refetch();
+          toast.success(
+            `${result.created} programari recurente create${
+              result.skipped > 0 ? `, ${result.skipped} omise (conflicte)` : ''
+            }.`
+          );
+        } else {
+          toast.error(result.error || 'Nu s-au putut crea programarile recurente.');
+        }
+      } catch (error) {
+        console.error('Error creating recurring appointments:', error);
+        toast.error('Eroare la crearea programarilor recurente.');
+      }
     } else {
-      toast.error('Nu s-a putut crea programarea.');
+      // Handle single appointment
+      const success = await createAppointment({
+        serviceId: parseInt(formData.serviceId),
+        clientName: formData.clientName,
+        clientEmail: formData.clientEmail,
+        clientPhone: formData.clientPhone,
+        startTime: state.selectedSlot.start.toISOString(),
+        endTime: calculatedEndTime.toISOString(),
+        notes: formData.notes,
+      });
+
+      if (success) {
+        setShowCreateModal(false);
+        actions.clearSelection();
+        toast.success('Programarea a fost creata.');
+      } else {
+        toast.error('Nu s-a putut crea programarea.');
+      }
     }
   };
 
@@ -214,19 +296,38 @@ export default function CalendarPageClient({
   }) => {
     if (!state.selectedAppointment) return;
 
-    const success = await updateAppointment(state.selectedAppointment.id, {
-      startTime: new Date(formData.startTime).toISOString(),
-      endTime: new Date(formData.endTime).toISOString(),
-      status: formData.status,
-      notes: formData.notes,
-    });
+    try {
+      const response = await fetch(`/api/appointments/${state.selectedAppointment.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startTime: new Date(formData.startTime).toISOString(),
+          endTime: new Date(formData.endTime).toISOString(),
+          status: formData.status,
+          notes: formData.notes,
+        }),
+      });
 
-    if (success) {
-      setShowEditModal(false);
-      actions.clearSelection();
-      toast.success('Programarea a fost actualizata.');
-    } else {
-      toast.error('Nu s-a putut actualiza programarea.');
+      const result = await response.json();
+
+      if (response.ok) {
+        setShowEditModal(false);
+        actions.clearSelection();
+        refetch();
+        toast.success('Programarea a fost actualizata.');
+      } else if (response.status === 409) {
+        // Conflict detected
+        setConflictData({
+          conflicts: result.conflicts || [],
+          suggestions: result.suggestions || [],
+        });
+        setShowConflictModal(true);
+      } else {
+        toast.error(result.error || 'Nu s-a putut actualiza programarea.');
+      }
+    } catch (error) {
+      console.error('Error updating appointment:', error);
+      toast.error('Eroare la actualizarea programarii.');
     }
   };
 
@@ -246,6 +347,19 @@ export default function CalendarPageClient({
       toast.success('Programarea a fost stearsa.');
     } else {
       toast.error('Nu s-a putut sterge programarea.');
+    }
+  };
+
+  const handleQuickStatusChange = async (status: string) => {
+    if (!state.selectedAppointment) return;
+
+    const success = await updateAppointment(state.selectedAppointment.id, { status });
+
+    if (success) {
+      refetch();
+      toast.success('Statusul a fost actualizat.');
+    } else {
+      toast.error('Nu s-a putut actualiza statusul.');
     }
   };
 
@@ -284,10 +398,22 @@ export default function CalendarPageClient({
         <CalendarHeader
           rangeLabel={rangeLabel}
           viewType={state.viewType}
+          providers={providers}
+          resources={resources}
+          selectedProviderId={state.selectedProvider?.id || null}
+          selectedResourceId={state.selectedResource?.id || null}
           onPrevPeriod={actions.prevPeriod}
           onNextPeriod={actions.nextPeriod}
           onTodayClick={actions.goToToday}
           onViewTypeChange={actions.setViewType}
+          onProviderChange={(providerId) => {
+            const provider = providers.find((p) => p.id === providerId);
+            actions.selectProvider(provider || null);
+          }}
+          onResourceChange={(resourceId) => {
+            const resource = resources.find((r) => r.id === resourceId);
+            actions.selectResource(resource || null);
+          }}
         />
 
         {(loading || loadingServices) && (
@@ -304,6 +430,14 @@ export default function CalendarPageClient({
             appointments={appointments}
             onSlotClick={handleSlotClick}
             onAppointmentClick={handleAppointmentClick}
+            enableDragDrop={true}
+            draggedAppointment={draggedAppointment}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDrop={async (day, hour) => {
+              await handleDrop(day, hour);
+            }}
+            providers={providers}
           />
         ) : (
           <MonthView
@@ -336,6 +470,7 @@ export default function CalendarPageClient({
         }}
         onEdit={handleEditClick}
         onDelete={handleDeleteClick}
+        onQuickStatusChange={handleQuickStatusChange}
       />
 
       <EditAppointmentModal
@@ -353,6 +488,21 @@ export default function CalendarPageClient({
         appointment={state.selectedAppointment}
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={handleConfirmDelete}
+      />
+
+      <ConflictWarningModal
+        isOpen={showConflictModal}
+        conflicts={conflictData.conflicts}
+        suggestions={conflictData.suggestions}
+        onClose={() => setShowConflictModal(false)}
+        onSelectSlot={(startTime, endTime) => {
+          // Auto-fill the selected alternative slot
+          actions.selectSlot({
+            start: new Date(startTime),
+            end: new Date(endTime),
+          });
+          setShowEditModal(true);
+        }}
       />
 
       <ToastContainer toasts={toast.toasts} onClose={toast.removeToast} />

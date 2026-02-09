@@ -53,7 +53,6 @@ export async function POST(request: NextRequest) {
         channel: 'facebook',
         channel_id: senderId,
         contact_name: senderName || 'Utilizator Facebook',
-        status: 'open',
         client_id: client.id,
         created_at: now,
         updated_at: now,

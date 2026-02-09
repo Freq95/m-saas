@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
     const { conversationsQuerySchema } = await import('@/lib/validation');
     const queryParams = {
       userId: searchParams.get('userId') || '1',
-      status: searchParams.get('status') || 'all',
     };
 
     const validationResult = conversationsQuerySchema.safeParse(queryParams);
@@ -22,8 +21,8 @@ export async function GET(request: NextRequest) {
       return handleApiError(validationResult.error, 'Invalid query parameters');
     }
 
-    const { userId, status } = validationResult.data;
-    const conversations = await getConversationsData(userId, status);
+    const { userId } = validationResult.data;
+    const conversations = await getConversationsData(userId);
 
     return createSuccessResponse({ conversations });
   } catch (error) {
@@ -64,7 +63,6 @@ export async function POST(request: NextRequest) {
       contact_email: contactEmail || null,
       contact_phone: contactPhone || null,
       subject: subject || 'Fara subiect',
-      status: 'open',
       created_at: now,
       updated_at: now,
     };

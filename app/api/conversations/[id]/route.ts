@@ -68,10 +68,6 @@ export async function PATCH(
     const updates: Record<string, unknown> = {};
     const validatedData = validationResult.data;
 
-    if (validatedData.status !== undefined) {
-      updates.status = validatedData.status;
-    }
-
     if (validatedData.contactName !== undefined) {
       updates.contact_name = validatedData.contactName.trim();
     }

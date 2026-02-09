@@ -1,10 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { format, isSameDay } from 'date-fns';
 import { ro } from 'date-fns/locale';
 import styles from '../../page.module.css';
-import type { Appointment } from '../../hooks/useCalendar';
+import type { Appointment, Provider } from '../../hooks/useCalendar';
 import { AppointmentBlock } from './AppointmentBlock';
 
 interface WeekViewProps {
@@ -13,6 +13,12 @@ interface WeekViewProps {
   appointments: Appointment[];
   onSlotClick: (day: Date, hour: number) => void;
   onAppointmentClick: (appointment: Appointment) => void;
+  draggedAppointment?: Appointment | null;
+  onDragStart?: (appointment: Appointment, day: Date) => void;
+  onDragEnd?: () => void;
+  onDrop?: (day: Date, hour: number) => void;
+  enableDragDrop?: boolean;
+  providers?: Provider[];
 }
 
 // Calculate appointment positions using lane assignment
@@ -119,7 +125,15 @@ export function WeekView({
   appointments,
   onSlotClick,
   onAppointmentClick,
+  draggedAppointment = null,
+  onDragStart,
+  onDragEnd,
+  onDrop,
+  enableDragDrop = false,
+  providers = [],
 }: WeekViewProps) {
+  const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
+
   const getAppointmentsForDay = (day: Date) => {
     return appointments.filter((apt) => isSameDay(new Date(apt.start_time), day));
   };
@@ -151,22 +165,44 @@ export function WeekView({
               <div className={styles.dayNumber}>{format(day, 'd')}</div>
             </div>
             <div className={styles.daySlots}>
-              {hours.map((hour) => (
-                <div
-                  key={hour}
-                  className={styles.slot}
-                  onClick={() => onSlotClick(day, hour)}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={`Creeaza programare pe ${format(day, 'd MMMM', { locale: ro })} la ${hour}:00`}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      onSlotClick(day, hour);
-                    }
-                  }}
-                />
-              ))}
+              {hours.map((hour) => {
+                const slotKey = `${day.toISOString()}-${hour}`;
+                return (
+                  <div
+                    key={hour}
+                    className={`${styles.slot} ${dragOverSlot === slotKey ? styles.dragOver : ''}`}
+                    onClick={() => onSlotClick(day, hour)}
+                    onDragOver={(e) => {
+                      if (enableDragDrop) {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        setDragOverSlot(slotKey);
+                      }
+                    }}
+                    onDragLeave={() => {
+                      if (enableDragDrop) {
+                        setDragOverSlot(null);
+                      }
+                    }}
+                    onDrop={(e) => {
+                      if (enableDragDrop && onDrop) {
+                        e.preventDefault();
+                        setDragOverSlot(null);
+                        onDrop(day, hour);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Creeaza programare pe ${format(day, 'd MMMM', { locale: ro })} la ${hour}:00`}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        onSlotClick(day, hour);
+                      }
+                    }}
+                  />
+                );
+              })}
               {appointmentPositions.map(({ apt, left, width }) => {
                 const aptStart = new Date(apt.start_time);
                 const aptEnd = new Date(apt.end_time);
@@ -190,6 +226,11 @@ export function WeekView({
                       height: `${heightPercent}%`,
                     }}
                     onClick={onAppointmentClick}
+                    enableDragDrop={enableDragDrop}
+                    onDragStart={onDragStart ? (appointment) => onDragStart(appointment, day) : undefined}
+                    onDragEnd={onDragEnd}
+                    isDragging={draggedAppointment?.id === apt.id}
+                    providers={providers}
                   />
                 );
               })}

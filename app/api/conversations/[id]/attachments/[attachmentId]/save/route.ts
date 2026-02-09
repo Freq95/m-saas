@@ -87,6 +87,52 @@ export async function POST(
       await linkConversationToClient(conversationId, targetClientId);
     }
 
+    if (
+      attachment.last_saved_client_id === targetClientId &&
+      typeof attachment.last_saved_client_file_id === 'number'
+    ) {
+      const existingByLastSaved = await db.collection('client_files').findOne({
+        id: attachment.last_saved_client_file_id,
+        client_id: targetClientId,
+      });
+      if (existingByLastSaved) {
+        return createSuccessResponse({
+          success: true,
+          alreadySaved: true,
+          clientId: targetClientId,
+          file: stripMongoId(existingByLastSaved),
+        });
+      }
+    }
+
+    const existingDuplicate = await db.collection('client_files').findOne({
+      client_id: targetClientId,
+      source_type: 'conversation_attachment',
+      source_conversation_id: conversationId,
+      source_attachment_id: attachmentId,
+    });
+    if (existingDuplicate) {
+      const now = new Date().toISOString();
+      await db.collection('message_attachments').updateOne(
+        { id: attachmentId },
+        {
+          $set: {
+            last_saved_client_id: targetClientId,
+            last_saved_client_file_id: existingDuplicate.id,
+            last_saved_at: now,
+            updated_at: now,
+          },
+        }
+      );
+
+      return createSuccessResponse({
+        success: true,
+        alreadySaved: true,
+        clientId: targetClientId,
+        file: stripMongoId(existingDuplicate),
+      });
+    }
+
     const originalFilename = attachment.original_filename || attachment.filename || 'attachment';
     const sanitizedOriginal = String(originalFilename).replace(/[^a-zA-Z0-9.-]/g, '_');
     const storedFilename = `${targetClientId}_${Date.now()}_${sanitizedOriginal}`;
@@ -108,6 +154,9 @@ export async function POST(
       file_size: attachment.file_size || sourceBuffer.length,
       mime_type: attachment.mime_type || 'application/octet-stream',
       description: `Saved from email conversation #${conversationId}`,
+      source_type: 'conversation_attachment',
+      source_conversation_id: conversationId,
+      source_attachment_id: attachmentId,
       created_at: now,
       updated_at: now,
     };
@@ -140,4 +189,3 @@ export async function POST(
     return handleApiError(error, 'Failed to save attachment to client');
   }
 }
-

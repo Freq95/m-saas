@@ -1,21 +1,16 @@
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { parseStoredMessage } from '@/lib/email-types';
 
-type InboxStatus = 'all' | 'open' | 'closed' | 'pending';
-
 type MessagePagination = {
   limit?: number;
   offset?: number;
   beforeId?: number;
 };
 
-export async function getConversationsData(userId: number, status: InboxStatus = 'all') {
+export async function getConversationsData(userId: number) {
   const db = await getMongoDbOrThrow();
 
   const conversationFilter: Record<string, unknown> = { user_id: userId };
-  if (status !== 'all') {
-    conversationFilter.status = status;
-  }
 
   const conversations = (await db
     .collection('conversations')
@@ -149,6 +144,133 @@ export async function getConversationMessagesData(
       attachments: stored.attachments,
     };
   });
+
+  const attachmentIds = parsedMessages.flatMap((msg: any) =>
+    Array.isArray(msg.attachments)
+      ? msg.attachments
+          .map((attachment: any) => (typeof attachment?.id === 'number' ? attachment.id : null))
+          .filter((id: number | null): id is number => id !== null)
+      : []
+  );
+
+  if (attachmentIds.length > 0) {
+    const [attachmentDocs, attachmentClientFiles] = await Promise.all([
+      db
+        .collection('message_attachments')
+        .find({
+          conversation_id: conversationId,
+          id: { $in: attachmentIds },
+        })
+        .toArray(),
+      db
+        .collection('client_files')
+        .find({
+          source_type: 'conversation_attachment',
+          source_conversation_id: conversationId,
+          source_attachment_id: { $in: attachmentIds },
+        })
+        .toArray(),
+    ]);
+
+    const attachmentMap = new Map<number, any>(
+      attachmentDocs
+        .map((doc: any) => stripMongoId(doc))
+        .map((doc: any) => [doc.id, doc])
+    );
+
+    const savedClientsByAttachmentId = new Map<number, Set<number>>();
+    for (const fileDoc of attachmentClientFiles as any[]) {
+      if (typeof fileDoc?.source_attachment_id !== 'number' || typeof fileDoc?.client_id !== 'number') {
+        continue;
+      }
+      const savedClients = savedClientsByAttachmentId.get(fileDoc.source_attachment_id) || new Set<number>();
+      savedClients.add(fileDoc.client_id);
+      savedClientsByAttachmentId.set(fileDoc.source_attachment_id, savedClients);
+    }
+
+    for (const msg of parsedMessages as any[]) {
+      if (!Array.isArray(msg.attachments)) {
+        continue;
+      }
+      msg.attachments = msg.attachments.map((attachment: any) => {
+        if (typeof attachment?.id !== 'number') {
+          return attachment;
+        }
+        const persistedAttachment = attachmentMap.get(attachment.id);
+        if (!persistedAttachment) {
+          return attachment;
+        }
+        const savedClientsSet = savedClientsByAttachmentId.get(attachment.id) || new Set<number>();
+        if (typeof persistedAttachment.last_saved_client_id === 'number') {
+          savedClientsSet.add(persistedAttachment.last_saved_client_id);
+        }
+        return {
+          ...attachment,
+          last_saved_client_id: persistedAttachment.last_saved_client_id,
+          last_saved_client_file_id: persistedAttachment.last_saved_client_file_id,
+          last_saved_at: persistedAttachment.last_saved_at,
+          saved_client_ids: Array.from(savedClientsSet),
+        };
+      });
+    }
+  }
+
+  const imageRefs = parsedMessages.flatMap((msg: any) =>
+    Array.isArray(msg.images)
+      ? msg.images.map((_: any, idx: number) => ({ messageId: msg.id, imageIndex: idx }))
+      : []
+  );
+
+  if (imageRefs.length > 0) {
+    const messageIds = Array.from(
+      new Set(
+        imageRefs
+          .map((ref: { messageId: number; imageIndex: number }) => ref.messageId)
+          .filter((id: number): id is number => typeof id === 'number' && id > 0)
+      )
+    );
+
+    const inlineImageClientFiles = await db
+      .collection('client_files')
+      .find({
+        source_type: 'conversation_inline_image',
+        source_conversation_id: conversationId,
+        source_message_id: { $in: messageIds },
+      })
+      .toArray();
+
+    const savedClientsByImageRef = new Map<string, Set<number>>();
+    for (const fileDoc of inlineImageClientFiles as any[]) {
+      if (
+        typeof fileDoc?.source_message_id !== 'number' ||
+        typeof fileDoc?.source_image_index !== 'number' ||
+        typeof fileDoc?.client_id !== 'number'
+      ) {
+        continue;
+      }
+      const imageKey = `${fileDoc.source_message_id}:${fileDoc.source_image_index}`;
+      const savedClients = savedClientsByImageRef.get(imageKey) || new Set<number>();
+      savedClients.add(fileDoc.client_id);
+      savedClientsByImageRef.set(imageKey, savedClients);
+    }
+
+    for (const msg of parsedMessages as any[]) {
+      if (!Array.isArray(msg.images)) {
+        continue;
+      }
+      msg.images = msg.images.map((image: any, idx: number) => {
+        const imageKey = `${msg.id}:${idx}`;
+        const savedClientsSet = savedClientsByImageRef.get(imageKey) || new Set<number>();
+        if (typeof image?.last_saved_client_id === 'number') {
+          savedClientsSet.add(image.last_saved_client_id);
+        }
+        return {
+          ...image,
+          saved_client_ids: Array.from(savedClientsSet),
+        };
+      });
+    }
+  }
 
   const hasMore = parsedMessages.length === limit;
   const oldestMessageId = parsedMessages.length > 0 ? parsedMessages[0].id : null;

@@ -45,7 +45,6 @@ export async function POST(request: NextRequest) {
       contact_email: email || null,
       contact_phone: phone || null,
       subject: subject || 'Formular site',
-      status: 'open',
       client_id: client.id,
       created_at: now,
       updated_at: now,

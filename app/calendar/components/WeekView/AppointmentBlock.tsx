@@ -2,20 +2,59 @@
 
 import React from 'react';
 import styles from '../../page.module.css';
-import type { Appointment } from '../../hooks/useCalendar';
+import type { Appointment, Provider } from '../../hooks/useCalendar';
 
 interface AppointmentBlockProps {
   appointment: Appointment;
   style: React.CSSProperties;
   onClick: (appointment: Appointment) => void;
+  onDragStart?: (appointment: Appointment) => void;
+  onDragEnd?: () => void;
+  isDragging?: boolean;
+  enableDragDrop?: boolean;
+  providers?: Provider[];
 }
 
 export const AppointmentBlock = React.memo<AppointmentBlockProps>(
-  ({ appointment, style, onClick }) => {
+  ({ appointment, style, onClick, onDragStart, onDragEnd, isDragging = false, enableDragDrop = false, providers = [] }) => {
+    const handleDragStart = (e: React.DragEvent) => {
+      e.stopPropagation();
+      if (onDragStart) {
+        onDragStart(appointment);
+      }
+      // Set drag effect
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', appointment.id.toString());
+    };
+
+    const handleDragEnd = (e: React.DragEvent) => {
+      e.stopPropagation();
+      if (onDragEnd) {
+        onDragEnd();
+      }
+    };
+
+    // Find provider color
+    const provider = providers.find((p) => p.id === appointment.provider_id);
+    const providerColor = provider?.color;
+
+    // Apply provider color as left border
+    const appointmentStyle = providerColor
+      ? {
+          ...style,
+          borderLeftColor: providerColor,
+          borderLeftWidth: '4px',
+          borderLeftStyle: 'solid',
+        }
+      : style;
+
     return (
       <div
-        className={`${styles.appointment} ${styles[appointment.status]}`}
-        style={style}
+        className={`${styles.appointment} ${styles[appointment.status]} ${isDragging ? styles.dragging : ''}`}
+        style={appointmentStyle}
+        draggable={enableDragDrop && appointment.status === 'scheduled'}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
         onClick={(e) => {
           e.stopPropagation();
           onClick(appointment);
@@ -30,7 +69,15 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
         tabIndex={0}
         aria-label={`Programare ${appointment.client_name}, ${appointment.service_name}`}
       >
-        <div className={styles.appointmentTitle}>{appointment.client_name}</div>
+        <div className={styles.appointmentHeader}>
+          <div className={styles.appointmentTitle}>{appointment.client_name}</div>
+          <span className={`${styles.statusBadge} ${styles[`statusBadge--${appointment.status}`]}`}>
+            {appointment.status === 'scheduled' && 'Programat'}
+            {appointment.status === 'completed' && 'Completat'}
+            {appointment.status === 'cancelled' && 'Anulat'}
+            {appointment.status === 'no-show' && 'Absent'}
+          </span>
+        </div>
         <div className={styles.appointmentService}>{appointment.service_name}</div>
       </div>
     );
@@ -42,10 +89,13 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
       prev.appointment.status === next.appointment.status &&
       prev.appointment.client_name === next.appointment.client_name &&
       prev.appointment.service_name === next.appointment.service_name &&
+      prev.appointment.provider_id === next.appointment.provider_id &&
       prev.style.top === next.style.top &&
       prev.style.left === next.style.left &&
       prev.style.width === next.style.width &&
-      prev.style.height === next.style.height
+      prev.style.height === next.style.height &&
+      prev.isDragging === next.isDragging &&
+      prev.providers?.length === next.providers?.length
     );
   }
 );

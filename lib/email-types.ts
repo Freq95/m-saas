@@ -10,6 +10,10 @@ export interface EmailAttachment {
   size: number;
   contentId?: string;
   persisted?: boolean;
+  last_saved_client_id?: number;
+  last_saved_client_file_id?: number;
+  last_saved_at?: string;
+  saved_client_ids?: number[];
 }
 
 export interface EmailImage {
@@ -18,6 +22,10 @@ export interface EmailImage {
   contentType: string;
   url?: string;
   data?: string; // base64 encoded
+  last_saved_client_id?: number;
+  last_saved_client_file_id?: number;
+  last_saved_at?: string;
+  saved_client_ids?: number[];
 }
 
 /**

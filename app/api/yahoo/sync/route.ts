@@ -153,7 +153,6 @@ export async function POST(request: NextRequest) {
             contact_name: name,
             contact_email: emailAddress,
             subject: email.subject || null,
-            status: 'open',
             client_id: client?.id || null,
             created_at: now,
             updated_at: now,

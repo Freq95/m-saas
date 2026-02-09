@@ -21,7 +21,6 @@ export interface Conversation {
   contact_email: string | null;
   contact_phone: string | null;
   subject: string | null;
-  status: 'open' | 'closed' | 'pending';
   client_id: number | null;
   created_at: string;
   updated_at: string;
