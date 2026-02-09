@@ -1,102 +1,184 @@
-# OpsGenie pentru Micro-Servicii - MVP V1
+# m-saas - OpsGenie for Micro-Services
 
-SaaS pentru gestionarea mesajelor, programărilor și automatizări pentru micro-servicii (saloane, cabinete, ateliere).
+**SaaS platform for managing messages, appointments, and automation** for micro-services (salons, dental clinics, workshops).
 
-## Funcționalități V1 (Toate implementate ✅)
+**Current Status:** MVP V1 ~75% complete (February 2026)
 
-### 1. Inbox unificat (beta)
-- ✅ Listă conversații cu thread view
-- ✅ Integrare email (Gmail/Outlook) prin webhook
-- ✅ Integrare Facebook Page messages prin webhook
-- ✅ Integrare formular site prin webhook
-- ✅ Tagging automat: "Lead nou", "Întrebare preț", "Reprogramare", "Anulare"
+---
 
-### 2. Calendar de programări
-- ✅ Vizualizare săptămânală cu sloturi orare
-- ✅ Tipuri de servicii cu durată și preț
-- ✅ Blocare automată când se adaugă programare
-- ✅ Export Google Calendar (când este configurat)
+## What is m-saas?
 
-### 3. Agent de răspuns semi-automat
-- ✅ Sugestii de răspuns AI în română, personalizate
-- ✅ Propune 2-3 ore libere pe baza calendarului
-- ✅ Utilizatorul trebuie să aprobe înainte de trimitere (semi-automat)
+A unified platform that helps small businesses (salons, clinics, workshops) manage:
+- **Inbox:** All messages (email, Facebook, forms) in one place
+- **Calendar:** Appointment scheduling with automatic slot blocking
+- **AI Agent:** Semi-automatic response suggestions in Romanian
+- **Reminders:** Automated appointment reminders (email/SMS)
+- **CRM:** Client management with history and statistics
+- **Dashboard:** Business metrics and analytics
 
-### 4. Reminder automat
-- ✅ Trimite reminder 24h înainte de programare
-- ✅ Suport SMS/WhatsApp și email
-- ✅ Reduce no-show → argument bun la vânzare
+---
 
-### 5. Dashboard simplu
-- ✅ Număr mesaje / zi (ultimele 7 zile)
-- ✅ Număr programări / zi (ultimele 7 zile)
-- ✅ Rată no-show estimată
-- ✅ Venit estimat (bazat pe prețuri servicii)
+## Quick Start
 
-## Setup
+### Prerequisites
+- Node.js 18+
+- MongoDB (Atlas or local)
+- Optional: OpenAI API key (for AI Agent)
 
-1. **Instalează dependențele:**
+### Installation
+
 ```bash
+# 1. Install dependencies
 npm install
-```
 
-2. **Configurează variabilele de mediu:**
-```bash
+# 2. Configure environment
 cp .env.example .env
-# Editează .env cu valorile tale
-```
+# Edit .env with your MongoDB URI and API keys
 
-3. **Inițializează storage-ul JSON:**
-```bash
-npm run db:migrate
-```
+# 3. Initialize MongoDB collections
+npm run db:init:mongo
 
-Aceasta creează directorul `data/` cu fișierul `data.json` care conține tag-urile implicite.
-
-4. **Seed date de test (opțional):**
-```bash
+# 4. Seed test data (optional)
 npm run db:seed
-```
 
-5. **Rulează aplicația:**
-```bash
+# 5. Start development server
 npm run dev
 ```
 
-Aplicația va rula pe http://localhost:3000
+Application available at: **http://localhost:3000**
 
-## Structură
+---
 
-- `/app` - Next.js App Router (frontend + API routes)
-  - `/api` - API endpoints pentru toate funcționalitățile
-  - `/dashboard` - Pagina dashboard
-  - `/inbox` - Pagina inbox unificat
-  - `/calendar` - Pagina calendar
-- `/lib` - Utilități și configurații
-  - `storage.ts` - Sistem de stocare JSON (înlocuiește PostgreSQL)
-  - `db.ts` - Wrapper pentru compatibilitate
-  - `ai-agent.ts` - Agent AI pentru răspunsuri
-  - `calendar.ts` - Logică calendar și sloturi
-  - `reminders.ts` - Sistem reminder automat
-  - `google-calendar.ts` - Export Google Calendar
-- `/scripts` - Scripturi pentru stocare
-  - `migrate.js` - Inițializează structura JSON
-  - `seed.js` - Seed date de test
-- `/data` - Date stocate în JSON (creat automat)
+## Tech Stack
 
-## Scripturi Utile
+- **Framework:** Next.js 14 (App Router) + TypeScript
+- **Database:** MongoDB (confirmed in use)
+- **AI:** OpenAI API (for response suggestions)
+- **Email:** Yahoo Mail (IMAP/SMTP)
+- **UI:** React + Tailwind CSS + Dark mode
+- **Deployment:** Vercel (planned)
 
-```bash
-# Populează aplicația cu date de test (30 conversații + programări)
-npm run db:populate
+---
 
-# Testează webhook-urile cu mock data (10 POST pe fiecare endpoint)
-npm run test:webhooks
+## Current Features (What's Working)
+
+✅ **Yahoo Mail Integration** - Full IMAP/SMTP integration
+✅ **Calendar & Appointments** - Week/month views with slot blocking
+✅ **CRM (Client Management)** - Auto-creation, deduplication, notes/files
+✅ **Dashboard Analytics** - Messages/appointments charts, revenue tracking
+✅ **Services Management** - Service catalog with pricing
+✅ **UI/UX** - Dark mode, keyboard accessibility, Apple-style modals
+
+⚠️ **AI Agent** - API exists but returns mock data (OpenAI integration pending)
+⚠️ **Reminders** - API complete but not automated (cron job needed)
+
+❌ **Gmail/Outlook** - Not implemented
+❌ **Auth/Multi-tenancy** - Not implemented (hardcoded userId)
+
+---
+
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| **[STATUS.md](STATUS.md)** | Current status, features checklist, recent sessions, next steps |
+| **[GUIDE.md](GUIDE.md)** | Setup guide, API reference, integrations, architecture |
+| **[archived/](archived/)** | Historical documents, session logs, analysis reports |
+
+---
+
+## Project Structure
+
+```
+m-saas/
+├── app/              # Next.js App Router
+│   ├── api/          # API routes
+│   ├── dashboard/    # Dashboard page
+│   ├── inbox/        # Inbox page
+│   ├── calendar/     # Calendar page
+│   └── clients/      # CRM pages
+├── lib/              # Utilities
+│   ├── db/           # MongoDB client
+│   ├── yahoo-mail.ts # Yahoo integration
+│   └── calendar.ts   # Calendar logic
+├── components/       # React components
+└── docs/             # (Removed - see root README, STATUS, GUIDE)
 ```
 
-## Documentație
+---
 
-- [SETUP.md](./SETUP.md) - Instrucțiuni setup complete
-- [INTEGRATION_GUIDE.md](./INTEGRATION_GUIDE.md) - Ghid integrare Gmail/Facebook
-- [API_COSTS.md](./API_COSTS.md) - Costuri API-uri (spoiler: majoritatea sunt GRATUITE)
+## Development Workflow
 
+### For AI Agents (Claude Code, Cursor)
+
+1. **Start session:** Read [STATUS.md](STATUS.md) for current status
+2. **Implementation:** Check [GUIDE.md](GUIDE.md) for API/setup details
+3. **End session:** Update STATUS.md with session notes
+
+### For Developers
+
+1. **Onboarding:** Read this README → STATUS.md → GUIDE.md
+2. **Daily work:** Check STATUS.md "Next Steps"
+3. **API docs:** See GUIDE.md "API Reference" section
+4. **Setup help:** See GUIDE.md "Setup & Installation" section
+
+---
+
+## Key Commands
+
+```bash
+# Development
+npm run dev              # Start dev server
+npm run build            # Build for production
+
+# Database
+npm run db:init:mongo    # Initialize MongoDB collections
+npm run db:migrate:mongo # Migrate JSON to MongoDB
+npm run db:seed          # Seed test data
+
+# Testing
+npm run test:webhooks    # Test webhook endpoints
+npm run db:populate      # Populate with mock data
+```
+
+---
+
+## Next Steps (Priority Order)
+
+**Priority 1 (Critical):**
+1. Implement authentication + multi-tenancy
+2. Calendar backend hardening (auth, conflict checks)
+3. AI Agent integration (replace mock with real OpenAI)
+4. Automated reminders (cron job setup)
+
+**Priority 2:**
+5. Gmail integration (OAuth2)
+6. Google Calendar two-way sync
+
+**Priority 3:**
+7. Testing & bug fixes
+8. Mobile responsiveness
+9. Production deployment
+
+See [STATUS.md](STATUS.md) for detailed next steps.
+
+---
+
+## Contributing
+
+This is a private project. For questions or suggestions, check documentation first:
+- [STATUS.md](STATUS.md) - What's done, what's next
+- [GUIDE.md](GUIDE.md) - How to set up and use
+- [archived/](archived/) - Historical context
+
+---
+
+## License
+
+Private project - Not open source
+
+---
+
+**Last Updated:** 2026-02-09
+**MVP Progress:** ~75% complete
+**Database:** MongoDB

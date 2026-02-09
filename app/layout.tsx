@@ -20,7 +20,9 @@ export default function RootLayout({
       <body>
         <ErrorBoundary>
           <AppTopNav />
-          <RouteTransition>{children}</RouteTransition>
+          <div className="app-shell-content">
+            <RouteTransition>{children}</RouteTransition>
+          </div>
         </ErrorBoundary>
       </body>
     </html>
