@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { getMongoDbOrThrow, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
 import { updateClientStats } from '@/lib/client-matching';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
+import { checkAppointmentConflict } from '@/lib/calendar-conflicts';
 
 // GET /api/appointments/[id] - Get single appointment
 export async function GET(
@@ -55,20 +56,52 @@ export async function PATCH(
       return createErrorResponse('Invalid appointment ID', 400);
     }
 
+    // Get existing appointment
+    const existingAppointment = await db.collection('appointments').findOne({ id: appointmentId });
+    if (!existingAppointment) {
+      return createErrorResponse('Appointment not found', 404);
+    }
+
     const updates: Record<string, unknown> = {};
 
     if (status !== undefined) {
       updates.status = status;
     }
 
-    if (startTime) {
-      const startDate = typeof startTime === 'string' ? new Date(startTime) : startTime;
-      updates.start_time = startDate.toISOString();
-    }
+    // If times are being changed, check for conflicts
+    if (startTime || endTime) {
+      const newStartTime = startTime
+        ? (typeof startTime === 'string' ? new Date(startTime) : startTime)
+        : new Date(existingAppointment.start_time);
 
-    if (endTime) {
-      const endDate = typeof endTime === 'string' ? new Date(endTime) : endTime;
-      updates.end_time = endDate.toISOString();
+      const newEndTime = endTime
+        ? (typeof endTime === 'string' ? new Date(endTime) : endTime)
+        : new Date(existingAppointment.end_time);
+
+      // Check for conflicts (excluding this appointment)
+      const conflictCheck = await checkAppointmentConflict(
+        existingAppointment.user_id,
+        existingAppointment.provider_id,
+        existingAppointment.resource_id,
+        newStartTime,
+        newEndTime,
+        appointmentId // Exclude current appointment from conflict check
+      );
+
+      if (conflictCheck.hasConflict) {
+        return createErrorResponse(
+          'Time slot conflicts with existing appointment or blocked time',
+          409,
+          { conflicts: conflictCheck.conflicts, suggestions: conflictCheck.suggestions }
+        );
+      }
+
+      if (startTime) {
+        updates.start_time = newStartTime.toISOString();
+      }
+      if (endTime) {
+        updates.end_time = newEndTime.toISOString();
+      }
     }
 
     if (notes !== undefined) {
