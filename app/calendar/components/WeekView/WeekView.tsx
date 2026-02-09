@@ -6,11 +6,23 @@ import { ro } from 'date-fns/locale';
 import styles from '../../page.module.css';
 import type { Appointment, Provider } from '../../hooks/useCalendar';
 import { AppointmentBlock } from './AppointmentBlock';
+import { BlockedTimeBlock } from './BlockedTimeBlock';
+
+interface BlockedTime {
+  id: number;
+  provider_id?: number;
+  resource_id?: number;
+  start_time: string;
+  end_time: string;
+  reason: string;
+  is_recurring: boolean;
+}
 
 interface WeekViewProps {
   weekDays: Date[];
   hours: number[];
   appointments: Appointment[];
+  blockedTimes?: BlockedTime[];
   onSlotClick: (day: Date, hour: number) => void;
   onAppointmentClick: (appointment: Appointment) => void;
   draggedAppointment?: Appointment | null;
@@ -123,6 +135,7 @@ export function WeekView({
   weekDays,
   hours,
   appointments,
+  blockedTimes = [],
   onSlotClick,
   onAppointmentClick,
   draggedAppointment = null,
@@ -136,6 +149,10 @@ export function WeekView({
 
   const getAppointmentsForDay = (day: Date) => {
     return appointments.filter((apt) => isSameDay(new Date(apt.start_time), day));
+  };
+
+  const getBlockedTimesForDay = (day: Date) => {
+    return blockedTimes.filter((bt) => isSameDay(new Date(bt.start_time), day));
   };
 
   return (
@@ -231,6 +248,31 @@ export function WeekView({
                     onDragEnd={onDragEnd}
                     isDragging={draggedAppointment?.id === apt.id}
                     providers={providers}
+                  />
+                );
+              })}
+              {getBlockedTimesForDay(day).map((blockedTime) => {
+                const btStart = new Date(blockedTime.start_time);
+                const btEnd = new Date(blockedTime.end_time);
+                const btStartTime = btStart.getTime();
+                const btEndTime = btEnd.getTime();
+
+                const topOffset = btStartTime - dayStart.getTime();
+                const topPercent = (topOffset / dayDuration) * 100;
+
+                const btDuration = btEndTime - btStartTime;
+                const heightPercent = (btDuration / dayDuration) * 100;
+
+                return (
+                  <BlockedTimeBlock
+                    key={blockedTime.id}
+                    blockedTime={blockedTime}
+                    style={{
+                      top: `${topPercent}%`,
+                      left: '0%',
+                      width: '100%',
+                      height: `${heightPercent}%`,
+                    }}
                   />
                 );
               })}

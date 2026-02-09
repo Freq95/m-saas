@@ -335,7 +335,6 @@ export default function InboxPageClient({
     setOldestMessageId(null);
     setSuggestedResponse(null);
     fetchMessages(selectedConversation.id, true);
-    // fetchSuggestedResponse(selectedConversation.id);
   }, [selectedConversation, initialHasMoreMessages, initialOldestMessageId]);
 
   // Filter conversations based on search
@@ -364,7 +363,6 @@ export default function InboxPageClient({
         cache: 'no-store',
       });
       const result = await response.json();
-      console.log('Conversations response:', result);
       if (result.conversations && Array.isArray(result.conversations)) {
         setAllConversations(result.conversations);
         setConversations(result.conversations);
@@ -483,18 +481,6 @@ export default function InboxPageClient({
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isResizing]);
-
-  const fetchSuggestedResponse = async (conversationId: number) => {
-    try {
-      const response = await fetch(`/api/conversations/${conversationId}/suggest-response?userId=${DEFAULT_USER_ID}`, {
-        cache: 'no-store',
-      });
-      const result = await response.json();
-      setSuggestedResponse(result.suggestedResponse);
-    } catch (error) {
-      console.error('Error fetching suggested response:', error);
-    }
-  };
 
   const syncInbox = async () => {
     setSyncing(true);

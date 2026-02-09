@@ -5,7 +5,7 @@ import { isSameDay } from 'date-fns';
 import styles from './page.module.css';
 import { useToast } from '@/lib/useToast';
 import { ToastContainer } from '@/components/Toast';
-import { useCalendar, useAppointmentsSWR as useAppointments, useProviders, useResources } from './hooks';
+import { useCalendar, useAppointmentsSWR as useAppointments, useProviders, useResources, useBlockedTimes } from './hooks';
 import { useDragAndDrop } from './hooks/useDragAndDrop';
 import {
   CalendarHeader,
@@ -64,6 +64,19 @@ export default function CalendarPageClient({
   // Fetch providers and resources
   const { providers } = useProviders(1);
   const { resources } = useResources(1);
+
+  // Calculate date range for blocked times
+  const viewStartDate = state.viewType === 'week' ? weekDays[0] : monthDays[0];
+  const viewEndDate = state.viewType === 'week' ? weekDays[weekDays.length - 1] : monthDays[monthDays.length - 1];
+
+  // Fetch blocked times for current view
+  const { blockedTimes } = useBlockedTimes(
+    1,
+    state.selectedProvider?.id,
+    state.selectedResource?.id,
+    viewStartDate,
+    viewEndDate
+  );
 
   const [services, setServices] = useState<Service[]>(initialServices);
   const [loadingServices, setLoadingServices] = useState(false);
@@ -428,6 +441,7 @@ export default function CalendarPageClient({
             weekDays={weekDays}
             hours={hours}
             appointments={appointments}
+            blockedTimes={blockedTimes}
             onSlotClick={handleSlotClick}
             onAppointmentClick={handleAppointmentClick}
             enableDragDrop={true}
