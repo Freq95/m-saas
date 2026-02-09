@@ -39,12 +39,12 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
     const providerColor = provider?.color;
 
     // Apply provider color as left border
-    const appointmentStyle = providerColor
+    const appointmentStyle: React.CSSProperties = providerColor
       ? {
           ...style,
           borderLeftColor: providerColor,
           borderLeftWidth: '4px',
-          borderLeftStyle: 'solid',
+          borderLeftStyle: 'solid' as React.CSSProperties['borderLeftStyle'],
         }
       : style;
 

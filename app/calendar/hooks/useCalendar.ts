@@ -18,6 +18,8 @@ interface Appointment {
 interface Provider {
   id: number;
   name: string;
+  email?: string;
+  role?: string;
   color: string;
 }
 
