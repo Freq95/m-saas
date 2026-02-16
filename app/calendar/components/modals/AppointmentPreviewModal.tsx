@@ -62,7 +62,7 @@ export function AppointmentPreviewModal({
             </div>
             <div className={styles.previewRow}>
               <span className={styles.previewLabel}>Status</span>
-              <span className={`${styles.statusBadge} ${styles[appointment.status]}`}>
+              <span className={`${styles.previewStatusBadge} ${styles[appointment.status]}`}>
                 {appointment.status}
               </span>
             </div>

@@ -1,16 +1,22 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { isSameDay } from 'date-fns';
+import { useState, useEffect, useMemo } from 'react';
 import styles from './page.module.css';
 import { useToast } from '@/lib/useToast';
 import { ToastContainer } from '@/components/Toast';
-import { useCalendar, useAppointmentsSWR as useAppointments, useProviders, useResources, useBlockedTimes } from './hooks';
+import {
+  useCalendar,
+  useAppointmentsSWR as useAppointments,
+  useProviders,
+  useResources,
+  useBlockedTimes,
+} from './hooks';
 import { useDragAndDrop } from './hooks/useDragAndDrop';
 import {
   CalendarHeader,
   WeekView,
   MonthView,
+  DayPanel,
   CreateAppointmentModal,
   AppointmentPreviewModal,
   EditAppointmentModal,
@@ -30,7 +36,7 @@ interface CalendarPageClientProps {
   initialAppointments: any[];
   initialServices: Service[];
   initialDate: string;
-  initialViewType?: 'week' | 'month';
+  initialViewType?: 'week' | 'month' | 'day';
 }
 
 export default function CalendarPageClient({
@@ -46,146 +52,137 @@ export default function CalendarPageClient({
     viewType: state.viewType,
   });
 
-  const {
-    appointments,
-    loading,
-    refetch,
-    createAppointment,
-    updateAppointment,
-    deleteAppointment,
-  } = useAppointments({
-    currentDate: state.currentDate,
-    viewType: state.viewType,
-    userId: 1, // Will be from auth later
-    providerId: state.selectedProvider?.id,
-    resourceId: state.selectedResource?.id,
-  });
+  const { appointments, loading, refetch, createAppointment, updateAppointment, deleteAppointment } =
+    useAppointments({
+      currentDate: state.currentDate,
+      viewType: state.viewType,
+      userId: 1,
+      providerId: state.selectedProvider?.id,
+      resourceId: state.selectedResource?.id,
+    });
 
-  // Fetch providers and resources
   const { providers } = useProviders(1);
   const { resources } = useResources(1);
 
-  // Calculate date range for blocked times
-  const viewStartDate = state.viewType === 'week' ? weekDays[0] : monthDays[0];
-  const viewEndDate = state.viewType === 'week' ? weekDays[weekDays.length - 1] : monthDays[monthDays.length - 1];
+  const viewStart = state.viewType === 'week' ? weekDays[0] : monthDays[0];
+  const viewEnd   = state.viewType === 'week' ? weekDays[weekDays.length - 1] : monthDays[monthDays.length - 1];
+  const { blockedTimes } = useBlockedTimes(1, state.selectedProvider?.id, state.selectedResource?.id, viewStart, viewEnd);
 
-  // Fetch blocked times for current view
-  const { blockedTimes } = useBlockedTimes(
-    1,
-    state.selectedProvider?.id,
-    state.selectedResource?.id,
-    viewStartDate,
-    viewEndDate
-  );
+  const [selectedDay, setSelectedDay]               = useState<Date>(() => new Date());
+  const [services, setServices]                     = useState<Service[]>(initialServices);
+  const [searchQuery, setSearchQuery]               = useState('');
+  const [showCreateModal, setShowCreateModal]       = useState(false);
+  const [showPreviewModal, setShowPreviewModal]     = useState(false);
+  const [showEditModal, setShowEditModal]           = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm]   = useState(false);
+  const [showConflictModal, setShowConflictModal]   = useState(false);
+  const [conflictData, setConflictData] = useState<{ conflicts: any[]; suggestions: any[] }>({
+    conflicts: [],
+    suggestions: [],
+  });
 
-  const [services, setServices] = useState<Service[]>(initialServices);
-  const [loadingServices, setLoadingServices] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showConflictModal, setShowConflictModal] = useState(false);
-  const [conflictData, setConflictData] = useState<{
-    conflicts: any[];
-    suggestions: any[];
-  }>({ conflicts: [], suggestions: [] });
-
-  // Drag-and-drop functionality
+  // Drag-and-drop
   const { draggedAppointment, handleDragStart, handleDragEnd, handleDrop } = useDragAndDrop(
     async (appointmentId, newStartTime, newEndTime) => {
-      const success = await updateAppointment(appointmentId, {
+      const ok = await updateAppointment(appointmentId, {
         startTime: newStartTime.toISOString(),
         endTime: newEndTime.toISOString(),
       });
-
-      if (success) {
-        toast.success('Programarea a fost mutata.');
-      } else {
-        toast.error('Nu s-a putut muta programarea. Verifica conflictele.');
-      }
-
-      return success;
+      ok
+        ? toast.success('Programarea a fost mutata.')
+        : toast.error('Nu s-a putut muta programarea. Verifica conflictele.');
+      return ok;
     }
   );
 
-  // Fetch services if not provided initially
+  // Filter appointments by search query
+  const filteredAppointments = useMemo(() => {
+    if (!searchQuery.trim()) return appointments;
+    const q = searchQuery.toLowerCase();
+    return appointments.filter(
+      (apt) =>
+        apt.client_name.toLowerCase().includes(q) ||
+        apt.service_name.toLowerCase().includes(q) ||
+        apt.category?.toLowerCase().includes(q) ||
+        apt.notes?.toLowerCase().includes(q)
+    );
+  }, [appointments, searchQuery]);
+
+  // Day view: single-day array for WeekView reuse
+  const dayViewDays = useMemo(() => [state.currentDate], [state.currentDate]);
+
+  // Lazy-load services if not provided server-side
   useEffect(() => {
     if (initialServices.length > 0) return;
-
-    const fetchServices = async () => {
-      try {
-        setLoadingServices(true);
-        const response = await fetch('/api/services?userId=1');
-        const result = await response.json();
-        setServices(result.services || []);
-      } catch (error) {
-        console.error('Error fetching services:', error);
-        toast.error('Eroare la incarcarea serviciilor.');
-      } finally {
-        setLoadingServices(false);
-      }
-    };
-
-    fetchServices();
+    fetch('/api/services?userId=1')
+      .then((r) => r.json())
+      .then((d) => setServices(d.services || []))
+      .catch(() => toast.error('Eroare la incarcarea serviciilor.'));
   }, [initialServices.length, toast]);
 
-  // Keyboard shortcut: ESC to close modals
+  // ESC to close all modals
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setShowCreateModal(false);
-        setShowEditModal(false);
-        setShowPreviewModal(false);
-        setShowDeleteConfirm(false);
-      }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setShowCreateModal(false);
+      setShowEditModal(false);
+      setShowPreviewModal(false);
+      setShowDeleteConfirm(false);
     };
-
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
+  /** Select a day in the panel without opening the create modal */
+  const handleDayHeaderClick = (day: Date) => {
+    setSelectedDay(day);
+    actions.navigateToDate(day);
+  };
+
+  /** Click on an empty slot — selects day AND opens create modal */
   const handleSlotClick = (day: Date, hour?: number) => {
-    const slotStart = new Date(day);
-    if (hour !== undefined) {
-      slotStart.setHours(hour, 0, 0, 0);
-    } else {
-      // For month view, default to 9 AM
-      slotStart.setHours(9, 0, 0, 0);
-    }
-
-    const selectedService = services[0];
-    const durationMinutes = selectedService?.duration_minutes || 60;
-    const slotEnd = new Date(slotStart);
-    slotEnd.setMinutes(slotEnd.getMinutes() + durationMinutes);
-
+    setSelectedDay(day);
+    const start = new Date(day);
+    start.setHours(hour ?? 9, 0, 0, 0);
+    const duration = (services[0]?.duration_minutes ?? 60);
+    const end = new Date(start.getTime() + duration * 60_000);
     actions.selectDate(day);
-    actions.selectSlot({ start: slotStart, end: slotEnd });
+    actions.selectSlot({ start, end });
     setShowCreateModal(true);
   };
 
-  const handleQuickCreate = () => {
-    const now = new Date();
-    const slotStart = new Date(now);
-    const roundedMinutes = Math.ceil(slotStart.getMinutes() / 15) * 15;
-    slotStart.setMinutes(roundedMinutes, 0, 0);
+  const handleAppointmentClick = (appointment: any) => {
+    actions.selectAppointment(appointment);
+    setShowPreviewModal(true);
+  };
 
-    if (slotStart.getHours() < 8) {
-      slotStart.setHours(8, 0, 0, 0);
+  /** Jump to date from header range label click or mini calendar nav */
+  const handleJumpToDate = (date: Date) => {
+    setSelectedDay(date);
+    actions.navigateToDate(date);
+  };
+
+  const handlePanelStatusChange = async (appointmentId: number, status: string) => {
+    try {
+      const res = await fetch(`/api/appointments/${appointmentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      const result = await res.json();
+      if (res.ok) {
+        refetch();
+        const label =
+          status === 'completed' ? 'completata' : status === 'cancelled' ? 'anulata' : 'absenta';
+        toast.success(`Programarea a fost marcata ca ${label}.`);
+      } else {
+        toast.error(result.error || 'Nu s-a putut actualiza statusul.');
+      }
+    } catch {
+      toast.error('Eroare la actualizarea statusului.');
     }
-
-    if (slotStart.getHours() >= 19) {
-      slotStart.setDate(slotStart.getDate() + 1);
-      slotStart.setHours(8, 0, 0, 0);
-    }
-
-    const selectedService = services[0];
-    const durationMinutes = selectedService?.duration_minutes || 60;
-    const slotEnd = new Date(slotStart);
-    slotEnd.setMinutes(slotEnd.getMinutes() + durationMinutes);
-
-    actions.selectDate(slotStart);
-    actions.selectSlot({ start: slotStart, end: slotEnd });
-    setShowCreateModal(true);
   };
 
   const handleCreateAppointment = async (formData: {
@@ -194,6 +191,8 @@ export default function CalendarPageClient({
     clientPhone: string;
     serviceId: string;
     notes: string;
+    category?: string;
+    color?: string;
     isRecurring?: boolean;
     recurrence?: {
       frequency: 'daily' | 'weekly' | 'monthly';
@@ -208,15 +207,13 @@ export default function CalendarPageClient({
       return;
     }
 
-    const selectedService = services.find((s) => s.id.toString() === formData.serviceId);
-    const durationMinutes = selectedService?.duration_minutes || 60;
-    const calculatedEndTime = new Date(state.selectedSlot.start);
-    calculatedEndTime.setMinutes(calculatedEndTime.getMinutes() + durationMinutes);
+    const service = services.find((s) => s.id.toString() === formData.serviceId);
+    const duration = service?.duration_minutes ?? 60;
+    const endTime = new Date(state.selectedSlot.start.getTime() + duration * 60_000);
 
-    // Handle recurring appointments
     if (formData.isRecurring && formData.recurrence) {
       try {
-        const response = await fetch('/api/appointments/recurring', {
+        const res = await fetch('/api/appointments/recurring', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -225,8 +222,10 @@ export default function CalendarPageClient({
             clientEmail: formData.clientEmail,
             clientPhone: formData.clientPhone,
             startTime: state.selectedSlot.start.toISOString(),
-            endTime: calculatedEndTime.toISOString(),
+            endTime: endTime.toISOString(),
             notes: formData.notes,
+            category: formData.category,
+            color: formData.color,
             recurrence: {
               frequency: formData.recurrence.frequency,
               interval: formData.recurrence.interval,
@@ -236,38 +235,33 @@ export default function CalendarPageClient({
             },
           }),
         });
-
-        const result = await response.json();
-
-        if (response.ok) {
+        const result = await res.json();
+        if (res.ok) {
           setShowCreateModal(false);
           actions.clearSelection();
           refetch();
           toast.success(
-            `${result.created} programari recurente create${
-              result.skipped > 0 ? `, ${result.skipped} omise (conflicte)` : ''
-            }.`
+            `${result.created} programari recurente create${result.skipped > 0 ? `, ${result.skipped} omise` : ''}.`
           );
         } else {
           toast.error(result.error || 'Nu s-au putut crea programarile recurente.');
         }
-      } catch (error) {
-        console.error('Error creating recurring appointments:', error);
+      } catch {
         toast.error('Eroare la crearea programarilor recurente.');
       }
     } else {
-      // Handle single appointment
-      const success = await createAppointment({
+      const ok = await createAppointment({
         serviceId: parseInt(formData.serviceId),
         clientName: formData.clientName,
         clientEmail: formData.clientEmail,
         clientPhone: formData.clientPhone,
         startTime: state.selectedSlot.start.toISOString(),
-        endTime: calculatedEndTime.toISOString(),
+        endTime: endTime.toISOString(),
         notes: formData.notes,
+        category: formData.category,
+        color: formData.color,
       });
-
-      if (success) {
+      if (ok) {
         setShowCreateModal(false);
         actions.clearSelection();
         toast.success('Programarea a fost creata.');
@@ -277,28 +271,17 @@ export default function CalendarPageClient({
     }
   };
 
-  const handleAppointmentClick = (appointment: any) => {
-    actions.selectAppointment(appointment);
-    setShowPreviewModal(true);
-  };
-
   const handleEditClick = async () => {
     if (!state.selectedAppointment) return;
-
-    // Fetch full appointment details
     try {
-      const response = await fetch(`/api/appointments/${state.selectedAppointment.id}`);
-      const result = await response.json();
-      const fullAppointment = result.appointment;
-
-      actions.selectAppointment(fullAppointment);
-      setShowPreviewModal(false);
-      setShowEditModal(true);
-    } catch (error) {
-      console.error('Error fetching appointment details:', error);
-      setShowPreviewModal(false);
-      setShowEditModal(true);
+      const res = await fetch(`/api/appointments/${state.selectedAppointment.id}`);
+      const result = await res.json();
+      actions.selectAppointment(result.appointment);
+    } catch {
+      // proceed with existing data
     }
+    setShowPreviewModal(false);
+    setShowEditModal(true);
   };
 
   const handleUpdateAppointment = async (formData: {
@@ -308,9 +291,8 @@ export default function CalendarPageClient({
     notes: string;
   }) => {
     if (!state.selectedAppointment) return;
-
     try {
-      const response = await fetch(`/api/appointments/${state.selectedAppointment.id}`, {
+      const res = await fetch(`/api/appointments/${state.selectedAppointment.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -320,40 +302,27 @@ export default function CalendarPageClient({
           notes: formData.notes,
         }),
       });
-
-      const result = await response.json();
-
-      if (response.ok) {
+      const result = await res.json();
+      if (res.ok) {
         setShowEditModal(false);
         actions.clearSelection();
         refetch();
         toast.success('Programarea a fost actualizata.');
-      } else if (response.status === 409) {
-        // Conflict detected
-        setConflictData({
-          conflicts: result.conflicts || [],
-          suggestions: result.suggestions || [],
-        });
+      } else if (res.status === 409) {
+        setConflictData({ conflicts: result.conflicts || [], suggestions: result.suggestions || [] });
         setShowConflictModal(true);
       } else {
         toast.error(result.error || 'Nu s-a putut actualiza programarea.');
       }
-    } catch (error) {
-      console.error('Error updating appointment:', error);
+    } catch {
       toast.error('Eroare la actualizarea programarii.');
     }
   };
 
-  const handleDeleteClick = () => {
-    setShowDeleteConfirm(true);
-  };
-
   const handleConfirmDelete = async () => {
     if (!state.selectedAppointment) return;
-
-    const success = await deleteAppointment(state.selectedAppointment.id);
-
-    if (success) {
+    const ok = await deleteAppointment(state.selectedAppointment.id);
+    if (ok) {
       setShowPreviewModal(false);
       setShowDeleteConfirm(false);
       actions.clearSelection();
@@ -365,10 +334,8 @@ export default function CalendarPageClient({
 
   const handleQuickStatusChange = async (status: string) => {
     if (!state.selectedAppointment) return;
-
-    const success = await updateAppointment(state.selectedAppointment.id, { status });
-
-    if (success) {
+    const ok = await updateAppointment(state.selectedAppointment.id, { status });
+    if (ok) {
       refetch();
       toast.success('Statusul a fost actualizat.');
     } else {
@@ -376,38 +343,10 @@ export default function CalendarPageClient({
     }
   };
 
-  const today = new Date();
-  const appointmentsToday = appointments.filter((apt) =>
-    isSameDay(new Date(apt.start_time), today)
-  );
-  const scheduledToday = appointmentsToday.filter((apt) => apt.status === 'scheduled').length;
-
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div className={styles.container}>
       <main className={styles.main}>
-        <section className={styles.hero}>
-          <div>
-            <p className={styles.eyebrow}>Dental Operations</p>
-            <h2 className={styles.heroTitle}>Calendar</h2>
-            <p className={styles.heroSubtitle}>
-              Programari clare, rapide si predictibile pentru cabinet.
-            </p>
-          </div>
-          <div className={styles.heroMetrics}>
-            <div className={styles.metricPill}>
-              <span>Astazi</span>
-              <strong>{appointmentsToday.length}</strong>
-            </div>
-            <div className={styles.metricPill}>
-              <span>Programate</span>
-              <strong>{scheduledToday}</strong>
-            </div>
-            <button type="button" className={styles.primaryAction} onClick={handleQuickCreate}>
-              + Programare rapida
-            </button>
-          </div>
-        </section>
-
         <CalendarHeader
           rangeLabel={rangeLabel}
           viewType={state.viewType}
@@ -415,85 +354,93 @@ export default function CalendarPageClient({
           resources={resources}
           selectedProviderId={state.selectedProvider?.id || null}
           selectedResourceId={state.selectedResource?.id || null}
+          searchQuery={searchQuery}
           onPrevPeriod={actions.prevPeriod}
           onNextPeriod={actions.nextPeriod}
           onTodayClick={actions.goToToday}
           onViewTypeChange={actions.setViewType}
-          onProviderChange={(providerId) => {
-            const provider = providers.find((p) => p.id === providerId);
-            actions.selectProvider(provider || null);
-          }}
-          onResourceChange={(resourceId) => {
-            const resource = resources.find((r) => r.id === resourceId);
-            actions.selectResource(resource || null);
-          }}
+          onProviderChange={(id) => actions.selectProvider(providers.find((p) => p.id === id) || null)}
+          onResourceChange={(id) => actions.selectResource(resources.find((r) => r.id === id) || null)}
+          onSearchChange={setSearchQuery}
+          onJumpToDate={handleJumpToDate}
         />
 
-        {(loading || loadingServices) && (
-          <div className="skeleton-stack" style={{ marginBottom: '1rem' }}>
-            <div className="skeleton skeleton-line" style={{ height: '16px', width: '220px' }} />
-            <div className="skeleton skeleton-line" style={{ height: '14px', width: '140px' }} />
+        {loading && (
+          <div className="skeleton-stack" style={{ marginBottom: '0.75rem' }}>
+            <div className="skeleton skeleton-line" style={{ height: '14px', width: '180px' }} />
           </div>
         )}
 
-        {state.viewType === 'week' ? (
-          <WeekView
-            weekDays={weekDays}
-            hours={hours}
-            appointments={appointments}
-            blockedTimes={blockedTimes}
-            onSlotClick={handleSlotClick}
-            onAppointmentClick={handleAppointmentClick}
-            enableDragDrop={true}
-            draggedAppointment={draggedAppointment}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-            onDrop={async (day, hour) => {
-              await handleDrop(day, hour);
-            }}
-            providers={providers}
-          />
-        ) : (
-          <MonthView
-            monthDays={monthDays}
+        {/* Calendar grid + day panel — always side-by-side for all views */}
+        <div className={styles.calendarWithPanel}>
+          {state.viewType === 'month' ? (
+            <MonthView
+              monthDays={monthDays}
+              currentDate={state.currentDate}
+              appointments={filteredAppointments}
+              selectedDay={selectedDay}
+              onDayClick={handleDayHeaderClick}
+              onAppointmentClick={handleAppointmentClick}
+            />
+          ) : (
+            /* Day view reuses WeekView with a single-day array */
+            <WeekView
+              weekDays={state.viewType === 'day' ? dayViewDays : weekDays}
+              hours={hours}
+              appointments={filteredAppointments}
+              blockedTimes={blockedTimes}
+              selectedDay={selectedDay}
+              onSlotClick={handleSlotClick}
+              onDayHeaderClick={handleDayHeaderClick}
+              onAppointmentClick={handleAppointmentClick}
+              enableDragDrop={state.viewType === 'week'}
+              draggedAppointment={draggedAppointment}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDrop={async (day, hour) => { await handleDrop(day, hour); }}
+              providers={providers}
+            />
+          )}
+
+          <DayPanel
+            selectedDay={selectedDay}
+            appointments={filteredAppointments}
             currentDate={state.currentDate}
-            appointments={appointments}
-            onDayClick={handleSlotClick}
-            onAppointmentClick={handleAppointmentClick}
+            onAppointmentClick={(apt) => {
+              actions.selectAppointment(apt);
+              setShowPreviewModal(true);
+            }}
+            onQuickStatusChange={handlePanelStatusChange}
+            onCreateClick={() => handleSlotClick(selectedDay, 9)}
+            onNavigate={(date) => {
+              setSelectedDay(date);
+              actions.navigateToDate(date);
+            }}
           />
-        )}
+        </div>
       </main>
 
       <CreateAppointmentModal
         isOpen={showCreateModal}
         selectedSlot={state.selectedSlot}
         services={services}
-        onClose={() => {
-          setShowCreateModal(false);
-          actions.clearSelection();
-        }}
+        onClose={() => { setShowCreateModal(false); actions.clearSelection(); }}
         onCreate={handleCreateAppointment}
       />
 
       <AppointmentPreviewModal
         isOpen={showPreviewModal}
         appointment={state.selectedAppointment}
-        onClose={() => {
-          setShowPreviewModal(false);
-          actions.clearSelection();
-        }}
+        onClose={() => { setShowPreviewModal(false); actions.clearSelection(); }}
         onEdit={handleEditClick}
-        onDelete={handleDeleteClick}
+        onDelete={() => setShowDeleteConfirm(true)}
         onQuickStatusChange={handleQuickStatusChange}
       />
 
       <EditAppointmentModal
         isOpen={showEditModal}
         appointment={state.selectedAppointment}
-        onClose={() => {
-          setShowEditModal(false);
-          actions.clearSelection();
-        }}
+        onClose={() => { setShowEditModal(false); actions.clearSelection(); }}
         onUpdate={handleUpdateAppointment}
       />
 
@@ -510,11 +457,7 @@ export default function CalendarPageClient({
         suggestions={conflictData.suggestions}
         onClose={() => setShowConflictModal(false)}
         onSelectSlot={(startTime, endTime) => {
-          // Auto-fill the selected alternative slot
-          actions.selectSlot({
-            start: new Date(startTime),
-            end: new Date(endTime),
-          });
+          actions.selectSlot({ start: new Date(startTime), end: new Date(endTime) });
           setShowEditModal(true);
         }}
       />

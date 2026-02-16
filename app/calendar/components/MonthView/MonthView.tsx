@@ -9,6 +9,7 @@ interface MonthViewProps {
   monthDays: Date[];
   currentDate: Date;
   appointments: Appointment[];
+  selectedDay?: Date | null;
   onDayClick: (day: Date) => void;
   onAppointmentClick: (appointment: Appointment) => void;
 }
@@ -17,17 +18,17 @@ export function MonthView({
   monthDays,
   currentDate,
   appointments,
+  selectedDay = null,
   onDayClick,
   onAppointmentClick,
 }: MonthViewProps) {
-  const getAppointmentsForDay = (day: Date) => {
-    return appointments.filter((apt) => isSameDay(new Date(apt.start_time), day));
-  };
+  const getAppointmentsForDay = (day: Date) =>
+    appointments.filter((apt) => isSameDay(new Date(apt.start_time), day));
 
   return (
     <div className={styles.monthCalendar}>
       <div className={styles.monthWeekDays}>
-        {['Luni', 'Marti', 'Miercuri', 'Joi', 'Vineri', 'Sambata', 'Duminica'].map((day) => (
+        {['Luni', 'Marti', 'Miercuri', 'Joi', 'Vineri', 'Sâmbătă', 'Duminică'].map((day) => (
           <div key={day} className={styles.monthWeekDay}>
             {day}
           </div>
@@ -37,21 +38,26 @@ export function MonthView({
         {monthDays.map((day) => {
           const dayAppointments = getAppointmentsForDay(day);
           const isCurrentMonth = isSameMonth(day, currentDate);
-          const isToday = isSameDay(day, new Date());
+          const isTodayFlag = isSameDay(day, new Date());
+          const isSelected = selectedDay ? isSameDay(day, selectedDay) : false;
 
           return (
             <div
               key={day.toISOString()}
-              className={`${styles.monthDay} ${!isCurrentMonth ? styles.monthDayOther : ''} ${
-                isToday ? styles.monthDayToday : ''
-              }`}
+              className={[
+                styles.monthDay,
+                !isCurrentMonth ? styles.monthDayOther : '',
+                isTodayFlag ? styles.monthDayToday : '',
+                isSelected && !isTodayFlag ? styles.monthDaySelected : '',
+              ].filter(Boolean).join(' ')}
               onClick={() => onDayClick(day)}
               role="button"
               tabIndex={0}
-              aria-label={`Creeaza programare pe ${format(day, 'd MMMM yyyy', { locale: ro })}`}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
+              aria-label={format(day, 'd MMMM yyyy', { locale: ro })}
+              aria-pressed={isSelected}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
                   onDayClick(day);
                 }
               }}
@@ -61,22 +67,22 @@ export function MonthView({
                 {dayAppointments.slice(0, 3).map((apt) => (
                   <div
                     key={apt.id}
-                    className={`${styles.monthAppointment} ${styles[apt.status]}`}
+                    className={`${styles.monthAppointment} ${styles[apt.status] ?? ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       onAppointmentClick(apt);
                     }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
                         onAppointmentClick(apt);
                       }
                     }}
                     role="button"
                     tabIndex={0}
-                    title={`${apt.client_name} - ${apt.service_name}`}
+                    title={`${apt.client_name} – ${apt.service_name}`}
                   >
-                    {format(new Date(apt.start_time), 'HH:mm', { locale: ro })} - {apt.client_name}
+                    {format(new Date(apt.start_time), 'HH:mm', { locale: ro })} {apt.client_name}
                   </div>
                 ))}
                 {dayAppointments.length > 3 && (

@@ -12,6 +12,14 @@ interface Service {
   price: number;
 }
 
+const CATEGORIES = [
+  { label: 'Consultatie', color: '#4da3ff' },
+  { label: 'Tratament',   color: '#34d399' },
+  { label: 'Control',     color: '#a78bfa' },
+  { label: 'Urgenta',     color: '#f87171' },
+  { label: 'Altele',      color: '#fbbf24' },
+] as const;
+
 interface CreateAppointmentModalProps {
   isOpen: boolean;
   selectedSlot: { start: Date; end: Date } | null;
@@ -23,6 +31,8 @@ interface CreateAppointmentModalProps {
     clientPhone: string;
     serviceId: string;
     notes: string;
+    category?: string;
+    color?: string;
     isRecurring?: boolean;
     recurrence?: {
       frequency: 'daily' | 'weekly' | 'monthly';
@@ -49,6 +59,7 @@ export function CreateAppointmentModal({
     notes: '',
   });
 
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrence, setRecurrence] = useState({
     frequency: 'weekly' as 'daily' | 'weekly' | 'monthly',
@@ -66,18 +77,20 @@ export function CreateAppointmentModal({
 
   if (!isOpen || !selectedSlot) return null;
 
+  const activeCategoryColor = CATEGORIES.find((c) => c.label === selectedCategory)?.color;
+
   const handleSubmit = async () => {
     if (!formData.clientName || !formData.serviceId) {
       return;
     }
 
-    const appointmentData = {
+    await onCreate({
       ...formData,
+      category: selectedCategory || undefined,
+      color: activeCategoryColor,
       isRecurring,
       ...(isRecurring && { recurrence }),
-    };
-
-    await onCreate(appointmentData);
+    });
 
     // Reset form
     setFormData({
@@ -87,14 +100,9 @@ export function CreateAppointmentModal({
       serviceId: services[0]?.id.toString() || '',
       notes: '',
     });
+    setSelectedCategory('');
     setIsRecurring(false);
-    setRecurrence({
-      frequency: 'weekly',
-      interval: 1,
-      endType: 'count',
-      endDate: '',
-      count: 4,
-    });
+    setRecurrence({ frequency: 'weekly', interval: 1, endType: 'count', endDate: '', count: 4 });
   };
 
   return (
@@ -164,6 +172,28 @@ export function CreateAppointmentModal({
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Category picker */}
+          <div className={styles.modalField}>
+            <label>Categorie</label>
+            <div className={styles.categoryPicker}>
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat.label}
+                  type="button"
+                  className={`${styles.categoryChip} ${selectedCategory === cat.label ? styles.categoryChipActive : ''}`}
+                  style={{
+                    '--chip-color': cat.color,
+                  } as React.CSSProperties}
+                  onClick={() => setSelectedCategory(selectedCategory === cat.label ? '' : cat.label)}
+                  title={cat.label}
+                >
+                  <span className={styles.categoryDot} style={{ background: cat.color }} />
+                  {cat.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className={styles.modalField}>

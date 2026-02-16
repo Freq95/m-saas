@@ -34,17 +34,20 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
       }
     };
 
-    // Find provider color
+    // Category color takes priority, then provider color
+    const categoryColor = appointment.color;
     const provider = providers.find((p) => p.id === appointment.provider_id);
-    const providerColor = provider?.color;
+    const accentColor = categoryColor || provider?.color;
 
-    // Apply provider color as left border
-    const appointmentStyle: React.CSSProperties = providerColor
+    const appointmentStyle: React.CSSProperties = accentColor
       ? {
           ...style,
-          borderLeftColor: providerColor,
+          borderLeftColor: accentColor,
           borderLeftWidth: '4px',
           borderLeftStyle: 'solid' as React.CSSProperties['borderLeftStyle'],
+          ...(categoryColor && {
+            background: `color-mix(in srgb, ${categoryColor} 18%, var(--color-surface))`,
+          }),
         }
       : style;
 
@@ -90,6 +93,7 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
       prev.appointment.client_name === next.appointment.client_name &&
       prev.appointment.service_name === next.appointment.service_name &&
       prev.appointment.provider_id === next.appointment.provider_id &&
+      prev.appointment.color === next.appointment.color &&
       prev.style.top === next.style.top &&
       prev.style.left === next.style.left &&
       prev.style.width === next.style.width &&

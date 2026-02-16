@@ -41,3 +41,4 @@ uploads/*
 *.tsbuildinfo
 next-env.d.ts
 
+nul

@@ -11,7 +11,7 @@ import { ro } from 'date-fns/locale';
 
 interface UseCalendarNavigationOptions {
   currentDate: Date;
-  viewType: 'week' | 'month';
+  viewType: 'week' | 'month' | 'day';
 }
 
 interface UseCalendarNavigationResult {
@@ -40,6 +40,10 @@ export function useCalendarNavigation({
   }, [currentDate]);
 
   const rangeLabel = useMemo(() => {
+    if (viewType === 'day') {
+      const label = format(currentDate, "EEEE, d MMMM yyyy", { locale: ro });
+      return label.charAt(0).toUpperCase() + label.slice(1);
+    }
     if (viewType === 'week') {
       const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
       return `${format(weekStart, "d MMMM", { locale: ro })} - ${format(
@@ -47,10 +51,9 @@ export function useCalendarNavigation({
         "d MMMM yyyy",
         { locale: ro }
       )}`;
-    } else {
-      const monthYear = format(currentDate, "MMMM yyyy", { locale: ro });
-      return monthYear.charAt(0).toUpperCase() + monthYear.slice(1);
     }
+    const monthYear = format(currentDate, "MMMM yyyy", { locale: ro });
+    return monthYear.charAt(0).toUpperCase() + monthYear.slice(1);
   }, [currentDate, viewType]);
 
   const hours = useMemo(() => {
