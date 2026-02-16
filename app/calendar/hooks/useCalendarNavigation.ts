@@ -57,7 +57,7 @@ export function useCalendarNavigation({
   }, [currentDate, viewType]);
 
   const hours = useMemo(() => {
-    return Array.from({ length: 12 }, (_, i) => i + 8); // 8 AM to 7 PM
+    return Array.from({ length: 24 }, (_, i) => i); // 00:00 to 23:00
   }, []);
 
   return {

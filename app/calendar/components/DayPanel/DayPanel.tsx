@@ -19,15 +19,24 @@ interface DayPanelProps {
   onNavigate: (date: Date) => void;
 }
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
-  scheduled: { label: 'Programat',  color: '#4da3ff', bg: 'rgba(77,163,255,0.14)' },
-  completed: { label: 'Completat',  color: '#34d399', bg: 'rgba(52,211,153,0.14)' },
-  cancelled: { label: 'Anul.',       color: '#f87171', bg: 'rgba(248,113,113,0.14)' },
-  'no-show': { label: 'Absent',      color: '#9ca3af', bg: 'rgba(156,163,175,0.14)' },
+type PanelStatusKey = 'scheduled' | 'completed' | 'cancelled' | 'no-show';
+
+const STATUS_CONFIG: Record<PanelStatusKey, { label: string; pillClass: string }> = {
+  scheduled: { label: 'Programat', pillClass: 'statusPillScheduled' },
+  completed: { label: 'Completat', pillClass: 'statusPillCompleted' },
+  cancelled: { label: 'Anul.', pillClass: 'statusPillCancelled' },
+  'no-show': { label: 'Absent', pillClass: 'statusPillNoShow' },
 };
 
-function getStatusConfig(status: string) {
-  return STATUS_CONFIG[status] ?? STATUS_CONFIG.scheduled;
+function normalizeStatus(status: string): PanelStatusKey {
+  if (status === 'no_show' || status === 'no-show') return 'no-show';
+  if (status === 'completed') return 'completed';
+  if (status === 'cancelled') return 'cancelled';
+  return 'scheduled';
+}
+
+function getStatusConfig(status: PanelStatusKey) {
+  return STATUS_CONFIG[status];
 }
 
 // ── Mini calendar ─────────────────────────────────────────────────────────────
@@ -129,12 +138,13 @@ function AppointmentCard({
 }) {
   const start = new Date(apt.start_time);
   const end   = new Date(apt.end_time);
-  const cfg   = getStatusConfig(apt.status);
+  const status = normalizeStatus(apt.status);
+  const cfg = getStatusConfig(status);
   const durationMin = Math.round((end.getTime() - start.getTime()) / 60_000);
 
   return (
     <div className={styles.card} onClick={() => onClick(apt)}>
-      <div className={styles.colorBar} style={{ background: apt.color || cfg.color }} />
+      <div className={styles.colorBar} style={{ background: apt.color || 'var(--color-accent)' }} />
       <div className={styles.cardBody}>
         <div className={styles.timeRow}>
           <span className={styles.time}>
@@ -145,11 +155,11 @@ function AppointmentCard({
         <p className={styles.clientName}>{apt.client_name}</p>
         <div className={styles.metaRow}>
           <span className={styles.service}>{apt.service_name}</span>
-          <span className={styles.statusPill} style={{ color: cfg.color, background: cfg.bg }}>
+          <span className={`${styles.statusPill} ${styles[cfg.pillClass]}`}>
             {cfg.label}
           </span>
         </div>
-        {apt.status === 'scheduled' && (
+        {status === 'scheduled' && (
           <div className={styles.quickActions} onClick={(e) => e.stopPropagation()}>
             <button
               className={`${styles.qBtn} ${styles.qComplete}`}
@@ -189,9 +199,12 @@ export function DayPanel({
 
   const stats = useMemo(() => ({
     total:     dayAppointments.length,
-    scheduled: dayAppointments.filter((a) => a.status === 'scheduled').length,
-    completed: dayAppointments.filter((a) => a.status === 'completed').length,
-    other:     dayAppointments.filter((a) => a.status === 'cancelled' || a.status === 'no-show').length,
+    scheduled: dayAppointments.filter((a) => normalizeStatus(a.status) === 'scheduled').length,
+    completed: dayAppointments.filter((a) => normalizeStatus(a.status) === 'completed').length,
+    other: dayAppointments.filter((a) => {
+      const status = normalizeStatus(a.status);
+      return status === 'cancelled' || status === 'no-show';
+    }).length,
   }), [dayAppointments]);
 
   // Mini calendar day click: if in same month → select day; if different month → navigate month AND select
@@ -248,17 +261,17 @@ export function DayPanel({
             </div>
             <div className={styles.statDivider} />
             <div className={styles.statItem}>
-              <span className={styles.statNum} style={{ color: '#4da3ff' }}>{stats.scheduled}</span>
+              <span className={`${styles.statNum} ${styles.statNumScheduled}`}>{stats.scheduled}</span>
               <span className={styles.statLabel}>Programate</span>
             </div>
             <div className={styles.statDivider} />
             <div className={styles.statItem}>
-              <span className={styles.statNum} style={{ color: '#34d399' }}>{stats.completed}</span>
+              <span className={`${styles.statNum} ${styles.statNumCompleted}`}>{stats.completed}</span>
               <span className={styles.statLabel}>Complete</span>
             </div>
             <div className={styles.statDivider} />
             <div className={styles.statItem}>
-              <span className={styles.statNum} style={{ color: '#f87171' }}>{stats.other}</span>
+              <span className={`${styles.statNum} ${styles.statNumOther}`}>{stats.other}</span>
               <span className={styles.statLabel}>Anulate</span>
             </div>
           </div>

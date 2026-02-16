@@ -13,11 +13,11 @@ interface Service {
 }
 
 const CATEGORIES = [
-  { label: 'Consultatie', color: '#4da3ff' },
-  { label: 'Tratament',   color: '#34d399' },
-  { label: 'Control',     color: '#a78bfa' },
-  { label: 'Urgenta',     color: '#f87171' },
-  { label: 'Altele',      color: '#fbbf24' },
+  { label: 'Consultatie', color: 'var(--color-accent)' },
+  { label: 'Tratament',   color: 'var(--color-success)' },
+  { label: 'Control',     color: 'var(--color-accent-strong)' },
+  { label: 'Urgenta',     color: 'var(--color-danger)' },
+  { label: 'Altele',      color: 'var(--color-text-soft)' },
 ] as const;
 
 interface CreateAppointmentModalProps {

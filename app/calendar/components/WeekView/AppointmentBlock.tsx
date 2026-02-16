@@ -17,6 +17,9 @@ interface AppointmentBlockProps {
 
 export const AppointmentBlock = React.memo<AppointmentBlockProps>(
   ({ appointment, style, onClick, onDragStart, onDragEnd, isDragging = false, enableDragDrop = false, providers = [] }) => {
+    const appointmentStatusClass = appointment.status === 'no-show' ? 'no_show' : appointment.status;
+    const badgeStatusClass = appointment.status === 'no_show' ? 'no-show' : appointment.status;
+
     const handleDragStart = (e: React.DragEvent) => {
       e.stopPropagation();
       if (onDragStart) {
@@ -53,9 +56,9 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
 
     return (
       <div
-        className={`${styles.appointment} ${styles[appointment.status]} ${isDragging ? styles.dragging : ''}`}
+        className={`${styles.appointment} ${styles[appointmentStatusClass]} ${isDragging ? styles.dragging : ''}`}
         style={appointmentStyle}
-        draggable={enableDragDrop && appointment.status === 'scheduled'}
+        draggable={enableDragDrop && badgeStatusClass === 'scheduled'}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onClick={(e) => {
@@ -74,11 +77,11 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
       >
         <div className={styles.appointmentHeader}>
           <div className={styles.appointmentTitle}>{appointment.client_name}</div>
-          <span className={`${styles.statusBadge} ${styles[`statusBadge--${appointment.status}`]}`}>
-            {appointment.status === 'scheduled' && 'Programat'}
-            {appointment.status === 'completed' && 'Completat'}
-            {appointment.status === 'cancelled' && 'Anulat'}
-            {appointment.status === 'no-show' && 'Absent'}
+          <span className={`${styles.statusBadge} ${styles[`statusBadge--${badgeStatusClass}`]}`}>
+            {badgeStatusClass === 'scheduled' && 'Programat'}
+            {badgeStatusClass === 'completed' && 'Completat'}
+            {badgeStatusClass === 'cancelled' && 'Anulat'}
+            {badgeStatusClass === 'no-show' && 'Absent'}
           </span>
         </div>
         <div className={styles.appointmentService}>{appointment.service_name}</div>

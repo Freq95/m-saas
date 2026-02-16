@@ -29,9 +29,9 @@
   justify-content: space-between;
   gap: 0.9rem;
   padding: 0.65rem 0.9rem;
-  border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--color-border) 86%, white 14%);
-  background: color-mix(in srgb, var(--color-bg-elevated) 88%, white 12%);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
   box-shadow: var(--shadow-sm);
 }
 
@@ -124,10 +124,10 @@
 .weekGrid {
   display: flex;
   flex-direction: column;
-  background: color-mix(in srgb, var(--color-surface) 92%, white 8%);
-  border: 1px solid color-mix(in srgb, var(--color-border) 84%, white 16%);
-  border-radius: 14px;
-  box-shadow: 0 20px 36px color-mix(in srgb, var(--color-bg) 70%, transparent);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   backdrop-filter: blur(var(--blur-md));
   -webkit-backdrop-filter: blur(var(--blur-md));
   overflow: hidden;
@@ -138,7 +138,7 @@
   display: grid;
   grid-template-columns: 56px repeat(7, 1fr);
   border-bottom: 1px solid var(--color-border);
-  background: color-mix(in srgb, var(--color-surface) 96%, white 4%);
+  background: color-mix(in srgb, var(--color-surface-muted) 45%, var(--color-surface));
   flex-shrink: 0;
 }
 
@@ -179,10 +179,11 @@
 /* Time gutter */
 .timeGutter {
   border-right: 1px solid var(--color-border);
-  background: color-mix(in srgb, var(--color-surface) 94%, white 6%);
+  background: color-mix(in srgb, var(--color-surface-muted) 40%, var(--color-surface));
   position: sticky;
   left: 0;
   z-index: 2;
+  overflow: visible;
 }
 
 .timeSlot {
@@ -209,7 +210,6 @@
 .weekDayColumn {
   border-right: 1px solid var(--color-border);
   position: relative;
-  height: calc(11 * 64px); /* 11 hours × 64px */
 }
 
 .weekDayColumn:last-child {
@@ -247,27 +247,58 @@
   pointer-events: none;
 }
 
-/* Current-time red indicator */
+/* Current-time indicator */
 .currentTimeLine {
   position: absolute;
   left: 0;
   right: 0;
   height: 2px;
-  background: #ef4444;
-  z-index: 30;
+  background: var(--color-accent-strong);
+  z-index: 35;
   pointer-events: none;
-  box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent-strong) 35%, transparent);
 }
 
-.currentTimeLine::before {
-  content: '';
+.currentTimeDot {
   position: absolute;
-  left: -4px;
-  top: -4px;
-  width: 10px;
-  height: 10px;
+  left: 0;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: #ef4444;
+  background: var(--color-accent-strong);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-surface) 95%, white 5%);
+}
+
+.currentTimeGutterIndicator {
+  position: absolute;
+  right: -1px;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  z-index: 40;
+  pointer-events: none;
+}
+
+.currentTimeGutterLabel {
+  background: var(--color-accent-strong);
+  color: var(--color-accent-contrast);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  padding: 3px 6px;
+  border-radius: 999px;
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--color-accent-strong) 34%, transparent);
+}
+
+.currentTimeGutterTick {
+  width: 8px;
+  height: 2px;
+  background: var(--color-accent-strong);
+  border-radius: 2px;
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -334,7 +365,7 @@
     color-mix(in srgb, var(--color-accent) 82%, black 18%));
   color: var(--color-accent-contrast);
   padding: 0.38rem 0.42rem;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   font-size: 0.68rem;
   z-index: 10;
   overflow: hidden;
@@ -395,7 +426,7 @@
   opacity: 0.5;
   cursor: move;
   transform: rotate(2deg);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-md);
   z-index: 1000;
 }
 
@@ -428,7 +459,7 @@
 .statusBadge {
   font-size: 0.58rem;
   padding: 0.14rem 0.32rem;
-  border-radius: 5px;
+  border-radius: var(--radius-xs);
   font-weight: 500;
   white-space: nowrap;
   text-transform: uppercase;
@@ -437,27 +468,27 @@
 }
 
 .statusBadge--scheduled {
-  background: rgba(59, 130, 246, 0.25);
-  color: rgb(59, 130, 246);
-  border: 1px solid rgba(59, 130, 246, 0.4);
+  background: color-mix(in srgb, var(--color-accent) 24%, transparent);
+  color: color-mix(in srgb, var(--color-accent) 72%, white);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
 }
 
 .statusBadge--completed {
-  background: rgba(34, 197, 94, 0.25);
-  color: rgb(34, 197, 94);
-  border: 1px solid rgba(34, 197, 94, 0.4);
+  background: color-mix(in srgb, var(--color-success) 24%, transparent);
+  color: color-mix(in srgb, var(--color-success) 74%, white);
+  border: 1px solid color-mix(in srgb, var(--color-success) 40%, transparent);
 }
 
 .statusBadge--cancelled {
-  background: rgba(239, 68, 68, 0.25);
-  color: rgb(239, 68, 68);
-  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: color-mix(in srgb, var(--color-danger) 24%, transparent);
+  color: color-mix(in srgb, var(--color-danger) 76%, white);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 40%, transparent);
 }
 
 .statusBadge--no-show {
-  background: rgba(156, 163, 175, 0.25);
-  color: rgb(156, 163, 175);
-  border: 1px solid rgba(156, 163, 175, 0.4);
+  background: color-mix(in srgb, var(--color-text-soft) 24%, transparent);
+  color: color-mix(in srgb, var(--color-text-soft) 80%, white);
+  border: 1px solid color-mix(in srgb, var(--color-text-soft) 40%, transparent);
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -467,13 +498,13 @@
   position: absolute;
   background: repeating-linear-gradient(
     45deg,
-    rgba(156, 163, 175, 0.15),
-    rgba(156, 163, 175, 0.15) 10px,
-    rgba(156, 163, 175, 0.08) 10px,
-    rgba(156, 163, 175, 0.08) 20px
+    color-mix(in srgb, var(--color-text-soft) 18%, transparent),
+    color-mix(in srgb, var(--color-text-soft) 18%, transparent) 10px,
+    color-mix(in srgb, var(--color-text-soft) 10%, transparent) 10px,
+    color-mix(in srgb, var(--color-text-soft) 10%, transparent) 20px
   );
-  border: 1px dashed rgba(156, 163, 175, 0.5);
-  border-radius: 8px;
+  border: 1px dashed color-mix(in srgb, var(--color-text-soft) 52%, transparent);
+  border-radius: var(--radius-xs);
   padding: 0.4rem;
   font-size: 0.65rem;
   z-index: 5;
@@ -486,7 +517,7 @@
   align-items: center;
   justify-content: center;
   gap: 0.2rem;
-  color: rgba(100, 116, 139, 0.9);
+  color: color-mix(in srgb, var(--color-text-soft) 90%, white);
 }
 
 .blockedTimeIcon   { font-size: 1rem; opacity: 0.7; }
@@ -497,10 +528,10 @@
    MONTH VIEW
 ───────────────────────────────────────────────────────── */
 .monthCalendar {
-  background: color-mix(in srgb, var(--color-surface) 92%, white 8%);
-  border: 1px solid color-mix(in srgb, var(--color-border) 84%, white 16%);
-  border-radius: 14px;
-  box-shadow: 0 20px 36px color-mix(in srgb, var(--color-bg) 70%, transparent);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   backdrop-filter: blur(var(--blur-md));
   -webkit-backdrop-filter: blur(var(--blur-md));
   overflow: hidden;
@@ -732,8 +763,8 @@
 ───────────────────────────────────────────────────────── */
 .conflictSection {
   padding: 1rem;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 28%, transparent);
   border-radius: var(--radius-md);
 }
 
@@ -748,7 +779,7 @@
 
 .conflictList { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; }
 .conflictItem { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.85rem; }
-.conflictType { font-weight: 500; color: rgb(239, 68, 68); }
+.conflictType { font-weight: 500; color: color-mix(in srgb, var(--color-danger) 80%, white); }
 .conflictMessage { color: var(--color-text-soft); }
 
 .suggestionsSection { margin-top: 1rem; }
@@ -817,14 +848,38 @@
   border: 1px solid;
 }
 
-.quickActionCompleted { background: rgba(34, 197, 94, 0.15); color: rgb(34, 197, 94); border-color: rgba(34, 197, 94, 0.3); }
-.quickActionCompleted:hover { background: rgba(34, 197, 94, 0.25); border-color: rgba(34, 197, 94, 0.5); transform: translateY(-2px); }
+.quickActionCompleted {
+  background: color-mix(in srgb, var(--color-success) 16%, transparent);
+  color: color-mix(in srgb, var(--color-success) 74%, white);
+  border-color: color-mix(in srgb, var(--color-success) 34%, transparent);
+}
+.quickActionCompleted:hover {
+  background: color-mix(in srgb, var(--color-success) 26%, transparent);
+  border-color: color-mix(in srgb, var(--color-success) 52%, transparent);
+  transform: translateY(-2px);
+}
 
-.quickActionCancelled { background: rgba(239, 68, 68, 0.15); color: rgb(239, 68, 68); border-color: rgba(239, 68, 68, 0.3); }
-.quickActionCancelled:hover { background: rgba(239, 68, 68, 0.25); border-color: rgba(239, 68, 68, 0.5); transform: translateY(-2px); }
+.quickActionCancelled {
+  background: color-mix(in srgb, var(--color-danger) 16%, transparent);
+  color: color-mix(in srgb, var(--color-danger) 76%, white);
+  border-color: color-mix(in srgb, var(--color-danger) 34%, transparent);
+}
+.quickActionCancelled:hover {
+  background: color-mix(in srgb, var(--color-danger) 26%, transparent);
+  border-color: color-mix(in srgb, var(--color-danger) 52%, transparent);
+  transform: translateY(-2px);
+}
 
-.quickActionNoShow { background: rgba(156, 163, 175, 0.15); color: rgb(156, 163, 175); border-color: rgba(156, 163, 175, 0.3); }
-.quickActionNoShow:hover { background: rgba(156, 163, 175, 0.25); border-color: rgba(156, 163, 175, 0.5); transform: translateY(-2px); }
+.quickActionNoShow {
+  background: color-mix(in srgb, var(--color-text-soft) 16%, transparent);
+  color: color-mix(in srgb, var(--color-text-soft) 82%, white);
+  border-color: color-mix(in srgb, var(--color-text-soft) 34%, transparent);
+}
+.quickActionNoShow:hover {
+  background: color-mix(in srgb, var(--color-text-soft) 26%, transparent);
+  border-color: color-mix(in srgb, var(--color-text-soft) 52%, transparent);
+  transform: translateY(-2px);
+}
 
 /* ─────────────────────────────────────────────────────────
    MODAL ACTIONS / BUTTONS
@@ -1031,7 +1086,7 @@
   margin: 0;
   text-align: center;
   cursor: pointer;
-  border-radius: 8px;
+  border-radius: var(--radius-xs);
   padding: 0.2rem 0.5rem;
   transition: background 120ms ease, color 120ms ease;
   user-select: none;
@@ -1170,3 +1225,4 @@
   .deleteSheet { width: 100%; border-radius: var(--radius-lg) var(--radius-lg) 0 0; margin-top: auto; }
   .modalActions { position: sticky; bottom: 0; background: var(--color-surface); padding-top: 0.8rem; }
 }
+
