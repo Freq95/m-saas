@@ -9,6 +9,7 @@ interface UseAppointmentsOptions {
   userId?: number;
   providerId?: number;
   resourceId?: number;
+  initialAppointments?: Appointment[];
 }
 
 interface UseAppointmentsResult {
@@ -68,6 +69,7 @@ export function useAppointmentsSWR({
   userId = 1,
   providerId,
   resourceId,
+  initialAppointments = [],
 }: UseAppointmentsOptions): UseAppointmentsResult {
   // Calculate date range
   let startDate: Date;
@@ -110,6 +112,7 @@ export function useAppointmentsSWR({
     isLoading,
     mutate,
   } = useSWR<Appointment[]>(url, fetcher, {
+    fallbackData: initialAppointments,
     revalidateOnFocus: false, // Don't refetch when window regains focus
     dedupingInterval: 10000, // 10 seconds deduplication
     revalidateOnReconnect: true, // Refetch when reconnecting

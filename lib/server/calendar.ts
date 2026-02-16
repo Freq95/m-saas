@@ -5,6 +5,8 @@ type AppointmentQuery = {
   userId?: number;
   startDate?: string | Date;
   endDate?: string | Date;
+  providerId?: number;
+  resourceId?: number;
   status?: string;
 };
 
@@ -13,6 +15,8 @@ export async function getAppointmentsData(query: AppointmentQuery = {}) {
   const userId = query.userId ?? DEFAULT_USER_ID;
   const startDate = query.startDate instanceof Date ? query.startDate.toISOString() : query.startDate;
   const endDate = query.endDate instanceof Date ? query.endDate.toISOString() : query.endDate;
+  const providerId = query.providerId;
+  const resourceId = query.resourceId;
   const status = query.status;
 
   const filter: Record<string, unknown> = { user_id: userId };
@@ -24,6 +28,12 @@ export async function getAppointmentsData(query: AppointmentQuery = {}) {
   }
   if (status) {
     filter.status = status;
+  }
+  if (providerId) {
+    filter.provider_id = providerId;
+  }
+  if (resourceId) {
+    filter.resource_id = resourceId;
   }
 
   const [appointments, services] = await Promise.all([

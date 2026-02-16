@@ -47,9 +47,20 @@ export const createAppointmentSchema = z.object({
   clientPhone: phoneSchema,
   startTime: dateTimeSchema,
   endTime: dateTimeSchema.optional(), // Will be calculated if not provided
+  providerId: z.number().int().positive().optional(),
+  resourceId: z.number().int().positive().optional(),
+  category: z.string().max(120).optional(),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   notes: z.string().max(2000).optional(),
   exportToGoogle: z.boolean().optional().default(false),
   googleAccessToken: z.string().optional(),
+});
+
+export const updateAppointmentSchema = z.object({
+  startTime: dateTimeSchema.optional(),
+  endTime: dateTimeSchema.optional(),
+  status: z.enum(['scheduled', 'completed', 'cancelled', 'no-show']).optional(),
+  notes: z.string().max(2000).optional(),
 });
 
 // Client schemas
@@ -126,6 +137,8 @@ export const appointmentsQuerySchema = z.object({
   userId: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
+  providerId: z.string().regex(/^\d+$/).transform(Number).optional(),
+  resourceId: z.string().regex(/^\d+$/).transform(Number).optional(),
   status: z.enum(['scheduled', 'completed', 'cancelled', 'no-show']).optional(),
 });
 
@@ -145,6 +158,8 @@ export const dashboardQuerySchema = z.object({
 export const calendarSlotsQuerySchema = z.object({
   userId: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
   date: z.string().datetime().optional(),
+  providerId: z.string().regex(/^\d+$/).transform(Number).optional(),
+  resourceId: z.string().regex(/^\d+$/).transform(Number).optional(),
 });
 
 export const tasksQuerySchema = z.object({

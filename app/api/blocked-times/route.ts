@@ -1,5 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId } from '@/lib/db/mongo-utils';
+
+function toDate(value: unknown): Date | null {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return null;
+}
+
+function overlapsRange(startA: Date, endA: Date, startB: Date, endB: Date): boolean {
+  return startA < endB && endA > startB;
+}
 
 // Cleanup classification: feature-flagged (advanced scheduling domain, no core UI dependency).
 // GET /api/blocked-times - Get blocked times for a date range
@@ -10,6 +23,7 @@ export async function GET(request: NextRequest) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     const providerId = searchParams.get('providerId');
+    const resourceId = searchParams.get('resourceId');
 
     if (!userId || !startDate || !endDate) {
       return NextResponse.json(
@@ -19,26 +33,51 @@ export async function GET(request: NextRequest) {
     }
 
     const db = await getMongoDbOrThrow();
-    const query: any = {
-      user_id: parseInt(userId),
-      start_time: { $lte: endDate },
-      end_time: { $gte: startDate },
-    };
+    const userIdNumber = Number(userId);
+    const startDateObj = toDate(startDate);
+    const endDateObj = toDate(endDate);
+    const providerIdNumber = providerId ? Number(providerId) : undefined;
+    const resourceIdNumber = resourceId ? Number(resourceId) : undefined;
 
-    if (providerId) {
-      query.$or = [
-        { provider_id: parseInt(providerId) },
-        { provider_id: { $exists: false } },
-      ];
+    if (
+      Number.isNaN(userIdNumber) ||
+      !startDateObj ||
+      !endDateObj ||
+      (providerIdNumber !== undefined && Number.isNaN(providerIdNumber)) ||
+      (resourceIdNumber !== undefined && Number.isNaN(resourceIdNumber))
+    ) {
+      return NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
     }
 
     const blockedTimes = await db
       .collection('blocked_times')
-      .find(query)
+      .find({ user_id: userIdNumber })
       .sort({ start_time: 1 })
       .toArray();
 
-    return NextResponse.json({ blockedTimes });
+    const filtered = blockedTimes.filter((blockedTime: any) => {
+      if (providerIdNumber !== undefined && blockedTime.provider_id && blockedTime.provider_id !== providerIdNumber) {
+        return false;
+      }
+      if (resourceIdNumber !== undefined && blockedTime.resource_id && blockedTime.resource_id !== resourceIdNumber) {
+        return false;
+      }
+
+      const start = toDate(blockedTime.start_time);
+      const end = toDate(blockedTime.end_time);
+      if (!start || !end) return false;
+      return overlapsRange(start, end, startDateObj, endDateObj);
+    }).map((blockedTime: any) => {
+      const start = toDate(blockedTime.start_time);
+      const end = toDate(blockedTime.end_time);
+      return {
+        ...blockedTime,
+        start_time: start ? start.toISOString() : blockedTime.start_time,
+        end_time: end ? end.toISOString() : blockedTime.end_time,
+      };
+    });
+
+    return NextResponse.json({ blockedTimes: filtered });
   } catch (error) {
     console.error('Error fetching blocked times:', error);
     return NextResponse.json({ error: 'Failed to fetch blocked times' }, { status: 500 });
@@ -59,15 +98,24 @@ export async function POST(request: NextRequest) {
     }
 
     const db = await getMongoDbOrThrow();
+    const userIdNumber = Number(userId);
+    const providerIdNumber = providerId ? Number(providerId) : undefined;
+    const resourceIdNumber = resourceId ? Number(resourceId) : undefined;
+    const startDateObj = toDate(startTime);
+    const endDateObj = toDate(endTime);
 
-    // Get next ID
-    const lastBlocked = await db
-      .collection('blocked_times')
-      .find()
-      .sort({ id: -1 })
-      .limit(1)
-      .toArray();
-    const nextId = lastBlocked.length > 0 ? lastBlocked[0].id + 1 : 1;
+    if (
+      Number.isNaN(userIdNumber) ||
+      !startDateObj ||
+      !endDateObj ||
+      startDateObj >= endDateObj ||
+      (providerIdNumber !== undefined && Number.isNaN(providerIdNumber)) ||
+      (resourceIdNumber !== undefined && Number.isNaN(resourceIdNumber))
+    ) {
+      return NextResponse.json({ error: 'Invalid input fields' }, { status: 400 });
+    }
+
+    const nextId = await getNextNumericId('blocked_times');
 
     // If recurring, generate recurrence_group_id
     let recurrenceGroupId: number | undefined;
@@ -76,16 +124,18 @@ export async function POST(request: NextRequest) {
     }
 
     const blockedTime: any = {
+      _id: nextId,
       id: nextId,
-      user_id: parseInt(userId),
-      start_time: new Date(startTime),
-      end_time: new Date(endTime),
+      user_id: userIdNumber,
+      start_time: startDateObj.toISOString(),
+      end_time: endDateObj.toISOString(),
       reason,
-      created_at: new Date(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
-    if (providerId) blockedTime.provider_id = parseInt(providerId);
-    if (resourceId) blockedTime.resource_id = parseInt(resourceId);
+    if (providerIdNumber) blockedTime.provider_id = providerIdNumber;
+    if (resourceIdNumber) blockedTime.resource_id = resourceIdNumber;
     if (recurrence) {
       blockedTime.recurrence = recurrence;
       blockedTime.recurrence_group_id = recurrenceGroupId;
@@ -98,24 +148,18 @@ export async function POST(request: NextRequest) {
       const instances = generateRecurringInstances(
         new Date(startTime),
         new Date(endTime),
-        recurrence,
-        recurrenceGroupId
+        recurrence
       );
 
       for (const instance of instances) {
-        const lastId = await db
-          .collection('blocked_times')
-          .find()
-          .sort({ id: -1 })
-          .limit(1)
-          .toArray();
-        const instanceId = lastId.length > 0 ? lastId[0].id + 1 : nextId + 1;
+        const instanceId = await getNextNumericId('blocked_times');
 
         await db.collection('blocked_times').insertOne({
           ...blockedTime,
+          _id: instanceId,
           id: instanceId,
-          start_time: instance.start,
-          end_time: instance.end,
+          start_time: instance.start.toISOString(),
+          end_time: instance.end.toISOString(),
           recurrence_group_id: recurrenceGroupId,
         });
       }
@@ -132,11 +176,11 @@ export async function POST(request: NextRequest) {
 function generateRecurringInstances(
   startTime: Date,
   endTime: Date,
-  recurrence: any,
-  groupId: number
+  recurrence: any
 ): Array<{ start: Date; end: Date }> {
   const instances: Array<{ start: Date; end: Date }> = [];
   const duration = endTime.getTime() - startTime.getTime();
+  const safeInterval = Math.max(1, Number(recurrence.interval) || 1);
 
   let currentStart = new Date(startTime);
   let count = 0;
@@ -145,15 +189,16 @@ function generateRecurringInstances(
   while (count < maxCount) {
     // Calculate next occurrence based on frequency
     if (recurrence.frequency === 'daily') {
-      currentStart.setDate(currentStart.getDate() + recurrence.interval);
+      currentStart.setDate(currentStart.getDate() + safeInterval);
     } else if (recurrence.frequency === 'weekly') {
-      currentStart.setDate(currentStart.getDate() + 7 * recurrence.interval);
+      currentStart.setDate(currentStart.getDate() + 7 * safeInterval);
     } else if (recurrence.frequency === 'monthly') {
-      currentStart.setMonth(currentStart.getMonth() + recurrence.interval);
+      currentStart.setMonth(currentStart.getMonth() + safeInterval);
     }
 
     // Check end condition
-    if (recurrence.end_date && currentStart > new Date(recurrence.end_date)) {
+    const recurrenceEndDate = recurrence.end_date || recurrence.endDate;
+    if (recurrenceEndDate && currentStart > new Date(recurrenceEndDate)) {
       break;
     }
 

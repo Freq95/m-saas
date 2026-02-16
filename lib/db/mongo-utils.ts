@@ -16,6 +16,8 @@ export async function getNextNumericId(
 ): Promise<number> {
   const db = await getMongoDbOrThrow();
   const collection = db.collection(collectionName);
+  const counters = db.collection('counters');
+
   const doc = await collection
     .find({ [idField]: { $type: 'number' } })
     .sort({ [idField]: -1 })
@@ -23,12 +25,35 @@ export async function getNextNumericId(
     .next();
 
   const maxId = doc?.[idField];
-  if (typeof maxId === 'number') {
-    return maxId + 1;
+  const currentMax =
+    typeof maxId === 'number'
+      ? maxId
+      : typeof doc?._id === 'number'
+        ? (doc._id as number)
+        : 0;
+
+  const counterKey = `${collectionName}:${idField}`;
+  const result: any = await counters.findOneAndUpdate(
+    { _id: counterKey },
+    {
+      $setOnInsert: {
+        seq: currentMax,
+        created_at: new Date().toISOString(),
+      },
+      $inc: { seq: 1 },
+      $set: { updated_at: new Date().toISOString() },
+    },
+    {
+      upsert: true,
+      returnDocument: 'after',
+    }
+  );
+
+  const value = result?.value ?? result;
+  if (typeof value?.seq === 'number') {
+    return value.seq;
   }
-  if (typeof doc?._id === 'number') {
-    return (doc._id as number) + 1;
-  }
+
   return 1;
 }
 

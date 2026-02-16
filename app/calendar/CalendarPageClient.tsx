@@ -59,6 +59,7 @@ export default function CalendarPageClient({
       userId: 1,
       providerId: state.selectedProvider?.id,
       resourceId: state.selectedResource?.id,
+      initialAppointments,
     });
 
   const { providers } = useProviders(1);
@@ -217,12 +218,15 @@ export default function CalendarPageClient({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            userId: 1,
             serviceId: parseInt(formData.serviceId),
             clientName: formData.clientName,
             clientEmail: formData.clientEmail,
             clientPhone: formData.clientPhone,
             startTime: state.selectedSlot.start.toISOString(),
             endTime: endTime.toISOString(),
+            providerId: state.selectedProvider?.id,
+            resourceId: state.selectedResource?.id,
             notes: formData.notes,
             category: formData.category,
             color: formData.color,
@@ -231,7 +235,7 @@ export default function CalendarPageClient({
               interval: formData.recurrence.interval,
               ...(formData.recurrence.endType === 'count'
                 ? { count: formData.recurrence.count }
-                : { endDate: formData.recurrence.endDate }),
+                : { end_date: formData.recurrence.endDate }),
             },
           }),
         });
@@ -309,7 +313,18 @@ export default function CalendarPageClient({
         refetch();
         toast.success('Programarea a fost actualizata.');
       } else if (res.status === 409) {
-        setConflictData({ conflicts: result.conflicts || [], suggestions: result.suggestions || [] });
+        let conflicts = result.conflicts || [];
+        let suggestions = result.suggestions || [];
+        if ((!conflicts.length && !suggestions.length) && typeof result.details === 'string') {
+          try {
+            const parsed = JSON.parse(result.details);
+            conflicts = parsed.conflicts || conflicts;
+            suggestions = parsed.suggestions || suggestions;
+          } catch {
+            // Ignore invalid details format
+          }
+        }
+        setConflictData({ conflicts, suggestions });
         setShowConflictModal(true);
       } else {
         toast.error(result.error || 'Nu s-a putut actualiza programarea.');

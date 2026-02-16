@@ -14,6 +14,7 @@
     "check:cleanup": "npm run build && npm run typecheck && npm run check:unused-exports && npm run check:dead-nav-css",
     "db:migrate:mongo": "tsx scripts/migrate-json-to-db.ts",
     "db:init:mongo": "node migrations/001_init_mongodb.js",
+    "db:normalize:blocked-times": "node scripts/migrations/normalize-blocked-times-dates.js",
     "db:validate:mongo": "tsx scripts/validate-mongo-data.ts",
     "test:webhooks": "node scripts/test-webhooks.js",
     "yahoo:sync": "node scripts/sync-yahoo.js",

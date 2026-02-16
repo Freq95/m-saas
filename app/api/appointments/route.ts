@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
       userId: searchParams.get('userId') || '1',
       startDate: searchParams.get('startDate') || undefined,
       endDate: searchParams.get('endDate') || undefined,
+      providerId: searchParams.get('providerId') || undefined,
+      resourceId: searchParams.get('resourceId') || undefined,
       status: searchParams.get('status') || undefined,
     };
 
@@ -24,8 +26,8 @@ export async function GET(request: NextRequest) {
       return handleApiError(validationResult.error, 'Invalid query parameters');
     }
 
-    const { userId, startDate, endDate, status } = validationResult.data;
-    const appointments = await getAppointmentsData({ userId, startDate, endDate, status });
+    const { userId, startDate, endDate, providerId, resourceId, status } = validationResult.data;
+    const appointments = await getAppointmentsData({ userId, startDate, endDate, providerId, resourceId, status });
 
     return createSuccessResponse({ appointments });
   } catch (error) {
@@ -61,6 +63,10 @@ export async function POST(request: NextRequest) {
       clientPhone,
       startTime,
       endTime,
+      providerId,
+      resourceId,
+      category,
+      color,
       notes,
       exportToGoogle,
       googleAccessToken,
@@ -73,14 +79,24 @@ export async function POST(request: NextRequest) {
     if (endTime) {
       end = typeof endTime === 'string' ? new Date(endTime) : endTime;
     } else {
-      const serviceDoc = await db.collection('services').findOne({ id: serviceId });
+      const serviceDoc = await db.collection('services').findOne({ id: serviceId, user_id: userId });
       const durationMinutes = serviceDoc?.duration_minutes || 60;
       end = new Date(start);
       end.setMinutes(end.getMinutes() + durationMinutes);
     }
 
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start >= end) {
+      return NextResponse.json(
+        { error: 'Invalid appointment time range' },
+        { status: 400 }
+      );
+    }
+
     // Check if slot is available
-    const available = await isSlotAvailable(Number(userId), start, end);
+    const available = await isSlotAvailable(Number(userId), start, end, {
+      providerId,
+      resourceId,
+    });
     if (!available) {
       return NextResponse.json(
         { error: 'Time slot is not available' },
@@ -113,6 +129,10 @@ export async function POST(request: NextRequest) {
       start_time: start.toISOString(),
       end_time: end.toISOString(),
       status: 'scheduled',
+      provider_id: providerId || null,
+      resource_id: resourceId || null,
+      category: category || null,
+      color: color || null,
       notes: notes || null,
       reminder_sent: false,
       created_at: now,

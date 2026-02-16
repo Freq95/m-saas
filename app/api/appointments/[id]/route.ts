@@ -1,8 +1,38 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
 import { updateClientStats } from '@/lib/client-matching';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { checkAppointmentConflict } from '@/lib/calendar-conflicts';
+
+const CONFLICT_MESSAGE_BY_TYPE: Record<string, string> = {
+  provider_appointment: 'Providerul are deja o programare in acest interval.',
+  resource_appointment: 'Resursa este deja ocupata in acest interval.',
+  blocked_time: 'Intervalul este blocat.',
+  outside_working_hours: 'Intervalul este in afara programului de lucru.',
+};
+
+function formatConflictPayload(conflict: any) {
+  const baseMessage = CONFLICT_MESSAGE_BY_TYPE[conflict.type] || 'Conflict detectat.';
+  if (conflict.type === 'blocked_time' && conflict.blockedTime?.reason) {
+    return {
+      type: conflict.type,
+      message: `${baseMessage} Motiv: ${conflict.blockedTime.reason}.`,
+    };
+  }
+  if ((conflict.type === 'provider_appointment' || conflict.type === 'resource_appointment') && conflict.appointment) {
+    return {
+      type: conflict.type,
+      message: `${baseMessage} ${conflict.appointment.client_name || 'Client'} (${conflict.appointment.start_time} - ${conflict.appointment.end_time}).`,
+    };
+  }
+  if (conflict.type === 'outside_working_hours' && conflict.workingHours) {
+    return {
+      type: conflict.type,
+      message: `${baseMessage} Program: ${conflict.workingHours.start}-${conflict.workingHours.end}.`,
+    };
+  }
+  return { type: conflict.type, message: baseMessage };
+}
 
 // GET /api/appointments/[id] - Get single appointment
 export async function GET(
@@ -50,11 +80,21 @@ export async function PATCH(
     const db = await getMongoDbOrThrow();
     const appointmentId = Number(params.id);
     const body = await request.json();
-    const { status, startTime, endTime, notes } = body;
 
     if (Number.isNaN(appointmentId)) {
       return createErrorResponse('Invalid appointment ID', 400);
     }
+
+    const { updateAppointmentSchema } = await import('@/lib/validation');
+    const validationResult = updateAppointmentSchema.safeParse(body);
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: 'Invalid input', details: validationResult.error.errors },
+        { status: 400 }
+      );
+    }
+
+    const { status, startTime, endTime, notes } = validationResult.data;
 
     // Get existing appointment
     const existingAppointment = await db.collection('appointments').findOne({ id: appointmentId });
@@ -78,6 +118,14 @@ export async function PATCH(
         ? (typeof endTime === 'string' ? new Date(endTime) : endTime)
         : new Date(existingAppointment.end_time);
 
+      if (
+        Number.isNaN(newStartTime.getTime()) ||
+        Number.isNaN(newEndTime.getTime()) ||
+        newStartTime >= newEndTime
+      ) {
+        return createErrorResponse('Invalid appointment time range', 400);
+      }
+
       // Check for conflicts (excluding this appointment)
       const conflictCheck = await checkAppointmentConflict(
         existingAppointment.user_id,
@@ -89,13 +137,17 @@ export async function PATCH(
       );
 
       if (conflictCheck.hasConflict) {
-        return createErrorResponse(
-          'Time slot conflicts with existing appointment or blocked time',
-          409,
-          JSON.stringify({
-            conflicts: conflictCheck.conflicts,
-            suggestions: conflictCheck.suggestions,
-          })
+        return NextResponse.json(
+          {
+            error: 'Time slot conflicts with existing appointment or blocked time',
+            conflicts: conflictCheck.conflicts.map(formatConflictPayload),
+            suggestions: conflictCheck.suggestions.map((slot) => ({
+              startTime: slot.start.toISOString(),
+              endTime: slot.end.toISOString(),
+              reason: 'Interval alternativ disponibil',
+            })),
+          },
+          { status: 409 }
         );
       }
 

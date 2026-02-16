@@ -13,6 +13,8 @@ export async function GET(request: NextRequest) {
     const queryParams = {
       userId: searchParams.get('userId') || '1',
       date: searchParams.get('date') || undefined,
+      providerId: searchParams.get('providerId') || undefined,
+      resourceId: searchParams.get('resourceId') || undefined,
     };
 
     const validationResult = calendarSlotsQuerySchema.safeParse(queryParams);
@@ -20,7 +22,7 @@ export async function GET(request: NextRequest) {
       return handleApiError(validationResult.error, 'Invalid query parameters');
     }
 
-    const { userId, date } = validationResult.data;
+    const { userId, date, providerId, resourceId } = validationResult.data;
     const serviceId = searchParams.get('serviceId');
     const suggested = searchParams.get('suggested') === 'true';
 
@@ -37,7 +39,10 @@ export async function GET(request: NextRequest) {
 
     if (suggested) {
       // Get 2-3 suggested slots for next few days
-      const suggestions = await getSuggestedSlots(userId, serviceDuration);
+      const suggestions = await getSuggestedSlots(userId, serviceDuration, 7, {
+        providerId,
+        resourceId,
+      });
       return createSuccessResponse({
         suggestions: suggestions.map(s => ({
           date: s.date.toISOString(),
@@ -50,7 +55,10 @@ export async function GET(request: NextRequest) {
       });
     } else if (date) {
       // Get slots for specific date
-      const slots = await getAvailableSlots(userId, new Date(date), serviceDuration);
+      const slots = await getAvailableSlots(userId, new Date(date), serviceDuration, { start: '09:00', end: '18:00' }, {
+        providerId,
+        resourceId,
+      });
       return createSuccessResponse({
         slots: slots.map(slot => ({
           start: slot.start.toISOString(),

@@ -15,6 +15,30 @@ export interface Service {
   price?: number;
 }
 
+interface SlotFilterOptions {
+  providerId?: number;
+  resourceId?: number;
+}
+
+function toDate(value: unknown): Date | null {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value === 'string' || typeof value === 'number') {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return null;
+}
+
+function appliesToScope(blocked: any, options: SlotFilterOptions): boolean {
+  const providerOk = options.providerId
+    ? blocked.provider_id === options.providerId || blocked.provider_id === null || blocked.provider_id === undefined
+    : blocked.provider_id === null || blocked.provider_id === undefined;
+  const resourceOk = options.resourceId
+    ? blocked.resource_id === options.resourceId || blocked.resource_id === null || blocked.resource_id === undefined
+    : blocked.resource_id === null || blocked.resource_id === undefined;
+  return providerOk && resourceOk;
+}
+
 /**
  * Get available time slots for a given date
  */
@@ -22,7 +46,8 @@ export async function getAvailableSlots(
   userId: number,
   date: Date,
   serviceDuration: number,
-  workingHours: { start: string; end: string } = { start: '09:00', end: '18:00' }
+  workingHours: { start: string; end: string } = { start: '09:00', end: '18:00' },
+  options: SlotFilterOptions = {}
 ): Promise<TimeSlot[]> {
   const db = await getMongoDbOrThrow();
   
@@ -30,22 +55,31 @@ export async function getAvailableSlots(
   const dayEnd = endOfDay(date);
   
   // Get all appointments for the day
+  const appointmentFilter: Record<string, any> = {
+    user_id: userId,
+    status: 'scheduled',
+    start_time: {
+      $gte: dayStart.toISOString(),
+      $lt: dayEnd.toISOString(),
+    },
+  };
+  if (options.providerId) {
+    appointmentFilter.provider_id = options.providerId;
+  }
+  if (options.resourceId) {
+    appointmentFilter.resource_id = options.resourceId;
+  }
+
   const appointments = await db
     .collection('appointments')
-    .find({
-      user_id: userId,
-      status: 'scheduled',
-      start_time: {
-        $gte: dayStart.toISOString(),
-        $lt: dayEnd.toISOString(),
-      },
-    })
+    .find(appointmentFilter)
     .toArray();
 
   const bookedSlots = appointments.map((row: any) => ({
     start: new Date(row.start_time),
     end: new Date(row.end_time),
   }));
+  const blockedTimes = await db.collection('blocked_times').find({ user_id: userId }).toArray();
 
   // Generate time slots (every 15 minutes)
   const slots: TimeSlot[] = [];
@@ -69,6 +103,12 @@ export async function getAvailableSlots(
           (slotEnd > booked.start && slotEnd <= booked.end) ||
           (slotStart <= booked.start && slotEnd >= booked.end)
         );
+      }) && !blockedTimes.some((blocked: any) => {
+        if (!appliesToScope(blocked, options)) return false;
+        const blockedStart = toDate(blocked.start_time);
+        const blockedEnd = toDate(blocked.end_time);
+        if (!blockedStart || !blockedEnd) return false;
+        return doTimeSlotsOverlap(slotStart, slotEnd, blockedStart, blockedEnd);
       });
 
       slots.push({
@@ -90,7 +130,8 @@ export async function getAvailableSlots(
 export async function getSuggestedSlots(
   userId: number,
   serviceDuration: number,
-  daysAhead: number = 7
+  daysAhead: number = 7,
+  options: SlotFilterOptions = {}
 ): Promise<Array<{ date: Date; slots: TimeSlot[] }>> {
   const suggestions: Array<{ date: Date; slots: TimeSlot[] }> = [];
   const today = new Date();
@@ -99,7 +140,7 @@ export async function getSuggestedSlots(
     const date = new Date(today);
     date.setDate(date.getDate() + i);
     
-    const slots = await getAvailableSlots(userId, date, serviceDuration);
+    const slots = await getAvailableSlots(userId, date, serviceDuration, { start: '09:00', end: '18:00' }, options);
     const availableSlots = slots.filter(s => s.available).slice(0, 3);
 
     if (availableSlots.length > 0) {
@@ -171,7 +212,8 @@ function doTimeSlotsOverlap(
 export async function isSlotAvailable(
   userId: number,
   startTime: Date,
-  endTime: Date
+  endTime: Date,
+  options: SlotFilterOptions = {}
 ): Promise<boolean> {
   const db = await getMongoDbOrThrow();
   
@@ -186,16 +228,24 @@ export async function isSlotAvailable(
   // Fetch all scheduled appointments for this user on the same day(s)
   // Using simple WHERE conditions: user_id, status, and date range
   // No complex OR conditions that might have parsing issues
+  const appointmentFilter: Record<string, any> = {
+    user_id: userId,
+    status: 'scheduled',
+    start_time: {
+      $gte: searchWindowStart.toISOString(),
+      $lte: searchWindowEnd.toISOString(),
+    },
+  };
+  if (options.providerId) {
+    appointmentFilter.provider_id = options.providerId;
+  }
+  if (options.resourceId) {
+    appointmentFilter.resource_id = options.resourceId;
+  }
+
   const appointments = await db
     .collection('appointments')
-    .find({
-      user_id: userId,
-      status: 'scheduled',
-      start_time: {
-        $gte: searchWindowStart.toISOString(),
-        $lte: searchWindowEnd.toISOString(),
-      },
-    })
+    .find(appointmentFilter)
     .toArray();
   
   // Also check appointments that start on previous days but end during our window
@@ -205,19 +255,27 @@ export async function isSlotAvailable(
     dayBeforeStart.setDate(dayBeforeStart.getDate() - 1);
     dayBeforeStart.setHours(0, 0, 0, 0);
     
+    const extraFilter: Record<string, any> = {
+      user_id: userId,
+      status: 'scheduled',
+      start_time: {
+        $gte: dayBeforeStart.toISOString(),
+        $lt: searchWindowStart.toISOString(),
+      },
+      end_time: {
+        $gte: searchWindowStart.toISOString(),
+      },
+    };
+    if (options.providerId) {
+      extraFilter.provider_id = options.providerId;
+    }
+    if (options.resourceId) {
+      extraFilter.resource_id = options.resourceId;
+    }
+
     const extraAppointments = await db
       .collection('appointments')
-      .find({
-        user_id: userId,
-        status: 'scheduled',
-        start_time: {
-          $gte: dayBeforeStart.toISOString(),
-          $lt: searchWindowStart.toISOString(),
-        },
-        end_time: {
-          $gte: searchWindowStart.toISOString(),
-        },
-      })
+      .find(extraFilter)
       .toArray();
 
     appointments.push(...extraAppointments);
@@ -237,6 +295,17 @@ export async function isSlotAvailable(
     // Check if this appointment overlaps with the requested time slot
     if (doTimeSlotsOverlap(startTime, endTime, aptStart, aptEnd)) {
       return false; // Slot is not available - found an overlapping appointment
+    }
+  }
+
+  const blockedTimes = await db.collection('blocked_times').find({ user_id: userId }).toArray();
+  for (const blocked of blockedTimes) {
+    if (!appliesToScope(blocked, options)) continue;
+    const blockedStart = toDate(blocked.start_time);
+    const blockedEnd = toDate(blocked.end_time);
+    if (!blockedStart || !blockedEnd) continue;
+    if (doTimeSlotsOverlap(startTime, endTime, blockedStart, blockedEnd)) {
+      return false;
     }
   }
 
