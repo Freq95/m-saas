@@ -130,6 +130,7 @@ export function WeekView({
 }: WeekViewProps) {
   const SLOT_HEIGHT = 64;
   const columnHeightPx = hours.length * SLOT_HEIGHT;
+  const CURRENT_TIME_EDGE_PADDING = 18;
   const gridTemplateColumns = `56px repeat(${weekDays.length}, minmax(0, 1fr))`;
 
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
@@ -151,7 +152,12 @@ export function WeekView({
         return;
       }
 
-      setCurrentTimeTopPx((currentMin / totalMin) * columnHeightPx);
+      const rawTopPx = (currentMin / totalMin) * columnHeightPx;
+      const clampedTopPx = Math.min(
+        Math.max(rawTopPx, CURRENT_TIME_EDGE_PADDING),
+        columnHeightPx - CURRENT_TIME_EDGE_PADDING
+      );
+      setCurrentTimeTopPx(clampedTopPx);
       setCurrentTimeLabel(format(now, 'HH:mm'));
     };
 
@@ -175,6 +181,8 @@ export function WeekView({
     blockedTimes.filter((bt) => isSameDay(new Date(bt.start_time), day));
 
   const showCurrentTime = todayIsVisible && currentTimeTopPx !== null;
+  const isNearTopEdge = currentTimeTopPx !== null && currentTimeTopPx <= 26;
+  const isNearBottomEdge = currentTimeTopPx !== null && currentTimeTopPx >= columnHeightPx - 26;
 
   return (
     <div className={styles.weekGrid}>
@@ -211,7 +219,10 @@ export function WeekView({
           ))}
 
           {showCurrentTime && (
-            <div className={styles.currentTimeGutterIndicator} style={{ top: `${currentTimeTopPx}px` }}>
+            <div
+              className={`${styles.currentTimeGutterIndicator}${isNearTopEdge ? ` ${styles.isNearTop}` : ''}${isNearBottomEdge ? ` ${styles.isNearBottom}` : ''}`}
+              style={{ top: `${currentTimeTopPx}px` }}
+            >
               <span className={styles.currentTimeGutterLabel}>{currentTimeLabel}</span>
               <span className={styles.currentTimeGutterTick} />
             </div>

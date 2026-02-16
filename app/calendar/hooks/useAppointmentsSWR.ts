@@ -1,11 +1,11 @@
 import { useCallback } from 'react';
 import useSWR from 'swr';
 import { startOfWeek, addDays, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
-import type { Appointment } from './useCalendar';
+import type { Appointment, CalendarViewType } from './useCalendar';
 
 interface UseAppointmentsOptions {
   currentDate: Date;
-  viewType: 'week' | 'month' | 'day';
+  viewType: CalendarViewType;
   userId?: number;
   providerId?: number;
   resourceId?: number;
@@ -78,10 +78,10 @@ export function useAppointmentsSWR({
   if (viewType === 'day') {
     startDate = startOfDay(currentDate);
     endDate = endOfDay(currentDate);
-  } else if (viewType === 'week') {
+  } else if (viewType === 'week' || viewType === 'workweek') {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
     startDate = weekStart;
-    endDate = addDays(weekStart, 6);
+    endDate = addDays(weekStart, viewType === 'workweek' ? 4 : 6);
   } else {
     const monthStart = startOfMonth(currentDate);
     startDate = monthStart;

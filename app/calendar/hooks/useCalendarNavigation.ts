@@ -8,10 +8,11 @@ import {
   eachDayOfInterval,
 } from 'date-fns';
 import { ro } from 'date-fns/locale';
+import type { CalendarViewType } from './useCalendar';
 
 interface UseCalendarNavigationOptions {
   currentDate: Date;
-  viewType: 'week' | 'month' | 'day';
+  viewType: CalendarViewType;
 }
 
 interface UseCalendarNavigationResult {
@@ -27,8 +28,9 @@ export function useCalendarNavigation({
 }: UseCalendarNavigationOptions): UseCalendarNavigationResult {
   const weekDays = useMemo(() => {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-    return Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  }, [currentDate]);
+    const daysCount = viewType === 'workweek' ? 5 : 7;
+    return Array.from({ length: daysCount }, (_, i) => addDays(weekStart, i));
+  }, [currentDate, viewType]);
 
   const monthDays = useMemo(() => {
     const monthStart = startOfMonth(currentDate);
@@ -44,10 +46,11 @@ export function useCalendarNavigation({
       const label = format(currentDate, "EEEE, d MMMM yyyy", { locale: ro });
       return label.charAt(0).toUpperCase() + label.slice(1);
     }
-    if (viewType === 'week') {
+    if (viewType === 'week' || viewType === 'workweek') {
       const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+      const rangeEnd = addDays(weekStart, viewType === 'workweek' ? 4 : 6);
       return `${format(weekStart, "d MMMM", { locale: ro })} - ${format(
-        addDays(weekStart, 6),
+        rangeEnd,
         "d MMMM yyyy",
         { locale: ro }
       )}`;

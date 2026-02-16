@@ -1,5 +1,7 @@
-import { useReducer, useCallback } from 'react';
+import { useReducer, useCallback, useEffect } from 'react';
 import { addWeeks, subWeeks, addMonths, subMonths, addDays, subDays } from 'date-fns';
+
+export type CalendarViewType = 'week' | 'workweek' | 'month' | 'day';
 
 interface Appointment {
   id: number;
@@ -32,7 +34,7 @@ interface Resource {
 }
 
 interface CalendarState {
-  viewType: 'week' | 'month' | 'day';
+  viewType: CalendarViewType;
   currentDate: Date;
   selectedDate: Date | null;
   selectedAppointment: Appointment | null;
@@ -42,7 +44,7 @@ interface CalendarState {
 }
 
 type CalendarAction =
-  | { type: 'SET_VIEW_TYPE'; payload: 'week' | 'month' | 'day' }
+  | { type: 'SET_VIEW_TYPE'; payload: CalendarViewType }
   | { type: 'SET_CURRENT_DATE'; payload: Date }
   | { type: 'SET_SELECTED_DATE'; payload: Date | null }
   | { type: 'SET_SELECTED_APPOINTMENT'; payload: Appointment | null }
@@ -84,18 +86,22 @@ function calendarReducer(state: CalendarState, action: CalendarAction): Calendar
       return {
         ...state,
         currentDate:
-          state.viewType === 'day'   ? addDays(state.currentDate, 1)
-          : state.viewType === 'week' ? addWeeks(state.currentDate, 1)
-          : addMonths(state.currentDate, 1),
+          state.viewType === 'day'
+            ? addDays(state.currentDate, 1)
+            : state.viewType === 'week' || state.viewType === 'workweek'
+              ? addWeeks(state.currentDate, 1)
+              : addMonths(state.currentDate, 1),
       };
 
     case 'PREV_PERIOD':
       return {
         ...state,
         currentDate:
-          state.viewType === 'day'   ? subDays(state.currentDate, 1)
-          : state.viewType === 'week' ? subWeeks(state.currentDate, 1)
-          : subMonths(state.currentDate, 1),
+          state.viewType === 'day'
+            ? subDays(state.currentDate, 1)
+            : state.viewType === 'week' || state.viewType === 'workweek'
+              ? subWeeks(state.currentDate, 1)
+              : subMonths(state.currentDate, 1),
       };
 
     case 'CLEAR_SELECTION':
@@ -109,7 +115,7 @@ function calendarReducer(state: CalendarState, action: CalendarAction): Calendar
 interface UseCalendarResult {
   state: CalendarState;
   actions: {
-    setViewType: (view: 'week' | 'month' | 'day') => void;
+    setViewType: (view: CalendarViewType) => void;
     navigateToDate: (date: Date) => void;
     goToToday: () => void;
     nextPeriod: () => void;
@@ -125,7 +131,7 @@ interface UseCalendarResult {
 
 export function useCalendar(
   initialDate: string = new Date().toISOString(),
-  initialViewType: 'week' | 'month' | 'day' = 'week'
+  initialViewType: CalendarViewType = 'week'
 ): UseCalendarResult {
   const [state, dispatch] = useReducer(calendarReducer, {
     viewType: initialViewType,
@@ -138,7 +144,7 @@ export function useCalendar(
   });
 
   const actions = {
-    setViewType: useCallback((view: 'week' | 'month' | 'day') => {
+    setViewType: useCallback((view: CalendarViewType) => {
       dispatch({ type: 'SET_VIEW_TYPE', payload: view });
     }, []),
     navigateToDate: useCallback((date: Date) => {
@@ -154,6 +160,24 @@ export function useCalendar(
     selectResource: useCallback((r: Resource | null) => dispatch({ type: 'SET_SELECTED_RESOURCE', payload: r }), []),
     clearSelection: useCallback(() => dispatch({ type: 'CLEAR_SELECTION' }), []),
   };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const persistedView = localStorage.getItem('calendar:viewType');
+    if (
+      persistedView === 'week' ||
+      persistedView === 'workweek' ||
+      persistedView === 'month' ||
+      persistedView === 'day'
+    ) {
+      dispatch({ type: 'SET_VIEW_TYPE', payload: persistedView });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem('calendar:viewType', state.viewType);
+  }, [state.viewType]);
 
   return { state, actions };
 }

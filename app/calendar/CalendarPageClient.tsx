@@ -13,7 +13,6 @@ import {
 } from './hooks';
 import { useDragAndDrop } from './hooks/useDragAndDrop';
 import {
-  CalendarHeader,
   WeekView,
   MonthView,
   DayPanel,
@@ -36,7 +35,7 @@ interface CalendarPageClientProps {
   initialAppointments: any[];
   initialServices: Service[];
   initialDate: string;
-  initialViewType?: 'week' | 'month' | 'day';
+  initialViewType?: 'week' | 'workweek' | 'month' | 'day';
 }
 
 export default function CalendarPageClient({
@@ -65,8 +64,11 @@ export default function CalendarPageClient({
   const { providers } = useProviders(1);
   const { resources } = useResources(1);
 
-  const viewStart = state.viewType === 'week' ? weekDays[0] : monthDays[0];
-  const viewEnd   = state.viewType === 'week' ? weekDays[weekDays.length - 1] : monthDays[monthDays.length - 1];
+  // Day view: single-day array for WeekView reuse
+  const dayViewDays = useMemo(() => [state.currentDate], [state.currentDate]);
+  const visibleDays = state.viewType === 'month' ? monthDays : state.viewType === 'day' ? dayViewDays : weekDays;
+  const viewStart = visibleDays[0];
+  const viewEnd = visibleDays[visibleDays.length - 1];
   const { blockedTimes } = useBlockedTimes(1, state.selectedProvider?.id, state.selectedResource?.id, viewStart, viewEnd);
 
   const [selectedDay, setSelectedDay]               = useState<Date>(() => new Date());
@@ -108,9 +110,6 @@ export default function CalendarPageClient({
         apt.notes?.toLowerCase().includes(q)
     );
   }, [appointments, searchQuery]);
-
-  // Day view: single-day array for WeekView reuse
-  const dayViewDays = useMemo(() => [state.currentDate], [state.currentDate]);
 
   // Lazy-load services if not provided server-side
   useEffect(() => {
@@ -362,24 +361,6 @@ export default function CalendarPageClient({
   return (
     <div className={styles.container}>
       <main className={styles.main}>
-        <CalendarHeader
-          rangeLabel={rangeLabel}
-          viewType={state.viewType}
-          providers={providers}
-          resources={resources}
-          selectedProviderId={state.selectedProvider?.id || null}
-          selectedResourceId={state.selectedResource?.id || null}
-          searchQuery={searchQuery}
-          onPrevPeriod={actions.prevPeriod}
-          onNextPeriod={actions.nextPeriod}
-          onTodayClick={actions.goToToday}
-          onViewTypeChange={actions.setViewType}
-          onProviderChange={(id) => actions.selectProvider(providers.find((p) => p.id === id) || null)}
-          onResourceChange={(id) => actions.selectResource(resources.find((r) => r.id === id) || null)}
-          onSearchChange={setSearchQuery}
-          onJumpToDate={handleJumpToDate}
-        />
-
         {loading && (
           <div className="skeleton-stack" style={{ marginBottom: '0.75rem' }}>
             <div className="skeleton skeleton-line" style={{ height: '14px', width: '180px' }} />
@@ -408,7 +389,7 @@ export default function CalendarPageClient({
               onSlotClick={handleSlotClick}
               onDayHeaderClick={handleDayHeaderClick}
               onAppointmentClick={handleAppointmentClick}
-              enableDragDrop={state.viewType === 'week'}
+              enableDragDrop={state.viewType === 'week' || state.viewType === 'workweek'}
               draggedAppointment={draggedAppointment}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
@@ -431,6 +412,21 @@ export default function CalendarPageClient({
               setSelectedDay(date);
               actions.navigateToDate(date);
             }}
+            rangeLabel={rangeLabel}
+            viewType={state.viewType}
+            providers={providers}
+            resources={resources}
+            selectedProviderId={state.selectedProvider?.id || null}
+            selectedResourceId={state.selectedResource?.id || null}
+            searchQuery={searchQuery}
+            onPrevPeriod={actions.prevPeriod}
+            onNextPeriod={actions.nextPeriod}
+            onTodayClick={actions.goToToday}
+            onViewTypeChange={actions.setViewType}
+            onProviderChange={(id) => actions.selectProvider(providers.find((p) => p.id === id) || null)}
+            onResourceChange={(id) => actions.selectResource(resources.find((r) => r.id === id) || null)}
+            onSearchChange={setSearchQuery}
+            onJumpToDate={handleJumpToDate}
           />
         </div>
       </main>
