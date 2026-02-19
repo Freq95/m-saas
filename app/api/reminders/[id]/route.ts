@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getMongoDbOrThrow, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
 // Validation schema
@@ -10,11 +10,18 @@ const updateReminderSchema = z.object({
   sentAt: z.string().datetime().optional(),
 });
 
-async function getReminderWithAppointment(reminderId: number) {
+async function getReminderWithAppointment(reminderId: number, userId?: number) {
   const db = await getMongoDbOrThrow();
-  const reminder = await db.collection('reminders').findOne({ id: reminderId });
+  const reminderFilter: Record<string, unknown> = { id: reminderId };
+  if (typeof userId === 'number') {
+    reminderFilter.user_id = userId;
+  }
+  const reminder = await db.collection('reminders').findOne(reminderFilter);
   if (!reminder) return null;
-  const appointment = await db.collection('appointments').findOne({ id: reminder.appointment_id });
+  const appointment = await db.collection('appointments').findOne({
+    id: reminder.appointment_id,
+    user_id: reminder.user_id,
+  });
   return {
     ...stripMongoId(reminder),
     client_name: appointment?.client_name || null,
@@ -56,6 +63,8 @@ export async function PATCH(
   try {
     const db = await getMongoDbOrThrow();
     const reminderId = parseInt(params.id);
+    const { DEFAULT_USER_ID } = await import('@/lib/constants');
+    const userId = parseInt(request.nextUrl.searchParams.get('userId') || DEFAULT_USER_ID.toString(), 10);
     const body = await request.json();
 
     // Validate input
@@ -76,12 +85,9 @@ export async function PATCH(
     }
 
     // Check if reminder exists
-    const existing = await db.collection('reminders').findOne({ id: reminderId });
+    const existing = await db.collection('reminders').findOne({ id: reminderId, user_id: userId });
     if (!existing) {
-      return NextResponse.json(
-        { error: 'Reminder not found' },
-        { status: 404 }
-      );
+      return createErrorResponse('Not found or not authorized', 404);
     }
 
     const updates: Record<string, any> = {};
@@ -91,11 +97,16 @@ export async function PATCH(
 
     if (Object.keys(updates).length > 0) {
       updates.updated_at = new Date().toISOString();
-      await db.collection('reminders').updateOne({ id: reminderId }, { $set: updates });
-      invalidateMongoCache();
+      const result = await db.collection('reminders').updateOne(
+        { id: reminderId, user_id: userId },
+        { $set: updates }
+      );
+      if (result.matchedCount === 0) {
+        return createErrorResponse('Not found or not authorized', 404);
+      }
     }
 
-    const reminder = await getReminderWithAppointment(reminderId);
+    const reminder = await getReminderWithAppointment(reminderId, userId);
 
     return createSuccessResponse({
       success: true,
@@ -114,19 +125,23 @@ export async function DELETE(
   try {
     const db = await getMongoDbOrThrow();
     const reminderId = parseInt(params.id);
+    const { DEFAULT_USER_ID } = await import('@/lib/constants');
+    const userId = parseInt(request.nextUrl.searchParams.get('userId') || DEFAULT_USER_ID.toString(), 10);
 
     // Validate ID
     if (isNaN(reminderId) || reminderId <= 0) {
       return createErrorResponse('Invalid reminder ID', 400);
     }
 
-    const existing = await db.collection('reminders').findOne({ id: reminderId });
+    const existing = await db.collection('reminders').findOne({ id: reminderId, user_id: userId });
     if (!existing) {
-      return createErrorResponse('Reminder not found', 404);
+      return createErrorResponse('Not found or not authorized', 404);
     }
 
-    await db.collection('reminders').deleteOne({ id: reminderId });
-    invalidateMongoCache();
+    const result = await db.collection('reminders').deleteOne({ id: reminderId, user_id: userId });
+    if (result.deletedCount === 0) {
+      return createErrorResponse('Not found or not authorized', 404);
+    }
 
     return createSuccessResponse({ success: true, message: 'Reminder deleted' });
   } catch (error) {

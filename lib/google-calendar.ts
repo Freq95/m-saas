@@ -1,5 +1,5 @@
 import { google } from 'googleapis';
-import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache } from './db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId } from './db/mongo-utils';
 
 let oauth2Client: any = null;
 
@@ -97,7 +97,6 @@ export async function exportToGoogleCalendar(
         created_at: now,
         updated_at: now,
       });
-      invalidateMongoCache();
     }
 
     return eventId;

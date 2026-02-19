@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
 // GET /api/clients/[id]/notes - Get notes for a client
@@ -44,6 +44,8 @@ export async function POST(
   try {
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
+    const { DEFAULT_USER_ID } = await import('@/lib/constants');
+    const userId = parseInt(request.nextUrl.searchParams.get('userId') || DEFAULT_USER_ID.toString(), 10);
 
     // Validate ID
     if (isNaN(clientId) || clientId <= 0) {
@@ -59,7 +61,7 @@ export async function POST(
       return createErrorResponse('Invalid input', 400, JSON.stringify(validationResult.error.errors));
     }
 
-    const { userId, content } = validationResult.data;
+    const { content } = validationResult.data;
 
     const now = new Date().toISOString();
     const noteId = await getNextNumericId('client_notes');
@@ -77,11 +79,9 @@ export async function POST(
 
     // Update client's last_activity_date
     await db.collection('clients').updateOne(
-      { id: clientId },
+      { id: clientId, user_id: userId },
       { $set: { last_activity_date: now, updated_at: now } }
     );
-
-    invalidateMongoCache();
     return createSuccessResponse({ note: stripMongoId(noteDoc) }, 201);
   } catch (error) {
     return handleApiError(error, 'Failed to create note');

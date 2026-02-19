@@ -3,7 +3,7 @@
  * Handles finding or creating clients based on contact information
  */
 
-import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, stripMongoId } from './db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from './db/mongo-utils';
 
 export interface Client {
   id: number;
@@ -109,7 +109,6 @@ export async function findOrCreateClient(
         { id: existingClient.id },
         { $set: updates }
       );
-      invalidateMongoCache();
       const updated = await db.collection('clients').findOne({ id: existingClient.id });
       if (updated) {
         existingClient = normalizeClientDoc(updated);
@@ -140,7 +139,6 @@ export async function findOrCreateClient(
   };
 
   await db.collection('clients').insertOne(newClientDoc);
-  invalidateMongoCache();
   return normalizeClientDoc(newClientDoc);
 }
 
@@ -202,8 +200,6 @@ export async function updateClientStats(clientId: number): Promise<void> {
       },
     }
   );
-
-  invalidateMongoCache();
 }
 
 /**

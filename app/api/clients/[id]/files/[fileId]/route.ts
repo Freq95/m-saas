@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMongoDbOrThrow, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import * as fs from 'fs';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
@@ -11,15 +11,17 @@ export async function PATCH(
   try {
     const db = await getMongoDbOrThrow();
     const fileId = parseInt(params.fileId);
+    const { DEFAULT_USER_ID } = await import('@/lib/constants');
+    const userId = parseInt(request.nextUrl.searchParams.get('userId') || DEFAULT_USER_ID.toString(), 10);
     const body = await request.json();
 
     const { description } = body;
 
-    let file = await db.collection('client_files').findOne({ id: fileId });
+    let file = await db.collection('client_files').findOne({ id: fileId, user_id: userId });
     let collectionName = 'client_files';
 
     if (!file) {
-      file = await db.collection('contact_files').findOne({ id: fileId });
+      file = await db.collection('contact_files').findOne({ id: fileId, user_id: userId });
       collectionName = 'contact_files';
     }
 
@@ -31,13 +33,15 @@ export async function PATCH(
     }
 
     const now = new Date().toISOString();
-    await db.collection(collectionName).updateOne(
-      { id: fileId },
+    const result = await db.collection(collectionName).updateOne(
+      { id: fileId, user_id: userId },
       { $set: { description: description || null, updated_at: now } }
     );
+    if (result.matchedCount === 0) {
+      return createErrorResponse('Not found or not authorized', 404);
+    }
 
-    const updated = await db.collection(collectionName).findOne({ id: fileId });
-    invalidateMongoCache();
+    const updated = await db.collection(collectionName).findOne({ id: fileId, user_id: userId });
     return createSuccessResponse({ file: updated ? stripMongoId(updated) : stripMongoId(file) });
   } catch (error) {
     return handleApiError(error, 'Failed to update file');
@@ -52,12 +56,14 @@ export async function DELETE(
   try {
     const db = await getMongoDbOrThrow();
     const fileId = parseInt(params.fileId);
+    const { DEFAULT_USER_ID } = await import('@/lib/constants');
+    const userId = parseInt(request.nextUrl.searchParams.get('userId') || DEFAULT_USER_ID.toString(), 10);
 
-    let file = await db.collection('client_files').findOne({ id: fileId });
+    let file = await db.collection('client_files').findOne({ id: fileId, user_id: userId });
     let collectionName = 'client_files';
 
     if (!file) {
-      file = await db.collection('contact_files').findOne({ id: fileId });
+      file = await db.collection('contact_files').findOne({ id: fileId, user_id: userId });
       collectionName = 'contact_files';
     }
 
@@ -70,9 +76,10 @@ export async function DELETE(
       fs.unlinkSync(file.file_path);
     }
 
-    await db.collection(collectionName).deleteOne({ id: fileId });
-
-    invalidateMongoCache();
+    const result = await db.collection(collectionName).deleteOne({ id: fileId, user_id: userId });
+    if (result.deletedCount === 0) {
+      return createErrorResponse('Not found or not authorized', 404);
+    }
     return createSuccessResponse({ success: true });
   } catch (error) {
     return handleApiError(error, 'Failed to delete file');

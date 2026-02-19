@@ -3,7 +3,7 @@
  * Handles storing and retrieving email integration credentials
  */
 
-import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, stripMongoId } from './db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from './db/mongo-utils';
 import { encrypt, decrypt } from './encryption';
 import { logger } from './logger';
 
@@ -147,7 +147,6 @@ export async function saveEmailIntegration(
       );
 
       const updated = await db.collection('email_integrations').findOne({ id: existing.id });
-      invalidateMongoCache();
       if (!updated) {
         throw new Error('Failed to load updated integration');
       }
@@ -172,7 +171,6 @@ export async function saveEmailIntegration(
     };
 
     await db.collection('email_integrations').insertOne(doc);
-    invalidateMongoCache();
     return normalizeEmailIntegration(doc);
   } catch (error) {
     logger.error('Error saving email integration', { error, userId, provider, email });
@@ -224,7 +222,6 @@ export async function deleteEmailIntegration(integrationId: number, userId: numb
       id: integrationId,
       user_id: userId,
     });
-    invalidateMongoCache();
     return result.deletedCount > 0;
   } catch (error) {
     logger.error('Error deleting email integration', { error, integrationId, userId });
@@ -244,7 +241,6 @@ export async function updateIntegrationSyncTime(integrationId: number): Promise<
       { id: integrationId },
       { $set: { last_sync_at: now, updated_at: now } }
     );
-    invalidateMongoCache();
   } catch (error) {
     logger.error('Error updating integration sync time', { error, integrationId });
   }

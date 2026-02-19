@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
-import { getMongoDbOrThrow, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getConversationMessagesData } from '@/lib/server/inbox';
 
@@ -50,12 +50,17 @@ export async function PATCH(
   try {
     const db = await getMongoDbOrThrow();
     const conversationId = parseInt(params.id);
+    const { DEFAULT_USER_ID } = await import('@/lib/constants');
+    const userId = parseInt(request.nextUrl.searchParams.get('userId') || DEFAULT_USER_ID.toString(), 10);
     const body = await request.json();
 
     // Validate conversation exists
-    const existingConv = await db.collection('conversations').findOne({ id: conversationId });
+    const existingConv = await db.collection('conversations').findOne({
+      id: conversationId,
+      user_id: userId,
+    });
     if (!existingConv) {
-      return createErrorResponse('Conversation not found', 404);
+      return createErrorResponse('Not found or not authorized', 404);
     }
 
     // Validate input
@@ -120,16 +125,21 @@ export async function PATCH(
 
     if (Object.keys(updates).length > 0 || tagsUpdated) {
       updates.updated_at = new Date().toISOString();
-      await db.collection('conversations').updateOne(
-        { id: conversationId },
+      const result = await db.collection('conversations').updateOne(
+        { id: conversationId, user_id: userId },
         { $set: updates }
       );
-      invalidateMongoCache();
+      if (result.matchedCount === 0) {
+        return createErrorResponse('Not found or not authorized', 404);
+      }
     }
 
-    const updatedDoc = await db.collection('conversations').findOne({ id: conversationId });
+    const updatedDoc = await db.collection('conversations').findOne({
+      id: conversationId,
+      user_id: userId,
+    });
     if (!updatedDoc) {
-      return createErrorResponse('Conversation not found', 404);
+      return createErrorResponse('Not found or not authorized', 404);
     }
 
     const tagsResult = await db.collection('tags').find({}).toArray();

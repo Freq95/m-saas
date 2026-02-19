@@ -28,9 +28,9 @@ Read `REVIEW-phase3-5.md` sections 1.1-1.5 for detailed explanations of WHY each
 5. Run `npm run build` to verify nothing breaks
 
 ### Acceptance criteria:
-- [ ] `writeMongoCollection` function no longer exists in `lib/db/mongo.ts`
-- [ ] No file imports or calls `writeMongoCollection`
-- [ ] Build passes
+- [x] `writeMongoCollection` function no longer exists in `lib/db/mongo.ts`
+- [x] No file imports or calls `writeMongoCollection`
+- [x] Build passes
 
 ---
 
@@ -80,11 +80,11 @@ app/api/yahoo/sync/route.ts
 ```
 
 ### Acceptance criteria:
-- [ ] `getMongoData()` function no longer exists
-- [ ] `invalidateMongoCache()` function no longer exists
-- [ ] Zero references to either function in the entire codebase
-- [ ] `mongoCache` variable removed
-- [ ] Build passes
+- [x] `getMongoData()` function no longer exists
+- [x] `invalidateMongoCache()` function no longer exists
+- [x] Zero references to either function in the entire codebase
+- [x] `mongoCache` variable removed
+- [x] Build passes
 
 ---
 
@@ -121,10 +121,10 @@ ENCRYPTION_KEY=
 ```
 
 ### Acceptance criteria:
-- [ ] No hardcoded fallback key in `lib/encryption.ts`
-- [ ] Application crashes with clear error message if `ENCRYPTION_KEY` not set
-- [ ] `.env.example` documents the variable
-- [ ] Build passes
+- [x] No hardcoded fallback key in `lib/encryption.ts`
+- [x] Application crashes with clear error message if `ENCRYPTION_KEY` not set
+- [x] `.env.example` documents the variable
+- [x] Build passes
 
 ---
 
@@ -172,9 +172,9 @@ Apply the same pattern to PATCH operations — add `user_id` to the query filter
 **Note:** This is a temporary fix. In Phase 1 (auth), `userId` will come from the session instead of query params. But adding the filter NOW prevents cross-user data access even in the current state.
 
 ### Acceptance criteria:
-- [ ] ALL 8 route files have `user_id` in their DELETE/PATCH query filters
-- [ ] Deleting/updating a record that belongs to a different user returns 404
-- [ ] Build passes
+- [x] ALL 8 route files have `user_id` in their DELETE/PATCH query filters
+- [x] Deleting/updating a record that belongs to a different user returns 404
+- [x] Build passes
 
 ---
 
@@ -187,10 +187,10 @@ Apply the same pattern to PATCH operations — add `user_id` to the query filter
 4. Remove any unused imports that result from the above changes
 
 ### Acceptance criteria:
-- [ ] `nul` file deleted
-- [ ] No orphaned dead code files
-- [ ] Build passes
-- [ ] `npx tsc --noEmit` passes with no errors
+- [x] `nul` file deleted
+- [x] No orphaned dead code files
+- [x] Build passes
+- [x] `npx tsc --noEmit` passes with no errors
 
 ---
 

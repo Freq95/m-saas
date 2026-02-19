@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId } from '@/lib/db/mongo-utils';
 import { suggestTags } from '@/lib/ai-agent';
 import { linkConversationToClient } from '@/lib/client-matching';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
@@ -103,8 +103,6 @@ export async function POST(request: NextRequest) {
         await db.collection('conversation_tags').insertMany(newConvTags, { ordered: false });
       }
     }
-
-    invalidateMongoCache();
     return createSuccessResponse({ success: true, conversationId });
   } catch (error) {
     return handleApiError(error, 'Failed to process email webhook');

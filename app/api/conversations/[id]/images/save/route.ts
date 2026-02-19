@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
 import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { linkConversationToClient } from '@/lib/client-matching';
 import { parseStoredMessage, serializeMessage } from '@/lib/email-types';
@@ -216,8 +216,6 @@ export async function POST(
     );
 
     await markImageAsSaved(targetClientId, fileId, now);
-
-    invalidateMongoCache();
     return createSuccessResponse({
       success: true,
       clientId: targetClientId,

@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 import { getYahooConfig, fetchYahooEmails, markEmailAsRead } from '@/lib/yahoo-mail';
-import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId } from '@/lib/db/mongo-utils';
 import { suggestTags } from '@/lib/ai-agent';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import * as fs from 'fs';
@@ -348,8 +348,6 @@ export async function POST(request: NextRequest) {
         logger.warn('Failed to update integration sync cursor/time', { error: err });
       }
     }
-
-    invalidateMongoCache();
     return createSuccessResponse({
       success: true,
       synced: syncedCount,

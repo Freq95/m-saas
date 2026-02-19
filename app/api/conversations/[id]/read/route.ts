@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getMongoDbOrThrow, invalidateMongoCache } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
 
 // POST /api/conversations/[id]/read
@@ -49,8 +49,6 @@ export async function POST(
       direction: 'inbound',
       is_read: false,
     });
-
-    invalidateMongoCache();
     return createSuccessResponse({
       success: true,
       conversationId,

@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
 // GET /api/tasks - Get tasks for a client or user
@@ -76,7 +76,6 @@ export async function POST(request: NextRequest) {
     };
 
     await db.collection('tasks').insertOne(taskDoc);
-    invalidateMongoCache();
 
     return createSuccessResponse({ task: stripMongoId(taskDoc) }, 201);
   } catch (error) {

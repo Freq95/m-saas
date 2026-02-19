@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMongoDbOrThrow, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { updateClientStats } from '@/lib/client-matching';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { checkAppointmentConflict } from '@/lib/calendar-conflicts';
@@ -79,6 +79,7 @@ export async function PATCH(
   try {
     const db = await getMongoDbOrThrow();
     const appointmentId = Number(params.id);
+    const userId = parseInt(request.nextUrl.searchParams.get('userId') || '1', 10);
     const body = await request.json();
 
     if (Number.isNaN(appointmentId)) {
@@ -110,9 +111,12 @@ export async function PATCH(
     } = validationResult.data;
 
     // Get existing appointment
-    const existingAppointment = await db.collection('appointments').findOne({ id: appointmentId });
+    const existingAppointment = await db.collection('appointments').findOne({
+      id: appointmentId,
+      user_id: userId,
+    });
     if (!existingAppointment) {
-      return createErrorResponse('Appointment not found', 404);
+      return createErrorResponse('Not found or not authorized', 404);
     }
 
     const updates: Record<string, unknown> = {};
@@ -252,12 +256,18 @@ export async function PATCH(
 
     updates.updated_at = new Date().toISOString();
 
-    await db.collection('appointments').updateOne(
-      { id: appointmentId },
+    const updateResult = await db.collection('appointments').updateOne(
+      { id: appointmentId, user_id: userId },
       { $set: updates }
     );
+    if (updateResult.matchedCount === 0) {
+      return createErrorResponse('Not found or not authorized', 404);
+    }
 
-    const appointmentDoc = await db.collection('appointments').findOne({ id: appointmentId });
+    const appointmentDoc = await db.collection('appointments').findOne({
+      id: appointmentId,
+      user_id: userId,
+    });
     if (!appointmentDoc) {
       return createErrorResponse('Appointment not found', 404);
     }
@@ -266,8 +276,6 @@ export async function PATCH(
     if (status === 'completed' && appointmentDoc.client_id) {
       await updateClientStats(appointmentDoc.client_id);
     }
-
-    invalidateMongoCache();
     return createSuccessResponse({ appointment: stripMongoId(appointmentDoc) });
   } catch (error) {
     return handleApiError(error, 'Failed to update appointment');
@@ -282,14 +290,19 @@ export async function DELETE(
   try {
     const db = await getMongoDbOrThrow();
     const appointmentId = Number(params.id);
+    const userId = parseInt(request.nextUrl.searchParams.get('userId') || '1', 10);
 
     if (Number.isNaN(appointmentId)) {
       return createErrorResponse('Invalid appointment ID', 400);
     }
 
-    await db.collection('appointments').deleteOne({ id: appointmentId });
-
-    invalidateMongoCache();
+    const result = await db.collection('appointments').deleteOne({
+      id: appointmentId,
+      user_id: userId,
+    });
+    if (result.deletedCount === 0) {
+      return createErrorResponse('Not found or not authorized', 404);
+    }
     return createSuccessResponse({ success: true });
   } catch (error) {
     return handleApiError(error, 'Failed to delete appointment');

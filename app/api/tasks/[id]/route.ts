@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getMongoDbOrThrow, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
 // GET /api/tasks/[id] - Get a single task
@@ -36,6 +36,8 @@ export async function PATCH(
   try {
     const db = await getMongoDbOrThrow();
     const taskId = parseInt(params.id);
+    const { DEFAULT_USER_ID } = await import('@/lib/constants');
+    const userId = parseInt(request.nextUrl.searchParams.get('userId') || DEFAULT_USER_ID.toString(), 10);
 
     // Validate ID
     if (isNaN(taskId) || taskId <= 0) {
@@ -66,17 +68,18 @@ export async function PATCH(
 
     updates.updated_at = new Date().toISOString();
 
-    await db.collection('tasks').updateOne(
-      { id: taskId },
+    const updateResult = await db.collection('tasks').updateOne(
+      { id: taskId, user_id: userId },
       { $set: updates }
     );
-
-    const task = await db.collection('tasks').findOne({ id: taskId });
-    if (!task) {
-      return createErrorResponse('Task not found', 404);
+    if (updateResult.matchedCount === 0) {
+      return createErrorResponse('Not found or not authorized', 404);
     }
 
-    invalidateMongoCache();
+    const task = await db.collection('tasks').findOne({ id: taskId, user_id: userId });
+    if (!task) {
+      return createErrorResponse('Not found or not authorized', 404);
+    }
     return createSuccessResponse({ task: stripMongoId(task) });
   } catch (error) {
     return handleApiError(error, 'Failed to update task');
@@ -91,14 +94,18 @@ export async function DELETE(
   try {
     const db = await getMongoDbOrThrow();
     const taskId = parseInt(params.id);
+    const { DEFAULT_USER_ID } = await import('@/lib/constants');
+    const userId = parseInt(request.nextUrl.searchParams.get('userId') || DEFAULT_USER_ID.toString(), 10);
 
     // Validate ID
     if (isNaN(taskId) || taskId <= 0) {
       return createErrorResponse('Invalid task ID', 400);
     }
 
-    await db.collection('tasks').deleteOne({ id: taskId });
-    invalidateMongoCache();
+    const result = await db.collection('tasks').deleteOne({ id: taskId, user_id: userId });
+    if (result.deletedCount === 0) {
+      return createErrorResponse('Not found or not authorized', 404);
+    }
 
     return createSuccessResponse({ success: true });
   } catch (error) {

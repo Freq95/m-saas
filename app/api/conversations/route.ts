@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
-import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { getConversationsData } from '@/lib/server/inbox';
 
@@ -84,8 +84,6 @@ export async function POST(request: NextRequest) {
         created_at: now,
       });
     }
-
-    invalidateMongoCache();
     return createSuccessResponse({ conversation }, 201);
   } catch (error) {
     return handleApiError(error, 'Failed to create conversation');

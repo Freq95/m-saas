@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { getServicesData } from '@/lib/server/calendar';
 
@@ -63,7 +63,6 @@ export async function POST(request: NextRequest) {
     };
 
     await db.collection('services').insertOne(serviceDoc);
-    invalidateMongoCache();
 
     return createSuccessResponse({ service: stripMongoId(serviceDoc) }, 201);
   } catch (error) {

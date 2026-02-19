@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
 import * as fs from 'fs';
 import * as path from 'path';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
@@ -112,8 +112,6 @@ export async function POST(
       { id: clientId },
       { $set: { last_activity_date: now, updated_at: now } }
     );
-
-    invalidateMongoCache();
     return createSuccessResponse({ file: stripMongoId(fileDoc) }, 201);
   } catch (error) {
     return handleApiError(error, 'Failed to upload file');

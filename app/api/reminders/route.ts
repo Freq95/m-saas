@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 
 // Validation schemas
@@ -123,7 +123,6 @@ export async function POST(request: NextRequest) {
     };
 
     await db.collection('reminders').insertOne(reminderDoc);
-    invalidateMongoCache();
 
     return createSuccessResponse({
       reminder: stripMongoId(reminderDoc),

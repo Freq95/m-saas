@@ -26,6 +26,7 @@ yarn-error.log*
 # Local env files
 .env*.local
 .env
+.env.example
 
 # Data files (JSON storage)
 data/

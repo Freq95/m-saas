@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
 import { isSlotAvailable } from '@/lib/calendar';
 import { exportToGoogleCalendar } from '@/lib/google-calendar';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
@@ -162,8 +162,6 @@ export async function POST(request: NextRequest) {
         // Don't fail the appointment creation if Google export fails
       }
     }
-
-    invalidateMongoCache();
     return createSuccessResponse({ appointment }, 201);
   } catch (error) {
     return handleApiError(error, 'Failed to create appointment');

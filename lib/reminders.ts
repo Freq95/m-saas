@@ -1,6 +1,6 @@
 import { addHours, format } from 'date-fns';
 import { ro } from 'date-fns/locale';
-import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache } from './db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId } from './db/mongo-utils';
 
 interface ReminderChannel {
   type: 'sms' | 'whatsapp' | 'email';
@@ -118,8 +118,6 @@ export async function processReminders() {
       }
     }
   }
-
-  invalidateMongoCache();
 }
 
 /**

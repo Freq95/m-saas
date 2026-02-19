@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getMongoDbOrThrow, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getClientProfileData } from '@/lib/server/client-profile';
 
@@ -36,10 +36,9 @@ export async function PATCH(
     if (isNaN(clientId) || clientId <= 0) {
       return createErrorResponse('Invalid client ID', 400);
     }
-    const body = await request.json();
-
     const { DEFAULT_USER_ID } = await import('@/lib/constants');
-    const userId = body.userId ?? DEFAULT_USER_ID;
+    const userId = parseInt(request.nextUrl.searchParams.get('userId') || DEFAULT_USER_ID.toString(), 10);
+    const body = await request.json();
 
     // Verify client exists and belongs to this user before updating
     const existing = await db.collection('clients').findOne({
@@ -48,7 +47,7 @@ export async function PATCH(
       deleted_at: { $exists: false },
     });
     if (!existing) {
-      return createErrorResponse('Client not found', 404);
+      return createErrorResponse('Not found or not authorized', 404);
     }
 
     // Validate input
@@ -95,10 +94,8 @@ export async function PATCH(
       deleted_at: { $exists: false },
     });
     if (!result) {
-      return createErrorResponse('Client not found', 404);
+      return createErrorResponse('Not found or not authorized', 404);
     }
-
-    invalidateMongoCache();
 
     return createSuccessResponse({
       client: stripMongoId(result),
@@ -131,19 +128,20 @@ export async function DELETE(
       deleted_at: { $exists: false },
     });
     if (!existing) {
-      return createErrorResponse('Client not found', 404);
+      return createErrorResponse('Not found or not authorized', 404);
     }
 
     // Soft delete using timestamp and cleanup legacy fields
-    await db.collection('clients').updateOne(
+    const result = await db.collection('clients').updateOne(
       { id: clientId, user_id: userId, deleted_at: { $exists: false } },
       {
         $set: { deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() },
         $unset: { status: '', source: '' },
       }
     );
-
-    invalidateMongoCache();
+    if (result.matchedCount === 0) {
+      return createErrorResponse('Not found or not authorized', 404);
+    }
     return createSuccessResponse({ success: true });
   } catch (error) {
     return handleApiError(error, 'Failed to delete client');

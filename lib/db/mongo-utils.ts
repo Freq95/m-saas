@@ -1,6 +1,6 @@
-import { getMongoDb, invalidateMongoCache, stripMongoId } from './mongo';
+import { getMongoDb, stripMongoId } from './mongo';
 
-export { invalidateMongoCache, stripMongoId };
+export { stripMongoId };
 
 export async function getMongoDbOrThrow(): Promise<any> {
   const db = await getMongoDb();

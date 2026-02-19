@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
 import { getYahooConfig, sendYahooEmail } from '@/lib/yahoo-mail';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 
@@ -71,8 +71,6 @@ export async function POST(
       { id: conversationId },
       { $set: { updated_at: now } }
     );
-
-    invalidateMongoCache();
     return createSuccessResponse({ message: stripMongoId(newMessage) }, 201);
   } catch (error) {
     return handleApiError(error, 'Failed to send message');
