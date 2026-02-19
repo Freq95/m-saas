@@ -110,19 +110,22 @@ export async function POST(request: NextRequest) {
 
         logger.debug('Yahoo sync: Extracted contact info', { email: emailAddress, name });
 
-        // Find or create client (non-blocking for inbox sync)
+        // Look up an existing client by email only — never auto-create from incoming mail.
+        // Spam, newsletters, and automated notifications would otherwise pollute the client list.
+        // Client records are created manually by the user.
         let client: { id: number } | null = null;
-        const { findOrCreateClient, linkConversationToClient } = await import('@/lib/client-matching');
+        const { linkConversationToClient } = await import('@/lib/client-matching');
         try {
-          client = await findOrCreateClient(
-            userId,
-            name,
-            emailAddress,
-            undefined,
-            'email'
-          );
+          const escapedEmail = emailAddress.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const existingClient = await db.collection('clients').findOne({
+            user_id: userId,
+            email: { $regex: `^${escapedEmail}$`, $options: 'i' },
+          });
+          if (existingClient) {
+            client = { id: existingClient.id };
+          }
         } catch (clientError) {
-          logger.warn('Yahoo sync: Failed to resolve client, continuing without client link', {
+          logger.warn('Yahoo sync: Failed to look up client, continuing without client link', {
             email: emailAddress,
             error: clientError instanceof Error ? clientError.message : String(clientError),
           });

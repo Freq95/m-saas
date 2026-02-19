@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useToast } from '@/lib/useToast';
+import { ToastContainer } from '@/components/Toast';
 import styles from './page.module.css';
 import navStyles from '../../dashboard/page.module.css';
 
@@ -19,6 +21,7 @@ export default function NewClientPageClient() {
     notes: '',
   });
   const [tagInput, setTagInput] = useState('');
+  const { toasts, removeToast, error: toastError } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +51,7 @@ export default function NewClientPageClient() {
       router.push(`/clients/${result.client.id}`);
     } catch (error: any) {
       console.error('Error creating client:', error);
-      alert(error.message || 'Eroare la crearea clientului');
+      toastError(error.message || 'Eroare la crearea clientului');
     } finally {
       setLoading(false);
     }
@@ -163,7 +166,7 @@ export default function NewClientPageClient() {
                   id="tags"
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
-                  onKeyPress={(e) => {
+                  onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
                       handleAddTag();
@@ -223,6 +226,7 @@ export default function NewClientPageClient() {
           </div>
         </form>
       </div>
+      <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );
 }

@@ -33,7 +33,19 @@ export async function PATCH(
   try {
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
+    if (isNaN(clientId) || clientId <= 0) {
+      return createErrorResponse('Invalid client ID', 400);
+    }
     const body = await request.json();
+
+    const { DEFAULT_USER_ID } = await import('@/lib/constants');
+    const userId = body.userId ?? DEFAULT_USER_ID;
+
+    // Verify client exists and belongs to this user before updating
+    const existing = await db.collection('clients').findOne({ id: clientId, user_id: userId });
+    if (!existing) {
+      return createErrorResponse('Client not found', 404);
+    }
 
     // Validate input
     const { updateClientSchema } = await import('@/lib/validation');
@@ -77,11 +89,11 @@ export async function PATCH(
     updates.updated_at = new Date().toISOString();
 
     await db.collection('clients').updateOne(
-      { id: clientId },
+      { id: clientId, user_id: userId },
       { $set: updates }
     );
 
-    const result = await db.collection('clients').findOne({ id: clientId });
+    const result = await db.collection('clients').findOne({ id: clientId, user_id: userId });
     if (!result) {
       return createErrorResponse('Client not found', 404);
     }
@@ -107,10 +119,23 @@ export async function DELETE(
   try {
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
+    if (isNaN(clientId) || clientId <= 0) {
+      return createErrorResponse('Invalid client ID', 400);
+    }
+
+    const { DEFAULT_USER_ID } = await import('@/lib/constants');
+    const searchParams = request.nextUrl.searchParams;
+    const userId = parseInt(searchParams.get('userId') || DEFAULT_USER_ID.toString());
+
+    // Verify client exists and belongs to this user
+    const existing = await db.collection('clients').findOne({ id: clientId, user_id: userId });
+    if (!existing) {
+      return createErrorResponse('Client not found', 404);
+    }
 
     // Soft delete: set status to 'deleted'
     await db.collection('clients').updateOne(
-      { id: clientId },
+      { id: clientId, user_id: userId },
       { $set: { status: 'deleted', updated_at: new Date().toISOString() } }
     );
 

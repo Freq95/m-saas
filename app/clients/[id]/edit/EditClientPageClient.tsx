@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useToast } from '@/lib/useToast';
+import { ToastContainer } from '@/components/Toast';
 import styles from './page.module.css';
 import navStyles from '../../../dashboard/page.module.css';
 
@@ -49,6 +51,7 @@ export default function EditClientPageClient({ clientId, initialClient }: EditCl
     notes: '',
   });
   const [tagInput, setTagInput] = useState('');
+  const { toasts, removeToast, error: toastError } = useToast();
 
   useEffect(() => {
     if (initialClient) {
@@ -80,7 +83,7 @@ export default function EditClientPageClient({ clientId, initialClient }: EditCl
       });
     } catch (error) {
       console.error('Error fetching client:', error);
-      alert('Eroare la încărcarea clientului');
+      toastError('Eroare la încărcarea clientului');
     } finally {
       setLoading(false);
     }
@@ -115,7 +118,7 @@ export default function EditClientPageClient({ clientId, initialClient }: EditCl
       router.push(`/clients/${clientId}`);
     } catch (error: any) {
       console.error('Error updating client:', error);
-      alert(error.message || 'Eroare la actualizarea clientului');
+      toastError(error.message || 'Eroare la actualizarea clientului');
     } finally {
       setSaving(false);
     }
@@ -240,7 +243,7 @@ export default function EditClientPageClient({ clientId, initialClient }: EditCl
                   id="tags"
                   value={tagInput}
                   onChange={(e) => setTagInput(e.target.value)}
-                  onKeyPress={(e) => {
+                  onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                       e.preventDefault();
                       handleAddTag();
@@ -300,6 +303,7 @@ export default function EditClientPageClient({ clientId, initialClient }: EditCl
           </div>
         </form>
       </div>
+      <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );
 }

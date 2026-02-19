@@ -78,14 +78,15 @@ export interface Client {
   name: string;
   email: string | null;
   phone: string | null;
-  source: 'email' | 'facebook' | 'form' | 'walk-in' | 'unknown';
-  status: 'lead' | 'active' | 'inactive' | 'vip';
+  source: 'email' | 'facebook' | 'form' | 'walk-in' | 'referral' | 'unknown';
+  status: 'lead' | 'active' | 'inactive' | 'vip' | 'deleted';
   tags: string[];
   notes: string | null;
   total_spent: number;
   total_appointments: number;
   last_appointment_date: string | null;
   last_conversation_date: string | null;
+  last_activity_date: string | null;
   first_contact_date: string;
   created_at: string;
   updated_at: string;

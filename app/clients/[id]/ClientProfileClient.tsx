@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import styles from './page.module.css';
 import navStyles from '../../dashboard/page.module.css';
+import { useToast } from '@/lib/useToast';
+import { ToastContainer } from '@/components/Toast';
 
 interface Client {
   id: number;
@@ -67,11 +69,12 @@ export default function ClientProfileClient({
   const [activityFilter, setActivityFilter] = useState<'all' | 'notes' | 'emails' | 'tasks' | 'appointments'>('all');
   const [showAddNote, setShowAddNote] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
-  const [showUploadFile, setShowUploadFile] = useState(false);
+  const [pendingDeleteFileId, setPendingDeleteFileId] = useState<number | null>(null);
   const [noteContent, setNoteContent] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
   const [taskDueDate, setTaskDueDate] = useState('');
+  const { toasts, removeToast, error: toastError } = useToast();
 
   useEffect(() => {
     setClient(initialClient);
@@ -90,6 +93,14 @@ export default function ClientProfileClient({
       fetchStats();
     }
   }, [clientId, initialClient, initialStats]);
+
+  // Fetch counts on mount so tab badges show correct numbers immediately
+  useEffect(() => {
+    if (!clientId) return;
+    fetchTasks();
+    fetchFiles();
+    fetchActivities();
+  }, [clientId]);
 
   useEffect(() => {
     if (!clientId) return;
@@ -178,7 +189,7 @@ export default function ClientProfileClient({
       if (activeTab === 'activities') fetchActivities();
     } catch (error) {
       console.error('Error adding note:', error);
-      alert('Eroare la adăugarea notei');
+      toastError('Eroare la adăugarea notei');
     }
   };
 
@@ -206,7 +217,7 @@ export default function ClientProfileClient({
       if (activeTab === 'activities') fetchActivities();
     } catch (error) {
       console.error('Error adding task:', error);
-      alert('Eroare la adăugarea task-ului');
+      toastError('Eroare la adăugarea task-ului');
     }
   };
 
@@ -221,12 +232,11 @@ export default function ClientProfileClient({
         body: formData,
       });
       if (!response.ok) throw new Error('Failed to upload file');
-      setShowUploadFile(false);
       fetchFiles();
       if (activeTab === 'activities') fetchActivities();
     } catch (error) {
       console.error('Error uploading file:', error);
-      alert('Eroare la încărcarea fișierului');
+      toastError('Eroare la încărcarea fișierului');
     }
   };
 
@@ -242,12 +252,18 @@ export default function ClientProfileClient({
       if (activeTab === 'activities') fetchActivities();
     } catch (error) {
       console.error('Error completing task:', error);
-      alert('Eroare la finalizarea task-ului');
+      toastError('Eroare la finalizarea task-ului');
     }
   };
 
-  const handleDeleteFile = async (fileId: number) => {
-    if (!confirm('Sigur vrei să ștergi acest fișier?')) return;
+  const handleDeleteFile = (fileId: number) => {
+    setPendingDeleteFileId(fileId);
+  };
+
+  const confirmDeleteFile = async () => {
+    if (!pendingDeleteFileId) return;
+    const fileId = pendingDeleteFileId;
+    setPendingDeleteFileId(null);
     try {
       const response = await fetch(`/api/clients/${clientId}/files/${fileId}`, {
         method: 'DELETE',
@@ -257,7 +273,7 @@ export default function ClientProfileClient({
       if (activeTab === 'activities') fetchActivities();
     } catch (error) {
       console.error('Error deleting file:', error);
-      alert('Eroare la ștergerea fișierului');
+      toastError('Eroare la ștergerea fișierului');
     }
   };
 
@@ -847,6 +863,25 @@ export default function ClientProfileClient({
           </div>
         </div>
       )}
+
+      {pendingDeleteFileId && (
+        <div className={styles.modal}>
+          <div className={styles.modalContent}>
+            <h3>Confirmare ștergere</h3>
+            <p>Sigur vrei să ștergi acest fișier? Acțiunea nu poate fi anulată.</p>
+            <div className={styles.modalActions}>
+              <button onClick={() => setPendingDeleteFileId(null)} className={styles.cancelButton}>
+                Anulează
+              </button>
+              <button onClick={confirmDeleteFile} className={styles.deleteButton}>
+                Șterge
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <ToastContainer toasts={toasts} onClose={removeToast} />
       </div>
     </div>
   );

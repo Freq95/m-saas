@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
     const clients = await db
       .collection('clients')
-      .find({ user_id: userId })
+      .find({ user_id: userId, status: { $ne: 'deleted' } })
       .sort({ name: 1 })
       .toArray();
 

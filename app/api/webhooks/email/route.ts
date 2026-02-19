@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache } from '@/lib/db/mongo-utils';
 import { suggestTags } from '@/lib/ai-agent';
-import { findOrCreateClient, linkConversationToClient } from '@/lib/client-matching';
+import { linkConversationToClient } from '@/lib/client-matching';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { DEFAULT_USER_ID } from '@/lib/constants';
 
@@ -17,14 +17,18 @@ export async function POST(request: NextRequest) {
     const email = emailMatch ? emailMatch[1] : from;
     const name = from.replace(/<.+>/, '').trim() || email.split('@')[0];
 
-    // Find or create client
-    const client = await findOrCreateClient(
-      userId,
-      name || email,
-      email,
-      undefined,
-      'email'
-    );
+    // Look up an existing client by email only — never auto-create from incoming mail.
+    // Spam, newsletters, and automated notifications would otherwise pollute the client list.
+    // Client records are created manually by the user.
+    let clientId: number | null = null;
+    const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const existingClientDoc = await db.collection('clients').findOne({
+      user_id: userId,
+      email: { $regex: `^${escapedEmail}$`, $options: 'i' },
+    });
+    if (existingClientDoc) {
+      clientId = existingClientDoc.id;
+    }
 
     const existingConv = await db
       .collection('conversations')
@@ -37,8 +41,9 @@ export async function POST(request: NextRequest) {
 
     if (existingConv) {
       conversationId = existingConv.id;
-      if (!existingConv.client_id) {
-        await linkConversationToClient(conversationId, client.id);
+      // Link to client if a matching client was found and conversation isn't linked yet
+      if (!existingConv.client_id && clientId) {
+        await linkConversationToClient(conversationId, clientId);
       }
     } else {
       const now = new Date().toISOString();
@@ -51,10 +56,13 @@ export async function POST(request: NextRequest) {
         contact_name: name,
         contact_email: email,
         subject: subject || null,
+        client_id: clientId,
         created_at: now,
         updated_at: now,
       });
-      await linkConversationToClient(conversationId, client.id);
+      if (clientId) {
+        await linkConversationToClient(conversationId, clientId);
+      }
     }
 
     const now = new Date().toISOString();

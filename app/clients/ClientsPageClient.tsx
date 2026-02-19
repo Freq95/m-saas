@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import styles from './page.module.css';
 import navStyles from '../dashboard/page.module.css';
@@ -44,31 +44,31 @@ export default function ClientsPageClient({
   const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState<PaginationInfo | null>(initialPagination);
+  // Tracks whether the current render is the first (server-data already shown)
   const skipInitialFetch = useRef(true);
+  // Debounce timer for the search input
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Stores the latest search value for use in the debounced callback
+  const searchRef = useRef(search);
 
-  useEffect(() => {
-    if (skipInitialFetch.current) {
-      skipInitialFetch.current = false;
-      return;
-    }
-    fetchClients();
-  }, [search, statusFilter, sourceFilter, sortBy, sortOrder, page]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [search, statusFilter, sourceFilter, sortBy, sortOrder]);
-
-  const fetchClients = async () => {
+  const fetchClients = useCallback(async (
+    currentSearch: string,
+    currentStatus: string,
+    currentSource: string,
+    currentSortBy: string,
+    currentSortOrder: string,
+    currentPage: number,
+  ) => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
         userId: '1',
-        ...(search && { search }),
-        ...(statusFilter !== 'all' && { status: statusFilter }),
-        ...(sourceFilter !== 'all' && { source: sourceFilter }),
-        sortBy,
-        sortOrder,
-        page: page.toString(),
+        ...(currentSearch && { search: currentSearch }),
+        ...(currentStatus !== 'all' && { status: currentStatus }),
+        ...(currentSource !== 'all' && { source: currentSource }),
+        sortBy: currentSortBy,
+        sortOrder: currentSortOrder,
+        page: currentPage.toString(),
         limit: '20',
       });
 
@@ -83,6 +83,33 @@ export default function ClientsPageClient({
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Filters/sort changed: reset to page 1 and fetch once (no double-fetch)
+  useEffect(() => {
+    if (skipInitialFetch.current) {
+      skipInitialFetch.current = false;
+      return;
+    }
+    setPage(1);
+    fetchClients(search, statusFilter, sourceFilter, sortBy, sortOrder, 1);
+  }, [statusFilter, sourceFilter, sortBy, sortOrder]);
+
+  // Page changed explicitly (pagination buttons): fetch for the new page
+  useEffect(() => {
+    if (skipInitialFetch.current) return;
+    fetchClients(search, statusFilter, sourceFilter, sortBy, sortOrder, page);
+  }, [page]);
+
+  // Search: debounce 350ms, reset to page 1
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    searchRef.current = value;
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = setTimeout(() => {
+      setPage(1);
+      fetchClients(searchRef.current, statusFilter, sourceFilter, sortBy, sortOrder, 1);
+    }, 350);
   };
 
   const formatDate = (dateString: string | null) => {
@@ -123,6 +150,7 @@ export default function ClientsPageClient({
       facebook: 'Facebook',
       form: 'Formular',
       'walk-in': 'Walk-in',
+      referral: 'Recomandare',
       conversation: 'Conversație',
       unknown: 'Necunoscut',
     };
@@ -153,7 +181,7 @@ export default function ClientsPageClient({
             type="text"
             placeholder="Caută după nume, email sau telefon..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className={styles.searchInput}
           />
 
@@ -179,6 +207,8 @@ export default function ClientsPageClient({
             <option value="facebook">Facebook</option>
             <option value="form">Formular</option>
             <option value="walk-in">Walk-in</option>
+            <option value="referral">Recomandare</option>
+            <option value="unknown">Necunoscut</option>
           </select>
 
           <select

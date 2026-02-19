@@ -98,18 +98,7 @@ export default function CalendarPageClient({
     }
   );
 
-  // Filter appointments by search query
-  const filteredAppointments = useMemo(() => {
-    if (!searchQuery.trim()) return appointments;
-    const q = searchQuery.toLowerCase();
-    return appointments.filter(
-      (apt) =>
-        apt.client_name.toLowerCase().includes(q) ||
-        apt.service_name.toLowerCase().includes(q) ||
-        apt.category?.toLowerCase().includes(q) ||
-        apt.notes?.toLowerCase().includes(q)
-    );
-  }, [appointments, searchQuery]);
+  // Search filtering happens inside DayPanel — calendar views always show all appointments
 
   // Lazy-load services if not provided server-side
   useEffect(() => {
@@ -373,7 +362,7 @@ export default function CalendarPageClient({
             <MonthView
               monthDays={monthDays}
               currentDate={state.currentDate}
-              appointments={filteredAppointments}
+              appointments={appointments}
               selectedDay={selectedDay}
               onDayClick={handleDayHeaderClick}
               onAppointmentClick={handleAppointmentClick}
@@ -383,7 +372,7 @@ export default function CalendarPageClient({
             <WeekView
               weekDays={state.viewType === 'day' ? dayViewDays : weekDays}
               hours={hours}
-              appointments={filteredAppointments}
+              appointments={appointments}
               blockedTimes={blockedTimes}
               selectedDay={selectedDay}
               onSlotClick={handleSlotClick}
@@ -400,7 +389,7 @@ export default function CalendarPageClient({
 
           <DayPanel
             selectedDay={selectedDay}
-            appointments={filteredAppointments}
+            appointments={appointments}
             currentDate={state.currentDate}
             onAppointmentClick={(apt) => {
               actions.selectAppointment(apt);

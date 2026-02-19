@@ -37,7 +37,11 @@ export async function getClientsData(query: ClientsQuery = {}): Promise<ClientsR
   const limit = query.limit ?? DEFAULT_PAGE_SIZE;
   const offset = (page - 1) * limit;
 
-  const filter: Record<string, unknown> = { user_id: userId };
+  const filter: Record<string, unknown> = {
+    user_id: userId,
+    // Always exclude soft-deleted clients regardless of the status filter
+    status: { $ne: 'deleted' },
+  };
 
   if (search) {
     const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
