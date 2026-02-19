@@ -43,25 +43,42 @@ export async function POST(
     const invite = await validateInviteToken(params.token);
     if (!invite) return createErrorResponse('Invalid or expired invite', 404);
 
+    const db = await getMongoDbOrThrow();
+    const [tenant, existingMember] = await Promise.all([
+      db.collection('tenants').findOne({ _id: invite.tenant_id }),
+      db.collection('team_members').findOne({ user_id: invite.user_id, tenant_id: invite.tenant_id }),
+    ]);
+    if (!tenant || tenant.status !== 'active') {
+      return createErrorResponse('Tenant is not active. Ask your administrator to reactivate the tenant and resend invite.', 409);
+    }
+    if (!existingMember) {
+      return createErrorResponse('Invite membership is no longer valid. Ask your administrator to resend invite.', 409);
+    }
+
     try {
       await markInviteUsed(params.token);
     } catch {
       return createErrorResponse('Invite already used or expired', 409);
     }
 
-    const db = await getMongoDbOrThrow();
     const passwordHash = await bcrypt.hash(password, 12);
     const nowIso = new Date().toISOString();
 
-    await db.collection('users').updateOne(
+    const userUpdateResult = await db.collection('users').updateOne(
       { _id: invite.user_id },
       { $set: { password_hash: passwordHash, status: 'active', updated_at: nowIso } }
     );
+    if (userUpdateResult.matchedCount === 0) {
+      return createErrorResponse('User no longer exists for this invite. Ask your administrator to resend invite.', 409);
+    }
 
-    await db.collection('team_members').updateOne(
+    const memberUpdateResult = await db.collection('team_members').updateOne(
       { user_id: invite.user_id, tenant_id: invite.tenant_id },
       { $set: { status: 'active', accepted_at: nowIso, updated_at: nowIso } }
     );
+    if (memberUpdateResult.modifiedCount === 0) {
+      return createErrorResponse('Invite membership update failed. Ask your administrator to resend invite.', 409);
+    }
 
     return createSuccessResponse({ message: 'Password set successfully' });
   } catch (error) {

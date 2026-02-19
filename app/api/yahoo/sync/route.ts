@@ -5,7 +5,7 @@ import { getYahooConfig, fetchYahooEmails, markEmailAsRead } from '@/lib/yahoo-m
 import { getMongoDbOrThrow, getNextNumericId } from '@/lib/db/mongo-utils';
 import { suggestTags } from '@/lib/ai-agent';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
-import { getAuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, type AuthContext } from '@/lib/auth-helpers';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -18,7 +18,8 @@ if (!fs.existsSync(EMAIL_ATTACHMENT_DIR)) {
 // POST /api/yahoo/sync - Sync Yahoo Mail inbox
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await getAuthUser();
+    const authUser: AuthContext = await getAuthUser();
+    const { userId } = authUser;
     const body = await request.json();
 
     // Validate input
@@ -370,7 +371,8 @@ export async function POST(request: NextRequest) {
 // GET /api/yahoo/sync - Test Yahoo connection
 export async function GET(_request: NextRequest) {
   try {
-    const { userId } = await getAuthUser();
+    const authUser: AuthContext = await getAuthUser();
+    const { userId } = authUser;
 
     const config = await getYahooConfig(userId);
 

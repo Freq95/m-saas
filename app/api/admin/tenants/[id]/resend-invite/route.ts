@@ -11,7 +11,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId: adminId, email: actorEmail } = await getSuperAdmin();
+    const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
     if (!ObjectId.isValid(params.id)) return createErrorResponse('Invalid tenant id', 400);
     const tenantId = new ObjectId(params.id);
     const body = await request.json();
@@ -31,12 +31,12 @@ export async function POST(
     }
     if (user.status !== 'pending_invite') return createErrorResponse('User is not pending invite', 400);
 
-    const token = await createInviteToken(user.email, userId, tenantId, user.role || 'staff', adminId);
+    const token = await createInviteToken(user.email, userId, tenantId, user.role || 'staff', actorUserId);
     const inviteEmail = await sendInviteEmail(user.email, user.name || 'Utilizator', tenant.name, token);
 
     await logAdminAudit({
       action: 'tenant.invite.resend',
-      actorUserId: adminId,
+      actorUserId,
       actorEmail,
       targetType: 'user',
       targetId: userId,

@@ -53,7 +53,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId: adminId, email: actorEmail } = await getSuperAdmin();
+    const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
     const tenantId = parseTenantId(params.id);
     if (!tenantId) return createErrorResponse('Invalid tenant id', 400);
 
@@ -111,14 +111,14 @@ export async function POST(
       updated_at: nowIso,
     });
 
-    const token = await createInviteToken(email, newUserId, tenantId, role, adminId);
+    const token = await createInviteToken(email, newUserId, tenantId, role, actorUserId);
     const inviteEmail = sendInvite
       ? await sendInviteEmail(email, name, tenant.name, token)
       : { ok: false as const, reason: 'not_requested' as const };
 
     await logAdminAudit({
       action: 'tenant.user.add',
-      actorUserId: adminId,
+      actorUserId,
       actorEmail,
       targetType: 'user',
       targetId: newUserId,

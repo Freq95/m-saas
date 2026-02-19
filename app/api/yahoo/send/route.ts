@@ -1,12 +1,13 @@
 import { NextRequest } from 'next/server';
 import { getYahooConfig, sendYahooEmail } from '@/lib/yahoo-mail';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
-import { getAuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, type AuthContext } from '@/lib/auth-helpers';
 
 // POST /api/yahoo/send - Send email via Yahoo
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await getAuthUser();
+    const authUser: AuthContext = await getAuthUser();
+    const { userId } = authUser;
     const body = await request.json();
 
     // Get config from database (with env fallback)

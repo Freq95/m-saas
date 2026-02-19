@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, email: actorEmail } = await getSuperAdmin();
+    const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
     const db = await getMongoDbOrThrow();
     await ensureTenantIndexes(db);
     const body = await request.json();
@@ -168,14 +168,14 @@ export async function POST(request: NextRequest) {
     await db.collection('users').insertOne(userDoc);
     await db.collection('team_members').insertOne(teamMemberDoc);
 
-    const token = await createInviteToken(ownerEmail, ownerId, tenantId, 'owner', userId);
+    const token = await createInviteToken(ownerEmail, ownerId, tenantId, 'owner', actorUserId);
     const inviteEmail = sendInvite
       ? await sendInviteEmail(ownerEmail, ownerName, clinicName, token)
       : { ok: false as const, reason: 'not_requested' as const };
 
     await logAdminAudit({
       action: 'tenant.create',
-      actorUserId: userId,
+      actorUserId,
       actorEmail,
       targetType: 'tenant',
       targetId: tenantId,

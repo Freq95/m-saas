@@ -173,7 +173,12 @@ export async function PATCH(
     const tenant = await db.collection('tenants').findOne({ _id: tenantId });
 
     await logAdminAudit({
-      action: updates.status === 'active' && before?.deleted_at ? 'tenant.restore' : 'tenant.update',
+      action:
+        nextStatus === 'suspended' && before?.status !== 'suspended'
+          ? 'tenant.suspend'
+          : updates.status === 'active' && before?.deleted_at
+            ? 'tenant.restore'
+            : 'tenant.update',
       actorUserId,
       actorEmail,
       targetType: 'tenant',
