@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { saveEmailIntegration } from '@/lib/email-integrations';
 import { testYahooConnection } from '@/lib/yahoo-mail';
-import { DEFAULT_USER_ID } from '@/lib/constants';
 import { createYahooIntegrationSchema } from '@/lib/validation';
 import { logger } from '@/lib/logger';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // POST /api/settings/email-integrations/yahoo
 export async function POST(request: NextRequest) {
   try {
+    const { userId } = await getAuthUser();
     const body = await request.json();
     
     const validationResult = createYahooIntegrationSchema.safeParse(body);
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Invalid input', 400, JSON.stringify(validationResult.error.errors));
     }
     
-    const { userId, email, password } = validationResult.data;
+    const { email, password } = validationResult.data;
     
     // Test connection before saving
     try {

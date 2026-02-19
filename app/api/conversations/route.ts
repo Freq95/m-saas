@@ -4,24 +4,12 @@ export const dynamic = 'force-dynamic';
 import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { getConversationsData } from '@/lib/server/inbox';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // GET /api/conversations - Get all conversations from storage
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
-
-    // Validate query parameters
-    const { conversationsQuerySchema } = await import('@/lib/validation');
-    const queryParams = {
-      userId: searchParams.get('userId') || '1',
-    };
-
-    const validationResult = conversationsQuerySchema.safeParse(queryParams);
-    if (!validationResult.success) {
-      return handleApiError(validationResult.error, 'Invalid query parameters');
-    }
-
-    const { userId } = validationResult.data;
+    const { userId } = await getAuthUser();
     const conversations = await getConversationsData(userId);
 
     return createSuccessResponse({ conversations });
@@ -33,6 +21,7 @@ export async function GET(request: NextRequest) {
 // POST /api/conversations - Create new conversation
 export async function POST(request: NextRequest) {
   try {
+    const { userId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const body = await request.json();
 
@@ -49,7 +38,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { userId, channel, channelId, contactName, contactEmail, contactPhone, subject, initialMessage } = validationResult.data;
+    const { channel, channelId, contactName, contactEmail, contactPhone, subject, initialMessage } = validationResult.data;
     const now = new Date().toISOString();
     const conversationId = await getNextNumericId('conversations');
 

@@ -2,24 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { getServicesData } from '@/lib/server/calendar';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // GET /api/services - Get services
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
-
-    // Validate query parameters
-    const { servicesQuerySchema } = await import('@/lib/validation');
-    const queryParams = {
-      userId: searchParams.get('userId') || '1',
-    };
-
-    const validationResult = servicesQuerySchema.safeParse(queryParams);
-    if (!validationResult.success) {
-      return handleApiError(validationResult.error, 'Invalid query parameters');
-    }
-
-    const { userId } = validationResult.data;
+    const { userId } = await getAuthUser();
     const services = await getServicesData(userId);
 
     return createSuccessResponse({ services });
@@ -31,6 +19,7 @@ export async function GET(request: NextRequest) {
 // POST /api/services - Create service
 export async function POST(request: NextRequest) {
   try {
+    const { userId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const body = await request.json();
 
@@ -47,7 +36,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { userId, name, durationMinutes, price, description } = validationResult.data;
+    const { name, durationMinutes, price, description } = validationResult.data;
     const now = new Date().toISOString();
     const serviceId = await getNextNumericId('services');
     const serviceDoc = {

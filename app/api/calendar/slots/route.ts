@@ -2,16 +2,18 @@ import { NextRequest } from 'next/server';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getAvailableSlots, getSuggestedSlots } from '@/lib/calendar';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // GET /api/calendar/slots - Get available time slots
 export async function GET(request: NextRequest) {
   try {
+    const { userId } = await getAuthUser();
     const searchParams = request.nextUrl.searchParams;
 
     // Validate query parameters
     const { calendarSlotsQuerySchema } = await import('@/lib/validation');
     const queryParams = {
-      userId: searchParams.get('userId') || '1',
+      userId: String(userId),
       date: searchParams.get('date') || undefined,
       providerId: searchParams.get('providerId') || undefined,
       resourceId: searchParams.get('resourceId') || undefined,
@@ -22,7 +24,7 @@ export async function GET(request: NextRequest) {
       return handleApiError(validationResult.error, 'Invalid query parameters');
     }
 
-    const { userId, date, providerId, resourceId } = validationResult.data;
+    const { date, providerId, resourceId } = validationResult.data;
     const serviceId = searchParams.get('serviceId');
     const suggested = searchParams.get('suggested') === 'true';
 

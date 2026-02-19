@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import DOMPurify from 'dompurify';
-import { DEFAULT_USER_ID } from '@/lib/constants';
+import { signOut } from 'next-auth/react';
 import { emailSchema } from '@/lib/validation';
 import { fetchWithRetry } from '@/lib/retry';
 import { useToast } from '@/lib/useToast';
@@ -32,9 +32,10 @@ interface EmailMessage {
 
 interface EmailSettingsPageContentProps {
   initialIntegrations: EmailIntegration[];
+  initialUserId: number;
 }
 
-function EmailSettingsPageContent({ initialIntegrations }: EmailSettingsPageContentProps) {
+function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailSettingsPageContentProps) {
   const [integrations, setIntegrations] = useState<EmailIntegration[]>(initialIntegrations);
   const [loading, setLoading] = useState(initialIntegrations.length === 0);
   const [showYahooForm, setShowYahooForm] = useState(false);
@@ -70,10 +71,8 @@ function EmailSettingsPageContent({ initialIntegrations }: EmailSettingsPageCont
 
   async function loadIntegrations() {
     try {
-      // TODO: Replace DEFAULT_USER_ID with actual userId from session/auth context
-      // For now, using DEFAULT_USER_ID as fallback until authentication is implemented
       const response = await fetchWithRetry(
-        `/api/settings/email-integrations?userId=${DEFAULT_USER_ID}`,
+        '/api/settings/email-integrations',
         {},
         { maxRetries: 2, initialDelay: 500 }
       );
@@ -139,7 +138,7 @@ function EmailSettingsPageContent({ initialIntegrations }: EmailSettingsPageCont
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userId: DEFAULT_USER_ID, // TODO: Get from session/auth context
+            userId: initialUserId,
             email: yahooEmail.trim(),
             password: passwordToSend,
           }),
@@ -222,7 +221,7 @@ function EmailSettingsPageContent({ initialIntegrations }: EmailSettingsPageCont
     setDeleting(id);
     try {
       const response = await fetchWithRetry(
-        `/api/settings/email-integrations/${id}?userId=${DEFAULT_USER_ID}`, // TODO: Get from session
+        `/api/settings/email-integrations/${id}`,
         { method: 'DELETE' },
         { maxRetries: 2, initialDelay: 500 }
       );
@@ -245,7 +244,7 @@ function EmailSettingsPageContent({ initialIntegrations }: EmailSettingsPageCont
     setTesting(id);
     try {
       const response = await fetchWithRetry(
-        `/api/settings/email-integrations/${id}/test?userId=${DEFAULT_USER_ID}`, // TODO: Get from session
+        `/api/settings/email-integrations/${id}/test`,
         { method: 'POST' },
         { maxRetries: 2, initialDelay: 500 }
       );
@@ -270,7 +269,7 @@ function EmailSettingsPageContent({ initialIntegrations }: EmailSettingsPageCont
     setLastEmail(null);
     try {
       const response = await fetchWithRetry(
-        `/api/settings/email-integrations/${id}/fetch-last-email?userId=${DEFAULT_USER_ID}`, // TODO: Get from session
+        `/api/settings/email-integrations/${id}/fetch-last-email`,
         { method: 'POST' },
         { maxRetries: 2, initialDelay: 1000 }
       );
@@ -341,7 +340,17 @@ function EmailSettingsPageContent({ initialIntegrations }: EmailSettingsPageCont
   return (
     <div className={navStyles.container}>
       <div className={styles.container}>
-        <h1>Email Integrations</h1>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
+          <h1>Email Integrations</h1>
+          <button
+            type="button"
+            className={styles.deleteButton}
+            onClick={() => signOut({ callbackUrl: '/login' })}
+            aria-label="Deconectare"
+          >
+            Deconectare
+          </button>
+        </div>
         <p className={styles.description}>
           Connect your email accounts to sync messages and manage conversations.
         </p>
@@ -596,10 +605,10 @@ function EmailSettingsPageContent({ initialIntegrations }: EmailSettingsPageCont
   );
 }
 
-export default function EmailSettingsPageClient({ initialIntegrations }: EmailSettingsPageContentProps) {
+export default function EmailSettingsPageClient({ initialIntegrations, initialUserId }: EmailSettingsPageContentProps) {
   return (
     <ErrorBoundary>
-      <EmailSettingsPageContent initialIntegrations={initialIntegrations} />
+      <EmailSettingsPageContent initialIntegrations={initialIntegrations} initialUserId={initialUserId} />
     </ErrorBoundary>
   );
 }

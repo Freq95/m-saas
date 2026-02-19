@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // GET /api/services/[id] - Get a single service
 export async function GET(
@@ -8,10 +9,11 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const serviceId = parseInt(params.id);
 
-    const service = await db.collection('services').findOne({ id: serviceId });
+    const service = await db.collection('services').findOne({ id: serviceId, user_id: userId });
 
     if (!service) {
       return NextResponse.json(
@@ -32,10 +34,9 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const serviceId = parseInt(params.id);
-    const { DEFAULT_USER_ID } = await import('@/lib/constants');
-    const userId = parseInt(request.nextUrl.searchParams.get('userId') || DEFAULT_USER_ID.toString(), 10);
     const body = await request.json();
 
     // Validate input
@@ -91,10 +92,9 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const serviceId = parseInt(params.id);
-    const { DEFAULT_USER_ID } = await import('@/lib/constants');
-    const userId = parseInt(request.nextUrl.searchParams.get('userId') || DEFAULT_USER_ID.toString(), 10);
 
     // Check if service is used in any appointments
     const appointmentCount = await db.collection('appointments').countDocuments({

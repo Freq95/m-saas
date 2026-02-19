@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 import '../styles/theme.css'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
-import RouteTransition from '@/components/RouteTransition'
-import AppTopNav from '@/components/AppTopNav'
+import AppChrome from '@/components/AppChrome'
+import AuthSessionProvider from '@/components/AuthSessionProvider'
 
 export const metadata: Metadata = {
   title: 'OpsGenie pentru Micro-Servicii',
@@ -18,12 +18,11 @@ export default function RootLayout({
   return (
     <html lang="ro">
       <body>
-        <ErrorBoundary>
-          <AppTopNav />
-          <div className="app-shell-content">
-            <RouteTransition>{children}</RouteTransition>
-          </div>
-        </ErrorBoundary>
+        <AuthSessionProvider>
+          <ErrorBoundary>
+            <AppChrome>{children}</AppChrome>
+          </ErrorBoundary>
+        </AuthSessionProvider>
       </body>
     </html>
   )

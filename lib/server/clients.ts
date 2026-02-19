@@ -1,5 +1,5 @@
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
-import { DEFAULT_PAGE_SIZE, DEFAULT_USER_ID } from '@/lib/constants';
+import { DEFAULT_PAGE_SIZE } from '@/lib/constants';
 import type { Client as ClientType } from '@/lib/types';
 
 type ClientsQuery = {
@@ -25,7 +25,10 @@ type ClientsResult = {
 
 export async function getClientsData(query: ClientsQuery = {}): Promise<ClientsResult> {
   const db = await getMongoDbOrThrow();
-  const userId = query.userId ?? DEFAULT_USER_ID;
+  if (!query.userId) {
+    throw new Error('userId is required');
+  }
+  const userId = query.userId;
   const search = query.search ?? '';
   const sortBy = query.sortBy ?? 'last_activity_date';
   const sortOrder = query.sortOrder ?? 'DESC';

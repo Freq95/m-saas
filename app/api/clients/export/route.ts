@@ -1,26 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { handleApiError } from '@/lib/error-handler';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // GET /api/clients/export - Export clients to CSV
 export async function GET(request: NextRequest) {
   try {
     const db = await getMongoDbOrThrow();
-    const searchParams = request.nextUrl.searchParams;
-
-    // Validate query parameters
-    const { userIdQuerySchema } = await import('@/lib/validation');
-    const { DEFAULT_USER_ID } = await import('@/lib/constants');
-    const queryParams = {
-      userId: searchParams.get('userId') || DEFAULT_USER_ID.toString(),
-    };
-
-    const validationResult = userIdQuerySchema.safeParse(queryParams);
-    if (!validationResult.success) {
-      return handleApiError(validationResult.error, 'Invalid query parameters');
-    }
-
-    const { userId } = validationResult.data;
+    const { userId } = await getAuthUser();
 
     const clients = await db
       .collection('clients')

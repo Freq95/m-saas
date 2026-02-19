@@ -1,6 +1,7 @@
 import InboxPageClient from './InboxPageClient';
-import { DEFAULT_USER_ID } from '@/lib/constants';
+import { redirect } from 'next/navigation';
 import { getConversationMessagesData, getConversationsData } from '@/lib/server/inbox';
+import { auth } from '@/lib/auth';
 
 export const revalidate = 30;
 
@@ -9,7 +10,12 @@ type InboxPageProps = {
 };
 
 export default async function InboxPage({ searchParams }: InboxPageProps) {
-  const conversations = await getConversationsData(DEFAULT_USER_ID);
+  const session = await auth();
+  if (!session?.user?.id) redirect('/login');
+  const userId = Number.parseInt(session.user.id, 10);
+  if (!Number.isFinite(userId) || userId <= 0) redirect('/login');
+
+  const conversations = await getConversationsData(userId);
 
   let selectedConversationId: number | null = null;
   if (searchParams?.conversation) {
@@ -43,6 +49,7 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
 
   return (
     <InboxPageClient
+      initialUserId={userId}
       initialConversations={conversations}
       initialSelectedConversationId={selectedConversationId}
       initialMessages={initialMessages}

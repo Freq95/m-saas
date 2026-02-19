@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getClientProfileData } from '@/lib/server/client-profile';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // GET /api/clients/[id] - Get client details with history
 export async function GET(
@@ -9,12 +10,13 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     const clientId = parseInt(params.id);
     if (isNaN(clientId) || clientId <= 0) {
       return createErrorResponse('Invalid client ID', 400);
     }
 
-    const profile = await getClientProfileData(clientId);
+    const profile = await getClientProfileData(clientId, userId);
     if (!profile) {
       return createErrorResponse('Client not found', 404);
     }
@@ -36,8 +38,7 @@ export async function PATCH(
     if (isNaN(clientId) || clientId <= 0) {
       return createErrorResponse('Invalid client ID', 400);
     }
-    const { DEFAULT_USER_ID } = await import('@/lib/constants');
-    const userId = parseInt(request.nextUrl.searchParams.get('userId') || DEFAULT_USER_ID.toString(), 10);
+    const { userId } = await getAuthUser();
     const body = await request.json();
 
     // Verify client exists and belongs to this user before updating
@@ -117,9 +118,7 @@ export async function DELETE(
       return createErrorResponse('Invalid client ID', 400);
     }
 
-    const { DEFAULT_USER_ID } = await import('@/lib/constants');
-    const searchParams = request.nextUrl.searchParams;
-    const userId = parseInt(searchParams.get('userId') || DEFAULT_USER_ID.toString());
+    const { userId } = await getAuthUser();
 
     // Verify client exists and belongs to this user
     const existing = await db.collection('clients').findOne({

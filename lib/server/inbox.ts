@@ -2,6 +2,7 @@ import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { parseStoredMessage } from '@/lib/email-types';
 
 type MessagePagination = {
+  userId?: number;
   limit?: number;
   offset?: number;
   beforeId?: number;
@@ -97,7 +98,11 @@ export async function getConversationMessagesData(
   pagination: MessagePagination = {}
 ) {
   const db = await getMongoDbOrThrow();
-  const conversationDoc = await db.collection('conversations').findOne({ id: conversationId });
+  const conversationFilter: Record<string, unknown> = { id: conversationId };
+  if (typeof pagination.userId === 'number') {
+    conversationFilter.user_id = pagination.userId;
+  }
+  const conversationDoc = await db.collection('conversations').findOne(conversationFilter);
   const conversation = conversationDoc ? stripMongoId(conversationDoc) : null;
 
   if (!conversation) {

@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // GET /api/clients/[id]/notes - Get notes for a client
 export async function GET(
@@ -8,6 +9,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
 
@@ -18,14 +20,14 @@ export async function GET(
 
     let notes = await db
       .collection('client_notes')
-      .find({ client_id: clientId })
+      .find({ client_id: clientId, user_id: userId })
       .sort({ created_at: -1 })
       .toArray();
 
     if (notes.length === 0) {
       notes = await db
         .collection('contact_notes')
-        .find({ contact_id: clientId })
+        .find({ contact_id: clientId, user_id: userId })
         .sort({ created_at: -1 })
         .toArray();
     }
@@ -42,10 +44,9 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
-    const { DEFAULT_USER_ID } = await import('@/lib/constants');
-    const userId = parseInt(request.nextUrl.searchParams.get('userId') || DEFAULT_USER_ID.toString(), 10);
 
     // Validate ID
     if (isNaN(clientId) || clientId <= 0) {

@@ -3,6 +3,7 @@ import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { updateClientStats } from '@/lib/client-matching';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { checkAppointmentConflict } from '@/lib/calendar-conflicts';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 const CONFLICT_MESSAGE_BY_TYPE: Record<string, string> = {
   provider_appointment: 'Providerul are deja o programare in acest interval.',
@@ -40,6 +41,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const appointmentId = Number(params.id);
 
@@ -47,7 +49,7 @@ export async function GET(
       return createErrorResponse('Invalid appointment ID', 400);
     }
 
-    const appointmentDoc = await db.collection('appointments').findOne({ id: appointmentId });
+    const appointmentDoc = await db.collection('appointments').findOne({ id: appointmentId, user_id: userId });
     if (!appointmentDoc) {
       return createErrorResponse('Appointment not found', 404);
     }
@@ -77,9 +79,9 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const appointmentId = Number(params.id);
-    const userId = parseInt(request.nextUrl.searchParams.get('userId') || '1', 10);
     const body = await request.json();
 
     if (Number.isNaN(appointmentId)) {
@@ -288,9 +290,9 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const appointmentId = Number(params.id);
-    const userId = parseInt(request.nextUrl.searchParams.get('userId') || '1', 10);
 
     if (Number.isNaN(appointmentId)) {
       return createErrorResponse('Invalid appointment ID', 400);

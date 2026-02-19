@@ -46,21 +46,28 @@ type ClientStatsData = {
   preferred_services: Array<{ name: string; count: number; total_spent: number }>;
 };
 
-export async function getClientProfileData(clientId: number): Promise<ClientProfileData | null> {
+export async function getClientProfileData(clientId: number, userId?: number): Promise<ClientProfileData | null> {
   const db = await getMongoDbOrThrow();
 
-  const clientDoc = await db.collection('clients').findOne({
-    id: clientId,
-    deleted_at: { $exists: false },
-  });
+  const clientFilter: Record<string, unknown> = { id: clientId, deleted_at: { $exists: false } };
+  if (typeof userId === 'number') clientFilter.user_id = userId;
+  const clientDoc = await db.collection('clients').findOne(clientFilter);
   if (!clientDoc) return null;
 
   const client = stripMongoId(clientDoc) as ProfileClient;
 
   const [appointments, services, conversations] = await Promise.all([
-    db.collection('appointments').find({ client_id: clientId }).sort({ start_time: -1 }).toArray(),
-    db.collection('services').find({}).toArray(),
-    db.collection('conversations').find({ client_id: clientId }).sort({ updated_at: -1 }).toArray(),
+    db
+      .collection('appointments')
+      .find(typeof userId === 'number' ? { client_id: clientId, user_id: userId } : { client_id: clientId })
+      .sort({ start_time: -1 })
+      .toArray(),
+    db.collection('services').find(typeof userId === 'number' ? { user_id: userId } : {}).toArray(),
+    db
+      .collection('conversations')
+      .find(typeof userId === 'number' ? { client_id: clientId, user_id: userId } : { client_id: clientId })
+      .sort({ updated_at: -1 })
+      .toArray(),
   ]);
 
   const serviceById = new Map<number, any>(
@@ -102,18 +109,20 @@ export async function getClientProfileData(clientId: number): Promise<ClientProf
   };
 }
 
-export async function getClientStatsData(clientId: number): Promise<ClientStatsData | null> {
+export async function getClientStatsData(clientId: number, userId?: number): Promise<ClientStatsData | null> {
   const db = await getMongoDbOrThrow();
 
-  const clientDoc = await db.collection('clients').findOne({
-    id: clientId,
-    deleted_at: { $exists: false },
-  });
+  const clientFilter: Record<string, unknown> = { id: clientId, deleted_at: { $exists: false } };
+  if (typeof userId === 'number') clientFilter.user_id = userId;
+  const clientDoc = await db.collection('clients').findOne(clientFilter);
   if (!clientDoc) return null;
 
   const [appointments, services] = await Promise.all([
-    db.collection('appointments').find({ client_id: clientId }).toArray(),
-    db.collection('services').find({}).toArray(),
+    db
+      .collection('appointments')
+      .find(typeof userId === 'number' ? { client_id: clientId, user_id: userId } : { client_id: clientId })
+      .toArray(),
+    db.collection('services').find(typeof userId === 'number' ? { user_id: userId } : {}).toArray(),
   ]);
 
   const serviceById = new Map<number, any>(

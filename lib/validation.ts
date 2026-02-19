@@ -12,7 +12,7 @@ const dateTimeSchema = z.string().datetime().or(z.date());
 
 // Conversation schemas
 export const createConversationSchema = z.object({
-  userId: z.number().int().positive().optional().default(1),
+  userId: z.number().int().positive().optional(),
   channel: z.enum(['email', 'facebook', 'form', 'sms', 'whatsapp']).default('email'),
   channelId: z.string().optional(),
   contactName: z.string().min(1, 'Contact name is required').max(255),
@@ -39,7 +39,7 @@ export const createMessageSchema = z.object({
 
 // Appointment schemas
 export const createAppointmentSchema = z.object({
-  userId: z.number().int().positive().optional().default(1),
+  userId: z.number().int().positive().optional(),
   conversationId: z.number().int().positive().optional(),
   serviceId: z.number().int().positive(),
   clientName: z.string().min(1, 'Client name is required').max(255),
@@ -73,7 +73,7 @@ export const updateAppointmentSchema = z.object({
 
 // Client schemas
 export const createClientSchema = z.object({
-  userId: z.number().int().positive().optional().default(1),
+  userId: z.number().int().positive().optional(),
   name: z.string().min(1, 'Name is required').max(255),
   email: emailSchema.optional(),
   phone: phoneSchema,
@@ -89,7 +89,7 @@ export const updateClientSchema = z.object({
 
 // Service schemas
 export const createServiceSchema = z.object({
-  userId: z.number().int().positive().optional().default(1),
+  userId: z.number().int().positive().optional(),
   name: z.string().min(1, 'Service name is required').max(255),
   durationMinutes: z.number().int().positive('Duration must be positive'),
   price: z.number().nonnegative('Price cannot be negative').optional(),
@@ -105,7 +105,7 @@ export const updateServiceSchema = z.object({
 
 // Yahoo sync schema
 export const yahooSyncSchema = z.object({
-  userId: z.number().int().positive().optional().default(1),
+  userId: z.number().int().positive().optional(),
   todayOnly: z.boolean().optional().default(false),
   since: dateTimeSchema.optional(),
   enableAiTagging: z.boolean().optional().default(false),
@@ -122,11 +122,11 @@ export const yahooSendSchema = z.object({
 
 // Query parameter schemas
 export const userIdQuerySchema = z.object({
-  userId: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
+  userId: z.string().regex(/^\d+$/).transform(Number).optional(),
 });
 
 export const appointmentsQuerySchema = z.object({
-  userId: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
+  userId: z.string().regex(/^\d+$/).transform(Number).optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
   providerId: z.string().regex(/^\d+$/).transform(Number).optional(),
@@ -135,33 +135,33 @@ export const appointmentsQuerySchema = z.object({
 });
 
 export const servicesQuerySchema = z.object({
-  userId: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
+  userId: z.string().regex(/^\d+$/).transform(Number).optional(),
 });
 
 export const conversationsQuerySchema = z.object({
-  userId: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
+  userId: z.string().regex(/^\d+$/).transform(Number).optional(),
 });
 
 export const dashboardQuerySchema = z.object({
-  userId: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
+  userId: z.string().regex(/^\d+$/).transform(Number).optional(),
   days: z.string().regex(/^\d+$/).transform(Number).optional().default('7'),
 });
 
 export const calendarSlotsQuerySchema = z.object({
-  userId: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
+  userId: z.string().regex(/^\d+$/).transform(Number).optional(),
   date: z.string().datetime().optional(),
   providerId: z.string().regex(/^\d+$/).transform(Number).optional(),
   resourceId: z.string().regex(/^\d+$/).transform(Number).optional(),
 });
 
 export const tasksQuerySchema = z.object({
-  userId: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
+  userId: z.string().regex(/^\d+$/).transform(Number).optional(),
   contactId: z.string().regex(/^\d+$/).transform(Number).optional(),
   status: z.enum(['open', 'completed', 'cancelled']).optional(),
 });
 
 export const remindersQuerySchema = z.object({
-  userId: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
+  userId: z.string().regex(/^\d+$/).transform(Number).optional(),
   status: z.enum(['pending', 'sent', 'failed']).optional(),
 });
 
@@ -182,7 +182,7 @@ export const updateTaskSchema = z.object({
 
 // Email integration schemas
 export const createYahooIntegrationSchema = z.object({
-  userId: z.number().int().positive().optional().default(1),
+  userId: z.number().int().positive().optional(),
   email: emailSchema,
   password: z.string().min(1, 'Password is required'),
 });

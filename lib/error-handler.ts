@@ -4,6 +4,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { AuthError } from '@/lib/auth-helpers';
 
 export interface ApiError {
   error: string;
@@ -36,6 +37,10 @@ export function createErrorResponse(
  * Handle API errors with standardized responses
  */
 export function handleApiError(error: unknown, defaultMessage: string = 'An error occurred'): NextResponse<ApiError> {
+  if (error instanceof AuthError) {
+    return createErrorResponse(error.message, error.status);
+  }
+
   if (error instanceof Error) {
     // Validation errors
     if (error.name === 'ZodError') {

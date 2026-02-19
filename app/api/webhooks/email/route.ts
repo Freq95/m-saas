@@ -3,14 +3,17 @@ import { getMongoDbOrThrow, getNextNumericId } from '@/lib/db/mongo-utils';
 import { suggestTags } from '@/lib/ai-agent';
 import { linkConversationToClient } from '@/lib/client-matching';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
-import { DEFAULT_USER_ID } from '@/lib/constants';
 
 // POST /api/webhooks/email - Webhook for receiving emails (Gmail/Outlook)
 export async function POST(request: NextRequest) {
   try {
     const db = await getMongoDbOrThrow();
     const body = await request.json();
-    const { userId = DEFAULT_USER_ID, from, to, subject, text, html } = body;
+    const { userId, from, to, subject, text, html } = body;
+    const normalizedUserId = Number.parseInt(String(userId || ''), 10);
+    if (!Number.isFinite(normalizedUserId) || normalizedUserId <= 0) {
+      throw new Error('Webhook payload must include a valid numeric userId');
+    }
 
     // Extract contact info
     const emailMatch = from.match(/<(.+)>/);
@@ -23,7 +26,7 @@ export async function POST(request: NextRequest) {
     let clientId: number | null = null;
     const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const existingClientDoc = await db.collection('clients').findOne({
-      user_id: userId,
+      user_id: normalizedUserId,
       email: { $regex: `^${escapedEmail}$`, $options: 'i' },
     });
     if (existingClientDoc) {
@@ -32,7 +35,7 @@ export async function POST(request: NextRequest) {
 
     const existingConv = await db
       .collection('conversations')
-      .find({ user_id: userId, channel: 'email', contact_email: email })
+      .find({ user_id: normalizedUserId, channel: 'email', contact_email: email })
       .sort({ created_at: -1 })
       .limit(1)
       .next();
@@ -51,7 +54,7 @@ export async function POST(request: NextRequest) {
       await db.collection('conversations').insertOne({
         _id: conversationId,
         id: conversationId,
-        user_id: userId,
+        user_id: normalizedUserId,
         channel: 'email',
         contact_name: name,
         contact_email: email,

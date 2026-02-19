@@ -6,6 +6,7 @@ import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getSuggestedSlots } from '@/lib/calendar';
 import { parseStoredMessage } from '@/lib/email-types';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // GET /api/conversations/[id]/suggest-response - Get AI suggested response
 export async function GET(
@@ -13,6 +14,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const conversationId = parseInt(params.id);
 
@@ -21,23 +23,8 @@ export async function GET(
       return createErrorResponse('Invalid conversation ID', 400);
     }
 
-    const searchParams = request.nextUrl.searchParams;
-
-    // Validate query parameters
-    const { userIdQuerySchema } = await import('@/lib/validation');
-    const queryParams = {
-      userId: searchParams.get('userId') || '1',
-    };
-
-    const validationResult = userIdQuerySchema.safeParse(queryParams);
-    if (!validationResult.success) {
-      return handleApiError(validationResult.error, 'Invalid query parameters');
-    }
-
-    const { userId } = validationResult.data;
-
     // Get conversation
-    const convDoc = await db.collection('conversations').findOne({ id: conversationId });
+    const convDoc = await db.collection('conversations').findOne({ id: conversationId, user_id: userId });
     if (!convDoc) {
       return createErrorResponse('Conversation not found', 404);
     }

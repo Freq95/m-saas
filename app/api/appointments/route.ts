@@ -4,16 +4,18 @@ import { isSlotAvailable } from '@/lib/calendar';
 import { exportToGoogleCalendar } from '@/lib/google-calendar';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { getAppointmentsData } from '@/lib/server/calendar';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // GET /api/appointments - Get appointments
 export async function GET(request: NextRequest) {
   try {
+    const { userId } = await getAuthUser();
     const searchParams = request.nextUrl.searchParams;
 
     // Validate query parameters
     const { appointmentsQuerySchema } = await import('@/lib/validation');
     const queryParams = {
-      userId: searchParams.get('userId') || '1',
+      userId: String(userId),
       startDate: searchParams.get('startDate') || undefined,
       endDate: searchParams.get('endDate') || undefined,
       providerId: searchParams.get('providerId') || undefined,
@@ -26,7 +28,7 @@ export async function GET(request: NextRequest) {
       return handleApiError(validationResult.error, 'Invalid query parameters');
     }
 
-    const { userId, startDate, endDate, providerId, resourceId, status } = validationResult.data;
+    const { startDate, endDate, providerId, resourceId, status } = validationResult.data;
     const appointments = await getAppointmentsData({ userId, startDate, endDate, providerId, resourceId, status });
 
     return createSuccessResponse({ appointments });
@@ -38,6 +40,7 @@ export async function GET(request: NextRequest) {
 // POST /api/appointments - Create appointment
 export async function POST(request: NextRequest) {
   try {
+    const { userId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const body = await request.json();
 
@@ -55,7 +58,6 @@ export async function POST(request: NextRequest) {
     }
 
     const {
-      userId,
       conversationId,
       serviceId,
       clientName,

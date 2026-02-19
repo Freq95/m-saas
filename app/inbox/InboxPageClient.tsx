@@ -5,7 +5,6 @@ import { useSearchParams } from 'next/navigation';
 import createDOMPurify from 'dompurify';
 import { format, isSameDay, isToday, isYesterday } from 'date-fns';
 import styles from './page.module.css';
-import { DEFAULT_USER_ID } from '@/lib/constants';
 import { useToast } from '@/lib/useToast';
 import { ToastContainer } from '@/components/Toast';
 
@@ -227,6 +226,7 @@ interface SaveableItem {
 }
 
 interface InboxPageClientProps {
+  initialUserId: number;
   initialConversations: Conversation[];
   initialSelectedConversationId: number | null;
   initialMessages: Message[] | null;
@@ -235,6 +235,7 @@ interface InboxPageClientProps {
 }
 
 export default function InboxPageClient({
+  initialUserId,
   initialConversations,
   initialSelectedConversationId,
   initialMessages,
@@ -359,7 +360,7 @@ export default function InboxPageClient({
 
   const fetchConversations = async () => {
     try {
-      const response = await fetch(`/api/conversations?userId=${DEFAULT_USER_ID}`, {
+      const response = await fetch('/api/conversations', {
         cache: 'no-store',
       });
       const result = await response.json();
@@ -489,7 +490,7 @@ export default function InboxPageClient({
       const response = await fetch('/api/yahoo/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: DEFAULT_USER_ID, todayOnly: true }),
+        body: JSON.stringify({ userId: initialUserId, todayOnly: true }),
       });
       if (!response.ok) {
         const err = await response.json();
@@ -614,7 +615,7 @@ export default function InboxPageClient({
       try {
         const trimmed = query.trim();
         const searchParams = new URLSearchParams({
-          userId: DEFAULT_USER_ID.toString(),
+          userId: initialUserId.toString(),
           limit: '30',
           page: '1',
           sortBy: 'name',

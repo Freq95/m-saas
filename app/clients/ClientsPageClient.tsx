@@ -132,7 +132,7 @@ export default function ClientsPageClient({
             <h1>Clienti</h1>
           </div>
           <div className={styles.headerActions}>
-            <a href="/api/clients/export?userId=1" download className={styles.exportButton}>
+            <a href="/api/clients/export" download className={styles.exportButton}>
               Export CSV
             </a>
             <button

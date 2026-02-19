@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // Validation schema
 const updateReminderSchema = z.object({
@@ -37,6 +38,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     const reminderId = parseInt(params.id);
 
     // Validate ID
@@ -44,7 +46,7 @@ export async function GET(
       return createErrorResponse('Invalid reminder ID', 400);
     }
 
-    const reminder = await getReminderWithAppointment(reminderId);
+    const reminder = await getReminderWithAppointment(reminderId, userId);
     if (!reminder) {
       return createErrorResponse('Reminder not found', 404);
     }
@@ -61,10 +63,9 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const reminderId = parseInt(params.id);
-    const { DEFAULT_USER_ID } = await import('@/lib/constants');
-    const userId = parseInt(request.nextUrl.searchParams.get('userId') || DEFAULT_USER_ID.toString(), 10);
     const body = await request.json();
 
     // Validate input
@@ -123,10 +124,9 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const reminderId = parseInt(params.id);
-    const { DEFAULT_USER_ID } = await import('@/lib/constants');
-    const userId = parseInt(request.nextUrl.searchParams.get('userId') || DEFAULT_USER_ID.toString(), 10);
 
     // Validate ID
     if (isNaN(reminderId) || reminderId <= 0) {

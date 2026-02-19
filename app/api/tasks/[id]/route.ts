@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // GET /api/tasks/[id] - Get a single task
 export async function GET(
@@ -8,6 +9,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const taskId = parseInt(params.id);
 
@@ -16,7 +18,7 @@ export async function GET(
       return createErrorResponse('Invalid task ID', 400);
     }
 
-    const task = await db.collection('tasks').findOne({ id: taskId });
+    const task = await db.collection('tasks').findOne({ id: taskId, user_id: userId });
 
     if (!task) {
       return createErrorResponse('Task not found', 404);
@@ -34,10 +36,9 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const taskId = parseInt(params.id);
-    const { DEFAULT_USER_ID } = await import('@/lib/constants');
-    const userId = parseInt(request.nextUrl.searchParams.get('userId') || DEFAULT_USER_ID.toString(), 10);
 
     // Validate ID
     if (isNaN(taskId) || taskId <= 0) {
@@ -92,10 +93,9 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const taskId = parseInt(params.id);
-    const { DEFAULT_USER_ID } = await import('@/lib/constants');
-    const userId = parseInt(request.nextUrl.searchParams.get('userId') || DEFAULT_USER_ID.toString(), 10);
 
     // Validate ID
     if (isNaN(taskId) || taskId <= 0) {

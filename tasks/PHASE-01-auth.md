@@ -152,11 +152,11 @@ EMAIL_FROM=noreply@yourdomain.com
 ```
 
 ### Acceptance criteria:
-- [ ] `lib/auth.ts` exists with Credentials provider only (no Google OAuth)
-- [ ] `app/api/auth/[...nextauth]/route.ts` exists
-- [ ] JWT session strategy with `userId`, `role`, `tenantId`
-- [ ] NextAuth types extended for role and tenantId
-- [ ] Build passes
+- [x] `lib/auth.ts` exists with Credentials provider only (no Google OAuth)
+- [x] `app/api/auth/[...nextauth]/route.ts` exists
+- [x] JWT session strategy with `userId`, `role`, `tenantId`
+- [x] NextAuth types extended for role and tenantId
+- [x] Build passes
 
 ---
 
@@ -230,11 +230,11 @@ export function requireRole(userRole: UserRole, minimumRole: UserRole) {
 ```
 
 ### Acceptance criteria:
-- [ ] `getAuthUser()` returns `{ userId, tenantId, email, name, role }` — for tenant routes
-- [ ] `getSuperAdmin()` returns super-admin context — for admin routes
-- [ ] `requireRole()` checks role hierarchy
-- [ ] AuthError includes HTTP status code (401 vs 403)
-- [ ] Build passes
+- [x] `getAuthUser()` returns `{ userId, tenantId, email, name, role }` — for tenant routes
+- [x] `getSuperAdmin()` returns super-admin context — for admin routes
+- [x] `requireRole()` checks role hierarchy
+- [x] AuthError includes HTTP status code (401 vs 403)
+- [x] Build passes
 
 ---
 
@@ -298,10 +298,10 @@ npm run admin:create -- your@email.com YourSecurePassword123 "Your Name"
 ```
 
 ### Acceptance criteria:
-- [ ] Script creates a user with `role: 'super_admin'` and `tenant_id: null`
-- [ ] Password hashed with bcrypt (cost 12)
-- [ ] Prevents duplicate creation
-- [ ] Build passes
+- [x] Script creates a user with `role: 'super_admin'` and `tenant_id: null`
+- [x] Password hashed with bcrypt (cost 12)
+- [x] Prevents duplicate creation
+- [x] Build passes
 
 ---
 
@@ -402,19 +402,19 @@ export async function GET(request: NextRequest) {
 ```
 
 ### Acceptance criteria:
-- [ ] `/admin` redirects to login if not authenticated
-- [ ] `/admin` shows 403 if authenticated but not super_admin
-- [ ] Dashboard shows tenant/user counts
-- [ ] Tenant list with search and filter works
-- [ ] "Create Tenant" flow creates tenant (with `max_seats`) + user + sends invite email
-- [ ] `max_seats` field required on tenant creation (min: 1, default: 1)
-- [ ] Tenant detail shows members and seat usage (e.g. "3 / 5 seats used")
-- [ ] Super-admin can change `max_seats` (increase or decrease)
-- [ ] Decreasing `max_seats` below current active count is allowed but shows warning
-- [ ] Plan change works
-- [ ] Suspend/unsuspend works
-- [ ] Resend invite works
-- [ ] Build passes
+- [x] `/admin` redirects to login if not authenticated
+- [x] `/admin` shows 403 if authenticated but not super_admin
+- [x] Dashboard shows tenant/user counts
+- [x] Tenant list with search and filter works
+- [x] "Create Tenant" flow creates tenant (with `max_seats`) + user + sends invite email
+- [x] `max_seats` field required on tenant creation (min: 1, default: 1)
+- [x] Tenant detail shows members and seat usage (e.g. "3 / 5 seats used")
+- [x] Super-admin can change `max_seats` (increase or decrease)
+- [x] Decreasing `max_seats` below current active count is allowed but shows warning
+- [x] Plan change works
+- [x] Suspend/unsuspend works
+- [x] Resend invite works
+- [x] Build passes
 
 ---
 
@@ -540,13 +540,13 @@ db.invite_tokens.createIndex({ email: 1, used_at: 1 });
 ```
 
 ### Acceptance criteria:
-- [ ] `lib/invite.ts` exists with create/validate/markUsed/sendEmail functions
-- [ ] Tokens are 32 random bytes (hex encoded)
-- [ ] Tokens expire after 48 hours
-- [ ] Expired tokens auto-deleted by MongoDB TTL index
-- [ ] Email includes Romanian text and a clear CTA button
-- [ ] Graceful fallback when RESEND_API_KEY not set (logs to console for dev)
-- [ ] Build passes
+- [x] `lib/invite.ts` exists with create/validate/markUsed/sendEmail functions
+- [x] Tokens are 32 random bytes (hex encoded)
+- [x] Tokens expire after 48 hours
+- [x] Expired tokens auto-deleted by MongoDB TTL index
+- [x] Email includes Romanian text and a clear CTA button
+- [x] Graceful fallback when RESEND_API_KEY not set (logs to console for dev)
+- [x] Build passes
 
 ---
 
@@ -636,14 +636,14 @@ export async function POST(request, { params }) {
 ```
 
 ### Acceptance criteria:
-- [ ] `/invite/{token}` page renders with pre-filled email and tenant name
-- [ ] Expired/invalid token shows clear error message
-- [ ] Password validation: minimum 8 characters
-- [ ] Password confirmation must match
-- [ ] After setting password, user status changes to 'active'
-- [ ] Token is marked as used (can't be reused)
-- [ ] Redirects to `/login` with success message
-- [ ] Build passes
+- [x] `/invite/{token}` page renders with pre-filled email and tenant name
+- [x] Expired/invalid token shows clear error message
+- [x] Password validation: minimum 8 characters
+- [x] Password confirmation must match
+- [x] After setting password, user status changes to 'active'
+- [x] Token is marked as used (can't be reused)
+- [x] Redirects to `/login` with success message
+- [x] Build passes
 
 ---
 
@@ -665,12 +665,12 @@ export async function POST(request, { params }) {
 - No navigation links to the main app
 
 ### Acceptance criteria:
-- [ ] `/login` renders with email + password form
-- [ ] Invalid credentials show error message
-- [ ] Super-admin redirects to `/admin` after login
-- [ ] Tenant users redirect to `/dashboard` after login
-- [ ] No registration link anywhere
-- [ ] Build passes
+- [x] `/login` renders with email + password form
+- [x] Invalid credentials show error message
+- [x] Super-admin redirects to `/admin` after login
+- [x] Tenant users redirect to `/dashboard` after login
+- [x] No registration link anywhere
+- [x] Build passes
 
 ---
 
@@ -742,12 +742,12 @@ export const config = {
 ```
 
 ### Acceptance criteria:
-- [ ] Unauthenticated → API returns 401, pages redirect to `/login`
-- [ ] Non-super-admin accessing `/admin` → redirected to `/dashboard`
-- [ ] Super-admin accessing `/admin` → allowed
-- [ ] User without tenant accessing tenant routes → blocked
-- [ ] `/login`, `/invite/*`, `/api/auth/*`, `/api/webhooks/*` → public
-- [ ] Build passes
+- [x] Unauthenticated → API returns 401, pages redirect to `/login`
+- [x] Non-super-admin accessing `/admin` → redirected to `/dashboard`
+- [x] Super-admin accessing `/admin` → allowed
+- [x] User without tenant accessing tenant routes → blocked
+- [x] `/login`, `/invite/*`, `/api/auth/*`, `/api/webhooks/*` → public
+- [x] Build passes
 
 ---
 
@@ -819,12 +819,12 @@ app/api/settings/email-integrations/[id]/fetch-last-email/route.ts — Use getAu
 - Remove all `userId` query parameter parsing from validation schemas
 
 ### Acceptance criteria:
-- [ ] `DEFAULT_USER_ID` no longer exists in any file
-- [ ] Zero references to `.default(1)` in validation schemas
-- [ ] All API routes use `getAuthUser()` or `getSuperAdmin()`
-- [ ] All pages use session for user identity
-- [ ] `app/layout.tsx` wrapped with `SessionProvider`
-- [ ] Build passes
+- [x] `DEFAULT_USER_ID` no longer exists in any file
+- [x] Zero references to `.default(1)` in validation schemas
+- [x] All API routes use `getAuthUser()` or `getSuperAdmin()`
+- [x] All pages use session for user identity
+- [x] `app/layout.tsx` wrapped with `SessionProvider`
+- [x] Build passes
 
 ---
 
@@ -846,10 +846,10 @@ export function handleApiError(error: unknown, context: string) {
 ```
 
 ### Acceptance criteria:
-- [ ] AuthError with status 401 returns 401
-- [ ] AuthError with status 403 returns 403
-- [ ] Other errors still return appropriate codes
-- [ ] Build passes
+- [x] AuthError with status 401 returns 401
+- [x] AuthError with status 403 returns 403
+- [x] Other errors still return appropriate codes
+- [x] Build passes
 
 ---
 
@@ -926,3 +926,4 @@ Commit:
 ```bash
 git add -A && git commit -m "PHASE-01: Add NextAuth v5 auth, invite-only onboarding, super-admin dashboard"
 ```
+

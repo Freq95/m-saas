@@ -1,5 +1,4 @@
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
-import { DEFAULT_USER_ID } from '@/lib/constants';
 
 type AppointmentQuery = {
   userId?: number;
@@ -12,7 +11,10 @@ type AppointmentQuery = {
 
 export async function getAppointmentsData(query: AppointmentQuery = {}) {
   const db = await getMongoDbOrThrow();
-  const userId = query.userId ?? DEFAULT_USER_ID;
+  if (!query.userId) {
+    throw new Error('userId is required');
+  }
+  const userId = query.userId;
   const startDate = query.startDate instanceof Date ? query.startDate.toISOString() : query.startDate;
   const endDate = query.endDate instanceof Date ? query.endDate.toISOString() : query.endDate;
   const providerId = query.providerId;
@@ -61,7 +63,7 @@ export async function getAppointmentsData(query: AppointmentQuery = {}) {
   });
 }
 
-export async function getServicesData(userId: number = DEFAULT_USER_ID) {
+export async function getServicesData(userId: number) {
   const db = await getMongoDbOrThrow();
   const services = await db
     .collection('services')

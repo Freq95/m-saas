@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getEmailIntegrationById } from '@/lib/email-integrations';
 import { fetchYahooEmails } from '@/lib/yahoo-mail';
-import { DEFAULT_USER_ID } from '@/lib/constants';
 import { logger } from '@/lib/logger';
 import { decrypt } from '@/lib/encryption';
 import { integrationIdParamSchema } from '@/lib/validation';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // POST /api/settings/email-integrations/[id]/fetch-last-email
 export async function POST(
@@ -13,6 +13,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     // Validate route parameter
     const paramValidation = integrationIdParamSchema.safeParse({ id: params.id });
     if (!paramValidation.success) {
@@ -20,9 +21,6 @@ export async function POST(
     }
     
     const integrationId = paramValidation.data.id;
-    const searchParams = request.nextUrl.searchParams;
-    const userId = parseInt(searchParams.get('userId') || String(DEFAULT_USER_ID));
-    
     // Get integration
     const integration = await getEmailIntegrationById(integrationId, userId);
     

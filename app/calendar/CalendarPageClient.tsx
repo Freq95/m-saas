@@ -35,6 +35,7 @@ interface CalendarPageClientProps {
   initialServices: Service[];
   initialDate: string;
   initialViewType?: 'week' | 'workweek' | 'month' | 'day';
+  initialUserId: number;
 }
 
 export default function CalendarPageClient({
@@ -42,6 +43,7 @@ export default function CalendarPageClient({
   initialServices,
   initialDate,
   initialViewType = 'week',
+  initialUserId,
 }: CalendarPageClientProps) {
   const toast = useToast();
   const { state, actions } = useCalendar(initialDate, initialViewType);
@@ -54,21 +56,27 @@ export default function CalendarPageClient({
     useAppointments({
       currentDate: state.currentDate,
       viewType: state.viewType,
-      userId: 1,
+      userId: initialUserId,
       providerId: state.selectedProvider?.id,
       resourceId: state.selectedResource?.id,
       initialAppointments,
     });
 
-  const { providers } = useProviders(1);
-  const { resources } = useResources(1);
+  const { providers } = useProviders(initialUserId);
+  const { resources } = useResources(initialUserId);
 
   // Day view: single-day array for WeekView reuse
   const dayViewDays = useMemo(() => [state.currentDate], [state.currentDate]);
   const visibleDays = state.viewType === 'month' ? monthDays : state.viewType === 'day' ? dayViewDays : weekDays;
   const viewStart = visibleDays[0];
   const viewEnd = visibleDays[visibleDays.length - 1];
-  const { blockedTimes } = useBlockedTimes(1, state.selectedProvider?.id, state.selectedResource?.id, viewStart, viewEnd);
+  const { blockedTimes } = useBlockedTimes(
+    initialUserId,
+    state.selectedProvider?.id,
+    state.selectedResource?.id,
+    viewStart,
+    viewEnd
+  );
 
   const [selectedDay, setSelectedDay]               = useState<Date>(() => new Date());
   const [services, setServices]                     = useState<Service[]>(initialServices);
@@ -111,7 +119,7 @@ export default function CalendarPageClient({
   // Lazy-load services if not provided server-side
   useEffect(() => {
     if (initialServices.length > 0) return;
-    fetch('/api/services?userId=1')
+    fetch('/api/services')
       .then((r) => r.json())
       .then((d) => setServices(d.services || []))
       .catch(() => toast.error('Eroare la incarcarea serviciilor.'));
@@ -215,7 +223,6 @@ export default function CalendarPageClient({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userId: 1,
             serviceId: parseInt(formData.serviceId),
             clientName: formData.clientName.trim(),
             clientEmail: formData.clientEmail || undefined,

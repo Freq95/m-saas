@@ -1,8 +1,10 @@
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { ro } from 'date-fns/locale';
+import { redirect } from 'next/navigation';
 import styles from './page.module.css';
 import { getDashboardData } from '@/lib/server/dashboard';
+import { auth } from '@/lib/auth';
 
 export const revalidate = 30;
 
@@ -46,7 +48,12 @@ interface DashboardData {
 }
 
 export default async function DashboardPage() {
-  const data: DashboardData = await getDashboardData(1, 7);
+  const session = await auth();
+  if (!session?.user?.id) redirect('/login');
+  const userId = Number.parseInt(session.user.id, 10);
+  if (!Number.isFinite(userId) || userId <= 0) redirect('/login');
+
+  const data: DashboardData = await getDashboardData(userId, 7);
 
   return (
     <div className={styles.container}>

@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getConversationMessagesData } from '@/lib/server/inbox';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // GET /api/conversations/[id] - Get conversation with messages
 export async function GET(
@@ -11,6 +12,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     const conversationId = parseInt(params.id);
 
     const { searchParams } = request.nextUrl;
@@ -20,6 +22,7 @@ export async function GET(
 
     // Get conversation
     const messageData = await getConversationMessagesData(conversationId, {
+      userId,
       limit,
       offset,
       beforeId: beforeId ? parseInt(beforeId) : undefined,
@@ -48,10 +51,9 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const conversationId = parseInt(params.id);
-    const { DEFAULT_USER_ID } = await import('@/lib/constants');
-    const userId = parseInt(request.nextUrl.searchParams.get('userId') || DEFAULT_USER_ID.toString(), 10);
     const body = await request.json();
 
     // Validate conversation exists

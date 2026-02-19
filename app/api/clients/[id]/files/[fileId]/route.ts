@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import * as fs from 'fs';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // PATCH /api/clients/[id]/files/[fileId] - Update file description
 export async function PATCH(
@@ -9,10 +10,9 @@ export async function PATCH(
   { params }: { params: { id: string; fileId: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const fileId = parseInt(params.fileId);
-    const { DEFAULT_USER_ID } = await import('@/lib/constants');
-    const userId = parseInt(request.nextUrl.searchParams.get('userId') || DEFAULT_USER_ID.toString(), 10);
     const body = await request.json();
 
     const { description } = body;
@@ -54,10 +54,9 @@ export async function DELETE(
   { params }: { params: { id: string; fileId: string } }
 ) {
   try {
+    const { userId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const fileId = parseInt(params.fileId);
-    const { DEFAULT_USER_ID } = await import('@/lib/constants');
-    const userId = parseInt(request.nextUrl.searchParams.get('userId') || DEFAULT_USER_ID.toString(), 10);
 
     let file = await db.collection('client_files').findOne({ id: fileId, user_id: userId });
     let collectionName = 'client_files';

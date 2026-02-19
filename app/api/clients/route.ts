@@ -3,13 +3,13 @@ import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { getClientsData } from '@/lib/server/clients';
 import { findOrCreateClient } from '@/lib/client-matching';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // GET /api/clients - Get all clients with filtering and sorting
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const { DEFAULT_USER_ID } = await import('@/lib/constants');
-    const userId = parseInt(searchParams.get('userId') || DEFAULT_USER_ID.toString());
+    const { userId } = await getAuthUser();
     const search = searchParams.get('search') || '';
     const sortBy = searchParams.get('sortBy') || 'last_appointment_date';
     const sortOrder = searchParams.get('sortOrder') || 'DESC';
@@ -51,7 +51,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { userId, name, email, phone, notes } = validationResult.data;
+    const { userId } = await getAuthUser();
+    const { name, email, phone, notes } = validationResult.data;
 
     // Use findOrCreateClient to avoid duplicates
     let client;
