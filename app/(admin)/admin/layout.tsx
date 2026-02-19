@@ -27,6 +27,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <Link href="/admin/users">Users</Link>
           <Link href="/admin/tenants/new">Create Tenant</Link>
           <Link href="/admin/audit">Audit Logs</Link>
+          <Link href="/admin/docs">Docs</Link>
         </nav>
       </aside>
       <main style={{ padding: 20 }}>{children}</main>

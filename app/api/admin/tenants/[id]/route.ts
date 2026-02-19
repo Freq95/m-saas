@@ -10,6 +10,73 @@ function parseTenantId(id: string): ObjectId | null {
   return new ObjectId(id);
 }
 
+async function cascadeTenantStatus(db: any, tenantId: ObjectId, targetStatus: 'suspended' | 'deleted') {
+  const nowIso = new Date().toISOString();
+  const users = await db.collection('users').find({ tenant_id: tenantId }).toArray();
+  const members = await db.collection('team_members').find({ tenant_id: tenantId }).toArray();
+  for (const member of members) {
+    if (!['active', 'pending_invite', 'suspended'].includes(member.status)) continue;
+    await db.collection('team_members').updateOne(
+      { _id: member._id },
+      {
+        $set: {
+          status: targetStatus === 'deleted' ? 'revoked' : 'suspended',
+          pre_tenant_disable_status: member.status,
+          disabled_by_tenant: true,
+          updated_at: nowIso,
+        },
+      }
+    );
+  }
+
+  for (const user of users) {
+    const currentStatus = user.status || 'active';
+    if (['active', 'pending_invite', 'suspended'].includes(currentStatus)) {
+      await db.collection('users').updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            status: targetStatus === 'deleted' ? 'deleted' : 'suspended',
+            pre_tenant_disable_status: currentStatus,
+            disabled_by_tenant: true,
+            updated_at: nowIso,
+          },
+        }
+      );
+    }
+  }
+}
+
+async function restoreTenantCascade(db: any, tenantId: ObjectId) {
+  const nowIso = new Date().toISOString();
+
+  const users = await db.collection('users').find({ tenant_id: tenantId }).toArray();
+  for (const user of users) {
+    if (!user.disabled_by_tenant) continue;
+    const restoreStatus = user.pre_tenant_disable_status || (user.status === 'deleted' ? 'active' : user.status);
+    await db.collection('users').updateOne(
+      { _id: user._id },
+      {
+        $set: { status: restoreStatus, updated_at: nowIso },
+        $unset: { pre_tenant_disable_status: '', disabled_by_tenant: '' },
+      }
+    );
+  }
+
+  const members = await db.collection('team_members').find({ tenant_id: tenantId }).toArray();
+  for (const member of members) {
+    if (!member.disabled_by_tenant) continue;
+    const restoreStatus = member.pre_tenant_disable_status || 'active';
+    await db.collection('team_members').updateOne(
+      { _id: member._id },
+      {
+        $set: { status: restoreStatus, updated_at: nowIso },
+        $unset: { pre_tenant_disable_status: '', disabled_by_tenant: '' },
+      }
+    );
+  }
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } }
@@ -87,7 +154,22 @@ export async function PATCH(
     updates.updated_at = new Date().toISOString();
     const db = await getMongoDbOrThrow();
     const before = await db.collection('tenants').findOne({ _id: tenantId });
+    const nextStatus = updates.status as string | undefined;
+    if (nextStatus && nextStatus !== before?.status) {
+      const reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
+      if (reason.length < 3) {
+        return createErrorResponse('Reason is required for status transitions', 400);
+      }
+      updates.status_reason = reason;
+    }
     await db.collection('tenants').updateOne({ _id: tenantId }, { $set: updates });
+    if (nextStatus === 'suspended') {
+      await cascadeTenantStatus(db, tenantId, 'suspended');
+    } else if (nextStatus === 'deleted') {
+      await cascadeTenantStatus(db, tenantId, 'deleted');
+    } else if (nextStatus === 'active' && before?.status !== 'active') {
+      await restoreTenantCascade(db, tenantId);
+    }
     const tenant = await db.collection('tenants').findOne({ _id: tenantId });
 
     await logAdminAudit({
@@ -111,8 +193,10 @@ export async function PATCH(
             plan: tenant.plan,
             status: tenant.status,
             max_seats: tenant.max_seats,
+            status_reason: tenant.status_reason || null,
           }
         : null,
+      metadata: nextStatus && nextStatus !== before?.status ? { reason: updates.status_reason || null } : null,
     });
     return createSuccessResponse({ tenant });
   } catch (error) {
@@ -131,6 +215,12 @@ export async function DELETE(
 
     const db = await getMongoDbOrThrow();
     const before = await db.collection('tenants').findOne({ _id: tenantId });
+    if (!before) return createErrorResponse('Tenant not found', 404);
+    const body = await _request.json().catch(() => ({}));
+    const reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
+    if (reason.length < 3) {
+      return createErrorResponse('Reason is required for soft delete', 400);
+    }
     const nowIso = new Date().toISOString();
     await db.collection('tenants').updateOne(
       { _id: tenantId },
@@ -139,10 +229,12 @@ export async function DELETE(
           status: 'deleted',
           deleted_at: nowIso,
           deleted_by: actorUserId,
+          status_reason: reason,
           updated_at: nowIso,
         },
       }
     );
+    await cascadeTenantStatus(db, tenantId, 'deleted');
 
     await logAdminAudit({
       action: 'tenant.soft_delete',
@@ -161,6 +253,7 @@ export async function DELETE(
         status: 'deleted',
         deleted_at: nowIso,
       },
+      metadata: { reason },
     });
 
     return createSuccessResponse({ success: true, status: 'deleted' });

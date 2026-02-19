@@ -73,13 +73,24 @@ export async function validateInviteToken(token: string): Promise<InviteToken | 
 
 export async function markInviteUsed(token: string): Promise<void> {
   const db = await getMongoDbOrThrow();
-  await db.collection('invite_tokens').updateOne({ token }, { $set: { used_at: new Date() } });
+  const result = await db.collection('invite_tokens').updateOne(
+    {
+      token,
+      used_at: null,
+      expires_at: { $gt: new Date() },
+    },
+    { $set: { used_at: new Date() } }
+  );
+
+  if (result.modifiedCount === 0) {
+    throw new Error('Invite token already used or expired');
+  }
 }
 
 export async function sendInviteEmail(email: string, name: string, tenantName: string, token: string) {
   const inviteUrl = `${getBaseUrl()}/invite/${token}`;
 
-  await sendEmail({
+  return sendEmail({
     to: email,
     subject: `Ai fost invitat pe ${tenantName}`,
     html: `

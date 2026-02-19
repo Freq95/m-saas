@@ -16,6 +16,7 @@ export default function TenantDetailClient({ tenant, owner, members, seatUsage }
   const [status, setStatus] = useState(tenant.status || 'active');
   const [maxSeats, setMaxSeats] = useState(Number(tenant.max_seats || 1));
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const isDeleted = tenant.status === 'deleted' || Boolean(tenant.deleted_at);
 
@@ -33,11 +34,21 @@ export default function TenantDetailClient({ tenant, owner, members, seatUsage }
   async function saveTenantChanges(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    const statusChanged = status !== (tenant.status || 'active');
+    let reason: string | undefined;
+    if (statusChanged) {
+      const input = window.prompt('Provide reason for tenant status transition:');
+      if (!input || input.trim().length < 3) {
+        setError('Reason is required for status transitions.');
+        return;
+      }
+      reason = input.trim();
+    }
     setWorking(true);
     const response = await fetch(`/api/admin/tenants/${tenant._id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ plan, status, maxSeats }),
+      body: JSON.stringify({ plan, status, maxSeats, reason }),
     });
     const data = await response.json();
     if (!response.ok) {
@@ -50,9 +61,20 @@ export default function TenantDetailClient({ tenant, owner, members, seatUsage }
   }
 
   async function softDeleteTenant() {
+    const confirmed = window.confirm('Soft delete this tenant? This will disable all tenant users and memberships.');
+    if (!confirmed) return;
+    const reason = window.prompt('Reason for soft delete:');
+    if (!reason || reason.trim().length < 3) {
+      setError('Reason is required for soft delete.');
+      return;
+    }
     setError(null);
     setWorking(true);
-    const response = await fetch(`/api/admin/tenants/${tenant._id}`, { method: 'DELETE' });
+    const response = await fetch(`/api/admin/tenants/${tenant._id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: reason.trim() }),
+    });
     const data = await response.json();
     if (!response.ok) {
       setError(data.error || 'Failed to suspend tenant');
@@ -64,9 +86,20 @@ export default function TenantDetailClient({ tenant, owner, members, seatUsage }
   }
 
   async function restoreTenant() {
+    const confirmed = window.confirm('Restore this tenant and re-enable tenant users/memberships?');
+    if (!confirmed) return;
+    const reason = window.prompt('Reason for restore:');
+    if (!reason || reason.trim().length < 3) {
+      setError('Reason is required for restore.');
+      return;
+    }
     setError(null);
     setWorking(true);
-    const response = await fetch(`/api/admin/tenants/${tenant._id}/restore`, { method: 'POST' });
+    const response = await fetch(`/api/admin/tenants/${tenant._id}/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: reason.trim() }),
+    });
     const data = await response.json();
     if (!response.ok) {
       setError(data.error || 'Failed to restore tenant');
@@ -79,6 +112,7 @@ export default function TenantDetailClient({ tenant, owner, members, seatUsage }
 
   async function resendInvite(userId: string) {
     setError(null);
+    setNotice(null);
     setWorking(true);
     const response = await fetch(`/api/admin/tenants/${tenant._id}/resend-invite`, {
       method: 'POST',
@@ -91,6 +125,11 @@ export default function TenantDetailClient({ tenant, owner, members, seatUsage }
       setWorking(false);
       return;
     }
+    if (data?.inviteEmail?.requested && !data?.inviteEmail?.sent) {
+      setNotice('Invite token regenerated, but email was not sent because email service is not configured.');
+    } else {
+      setNotice('Invite resent successfully.');
+    }
     router.refresh();
     setWorking(false);
   }
@@ -98,6 +137,7 @@ export default function TenantDetailClient({ tenant, owner, members, seatUsage }
   async function addUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setNotice(null);
     setWorking(true);
     const form = new FormData(event.currentTarget);
     const response = await fetch(`/api/admin/tenants/${tenant._id}/users`, {
@@ -115,6 +155,11 @@ export default function TenantDetailClient({ tenant, owner, members, seatUsage }
       setError(data.error || 'Failed to add user');
       setWorking(false);
       return;
+    }
+    if (data?.inviteEmail?.requested && !data?.inviteEmail?.sent) {
+      setNotice('User created, but invite email was not sent because email service is not configured.');
+    } else {
+      setNotice('User created and invite email sent.');
     }
     event.currentTarget.reset();
     router.refresh();
@@ -135,6 +180,7 @@ export default function TenantDetailClient({ tenant, owner, members, seatUsage }
 
       <form onSubmit={saveTenantChanges} style={{ display: 'grid', gap: 8, maxWidth: 400 }}>
         {error && <p style={{ color: '#f87171' }}>{error}</p>}
+        {notice && <p style={{ color: '#facc15' }}>{notice}</p>}
         <label style={{ display: 'grid', gap: 6 }}>
           <span>Plan</span>
           <select value={plan} onChange={(e) => setPlan(e.target.value)}>

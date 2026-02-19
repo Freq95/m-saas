@@ -17,16 +17,27 @@ export async function POST(
     const db = await getMongoDbOrThrow();
     const before = await db.collection('users').findOne({ _id: userId });
     if (!before) return createErrorResponse('User not found', 404);
+    const body = await request.json().catch(() => ({}));
+    const reason = typeof body?.reason === 'string' ? body.reason.trim() : '';
+    if (reason.length < 3) {
+      return createErrorResponse('Reason is required for restore', 400);
+    }
 
+    const nowIso = new Date().toISOString();
     await db.collection('users').updateOne(
       { _id: userId },
       {
         $set: {
           status: 'active',
-          updated_at: new Date().toISOString(),
+          updated_at: nowIso,
+          status_reason: reason,
         },
         $unset: { deleted_at: '', deleted_by: '' },
       }
+    );
+    await db.collection('team_members').updateMany(
+      { user_id: userId },
+      { $set: { status: 'active', updated_at: nowIso } }
     );
     const user = await db.collection('users').findOne({ _id: userId });
 
@@ -45,6 +56,7 @@ export async function POST(
         status: user?.status || 'active',
         deleted_at: user?.deleted_at || null,
       },
+      metadata: { reason },
     });
 
     return createSuccessResponse({ success: true, user });

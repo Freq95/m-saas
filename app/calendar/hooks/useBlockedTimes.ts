@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { logger } from '@/lib/logger';
 
 interface BlockedTime {
@@ -18,22 +19,36 @@ interface UseBlockedTimesResult {
 }
 
 export function useBlockedTimes(
-  userId: number = 1,
+  userId?: number,
   providerId?: number | null,
   resourceId?: number | null,
   startDate?: Date,
   endDate?: Date
 ): UseBlockedTimesResult {
+  const { data: session, status } = useSession();
+  const sessionUserId =
+    session?.user?.id && /^[1-9]\d*$/.test(session.user.id)
+      ? Number.parseInt(session.user.id, 10)
+      : null;
+  const effectiveUserId = userId ?? sessionUserId;
   const [blockedTimes, setBlockedTimes] = useState<BlockedTime[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchBlockedTimes = async () => {
+      if (status === 'loading') return;
+      if (!effectiveUserId) {
+        setBlockedTimes([]);
+        setLoading(false);
+        setError('Not authenticated');
+        return;
+      }
+
       try {
         setLoading(true);
         const params = new URLSearchParams({
-          userId: userId.toString(),
+          userId: effectiveUserId.toString(),
           ...(providerId && { providerId: providerId.toString() }),
           ...(resourceId && { resourceId: resourceId.toString() }),
           ...(startDate && { startDate: startDate.toISOString() }),
@@ -51,7 +66,7 @@ export function useBlockedTimes(
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
         logger.error('Calendar hook: failed to fetch blocked times', err instanceof Error ? err : new Error(String(err)), {
-          userId,
+          userId: effectiveUserId,
           providerId: providerId || null,
           resourceId: resourceId || null,
           startDate: startDate?.toISOString(),
@@ -63,7 +78,7 @@ export function useBlockedTimes(
     };
 
     fetchBlockedTimes();
-  }, [userId, providerId, resourceId, startDate, endDate]);
+  }, [effectiveUserId, providerId, resourceId, startDate, endDate, status]);
 
   return { blockedTimes, loading, error };
 }

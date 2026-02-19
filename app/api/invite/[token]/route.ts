@@ -43,6 +43,12 @@ export async function POST(
     const invite = await validateInviteToken(params.token);
     if (!invite) return createErrorResponse('Invalid or expired invite', 404);
 
+    try {
+      await markInviteUsed(params.token);
+    } catch {
+      return createErrorResponse('Invite already used or expired', 409);
+    }
+
     const db = await getMongoDbOrThrow();
     const passwordHash = await bcrypt.hash(password, 12);
     const nowIso = new Date().toISOString();
@@ -56,8 +62,6 @@ export async function POST(
       { user_id: invite.user_id, tenant_id: invite.tenant_id },
       { $set: { status: 'active', accepted_at: nowIso, updated_at: nowIso } }
     );
-
-    await markInviteUsed(params.token);
 
     return createSuccessResponse({ message: 'Password set successfully' });
   } catch (error) {

@@ -21,10 +21,19 @@ async function getNextUserId(db: any): Promise<number> {
   return (latest?.id || 0) + 1;
 }
 
+let tenantIndexesEnsured = false;
+
+async function ensureTenantIndexes(db: any) {
+  if (tenantIndexesEnsured) return;
+  await db.collection('tenants').createIndex({ slug: 1 }, { unique: true });
+  tenantIndexesEnsured = true;
+}
+
 export async function GET(request: NextRequest) {
   try {
     await getSuperAdmin();
     const db = await getMongoDbOrThrow();
+    await ensureTenantIndexes(db);
     const search = request.nextUrl.searchParams.get('search')?.trim();
     const plan = request.nextUrl.searchParams.get('plan')?.trim();
     const status = request.nextUrl.searchParams.get('status')?.trim();
@@ -88,6 +97,7 @@ export async function POST(request: NextRequest) {
   try {
     const { userId, email: actorEmail } = await getSuperAdmin();
     const db = await getMongoDbOrThrow();
+    await ensureTenantIndexes(db);
     const body = await request.json();
 
     const clinicName = typeof body?.clinicName === 'string' ? body.clinicName.trim() : '';
@@ -159,9 +169,9 @@ export async function POST(request: NextRequest) {
     await db.collection('team_members').insertOne(teamMemberDoc);
 
     const token = await createInviteToken(ownerEmail, ownerId, tenantId, 'owner', userId);
-    if (sendInvite) {
-      await sendInviteEmail(ownerEmail, ownerName, clinicName, token);
-    }
+    const inviteEmail = sendInvite
+      ? await sendInviteEmail(ownerEmail, ownerName, clinicName, token)
+      : { ok: false as const, reason: 'not_requested' as const };
 
     await logAdminAudit({
       action: 'tenant.create',
@@ -178,11 +188,24 @@ export async function POST(request: NextRequest) {
         owner_email: ownerEmail,
       },
       metadata: {
-        invite_sent: sendInvite,
+        invite_requested: sendInvite,
+        invite_sent: inviteEmail.ok,
+        invite_reason: inviteEmail.ok ? 'sent' : inviteEmail.reason,
       },
     });
 
-    return createSuccessResponse({ tenantId: String(tenantId), inviteToken: token }, 201);
+    return createSuccessResponse(
+      {
+        tenantId: String(tenantId),
+        inviteToken: token,
+        inviteEmail: {
+          requested: sendInvite,
+          sent: inviteEmail.ok,
+          reason: inviteEmail.ok ? 'sent' : inviteEmail.reason,
+        },
+      },
+      201
+    );
   } catch (error) {
     return handleApiError(error, 'Failed to create tenant');
   }

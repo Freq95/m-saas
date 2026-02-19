@@ -21,11 +21,21 @@ export default function UserDetailClient({ user, tenant, memberships }: UserDeta
   async function save(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    const statusChanged = status !== (user.status || 'active');
+    let reason: string | undefined;
+    if (statusChanged) {
+      const input = window.prompt('Provide reason for user status transition:');
+      if (!input || input.trim().length < 3) {
+        setError('Reason is required for status transitions.');
+        return;
+      }
+      reason = input.trim();
+    }
     setWorking(true);
     const response = await fetch(`/api/admin/users/${user._id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, role, status }),
+      body: JSON.stringify({ name, role, status, reason }),
     });
     const data = await response.json();
     if (!response.ok) {
@@ -38,9 +48,20 @@ export default function UserDetailClient({ user, tenant, memberships }: UserDeta
   }
 
   async function softDelete() {
+    const confirmed = window.confirm('Soft delete this user?');
+    if (!confirmed) return;
+    const reason = window.prompt('Reason for soft delete:');
+    if (!reason || reason.trim().length < 3) {
+      setError('Reason is required for soft delete.');
+      return;
+    }
     setError(null);
     setWorking(true);
-    const response = await fetch(`/api/admin/users/${user._id}`, { method: 'DELETE' });
+    const response = await fetch(`/api/admin/users/${user._id}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: reason.trim() }),
+    });
     const data = await response.json();
     if (!response.ok) {
       setError(data.error || 'Failed to delete user');
@@ -52,9 +73,20 @@ export default function UserDetailClient({ user, tenant, memberships }: UserDeta
   }
 
   async function restore() {
+    const confirmed = window.confirm('Restore this user?');
+    if (!confirmed) return;
+    const reason = window.prompt('Reason for restore:');
+    if (!reason || reason.trim().length < 3) {
+      setError('Reason is required for restore.');
+      return;
+    }
     setError(null);
     setWorking(true);
-    const response = await fetch(`/api/admin/users/${user._id}/restore`, { method: 'POST' });
+    const response = await fetch(`/api/admin/users/${user._id}/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason: reason.trim() }),
+    });
     const data = await response.json();
     if (!response.ok) {
       setError(data.error || 'Failed to restore user');

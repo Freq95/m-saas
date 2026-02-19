@@ -1,25 +1,24 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getYahooConfig, sendYahooEmail } from '@/lib/yahoo-mail';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // POST /api/yahoo/send - Send email via Yahoo
 export async function POST(request: NextRequest) {
   try {
+    const { userId } = await getAuthUser();
     const body = await request.json();
-    
-    // Get userId from body if provided, default to 1
-    const userId = body.userId || 1;
-    
+
     // Get config from database (with env fallback)
     const config = await getYahooConfig(userId);
-    
+
     if (!config) {
       return createErrorResponse(
         'Yahoo Mail not configured. Please configure it in Settings > Email Integrations or set YAHOO_EMAIL and YAHOO_PASSWORD (or YAHOO_APP_PASSWORD) in .env',
         400
       );
     }
-    
+
     // Validate input
     const { yahooSendSchema } = await import('@/lib/validation');
     const validationResult = yahooSendSchema.safeParse(body);

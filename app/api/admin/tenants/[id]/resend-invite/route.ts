@@ -26,10 +26,13 @@ export async function POST(
     ]);
 
     if (!tenant || !user) return createErrorResponse('Tenant or user not found', 404);
+    if (tenant.status !== 'active') {
+      return createErrorResponse(`Cannot resend invite for tenant with status ${tenant.status}`, 409);
+    }
     if (user.status !== 'pending_invite') return createErrorResponse('User is not pending invite', 400);
 
     const token = await createInviteToken(user.email, userId, tenantId, user.role || 'staff', adminId);
-    await sendInviteEmail(user.email, user.name || 'Utilizator', tenant.name, token);
+    const inviteEmail = await sendInviteEmail(user.email, user.name || 'Utilizator', tenant.name, token);
 
     await logAdminAudit({
       action: 'tenant.invite.resend',
@@ -42,10 +45,20 @@ export async function POST(
         tenant_id: String(tenantId),
         email: user.email,
         role: user.role || 'staff',
+        invite_sent: inviteEmail.ok,
+        invite_reason: inviteEmail.ok ? 'sent' : inviteEmail.reason,
       },
     });
 
-    return createSuccessResponse({ success: true, inviteToken: token });
+    return createSuccessResponse({
+      success: true,
+      inviteToken: token,
+      inviteEmail: {
+        requested: true,
+        sent: inviteEmail.ok,
+        reason: inviteEmail.ok ? 'sent' : inviteEmail.reason,
+      },
+    });
   } catch (error) {
     return handleApiError(error, 'Failed to resend invite');
   }

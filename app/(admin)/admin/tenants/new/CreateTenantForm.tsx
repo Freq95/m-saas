@@ -32,6 +32,10 @@ export default function CreateTenantForm() {
       return;
     }
 
+    if (data?.inviteEmail?.requested && !data?.inviteEmail?.sent) {
+      window.alert('Tenant created, but invite email was not sent. Configure RESEND_API_KEY and retry from tenant details.');
+    }
+
     router.replace(`/admin/tenants/${data.tenantId}`);
   }
 

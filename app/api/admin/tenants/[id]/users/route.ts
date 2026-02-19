@@ -68,6 +68,9 @@ export async function POST(
     const db = await getMongoDbOrThrow();
     const tenant = await db.collection('tenants').findOne({ _id: tenantId });
     if (!tenant) return createErrorResponse('Tenant not found', 404);
+    if (tenant.status !== 'active') {
+      return createErrorResponse(`Cannot add users to tenant with status ${tenant.status}`, 409);
+    }
 
     const currentSeats = await db
       .collection('team_members')
@@ -109,9 +112,9 @@ export async function POST(
     });
 
     const token = await createInviteToken(email, newUserId, tenantId, role, adminId);
-    if (sendInvite) {
-      await sendInviteEmail(email, name, tenant.name, token);
-    }
+    const inviteEmail = sendInvite
+      ? await sendInviteEmail(email, name, tenant.name, token)
+      : { ok: false as const, reason: 'not_requested' as const };
 
     await logAdminAudit({
       action: 'tenant.user.add',
@@ -127,11 +130,24 @@ export async function POST(
         status: 'pending_invite',
       },
       metadata: {
-        invite_sent: sendInvite,
+        invite_requested: sendInvite,
+        invite_sent: inviteEmail.ok,
+        invite_reason: inviteEmail.ok ? 'sent' : inviteEmail.reason,
       },
     });
 
-    return createSuccessResponse({ userId: String(newUserId), inviteToken: token }, 201);
+    return createSuccessResponse(
+      {
+        userId: String(newUserId),
+        inviteToken: token,
+        inviteEmail: {
+          requested: sendInvite,
+          sent: inviteEmail.ok,
+          reason: inviteEmail.ok ? 'sent' : inviteEmail.reason,
+        },
+      },
+      201
+    );
   } catch (error) {
     return handleApiError(error, 'Failed to add user');
   }

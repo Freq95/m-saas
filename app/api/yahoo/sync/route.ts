@@ -5,6 +5,7 @@ import { getYahooConfig, fetchYahooEmails, markEmailAsRead } from '@/lib/yahoo-m
 import { getMongoDbOrThrow, getNextNumericId } from '@/lib/db/mongo-utils';
 import { suggestTags } from '@/lib/ai-agent';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
+import { getAuthUser } from '@/lib/auth-helpers';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -17,6 +18,7 @@ if (!fs.existsSync(EMAIL_ATTACHMENT_DIR)) {
 // POST /api/yahoo/sync - Sync Yahoo Mail inbox
 export async function POST(request: NextRequest) {
   try {
+    const { userId } = await getAuthUser();
     const body = await request.json();
 
     // Validate input
@@ -26,7 +28,7 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Invalid input', 400, JSON.stringify(validationResult.error.errors));
     }
 
-    const { userId, todayOnly, since: sinceParam, enableAiTagging, markAsRead } = validationResult.data;
+    const { todayOnly, since: sinceParam, enableAiTagging, markAsRead } = validationResult.data;
 
     // Get config from database (with env fallback)
     const config = await getYahooConfig(userId);
@@ -366,10 +368,9 @@ export async function POST(request: NextRequest) {
 }
 
 // GET /api/yahoo/sync - Test Yahoo connection
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const userId = parseInt(searchParams.get('userId') || '1');
+    const { userId } = await getAuthUser();
 
     const config = await getYahooConfig(userId);
 

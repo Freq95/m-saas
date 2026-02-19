@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import useSWR from 'swr';
 import { startOfWeek, addDays, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
+import { useSession } from 'next-auth/react';
 import type { Appointment, CalendarViewType } from './useCalendar';
 import { logger } from '@/lib/logger';
 
@@ -87,11 +88,18 @@ function extractApiError(payload: any, fallback: string): string {
 export function useAppointmentsSWR({
   currentDate,
   viewType,
-  userId = 1,
+  userId,
   providerId,
   resourceId,
   initialAppointments = [],
 }: UseAppointmentsOptions): UseAppointmentsResult {
+  const { data: session, status } = useSession();
+  const sessionUserId =
+    session?.user?.id && /^[1-9]\d*$/.test(session.user.id)
+      ? Number.parseInt(session.user.id, 10)
+      : null;
+  const effectiveUserId = userId ?? sessionUserId;
+
   // Calculate date range
   let startDate: Date;
   let endDate: Date;
@@ -110,7 +118,7 @@ export function useAppointmentsSWR({
 
   // Build query string
   const queryParams = new URLSearchParams({
-    userId: userId.toString(),
+    userId: String(effectiveUserId || ''),
     startDate: startDate.toISOString(),
     endDate: endDate.toISOString(),
   });
@@ -123,7 +131,7 @@ export function useAppointmentsSWR({
     queryParams.append('resourceId', resourceId.toString());
   }
 
-  const url = `/api/appointments?${queryParams.toString()}`;
+  const url = effectiveUserId ? `/api/appointments?${queryParams.toString()}` : null;
 
   // Use SWR with caching configuration
   const {
@@ -145,12 +153,16 @@ export function useAppointmentsSWR({
 
   const createAppointment = useCallback(
     async (data: CreateAppointmentInput): Promise<{ ok: boolean; error?: string }> => {
+      if (!effectiveUserId) {
+        return { ok: false, error: 'Sesiune invalida. Reautentifica-te.' };
+      }
+
       try {
         const response = await fetch('/api/appointments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            userId,
+            userId: effectiveUserId,
             ...data,
           }),
         });
@@ -175,7 +187,7 @@ export function useAppointmentsSWR({
         return { ok: false, error: 'Eroare de retea la crearea programarii.' };
       }
     },
-    [userId, mutate]
+    [effectiveUserId, mutate]
   );
 
   const updateAppointment = useCallback(
@@ -242,7 +254,7 @@ export function useAppointmentsSWR({
 
   return {
     appointments,
-    loading: isLoading,
+    loading: status === 'loading' || isLoading,
     error: error ? error.message : null,
     refetch,
     createAppointment,

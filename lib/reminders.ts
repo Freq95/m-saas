@@ -27,15 +27,32 @@ export async function processReminders() {
       },
     }).toArray(),
     db.collection('services').find({}).toArray(),
-    db.collection('users').find({}).toArray(),
+    db.collection('users').find({ status: 'active' }).toArray(),
   ]);
 
+  const activeTenantIds = new Set<string>(
+    (
+      await db
+        .collection('tenants')
+        .find({ status: 'active' })
+        .project({ _id: 1 })
+        .toArray()
+    ).map((tenant: any) => String(tenant._id))
+  );
+
   const serviceById = new Map<number, any>(services.map((s: any) => [s.id, s]));
-  const userById = new Map<number, any>(users.map((u: any) => [u.id, u]));
+  const userById = new Map<number, any>(
+    users
+      .filter((u: any) => !u.tenant_id || activeTenantIds.has(String(u.tenant_id)))
+      .map((u: any) => [u.id, u])
+  );
 
   for (const appointment of appointments) {
     const service = serviceById.get(appointment.service_id);
     const user = userById.get(appointment.user_id);
+    if (!user) {
+      continue;
+    }
     const appointmentTime = new Date(appointment.start_time);
     const timeStr = format(appointmentTime, "EEEE, d MMMM 'la' HH:mm", { locale: ro });
 

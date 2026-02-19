@@ -27,6 +27,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (!user || !user.password_hash || user.status !== 'active') return null;
 
+        if (user.role !== 'super_admin') {
+          if (!user.tenant_id) return null;
+          const [tenant, membership] = await Promise.all([
+            db.collection('tenants').findOne({ _id: user.tenant_id }),
+            db.collection('team_members').findOne({ user_id: user._id, tenant_id: user.tenant_id }),
+          ]);
+          if (!tenant || tenant.status !== 'active') return null;
+          if (!membership || membership.status !== 'active') return null;
+        }
+
         const isValid = await bcrypt.compare(password, String(user.password_hash));
         if (!isValid) return null;
 

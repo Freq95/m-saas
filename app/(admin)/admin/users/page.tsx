@@ -95,7 +95,13 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
                 <td>{user.role || '-'}</td>
                 <td>{user.status || '-'}</td>
                 <td>
-                  {tenant ? <Link href={`/admin/tenants/${tenant._id}`}>{tenant.name}</Link> : 'Platform (no tenant)'}
+                  {tenant ? (
+                    <Link href={`/admin/tenants/${tenant._id}`}>
+                      {tenant.name} [{tenant.status || 'unknown'}]
+                    </Link>
+                  ) : (
+                    'Platform (no tenant)'
+                  )}
                 </td>
                 <td>
                   {memberRows.length === 0
@@ -104,7 +110,8 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
                         .map((membership: any) => {
                           const tenantForMembership = tenantMap.get(String(membership.tenant_id));
                           const tenantLabel = tenantForMembership?.name || String(membership.tenant_id);
-                          return `${membership.role || '-'} / ${membership.status || '-'} @ ${tenantLabel}`;
+                          const tenantStatusLabel = tenantForMembership?.status || 'unknown';
+                          return `${membership.role || '-'} / ${membership.status || '-'} @ ${tenantLabel} [${tenantStatusLabel}]`;
                         })
                         .join('; ')}
                 </td>
