@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMongoDbOrThrow, parseTags } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { handleApiError } from '@/lib/error-handler';
 
 // GET /api/clients/export - Export clients to CSV
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
     const clients = await db
       .collection('clients')
-      .find({ user_id: userId, status: { $ne: 'deleted' } })
+      .find({ user_id: userId, deleted_at: { $exists: false } })
       .sort({ name: 1 })
       .toArray();
 
@@ -33,9 +33,6 @@ export async function GET(request: NextRequest) {
       'Nume',
       'Email',
       'Telefon',
-      'Sursa',
-      'Status',
-      'Tag-uri',
       'Total cheltuit (RON)',
       'Programari totale',
       'Ultima vizita',
@@ -47,16 +44,11 @@ export async function GET(request: NextRequest) {
     const csvRows = [headers.join(',')];
 
     for (const client of clients) {
-      const tags = parseTags(client.tags);
-
       const row = [
         client.id,
         `"${(client.name || '').replace(/"/g, '""')}"`,
         client.email ? `"${client.email.replace(/"/g, '""')}"` : '',
         client.phone ? `"${client.phone.replace(/"/g, '""')}"` : '',
-        client.source || '',
-        client.status || '',
-        `"${tags.join('; ').replace(/"/g, '""')}"`,
         (client.total_spent || 0).toFixed(2),
         client.total_appointments || 0,
         client.last_appointment_date

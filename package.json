@@ -15,6 +15,8 @@
     "db:migrate:mongo": "tsx scripts/migrate-json-to-db.ts",
     "db:init:mongo": "node migrations/001_init_mongodb.js",
     "db:normalize:blocked-times": "node scripts/migrations/normalize-blocked-times-dates.js",
+    "db:backfill:clients-deleted-at": "node scripts/migrations/backfill-clients-deleted-at.js",
+    "db:cleanup:clients-legacy-fields": "node scripts/migrations/cleanup-clients-legacy-fields.js",
     "db:validate:mongo": "tsx scripts/validate-mongo-data.ts",
     "test:webhooks": "node scripts/test-webhooks.js",
     "yahoo:sync": "node scripts/sync-yahoo.js",

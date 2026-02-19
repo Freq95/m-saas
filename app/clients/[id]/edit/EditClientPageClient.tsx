@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -13,9 +13,6 @@ interface Client {
   name: string;
   email: string | null;
   phone: string | null;
-  source: string;
-  status: string;
-  tags: string[];
   notes: string | null;
 }
 
@@ -24,9 +21,6 @@ interface ClientFormData {
   name: string;
   email: string;
   phone: string;
-  source: string;
-  status: string;
-  tags: string[];
   notes: string;
 }
 
@@ -45,12 +39,8 @@ export default function EditClientPageClient({ clientId, initialClient }: EditCl
     name: '',
     email: '',
     phone: '',
-    source: 'unknown',
-    status: 'lead',
-    tags: [],
     notes: '',
   });
-  const [tagInput, setTagInput] = useState('');
   const { toasts, removeToast, error: toastError } = useToast();
 
   useEffect(() => {
@@ -73,7 +63,7 @@ export default function EditClientPageClient({ clientId, initialClient }: EditCl
       setLoading(true);
       const response = await fetch(`/api/clients/${clientId}`);
       if (!response.ok) throw new Error('Failed to fetch client');
-      
+
       const result = await response.json();
       setFormData({
         ...result.client,
@@ -83,7 +73,7 @@ export default function EditClientPageClient({ clientId, initialClient }: EditCl
       });
     } catch (error) {
       console.error('Error fetching client:', error);
-      toastError('Eroare la încărcarea clientului');
+      toastError('Eroare la incarcarea clientului');
     } finally {
       setLoading(false);
     }
@@ -103,9 +93,6 @@ export default function EditClientPageClient({ clientId, initialClient }: EditCl
           name: formData.name,
           email: formData.email || null,
           phone: formData.phone || null,
-          source: formData.source,
-          status: formData.status,
-          tags: formData.tags,
           notes: formData.notes || null,
         }),
       });
@@ -124,28 +111,11 @@ export default function EditClientPageClient({ clientId, initialClient }: EditCl
     }
   };
 
-  const handleAddTag = () => {
-    if (tagInput.trim() && !formData.tags.includes(tagInput.trim())) {
-      setFormData({
-        ...formData,
-        tags: [...formData.tags, tagInput.trim()],
-      });
-      setTagInput('');
-    }
-  };
-
-  const handleRemoveTag = (tagToRemove: string) => {
-    setFormData({
-      ...formData,
-      tags: formData.tags.filter(tag => tag !== tagToRemove),
-    });
-  };
-
   if (loading) {
     return (
       <div className={navStyles.container}>
         <div className={styles.container}>
-          <div className={styles.loading}>Se încarcă...</div>
+          <div className={styles.loading}>Se incarca...</div>
         </div>
       </div>
     );
@@ -156,15 +126,15 @@ export default function EditClientPageClient({ clientId, initialClient }: EditCl
       <div className={styles.container}>
         <div className={styles.header}>
           <Link href={`/clients/${clientId}`} className={styles.backLink} prefetch>
-            ← Înapoi la profil
+            Inapoi la profil
           </Link>
-          <h1>Editează Client</h1>
+          <h1>Editeaza Client</h1>
         </div>
 
         <form onSubmit={handleSubmit} className={styles.form}>
           <div className={styles.section}>
-            <h2>Informații de bază</h2>
-            
+            <h2>Informatii de baza</h2>
+
             <div className={styles.field}>
               <label htmlFor="name">
                 Nume <span className={styles.required}>*</span>
@@ -204,101 +174,29 @@ export default function EditClientPageClient({ clientId, initialClient }: EditCl
 
           <div className={styles.section}>
             <h2>Detalii</h2>
-            
-            <div className={styles.field}>
-              <label htmlFor="source">Sursă</label>
-              <select
-                id="source"
-                value={formData.source}
-                onChange={(e) => setFormData({ ...formData, source: e.target.value })}
-              >
-                <option value="unknown">Necunoscut</option>
-                <option value="email">Email</option>
-                <option value="facebook">Facebook</option>
-                <option value="form">Formular</option>
-                <option value="walk-in">Walk-in</option>
-                <option value="referral">Recomandare</option>
-              </select>
-            </div>
 
             <div className={styles.field}>
-              <label htmlFor="status">Status</label>
-              <select
-                id="status"
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-              >
-                <option value="lead">Lead</option>
-                <option value="active">Activ</option>
-                <option value="inactive">Inactiv</option>
-                <option value="vip">VIP</option>
-              </select>
-            </div>
-
-            <div className={styles.field}>
-              <label htmlFor="tags">Tag-uri</label>
-              <div className={styles.tagInput}>
-                <input
-                  type="text"
-                  id="tags"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddTag();
-                    }
-                  }}
-                  placeholder="Adaugă tag și apasă Enter"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddTag}
-                  className={styles.addTagButton}
-                >
-                  Adaugă
-                </button>
-              </div>
-              {formData.tags.length > 0 && (
-                <div className={styles.tags}>
-                  {formData.tags.map((tag, idx) => (
-                    <span key={idx} className={styles.tag}>
-                      {tag}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTag(tag)}
-                        className={styles.removeTag}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className={styles.field}>
-              <label htmlFor="notes">Notițe</label>
+              <label htmlFor="notes">Notite</label>
               <textarea
                 id="notes"
                 rows={4}
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Notițe despre client..."
+                placeholder="Notite despre client..."
               />
             </div>
           </div>
 
           <div className={styles.actions}>
             <Link href={`/clients/${clientId}`} className={styles.cancelButton} prefetch>
-              Anulează
+              Anuleaza
             </Link>
             <button
               type="submit"
               disabled={saving || !formData.name.trim()}
               className={styles.submitButton}
             >
-              {saving ? 'Se salvează...' : 'Salvează Modificările'}
+              {saving ? 'Se salveaza...' : 'Salveaza Modificarile'}
             </button>
           </div>
         </form>
@@ -307,4 +205,3 @@ export default function EditClientPageClient({ clientId, initialClient }: EditCl
     </div>
   );
 }
-

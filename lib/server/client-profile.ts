@@ -1,13 +1,10 @@
-import { getMongoDbOrThrow, parseTags, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 
 type ProfileClient = {
   id: number;
   name: string;
   email: string | null;
   phone: string | null;
-  source: string;
-  status: string;
-  tags: string[];
   notes: string | null;
   total_spent: number;
   total_appointments: number;
@@ -52,13 +49,13 @@ type ClientStatsData = {
 export async function getClientProfileData(clientId: number): Promise<ClientProfileData | null> {
   const db = await getMongoDbOrThrow();
 
-  const clientDoc = await db.collection('clients').findOne({ id: clientId });
+  const clientDoc = await db.collection('clients').findOne({
+    id: clientId,
+    deleted_at: { $exists: false },
+  });
   if (!clientDoc) return null;
 
-  const client = {
-    ...stripMongoId(clientDoc),
-    tags: parseTags(clientDoc.tags),
-  } as ProfileClient;
+  const client = stripMongoId(clientDoc) as ProfileClient;
 
   const [appointments, services, conversations] = await Promise.all([
     db.collection('appointments').find({ client_id: clientId }).sort({ start_time: -1 }).toArray(),
@@ -108,7 +105,10 @@ export async function getClientProfileData(clientId: number): Promise<ClientProf
 export async function getClientStatsData(clientId: number): Promise<ClientStatsData | null> {
   const db = await getMongoDbOrThrow();
 
-  const clientDoc = await db.collection('clients').findOne({ id: clientId });
+  const clientDoc = await db.collection('clients').findOne({
+    id: clientId,
+    deleted_at: { $exists: false },
+  });
   if (!clientDoc) return null;
 
   const [appointments, services] = await Promise.all([

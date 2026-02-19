@@ -69,9 +69,6 @@ export const createClientSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255),
   email: emailSchema.optional(),
   phone: phoneSchema,
-  source: z.enum(['email', 'facebook', 'form', 'walk-in', 'referral', 'unknown']).default('unknown'),
-  status: z.enum(['lead', 'active', 'inactive', 'vip']).default('lead'),
-  tags: z.array(z.string()).optional().default([]),
   notes: z.string().max(5000).optional(),
 });
 
@@ -79,9 +76,6 @@ export const updateClientSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   email: emailSchema.optional(),
   phone: phoneSchema,
-  source: z.enum(['email', 'facebook', 'form', 'walk-in', 'referral', 'unknown']).optional(),
-  status: z.enum(['lead', 'active', 'inactive', 'vip']).optional(),
-  tags: z.array(z.string()).optional(),
   notes: z.string().max(5000).optional(),
 });
 
@@ -116,16 +110,6 @@ export const yahooSendSchema = z.object({
   subject: z.string().min(1, 'Subject is required').max(500),
   text: z.string().min(1, 'Message text is required'),
   html: z.string().optional(),
-});
-
-// Form webhook schema
-export const formWebhookSchema = z.object({
-  userId: z.number().int().positive().optional().default(1),
-  name: z.string().max(255).optional(),
-  email: emailSchema.optional(),
-  phone: phoneSchema,
-  message: z.string().min(1, 'Message is required'),
-  subject: z.string().max(500).optional(),
 });
 
 // Query parameter schemas
@@ -186,17 +170,6 @@ export const updateTaskSchema = z.object({
   dueDate: z.string().datetime().optional().nullable(),
   status: z.enum(['open', 'completed', 'cancelled']).optional(),
   priority: z.enum(['low', 'medium', 'high']).optional(),
-});
-
-// Facebook webhook schema
-export const facebookWebhookSchema = z.object({
-  userId: z.number().int().positive().optional().default(1),
-  senderId: z.string().min(1, 'senderId is required'),
-  senderName: z.string().optional(),
-  message: z.string().min(1, 'Message is required'),
-  pageId: z.string().optional(),
-  senderEmail: emailSchema.optional(),
-  senderPhone: phoneSchema,
 });
 
 // Email integration schemas

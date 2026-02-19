@@ -3,7 +3,7 @@
  * Handles finding or creating clients based on contact information
  */
 
-import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, parseTags, stripMongoId } from './db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, stripMongoId } from './db/mongo-utils';
 
 export interface Client {
   id: number;
@@ -11,9 +11,6 @@ export interface Client {
   name: string;
   email: string | null;
   phone: string | null;
-  source: string; // 'email', 'facebook', 'form', 'walk-in', 'unknown'
-  status: string; // 'lead', 'active', 'inactive', 'vip'
-  tags: string[];
   notes: string | null;
   total_spent: number;
   total_appointments: number;
@@ -43,11 +40,7 @@ function normalizePhone(phone?: string): string | null {
 }
 
 function normalizeClientDoc(doc: any): Client {
-  const normalized = stripMongoId(doc) as Client;
-  return {
-    ...normalized,
-    tags: parseTags(normalized.tags),
-  };
+  return stripMongoId(doc) as Client;
 }
 
 /**
@@ -62,8 +55,7 @@ export async function findOrCreateClient(
   userId: number,
   name: string,
   email?: string,
-  phone?: string,
-  source: string = 'unknown'
+  phone?: string
 ): Promise<Client> {
   const db = await getMongoDbOrThrow();
 
@@ -77,6 +69,7 @@ export async function findOrCreateClient(
     const escaped = normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const client = await db.collection('clients').findOne({
       user_id: userId,
+      deleted_at: { $exists: false },
       email: { $regex: `^${escaped}$`, $options: 'i' },
     });
     if (client) {
@@ -87,6 +80,7 @@ export async function findOrCreateClient(
   if (!existingClient && normalizedPhone) {
     const client = await db.collection('clients').findOne({
       user_id: userId,
+      deleted_at: { $exists: false },
       phone: normalizedPhone,
     });
     if (client) {
@@ -134,9 +128,6 @@ export async function findOrCreateClient(
     name: normalizedName,
     email: normalizedEmail,
     phone: normalizedPhone,
-    source,
-    status: 'lead',
-    tags: JSON.stringify([]),
     notes: null,
     total_spent: 0,
     total_appointments: 0,
@@ -160,7 +151,7 @@ export async function findOrCreateClient(
 export async function updateClientStats(clientId: number): Promise<void> {
   const db = await getMongoDbOrThrow();
 
-  const client = await db.collection('clients').findOne({ id: clientId });
+  const client = await db.collection('clients').findOne({ id: clientId, deleted_at: { $exists: false } });
   if (!client) return;
 
   const [appointments, services, conversations] = await Promise.all([
@@ -199,7 +190,7 @@ export async function updateClientStats(clientId: number): Promise<void> {
     : null;
 
   await db.collection('clients').updateOne(
-    { id: clientId },
+    { id: clientId, deleted_at: { $exists: false } },
     {
       $set: {
         total_spent: totalSpent,
@@ -283,7 +274,10 @@ export async function getClientSegments(
   const newDate = new Date(now);
   newDate.setDate(newDate.getDate() - newDays);
 
-  const clients: Client[] = (await db.collection('clients').find({ user_id: userId }).toArray())
+  const clients: Client[] = (await db.collection('clients').find({
+    user_id: userId,
+    deleted_at: { $exists: false },
+  }).toArray())
     .map(normalizeClientDoc);
 
   const vip = clients

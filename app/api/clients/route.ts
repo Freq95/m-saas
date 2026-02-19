@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMongoDbOrThrow, invalidateMongoCache, parseTags, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
 import { getClientsData } from '@/lib/server/clients';
 import { findOrCreateClient } from '@/lib/client-matching';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
@@ -11,8 +11,6 @@ export async function GET(request: NextRequest) {
     const { DEFAULT_USER_ID } = await import('@/lib/constants');
     const userId = parseInt(searchParams.get('userId') || DEFAULT_USER_ID.toString());
     const search = searchParams.get('search') || '';
-    const status = searchParams.get('status') || 'all';
-    const source = searchParams.get('source') || 'all';
     const sortBy = searchParams.get('sortBy') || 'last_appointment_date';
     const sortOrder = searchParams.get('sortOrder') || 'DESC';
 
@@ -22,8 +20,6 @@ export async function GET(request: NextRequest) {
     const data = await getClientsData({
       userId,
       search,
-      status,
-      source,
       sortBy,
       sortOrder,
       page,
@@ -55,7 +51,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { userId, name, email, phone, source, status, tags, notes } = validationResult.data;
+    const { userId, name, email, phone, notes } = validationResult.data;
 
     // Use findOrCreateClient to avoid duplicates
     let client;
@@ -64,8 +60,7 @@ export async function POST(request: NextRequest) {
         userId,
         name,
         email,
-        phone,
-        source
+        phone
       );
     } catch (error: any) {
       const { logger } = await import('@/lib/logger');
@@ -74,14 +69,6 @@ export async function POST(request: NextRequest) {
     }
 
     const updates: Record<string, unknown> = {};
-
-    if (status && status !== client.status) {
-      updates.status = status;
-    }
-
-    if (tags && Array.isArray(tags) && tags.length > 0) {
-      updates.tags = JSON.stringify(tags);
-    }
 
     if (notes !== undefined) {
       updates.notes = notes;
@@ -98,20 +85,14 @@ export async function POST(request: NextRequest) {
       if (updatedClient) {
         invalidateMongoCache();
         return NextResponse.json({
-          client: {
-            ...stripMongoId(updatedClient),
-            tags: parseTags(updatedClient.tags),
-          },
+          client: stripMongoId(updatedClient),
         });
       }
     }
 
     invalidateMongoCache();
     return createSuccessResponse({
-      client: {
-        ...client,
-        tags: parseTags(client.tags),
-      },
+      client,
     }, 201);
   } catch (error) {
     return handleApiError(error, 'Failed to create client');

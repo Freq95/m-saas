@@ -161,7 +161,10 @@ export async function getDashboardData(userId: number, days: number): Promise<Da
         return aTime.getTime() - bTime.getTime();
       });
 
-    const totalClients = await db.collection('clients').countDocuments({ user_id: userId });
+    const totalClients = await db.collection('clients').countDocuments({
+      user_id: userId,
+      deleted_at: { $exists: false },
+    });
 
     const noShows = appointmentsInRange.filter((a: any) => a.status === 'no_show' || a.status === 'no-show').length;
     const totalAppointments = appointmentsInRange.filter((a: any) =>
@@ -178,12 +181,15 @@ export async function getDashboardData(userId: number, days: number): Promise<Da
 
     const topClients = (await db
       .collection('clients')
-      .find({ user_id: userId, total_spent: { $gt: 0 } })
+      .find({ user_id: userId, deleted_at: { $exists: false }, total_spent: { $gt: 0 } })
       .sort({ total_spent: -1 })
       .limit(5)
       .toArray()).map(stripMongoId);
 
-    const clients = (await db.collection('clients').find({ user_id: userId }).toArray())
+    const clients = (await db.collection('clients').find({
+      user_id: userId,
+      deleted_at: { $exists: false },
+    }).toArray())
       .map(stripMongoId);
 
     const newClientsToday = clients.filter((client: any) => {

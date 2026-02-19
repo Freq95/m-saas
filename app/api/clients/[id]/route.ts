@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getMongoDbOrThrow, invalidateMongoCache, parseTags, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getClientProfileData } from '@/lib/server/client-profile';
 
@@ -42,7 +42,11 @@ export async function PATCH(
     const userId = body.userId ?? DEFAULT_USER_ID;
 
     // Verify client exists and belongs to this user before updating
-    const existing = await db.collection('clients').findOne({ id: clientId, user_id: userId });
+    const existing = await db.collection('clients').findOne({
+      id: clientId,
+      user_id: userId,
+      deleted_at: { $exists: false },
+    });
     if (!existing) {
       return createErrorResponse('Client not found', 404);
     }
@@ -54,7 +58,7 @@ export async function PATCH(
       return createErrorResponse('Invalid input', 400, JSON.stringify(validationResult.error.errors));
     }
 
-    const { name, email, phone, status, tags, notes } = validationResult.data;
+    const { name, email, phone, notes } = validationResult.data;
 
     const updates: Record<string, unknown> = {};
 
@@ -70,14 +74,6 @@ export async function PATCH(
       updates.phone = phone ? phone.trim() : null;
     }
 
-    if (status !== undefined) {
-      updates.status = status;
-    }
-
-    if (tags !== undefined && Array.isArray(tags)) {
-      updates.tags = JSON.stringify(tags);
-    }
-
     if (notes !== undefined) {
       updates.notes = notes;
     }
@@ -89,11 +85,15 @@ export async function PATCH(
     updates.updated_at = new Date().toISOString();
 
     await db.collection('clients').updateOne(
-      { id: clientId, user_id: userId },
+      { id: clientId, user_id: userId, deleted_at: { $exists: false } },
       { $set: updates }
     );
 
-    const result = await db.collection('clients').findOne({ id: clientId, user_id: userId });
+    const result = await db.collection('clients').findOne({
+      id: clientId,
+      user_id: userId,
+      deleted_at: { $exists: false },
+    });
     if (!result) {
       return createErrorResponse('Client not found', 404);
     }
@@ -101,17 +101,14 @@ export async function PATCH(
     invalidateMongoCache();
 
     return createSuccessResponse({
-      client: {
-        ...stripMongoId(result),
-        tags: parseTags(result.tags),
-      },
+      client: stripMongoId(result),
     });
   } catch (error) {
     return handleApiError(error, 'Failed to update client');
   }
 }
 
-// DELETE /api/clients/[id] - Delete client (soft delete by setting status to 'deleted')
+// DELETE /api/clients/[id] - Soft delete client (using deleted_at timestamp)
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -128,15 +125,22 @@ export async function DELETE(
     const userId = parseInt(searchParams.get('userId') || DEFAULT_USER_ID.toString());
 
     // Verify client exists and belongs to this user
-    const existing = await db.collection('clients').findOne({ id: clientId, user_id: userId });
+    const existing = await db.collection('clients').findOne({
+      id: clientId,
+      user_id: userId,
+      deleted_at: { $exists: false },
+    });
     if (!existing) {
       return createErrorResponse('Client not found', 404);
     }
 
-    // Soft delete: set status to 'deleted'
+    // Soft delete using timestamp and cleanup legacy fields
     await db.collection('clients').updateOne(
-      { id: clientId, user_id: userId },
-      { $set: { status: 'deleted', updated_at: new Date().toISOString() } }
+      { id: clientId, user_id: userId, deleted_at: { $exists: false } },
+      {
+        $set: { deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+        $unset: { status: '', source: '' },
+      }
     );
 
     invalidateMongoCache();

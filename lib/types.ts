@@ -78,9 +78,6 @@ export interface Client {
   name: string;
   email: string | null;
   phone: string | null;
-  source: 'email' | 'facebook' | 'form' | 'walk-in' | 'referral' | 'unknown';
-  status: 'lead' | 'active' | 'inactive' | 'vip' | 'deleted';
-  tags: string[];
   notes: string | null;
   total_spent: number;
   total_appointments: number;

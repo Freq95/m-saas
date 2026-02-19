@@ -10,7 +10,10 @@ export async function GET(
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
 
-    const client = await db.collection('clients').findOne({ id: clientId });
+    const client = await db.collection('clients').findOne({
+      id: clientId,
+      deleted_at: { $exists: false },
+    });
     if (!client) {
       return NextResponse.json(
         { error: 'Client not found' },

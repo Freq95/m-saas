@@ -8,29 +8,39 @@
 .error,
 .empty {
   text-align: center;
-  padding: var(--space-9);
+  padding: var(--space-8);
   color: var(--color-text-muted);
 }
 
 .backLink,
 .backButton {
-  display: inline-block;
-  color: var(--color-text);
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-soft);
   text-decoration: none;
-  font-size: 0.875rem;
-  margin-bottom: var(--space-4);
+  font-size: 0.83rem;
+  margin-bottom: var(--space-3);
   transition: color var(--transition-fast);
 }
 
 .backLink:hover,
 .backButton:hover {
-  color: var(--color-accent);
+  color: var(--color-text);
+}
+
+.header,
+.stats,
+.tabs,
+.tabContent {
+  width: min(100%, var(--max-content-width));
+  margin: 0 auto;
+  padding-left: var(--space-6);
+  padding-right: var(--space-6);
 }
 
 .header {
-  max-width: var(--max-content-width);
-  margin: 0 auto var(--space-6);
-  padding: var(--space-6);
+  margin-bottom: var(--space-5);
+  padding-top: var(--space-6);
 }
 
 .headerContent {
@@ -42,39 +52,38 @@
 
 .header h1 {
   margin: 0 0 var(--space-2);
-  font-size: clamp(1.5rem, 2.2vw, 2rem);
-  font-weight: 700;
+  font-size: clamp(1.5rem, 2.1vw, 1.9rem);
+  font-weight: 650;
   letter-spacing: -0.02em;
 }
 
 .meta {
   display: flex;
-  gap: var(--space-3);
+  gap: var(--space-2);
   flex-wrap: wrap;
   align-items: center;
 }
 
 .badge,
 .statusBadge,
-.channel,
-.tag {
+.channel {
   display: inline-flex;
   align-items: center;
-  padding: 0.25rem 0.65rem;
+  padding: 0.2rem 0.52rem;
   border-radius: 999px;
   border: 1px solid var(--color-border);
-  background: rgba(148, 163, 184, 0.18);
-  color: var(--color-text);
-  font-size: 0.73rem;
+  background: rgba(148, 163, 184, 0.11);
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.015em;
   text-transform: uppercase;
 }
 
 .badgeVip {
-  background: var(--gradient-accent);
-  color: var(--color-accent-contrast);
-  border-color: transparent;
+  background: rgba(77, 163, 255, 0.16);
+  color: #d3e9ff;
+  border-color: rgba(77, 163, 255, 0.35);
 }
 
 .badgeActive,
@@ -82,8 +91,8 @@
 .statusScheduled,
 .statusCompleted,
 .badgeDefault {
-  background: rgba(77, 163, 255, 0.14);
-  color: #b8dbff;
+  background: rgba(77, 163, 255, 0.11);
+  color: #bddfff;
   border-color: rgba(77, 163, 255, 0.3);
 }
 
@@ -91,26 +100,20 @@
 .statusCancelled,
 .statusNoShow,
 .statusDefault {
-  background: rgba(148, 163, 184, 0.16);
-  color: var(--color-text-muted);
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--color-text-soft);
   border-color: var(--color-border);
-}
-
-.statusOverdue {
-  background: rgba(248, 113, 113, 0.18);
-  color: #fecaca;
-  border-color: rgba(248, 113, 113, 0.45);
 }
 
 .email,
 .phone {
-  color: var(--color-text-muted);
-  font-size: 0.86rem;
+  color: var(--color-text-soft);
+  font-size: 0.83rem;
 }
 
 .headerActions {
   display: flex;
-  gap: var(--space-3);
+  gap: var(--space-2);
   flex-wrap: wrap;
   justify-content: flex-end;
 }
@@ -120,7 +123,6 @@
 .previewButton,
 .downloadButton,
 .deleteButton,
-.completeButton,
 .cancelButton,
 .submitButton {
   display: inline-flex;
@@ -128,43 +130,34 @@
   justify-content: center;
   gap: var(--space-2);
   border-radius: var(--radius-md);
-  padding: 0.62rem 1rem;
-  font-size: 0.875rem;
+  min-height: 38px;
+  padding: 0.52rem 0.86rem;
+  font-size: 0.82rem;
   font-weight: 600;
   border: 1px solid var(--color-border);
   text-decoration: none;
-  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+  color: var(--color-text);
+  background: rgba(15, 23, 42, 0.42);
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
   cursor: pointer;
 }
 
 .editButton,
 .submitButton {
-  background: var(--gradient-accent);
-  border-color: transparent;
-  color: var(--color-accent-contrast);
+  background: rgba(77, 163, 255, 0.16);
+  border-color: rgba(77, 163, 255, 0.34);
+  color: #d9ecff;
 }
 
 .editButton:hover,
 .submitButton:hover {
-  transform: translateY(-1px);
-  filter: brightness(1.06);
-}
-
-.actionButton,
-.previewButton,
-.downloadButton,
-.completeButton,
-.cancelButton,
-.deleteButton {
-  background: var(--color-surface-muted);
-  color: var(--color-text);
-  backdrop-filter: blur(var(--blur-sm));
+  background: rgba(77, 163, 255, 0.24);
+  border-color: rgba(77, 163, 255, 0.44);
 }
 
 .actionButton:hover,
 .previewButton:hover,
 .downloadButton:hover,
-.completeButton:hover,
 .cancelButton:hover,
 .deleteButton:hover {
   background: var(--color-surface-strong);
@@ -172,31 +165,28 @@
 }
 
 .previewButton {
-  color: #9fceff;
+  color: #cae7ff;
 }
 
 .deleteButton {
-  color: #ffb5b5;
+  color: #f3b5b5;
 }
 
 .deleteButton:hover {
-  background: rgba(248, 113, 113, 0.2);
-  border-color: rgba(248, 113, 113, 0.55);
+  background: rgba(248, 113, 113, 0.16);
+  border-color: rgba(248, 113, 113, 0.45);
 }
 
 .stats {
-  max-width: var(--max-content-width);
-  margin: 0 auto var(--space-6);
-  padding: 0 var(--space-6);
+  margin-bottom: var(--space-5);
   display: grid;
-  gap: var(--space-4);
+  gap: var(--space-3);
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
 .statCard,
 .section,
 .activityItem,
-.taskItem,
 .fileItem,
 .appointmentItem,
 .conversationItem,
@@ -206,29 +196,29 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(var(--blur-md));
 }
 
 .statCard {
-  padding: var(--space-5);
+  padding: var(--space-4);
 }
 
 .statLabel {
   margin-bottom: var(--space-2);
-  font-size: 0.8rem;
+  font-size: 0.74rem;
   color: var(--color-text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .statValue {
-  font-size: clamp(1.1rem, 1.6vw, 1.35rem);
-  font-weight: 700;
-  line-height: 1.3;
+  font-size: clamp(1rem, 1.4vw, 1.2rem);
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text-muted);
 }
 
 .tabs {
-  max-width: var(--max-content-width);
-  margin: 0 auto var(--space-6);
-  padding: 0 var(--space-6);
+  margin-bottom: var(--space-5);
   display: flex;
   gap: var(--space-2);
   overflow-x: auto;
@@ -241,10 +231,10 @@
   white-space: nowrap;
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
-  background: var(--color-surface-muted);
-  color: var(--color-text-muted);
-  padding: 0.56rem 0.95rem;
-  font-size: 0.875rem;
+  background: rgba(15, 23, 42, 0.4);
+  color: var(--color-text-soft);
+  padding: 0.5rem 0.82rem;
+  font-size: 0.82rem;
   font-weight: 600;
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
   cursor: pointer;
@@ -258,60 +248,60 @@
 
 .tabActive,
 .filterActive {
-  background: rgba(77, 163, 255, 0.16);
-  color: #d6eaff;
-  border-color: rgba(77, 163, 255, 0.42);
+  background: rgba(77, 163, 255, 0.14);
+  color: #dceeff;
+  border-color: rgba(77, 163, 255, 0.35);
 }
 
 .tabContent {
-  max-width: var(--max-content-width);
-  margin: 0 auto;
-  padding: 0 var(--space-6) var(--space-8);
+  padding-bottom: var(--space-8);
 }
 
 .overview,
 .appointments,
 .conversations,
-.notes,
 .activities,
-.tasks,
 .files,
 .list,
 .activityList {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .section {
-  padding: var(--space-6);
+  padding: var(--space-5);
 }
 
 .section h2 {
   margin: 0 0 var(--space-4);
-  font-size: 1.05rem;
-  font-weight: 700;
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--color-text);
 }
 
 .infoGrid,
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
 }
 
 .infoGrid label,
 .statItem label {
   display: block;
   margin-bottom: var(--space-2);
-  font-size: 0.78rem;
+  font-size: 0.73rem;
   color: var(--color-text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .infoGrid p,
 .statItem p {
   margin: 0;
-  color: var(--color-text);
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
 }
 
 .preferredServices {
@@ -322,27 +312,21 @@
 .serviceItem {
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
-  background: rgba(15, 23, 42, 0.42);
-  padding: var(--space-4);
+  background: rgba(9, 16, 34, 0.45);
+  padding: var(--space-3) var(--space-4);
 }
 
 .serviceName {
-  font-weight: 650;
-  margin-bottom: var(--space-2);
+  font-weight: 600;
+  margin-bottom: var(--space-1);
 }
 
 .serviceStats {
   display: flex;
   justify-content: space-between;
-  gap: var(--space-3);
-  color: var(--color-text-muted);
-  font-size: 0.86rem;
-}
-
-.tags {
-  display: flex;
-  flex-wrap: wrap;
   gap: var(--space-2);
+  color: var(--color-text-soft);
+  font-size: 0.82rem;
 }
 
 .activityFilters {
@@ -352,23 +336,22 @@
 }
 
 .activityItem,
-.taskItem,
 .fileItem,
 .appointmentItem,
 .conversationItem {
-  padding: var(--space-5);
-}
-
-.activityIcon,
-.fileIcon {
-  flex-shrink: 0;
-  font-size: 1.25rem;
+  padding: var(--space-4);
 }
 
 .activityItem,
 .fileItem {
   display: flex;
-  gap: var(--space-4);
+  gap: var(--space-3);
+}
+
+.activityIcon,
+.fileIcon {
+  flex-shrink: 0;
+  font-size: 1rem;
 }
 
 .activityContent,
@@ -378,22 +361,20 @@
 
 .activityContent h4,
 .fileContent h4,
-.taskHeader h3,
 .appointmentHeader h3,
 .conversationHeader h3 {
   margin: 0;
-  font-size: 0.98rem;
-  font-weight: 700;
+  font-size: 0.92rem;
+  font-weight: 650;
 }
 
 .activityContent p,
 .fileContent p,
-.taskItem p,
 .appointmentDetails p,
 .conversationDetails p {
   margin: var(--space-2) 0 0;
-  color: var(--color-text-muted);
-  font-size: 0.86rem;
+  color: var(--color-text-soft);
+  font-size: 0.83rem;
 }
 
 .activityDate,
@@ -401,40 +382,16 @@
   display: block;
   margin-top: var(--space-2);
   color: var(--color-text-soft);
-  font-size: 0.78rem;
+  font-size: 0.76rem;
 }
 
-.taskHeader,
 .appointmentHeader,
 .conversationHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
-  margin-bottom: var(--space-3);
-}
-
-.taskOverdue {
-  border-color: rgba(248, 113, 113, 0.48);
-  background: rgba(127, 29, 29, 0.2);
-}
-
-.taskCompleted {
-  opacity: 0.72;
-}
-
-.overdueSection,
-.completedSection {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.overdueTitle,
-.completedTitle {
-  margin: 0;
-  font-size: 0.95rem;
-  color: var(--color-text);
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
 }
 
 .fileActions {
@@ -458,31 +415,31 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-5);
-  background: rgba(6, 8, 13, 0.74);
+  padding: var(--space-4);
+  background: rgba(6, 8, 13, 0.72);
 }
 
 .modalContent {
-  width: min(560px, 100%);
+  width: min(540px, 100%);
   max-height: 90vh;
   overflow: auto;
-  padding: var(--space-6);
+  padding: var(--space-5);
 }
 
 .modalContent h3 {
   margin: 0 0 var(--space-4);
-  font-size: 1.06rem;
+  font-size: 1rem;
 }
 
 .modalInput,
 .modalTextarea {
   width: 100%;
-  background: rgba(15, 23, 42, 0.44);
+  background: rgba(15, 23, 42, 0.4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   color: var(--color-text);
-  padding: 0.7rem 0.8rem;
-  font-size: 0.9rem;
+  padding: 0.68rem 0.78rem;
+  font-size: 0.88rem;
   font-family: inherit;
   margin-bottom: var(--space-3);
   transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
@@ -503,7 +460,7 @@
 .modalActions {
   margin-top: var(--space-4);
   display: flex;
-  gap: var(--space-3);
+  gap: var(--space-2);
   justify-content: flex-end;
 }
 
@@ -533,7 +490,6 @@
     grid-template-columns: 1fr;
   }
 
-  .taskHeader,
   .appointmentHeader,
   .conversationHeader {
     align-items: flex-start;

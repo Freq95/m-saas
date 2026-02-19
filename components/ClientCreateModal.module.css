@@ -1,0 +1,147 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: rgba(4, 8, 16, 0.72);
+  backdrop-filter: blur(8px) saturate(0.85);
+  -webkit-backdrop-filter: blur(8px) saturate(0.85);
+}
+
+.modal {
+  width: min(640px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-6);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.title {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+}
+
+.closeButton {
+  min-height: 36px;
+  min-width: 36px;
+  padding: 0;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-soft);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.fieldFull {
+  grid-column: 1 / -1;
+}
+
+.field label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.required {
+  color: #f7b4b4;
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  background: rgba(15, 23, 42, 0.42);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  padding: 0.7rem 0.82rem;
+}
+
+.field textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.error {
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  background: rgba(127, 29, 29, 0.18);
+  color: #fecaca;
+  padding: 0.7rem 0.8rem;
+  font-size: 0.86rem;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.cancelButton,
+.submitButton {
+  min-height: 38px;
+  border-radius: var(--radius-md);
+  padding: 0.55rem 0.95rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+}
+
+.cancelButton {
+  background: rgba(15, 23, 42, 0.5);
+  color: var(--color-text);
+}
+
+.submitButton {
+  background: rgba(77, 163, 255, 0.2);
+  color: #dcf0ff;
+  border-color: rgba(77, 163, 255, 0.4);
+}
+
+.submitButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 700px) {
+  .modal {
+    padding: var(--space-4);
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,12 +1,10 @@
-import { getMongoDbOrThrow, parseTags, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { DEFAULT_PAGE_SIZE, DEFAULT_USER_ID } from '@/lib/constants';
 import type { Client as ClientType } from '@/lib/types';
 
 type ClientsQuery = {
   userId?: number;
   search?: string;
-  status?: string;
-  source?: string;
   sortBy?: string;
   sortOrder?: string;
   page?: number;
@@ -29,8 +27,6 @@ export async function getClientsData(query: ClientsQuery = {}): Promise<ClientsR
   const db = await getMongoDbOrThrow();
   const userId = query.userId ?? DEFAULT_USER_ID;
   const search = query.search ?? '';
-  const status = query.status ?? 'all';
-  const source = query.source ?? 'all';
   const sortBy = query.sortBy ?? 'last_activity_date';
   const sortOrder = query.sortOrder ?? 'DESC';
   const page = query.page ?? 1;
@@ -39,8 +35,8 @@ export async function getClientsData(query: ClientsQuery = {}): Promise<ClientsR
 
   const filter: Record<string, unknown> = {
     user_id: userId,
-    // Always exclude soft-deleted clients regardless of the status filter
-    status: { $ne: 'deleted' },
+    // Always exclude soft-deleted clients
+    deleted_at: { $exists: false },
   };
 
   if (search) {
@@ -51,14 +47,6 @@ export async function getClientsData(query: ClientsQuery = {}): Promise<ClientsR
       { email: regex },
       { phone: regex },
     ];
-  }
-
-  if (status !== 'all') {
-    filter.status = status;
-  }
-
-  if (source !== 'all') {
-    filter.source = source;
   }
 
   const validSortColumns = new Set([
@@ -84,11 +72,7 @@ export async function getClientsData(query: ClientsQuery = {}): Promise<ClientsR
     .skip(offset)
     .limit(limit)
     .toArray())
-    .map(stripMongoId)
-    .map((client: ClientType) => ({
-      ...client,
-      tags: parseTags(client.tags),
-    }));
+    .map(stripMongoId) as ClientType[];
 
   return {
     clients,
