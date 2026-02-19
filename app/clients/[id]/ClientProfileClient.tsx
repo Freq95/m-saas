@@ -6,6 +6,8 @@ import styles from './page.module.css';
 import navStyles from '../../dashboard/page.module.css';
 import { useToast } from '@/lib/useToast';
 import { ToastContainer } from '@/components/Toast';
+import ClientCreateModal from '@/components/ClientCreateModal';
+import { logger } from '@/lib/logger';
 
 interface Client {
   id: number;
@@ -64,6 +66,7 @@ export default function ClientProfileClient({
   const [activeTab, setActiveTab] = useState<'overview' | 'activities' | 'appointments' | 'conversations' | 'files'>('overview');
   const [activityFilter, setActivityFilter] = useState<'all' | 'notes' | 'emails' | 'appointments'>('all');
   const [showAddNote, setShowAddNote] = useState(false);
+  const [showEditClient, setShowEditClient] = useState(false);
   const [pendingDeleteFileId, setPendingDeleteFileId] = useState<number | null>(null);
   const [noteContent, setNoteContent] = useState('');
   const { toasts, removeToast, error: toastError } = useToast();
@@ -112,7 +115,9 @@ export default function ClientProfileClient({
       setAppointments(result.appointments || []);
       setConversations(result.conversations || []);
     } catch (error) {
-      console.error('Error fetching client:', error);
+      logger.error('Client profile: failed to fetch client data', error instanceof Error ? error : new Error(String(error)), {
+        clientId,
+      });
     } finally {
       setLoading(false);
     }
@@ -125,7 +130,10 @@ export default function ClientProfileClient({
       const result = await response.json();
       setActivities(result.activities || []);
     } catch (error) {
-      console.error('Error fetching activities:', error);
+      logger.error('Client profile: failed to fetch activities', error instanceof Error ? error : new Error(String(error)), {
+        clientId,
+        filter: activityFilter,
+      });
     }
   };
 
@@ -136,7 +144,9 @@ export default function ClientProfileClient({
       const result = await response.json();
       setFiles(result.files || []);
     } catch (error) {
-      console.error('Error fetching files:', error);
+      logger.error('Client profile: failed to fetch files', error instanceof Error ? error : new Error(String(error)), {
+        clientId,
+      });
     }
   };
 
@@ -147,7 +157,9 @@ export default function ClientProfileClient({
       const result = await response.json();
       setStats(result.stats || null);
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      logger.error('Client profile: failed to fetch stats', error instanceof Error ? error : new Error(String(error)), {
+        clientId,
+      });
     }
   };
 
@@ -165,7 +177,9 @@ export default function ClientProfileClient({
       fetchClientData();
       if (activeTab === 'activities') fetchActivities();
     } catch (error) {
-      console.error('Error adding note:', error);
+      logger.error('Client profile: failed to add note', error instanceof Error ? error : new Error(String(error)), {
+        clientId,
+      });
       toastError('Eroare la adaugarea notei');
     }
   };
@@ -184,7 +198,9 @@ export default function ClientProfileClient({
       fetchFiles();
       if (activeTab === 'activities') fetchActivities();
     } catch (error) {
-      console.error('Error uploading file:', error);
+      logger.error('Client profile: failed to upload file', error instanceof Error ? error : new Error(String(error)), {
+        clientId,
+      });
       toastError('Eroare la incarcarea fisierului');
     }
   };
@@ -205,7 +221,10 @@ export default function ClientProfileClient({
       fetchFiles();
       if (activeTab === 'activities') fetchActivities();
     } catch (error) {
-      console.error('Error deleting file:', error);
+      logger.error('Client profile: failed to delete file', error instanceof Error ? error : new Error(String(error)), {
+        clientId,
+        fileId,
+      });
       toastError('Eroare la stergerea fisierului');
     }
   };
@@ -302,9 +321,13 @@ export default function ClientProfileClient({
               </div>
             </div>
             <div className={styles.headerActions}>
-              <Link href={`/clients/${clientId}/edit`} className={styles.editButton} prefetch>
+              <button
+                type="button"
+                className={styles.editButton}
+                onClick={() => setShowEditClient(true)}
+              >
                 Editeaza
-              </Link>
+              </button>
               <button onClick={() => setShowAddNote(true)} className={styles.actionButton}>
                 + Nota
               </button>
@@ -633,6 +656,26 @@ export default function ClientProfileClient({
             </div>
           </div>
         )}
+
+        <ClientCreateModal
+          isOpen={showEditClient}
+          mode="edit"
+          clientId={client.id}
+          initialData={{
+            id: client.id,
+            name: client.name,
+            email: client.email,
+            phone: client.phone,
+            notes: client.notes,
+          }}
+          title="Editeaza client"
+          submitLabel="Salveaza modificarile"
+          onClose={() => setShowEditClient(false)}
+          onUpdated={(updatedClient) => {
+            setClient((prev) => (prev ? { ...prev, ...updatedClient } : prev));
+            setShowEditClient(false);
+          }}
+        />
 
         <ToastContainer toasts={toasts} onClose={removeToast} />
       </div>

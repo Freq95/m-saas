@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { getMongoDbOrThrow, getNextNumericId, invalidateMongoCache, stripMongoId } from '@/lib/db/mongo-utils';
 import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
-import { findOrCreateClient, linkConversationToClient } from '@/lib/client-matching';
+import { linkConversationToClient } from '@/lib/client-matching';
 import { parseStoredMessage, serializeMessage } from '@/lib/email-types';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -97,22 +97,16 @@ export async function POST(
     } else if (conversation.client_id && typeof conversation.client_id === 'number') {
       targetClientId = conversation.client_id;
     } else {
-      if (!createClient) {
+      if (createClient) {
         return createErrorResponse(
-          'Conversation is not linked to a client. Provide clientId or set createClient=true.',
+          'Automatic client creation is disabled. Create the client manually, then retry with clientId.',
           400
         );
       }
-
-      const fallbackName = conversation.contact_name?.trim() || conversation.contact_email || `Client ${conversationId}`;
-      const newClient = await findOrCreateClient(
-        Number(conversation.user_id) || 1,
-        fallbackName,
-        conversation.contact_email || undefined,
-        conversation.contact_phone || undefined,
-        'email'
+      return createErrorResponse(
+        'Conversation is not linked to a client. Provide clientId.',
+        400
       );
-      targetClientId = newClient.id;
     }
 
     if (!targetClientId) {

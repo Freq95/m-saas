@@ -110,8 +110,7 @@ export async function POST(request: NextRequest) {
       userId,
       clientName,
       clientEmail,
-      clientPhone,
-      conversationId ? 'conversation' : 'walk-in'
+      clientPhone
     );
 
     const now = new Date().toISOString();

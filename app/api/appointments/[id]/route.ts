@@ -94,7 +94,20 @@ export async function PATCH(
       );
     }
 
-    const { status, startTime, endTime, notes } = validationResult.data;
+    const {
+      status,
+      startTime,
+      endTime,
+      notes,
+      serviceId,
+      clientName,
+      clientEmail,
+      clientPhone,
+      providerId,
+      resourceId,
+      category,
+      color,
+    } = validationResult.data;
 
     // Get existing appointment
     const existingAppointment = await db.collection('appointments').findOne({ id: appointmentId });
@@ -108,8 +121,14 @@ export async function PATCH(
       updates.status = status;
     }
 
-    // If times are being changed, check for conflicts
-    if (startTime || endTime) {
+    const hasTimeOrAllocationChange =
+      startTime !== undefined ||
+      endTime !== undefined ||
+      providerId !== undefined ||
+      resourceId !== undefined;
+
+    // If times or assignment are being changed, check for conflicts
+    if (hasTimeOrAllocationChange) {
       const newStartTime = startTime
         ? (typeof startTime === 'string' ? new Date(startTime) : startTime)
         : new Date(existingAppointment.start_time);
@@ -126,11 +145,20 @@ export async function PATCH(
         return createErrorResponse('Invalid appointment time range', 400);
       }
 
+      const targetProviderId =
+        providerId === null
+          ? null
+          : (providerId !== undefined ? providerId : (existingAppointment.provider_id ?? null));
+      const targetResourceId =
+        resourceId === null
+          ? null
+          : (resourceId !== undefined ? resourceId : (existingAppointment.resource_id ?? null));
+
       // Check for conflicts (excluding this appointment)
       const conflictCheck = await checkAppointmentConflict(
         existingAppointment.user_id,
-        existingAppointment.provider_id,
-        existingAppointment.resource_id,
+        targetProviderId || undefined,
+        targetResourceId || undefined,
         newStartTime,
         newEndTime,
         appointmentId // Exclude current appointment from conflict check
@@ -157,10 +185,65 @@ export async function PATCH(
       if (endTime) {
         updates.end_time = newEndTime.toISOString();
       }
+      if (providerId !== undefined) {
+        updates.provider_id = targetProviderId;
+      }
+      if (resourceId !== undefined) {
+        updates.resource_id = targetResourceId;
+      }
+    } else {
+      if (providerId !== undefined) {
+        updates.provider_id = providerId === null ? null : providerId;
+      }
+      if (resourceId !== undefined) {
+        updates.resource_id = resourceId === null ? null : resourceId;
+      }
     }
 
     if (notes !== undefined) {
       updates.notes = notes;
+    }
+
+    if (serviceId !== undefined) {
+      updates.service_id = serviceId;
+    }
+
+    const shouldUpdateClient =
+      clientName !== undefined || clientEmail !== undefined || clientPhone !== undefined;
+
+    if (shouldUpdateClient) {
+      const normalizedName = (clientName ?? existingAppointment.client_name ?? '').trim();
+      if (!normalizedName) {
+        return createErrorResponse('Client name is required', 400);
+      }
+
+      const normalizedEmail = clientEmail !== undefined
+        ? (clientEmail || null)
+        : (existingAppointment.client_email || null);
+      const normalizedPhone = clientPhone !== undefined
+        ? (clientPhone || null)
+        : (existingAppointment.client_phone || null);
+
+      const { findOrCreateClient } = await import('@/lib/client-matching');
+      const linkedClient = await findOrCreateClient(
+        existingAppointment.user_id,
+        normalizedName,
+        normalizedEmail || undefined,
+        normalizedPhone || undefined
+      );
+
+      updates.client_id = linkedClient.id;
+      updates.client_name = normalizedName;
+      updates.client_email = normalizedEmail;
+      updates.client_phone = normalizedPhone;
+    }
+
+    if (category !== undefined) {
+      updates.category = category || null;
+    }
+
+    if (color !== undefined) {
+      updates.color = color || null;
     }
 
     if (Object.keys(updates).length === 0) {

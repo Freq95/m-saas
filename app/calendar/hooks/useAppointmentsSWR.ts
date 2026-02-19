@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import useSWR from 'swr';
 import { startOfWeek, addDays, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
 import type { Appointment, CalendarViewType } from './useCalendar';
+import { logger } from '@/lib/logger';
 
 interface UseAppointmentsOptions {
   currentDate: Date;
@@ -17,7 +18,7 @@ interface UseAppointmentsResult {
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
-  createAppointment: (data: CreateAppointmentInput) => Promise<boolean>;
+  createAppointment: (data: CreateAppointmentInput) => Promise<{ ok: boolean; error?: string }>;
   updateAppointment: (id: number, data: UpdateAppointmentInput) => Promise<boolean>;
   deleteAppointment: (id: number) => Promise<boolean>;
 }
@@ -53,6 +54,26 @@ const fetcher = async (url: string) => {
   return result.appointments || [];
 };
 
+function extractApiError(payload: any, fallback: string): string {
+  if (payload?.error && typeof payload.error === 'string') {
+    return payload.error;
+  }
+
+  if (payload?.details) {
+    if (typeof payload.details === 'string') {
+      return payload.details;
+    }
+    if (Array.isArray(payload.details) && payload.details.length > 0) {
+      const first = payload.details[0];
+      if (typeof first?.message === 'string') {
+        return first.message;
+      }
+    }
+  }
+
+  return fallback;
+}
+
 /**
  * Hook for managing appointments with SWR caching
  *
@@ -80,12 +101,11 @@ export function useAppointmentsSWR({
     endDate = endOfDay(currentDate);
   } else if (viewType === 'week' || viewType === 'workweek') {
     const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-    startDate = weekStart;
-    endDate = addDays(weekStart, viewType === 'workweek' ? 4 : 6);
+    startDate = startOfDay(weekStart);
+    endDate = endOfDay(addDays(weekStart, viewType === 'workweek' ? 4 : 6));
   } else {
-    const monthStart = startOfMonth(currentDate);
-    startDate = monthStart;
-    endDate = endOfMonth(currentDate);
+    startDate = startOfDay(startOfMonth(currentDate));
+    endDate = endOfDay(endOfMonth(currentDate));
   }
 
   // Build query string
@@ -124,7 +144,7 @@ export function useAppointmentsSWR({
   }, [mutate]);
 
   const createAppointment = useCallback(
-    async (data: CreateAppointmentInput): Promise<boolean> => {
+    async (data: CreateAppointmentInput): Promise<{ ok: boolean; error?: string }> => {
       try {
         const response = await fetch('/api/appointments', {
           method: 'POST',
@@ -137,16 +157,22 @@ export function useAppointmentsSWR({
 
         if (!response.ok) {
           const errorData = await response.json();
-          console.error('Create appointment error:', errorData);
-          return false;
+          logger.error('Calendar hook: create appointment API error', {
+            status: response.status,
+            errorData,
+          });
+          return {
+            ok: false,
+            error: extractApiError(errorData, 'Nu s-a putut crea programarea.'),
+          };
         }
 
         // Optimistically update cache
         await mutate();
-        return true;
+        return { ok: true };
       } catch (err) {
-        console.error('Error creating appointment:', err);
-        return false;
+        logger.error('Calendar hook: failed to create appointment', err instanceof Error ? err : new Error(String(err)));
+        return { ok: false, error: 'Eroare de retea la crearea programarii.' };
       }
     },
     [userId, mutate]
@@ -163,7 +189,11 @@ export function useAppointmentsSWR({
 
         if (!response.ok) {
           const errorData = await response.json();
-          console.error('Update appointment error:', errorData);
+          logger.error('Calendar hook: update appointment API error', {
+            status: response.status,
+            appointmentId: id,
+            errorData,
+          });
           return false;
         }
 
@@ -171,7 +201,9 @@ export function useAppointmentsSWR({
         await mutate();
         return true;
       } catch (err) {
-        console.error('Error updating appointment:', err);
+        logger.error('Calendar hook: failed to update appointment', err instanceof Error ? err : new Error(String(err)), {
+          appointmentId: id,
+        });
         return false;
       }
     },
@@ -187,7 +219,11 @@ export function useAppointmentsSWR({
 
         if (!response.ok) {
           const errorData = await response.json();
-          console.error('Delete appointment error:', errorData);
+          logger.error('Calendar hook: delete appointment API error', {
+            status: response.status,
+            appointmentId: id,
+            errorData,
+          });
           return false;
         }
 
@@ -195,7 +231,9 @@ export function useAppointmentsSWR({
         await mutate();
         return true;
       } catch (err) {
-        console.error('Error deleting appointment:', err);
+        logger.error('Calendar hook: failed to delete appointment', err instanceof Error ? err : new Error(String(err)), {
+          appointmentId: id,
+        });
         return false;
       }
     },

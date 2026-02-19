@@ -5,6 +5,8 @@ export type CalendarViewType = 'week' | 'workweek' | 'month' | 'day';
 
 interface Appointment {
   id: number;
+  service_id?: number;
+  client_id?: number;
   client_name: string;
   client_email?: string;
   client_phone?: string;

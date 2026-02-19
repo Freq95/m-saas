@@ -18,7 +18,6 @@ import {
   DayPanel,
   CreateAppointmentModal,
   AppointmentPreviewModal,
-  EditAppointmentModal,
   DeleteConfirmModal,
   ConflictWarningModal,
 } from './components';
@@ -76,7 +75,16 @@ export default function CalendarPageClient({
   const [searchQuery, setSearchQuery]               = useState('');
   const [showCreateModal, setShowCreateModal]       = useState(false);
   const [showPreviewModal, setShowPreviewModal]     = useState(false);
-  const [showEditModal, setShowEditModal]           = useState(false);
+  const [appointmentModalMode, setAppointmentModalMode] = useState<'create' | 'edit'>('create');
+  const [editInitialData, setEditInitialData] = useState<{
+    clientName: string;
+    clientEmail: string;
+    clientPhone: string;
+    serviceId: string;
+    notes: string;
+    category?: string;
+    color?: string;
+  } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm]   = useState(false);
   const [showConflictModal, setShowConflictModal]   = useState(false);
   const [conflictData, setConflictData] = useState<{ conflicts: any[]; suggestions: any[] }>({
@@ -114,7 +122,6 @@ export default function CalendarPageClient({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
       setShowCreateModal(false);
-      setShowEditModal(false);
       setShowPreviewModal(false);
       setShowDeleteConfirm(false);
     };
@@ -139,6 +146,8 @@ export default function CalendarPageClient({
     const end = new Date(start.getTime() + duration * 60_000);
     actions.selectDate(day);
     actions.selectSlot({ start, end });
+    setAppointmentModalMode('create');
+    setEditInitialData(null);
     setShowCreateModal(true);
   };
 
@@ -191,7 +200,7 @@ export default function CalendarPageClient({
       count?: number;
     };
   }) => {
-    if (!state.selectedSlot || !formData.clientName || !formData.serviceId) {
+    if (!state.selectedSlot || !formData.clientName.trim() || !formData.serviceId) {
       toast.warning('Completeaza toate campurile obligatorii (nume client si serviciu).');
       return;
     }
@@ -208,9 +217,9 @@ export default function CalendarPageClient({
           body: JSON.stringify({
             userId: 1,
             serviceId: parseInt(formData.serviceId),
-            clientName: formData.clientName,
-            clientEmail: formData.clientEmail,
-            clientPhone: formData.clientPhone,
+            clientName: formData.clientName.trim(),
+            clientEmail: formData.clientEmail || undefined,
+            clientPhone: formData.clientPhone || undefined,
             startTime: state.selectedSlot.start.toISOString(),
             endTime: endTime.toISOString(),
             providerId: state.selectedProvider?.id,
@@ -244,59 +253,92 @@ export default function CalendarPageClient({
     } else {
       const ok = await createAppointment({
         serviceId: parseInt(formData.serviceId),
-        clientName: formData.clientName,
-        clientEmail: formData.clientEmail,
-        clientPhone: formData.clientPhone,
+        clientName: formData.clientName.trim(),
+        clientEmail: formData.clientEmail || undefined,
+        clientPhone: formData.clientPhone || undefined,
         startTime: state.selectedSlot.start.toISOString(),
         endTime: endTime.toISOString(),
         notes: formData.notes,
         category: formData.category,
         color: formData.color,
       });
-      if (ok) {
+      if (ok.ok) {
         setShowCreateModal(false);
         actions.clearSelection();
         toast.success('Programarea a fost creata.');
       } else {
-        toast.error('Nu s-a putut crea programarea.');
+        toast.error(ok.error || 'Nu s-a putut crea programarea.');
       }
     }
   };
 
   const handleEditClick = async () => {
     if (!state.selectedAppointment) return;
+    let appointment = state.selectedAppointment;
     try {
       const res = await fetch(`/api/appointments/${state.selectedAppointment.id}`);
       const result = await res.json();
-      actions.selectAppointment(result.appointment);
+      if (res.ok && result?.appointment) {
+        appointment = result.appointment;
+        actions.selectAppointment(result.appointment);
+      }
     } catch {
       // proceed with existing data
     }
+    const start = new Date(appointment.start_time);
+    const end = new Date(appointment.end_time);
+    actions.selectSlot({ start, end });
+    setAppointmentModalMode('edit');
+    setEditInitialData({
+      clientName: appointment.client_name || '',
+      clientEmail: appointment.client_email || '',
+      clientPhone: appointment.client_phone || '',
+      serviceId: appointment.service_id ? String(appointment.service_id) : '',
+      notes: appointment.notes || '',
+      category: appointment.category || undefined,
+      color: appointment.color || undefined,
+    });
     setShowPreviewModal(false);
-    setShowEditModal(true);
+    setShowCreateModal(true);
   };
 
-  const handleUpdateAppointment = async (formData: {
-    startTime: string;
-    endTime: string;
-    status: string;
+  const handleEditAppointment = async (formData: {
+    clientName: string;
+    clientEmail: string;
+    clientPhone: string;
+    serviceId: string;
     notes: string;
+    category?: string;
+    color?: string;
   }) => {
-    if (!state.selectedAppointment) return;
+    if (!state.selectedAppointment || !state.selectedSlot) return;
+
+    const service = services.find((s) => s.id.toString() === formData.serviceId);
+    const duration = service?.duration_minutes ?? 60;
+    const newStart = state.selectedSlot.start;
+    const newEnd = new Date(newStart.getTime() + duration * 60_000);
+
     try {
       const res = await fetch(`/api/appointments/${state.selectedAppointment.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          startTime: new Date(formData.startTime).toISOString(),
-          endTime: new Date(formData.endTime).toISOString(),
-          status: formData.status,
+          startTime: newStart.toISOString(),
+          endTime: newEnd.toISOString(),
+          serviceId: parseInt(formData.serviceId, 10),
+          clientName: formData.clientName.trim(),
+          clientEmail: formData.clientEmail || undefined,
+          clientPhone: formData.clientPhone || undefined,
           notes: formData.notes,
+          category: formData.category,
+          color: formData.color,
+          providerId: state.selectedProvider?.id,
+          resourceId: state.selectedResource?.id,
         }),
       });
       const result = await res.json();
       if (res.ok) {
-        setShowEditModal(false);
+        setShowCreateModal(false);
         actions.clearSelection();
         refetch();
         toast.success('Programarea a fost actualizata.');
@@ -424,8 +466,18 @@ export default function CalendarPageClient({
         isOpen={showCreateModal}
         selectedSlot={state.selectedSlot}
         services={services}
-        onClose={() => { setShowCreateModal(false); actions.clearSelection(); }}
-        onCreate={handleCreateAppointment}
+        mode={appointmentModalMode}
+        title={appointmentModalMode === 'edit' ? 'Editeaza programare' : 'Creeaza programare'}
+        submitLabel={appointmentModalMode === 'edit' ? 'Salveaza modificarile' : 'Salveaza'}
+        allowRecurring={appointmentModalMode === 'create'}
+        initialData={appointmentModalMode === 'edit' ? editInitialData : null}
+        onClose={() => {
+          setShowCreateModal(false);
+          setAppointmentModalMode('create');
+          setEditInitialData(null);
+          actions.clearSelection();
+        }}
+        onSubmit={appointmentModalMode === 'edit' ? handleEditAppointment : handleCreateAppointment}
       />
 
       <AppointmentPreviewModal
@@ -435,13 +487,6 @@ export default function CalendarPageClient({
         onEdit={handleEditClick}
         onDelete={() => setShowDeleteConfirm(true)}
         onQuickStatusChange={handleQuickStatusChange}
-      />
-
-      <EditAppointmentModal
-        isOpen={showEditModal}
-        appointment={state.selectedAppointment}
-        onClose={() => { setShowEditModal(false); actions.clearSelection(); }}
-        onUpdate={handleUpdateAppointment}
       />
 
       <DeleteConfirmModal
@@ -458,7 +503,8 @@ export default function CalendarPageClient({
         onClose={() => setShowConflictModal(false)}
         onSelectSlot={(startTime, endTime) => {
           actions.selectSlot({ start: new Date(startTime), end: new Date(endTime) });
-          setShowEditModal(true);
+          setAppointmentModalMode('edit');
+          setShowCreateModal(true);
         }}
       />
 

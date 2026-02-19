@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { ro } from 'date-fns/locale';
 import styles from '../../page.module.css';
@@ -14,95 +14,135 @@ interface Service {
 
 const CATEGORIES = [
   { label: 'Consultatie', color: 'var(--color-accent)' },
-  { label: 'Tratament',   color: 'var(--color-success)' },
-  { label: 'Control',     color: 'var(--color-accent-strong)' },
-  { label: 'Urgenta',     color: 'var(--color-danger)' },
-  { label: 'Altele',      color: 'var(--color-text-soft)' },
+  { label: 'Tratament', color: 'var(--color-success)' },
+  { label: 'Control', color: 'var(--color-accent-strong)' },
+  { label: 'Urgenta', color: 'var(--color-danger)' },
+  { label: 'Altele', color: 'var(--color-text-soft)' },
 ] as const;
+
+type AppointmentFormPayload = {
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  serviceId: string;
+  notes: string;
+  category?: string;
+  color?: string;
+  isRecurring?: boolean;
+  recurrence?: {
+    frequency: 'daily' | 'weekly' | 'monthly';
+    interval: number;
+    endType: 'date' | 'count';
+    endDate?: string;
+    count?: number;
+  };
+};
+
+type RecurrenceForm = {
+  frequency: 'daily' | 'weekly' | 'monthly';
+  interval: number;
+  endType: 'date' | 'count';
+  endDate: string;
+  count: number;
+};
 
 interface CreateAppointmentModalProps {
   isOpen: boolean;
   selectedSlot: { start: Date; end: Date } | null;
   services: Service[];
   onClose: () => void;
-  onCreate: (data: {
-    clientName: string;
-    clientEmail: string;
-    clientPhone: string;
-    serviceId: string;
-    notes: string;
-    category?: string;
-    color?: string;
-    isRecurring?: boolean;
-    recurrence?: {
-      frequency: 'daily' | 'weekly' | 'monthly';
-      interval: number;
-      endType: 'date' | 'count';
-      endDate?: string;
-      count?: number;
-    };
-  }) => Promise<void>;
+  onSubmit: (data: AppointmentFormPayload) => Promise<void>;
+  mode?: 'create' | 'edit';
+  title?: string;
+  submitLabel?: string;
+  allowRecurring?: boolean;
+  initialData?: Partial<AppointmentFormPayload> | null;
 }
+
+const DEFAULT_RECURRENCE: RecurrenceForm = {
+  frequency: 'weekly',
+  interval: 1,
+  endType: 'count',
+  endDate: '',
+  count: 4,
+};
 
 export function CreateAppointmentModal({
   isOpen,
   selectedSlot,
   services,
   onClose,
-  onCreate,
+  onSubmit,
+  mode = 'create',
+  title,
+  submitLabel,
+  allowRecurring = true,
+  initialData,
 }: CreateAppointmentModalProps) {
+  const defaultServiceId = useMemo(
+    () => (services[0]?.id ? services[0].id.toString() : ''),
+    [services]
+  );
+
   const [formData, setFormData] = useState({
     clientName: '',
     clientEmail: '',
     clientPhone: '',
-    serviceId: services[0]?.id ? services[0].id.toString() : '',
+    serviceId: defaultServiceId,
     notes: '',
   });
 
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [isRecurring, setIsRecurring] = useState(false);
-  const [recurrence, setRecurrence] = useState({
-    frequency: 'weekly' as 'daily' | 'weekly' | 'monthly',
-    interval: 1,
-    endType: 'count' as 'date' | 'count',
-    endDate: '',
-    count: 4,
-  });
+  const [recurrence, setRecurrence] = useState<RecurrenceForm>(DEFAULT_RECURRENCE);
 
   useEffect(() => {
-    if (services.length > 0 && !formData.serviceId) {
-      setFormData((prev) => ({ ...prev, serviceId: services[0].id.toString() }));
-    }
-  }, [services, formData.serviceId]);
+    if (!isOpen) return;
+    setFormData({
+      clientName: initialData?.clientName || '',
+      clientEmail: initialData?.clientEmail || '',
+      clientPhone: initialData?.clientPhone || '',
+      serviceId: initialData?.serviceId || defaultServiceId,
+      notes: initialData?.notes || '',
+    });
+    setSelectedCategory(initialData?.category || '');
+    setIsRecurring(Boolean(initialData?.isRecurring) && allowRecurring);
+    setRecurrence({
+      ...DEFAULT_RECURRENCE,
+      ...(initialData?.recurrence || {}),
+    });
+  }, [isOpen, initialData, defaultServiceId, allowRecurring]);
 
   if (!isOpen || !selectedSlot) return null;
 
+  const modalTitle = title || (mode === 'edit' ? 'Editeaza programare' : 'Creeaza programare');
+  const modalSubmitLabel = submitLabel || (mode === 'edit' ? 'Salveaza modificarile' : 'Salveaza');
   const activeCategoryColor = CATEGORIES.find((c) => c.label === selectedCategory)?.color;
 
   const handleSubmit = async () => {
-    if (!formData.clientName || !formData.serviceId) {
-      return;
-    }
+    if (!formData.clientName.trim() || !formData.serviceId) return;
 
-    await onCreate({
+    await onSubmit({
       ...formData,
+      clientName: formData.clientName.trim(),
       category: selectedCategory || undefined,
       color: activeCategoryColor,
-      isRecurring,
-      ...(isRecurring && { recurrence }),
+      isRecurring: allowRecurring ? isRecurring : false,
+      ...(allowRecurring && isRecurring ? { recurrence } : {}),
     });
 
-    // Reset form
-    setFormData({
-      clientName: '',
-      clientEmail: '',
-      clientPhone: '',
-      serviceId: services[0]?.id.toString() || '',
-      notes: '',
-    });
-    setSelectedCategory('');
-    setIsRecurring(false);
-    setRecurrence({ frequency: 'weekly', interval: 1, endType: 'count', endDate: '', count: 4 });
+    if (mode === 'create') {
+      setFormData({
+        clientName: '',
+        clientEmail: '',
+        clientPhone: '',
+        serviceId: defaultServiceId,
+        notes: '',
+      });
+      setSelectedCategory('');
+      setIsRecurring(false);
+      setRecurrence(DEFAULT_RECURRENCE);
+    }
   };
 
   return (
@@ -112,9 +152,9 @@ export function CreateAppointmentModal({
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label="Creare programare"
+        aria-label={modalTitle}
       >
-        <h3>Creeaza programare</h3>
+        <h3>{modalTitle}</h3>
         <div className={styles.modalContent}>
           <div className={styles.modalField}>
             <label>Data si ora</label>
@@ -174,7 +214,6 @@ export function CreateAppointmentModal({
             </select>
           </div>
 
-          {/* Category picker */}
           <div className={styles.modalField}>
             <label>Categorie</label>
             <div className={styles.categoryPicker}>
@@ -183,9 +222,7 @@ export function CreateAppointmentModal({
                   key={cat.label}
                   type="button"
                   className={`${styles.categoryChip} ${selectedCategory === cat.label ? styles.categoryChipActive : ''}`}
-                  style={{
-                    '--chip-color': cat.color,
-                  } as React.CSSProperties}
+                  style={{ '--chip-color': cat.color } as React.CSSProperties}
                   onClick={() => setSelectedCategory(selectedCategory === cat.label ? '' : cat.label)}
                   title={cat.label}
                 >
@@ -205,86 +242,90 @@ export function CreateAppointmentModal({
             />
           </div>
 
-          <div className={styles.modalField}>
-            <label className={styles.checkboxLabel}>
-              <input
-                type="checkbox"
-                checked={isRecurring}
-                onChange={(e) => setIsRecurring(e.target.checked)}
-              />
-              <span>Programare recurenta</span>
-            </label>
-          </div>
-
-          {isRecurring && (
-            <div className={styles.recurringOptions}>
+          {allowRecurring && (
+            <>
               <div className={styles.modalField}>
-                <label>Frecventa</label>
-                <select
-                  value={recurrence.frequency}
-                  onChange={(e) => setRecurrence({ ...recurrence, frequency: e.target.value as any })}
-                >
-                  <option value="daily">Zilnic</option>
-                  <option value="weekly">Saptamanal</option>
-                  <option value="monthly">Lunar</option>
-                </select>
-              </div>
-
-              <div className={styles.modalField}>
-                <label>
-                  Interval (la fiecare{' '}
-                  {recurrence.frequency === 'daily'
-                    ? 'zile'
-                    : recurrence.frequency === 'weekly'
-                    ? 'saptamani'
-                    : 'luni'}
-                  )
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={isRecurring}
+                    onChange={(e) => setIsRecurring(e.target.checked)}
+                  />
+                  <span>Programare recurenta</span>
                 </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="12"
-                  value={recurrence.interval}
-                  onChange={(e) => setRecurrence({ ...recurrence, interval: parseInt(e.target.value) || 1 })}
-                />
               </div>
 
-              <div className={styles.modalField}>
-                <label>Sfarsit</label>
-                <select
-                  value={recurrence.endType}
-                  onChange={(e) => setRecurrence({ ...recurrence, endType: e.target.value as any })}
-                >
-                  <option value="count">Dupa un numar de repetari</option>
-                  <option value="date">La o data specifica</option>
-                </select>
-              </div>
+              {isRecurring && (
+                <div className={styles.recurringOptions}>
+                  <div className={styles.modalField}>
+                    <label>Frecventa</label>
+                    <select
+                      value={recurrence.frequency}
+                      onChange={(e) => setRecurrence({ ...recurrence, frequency: e.target.value as any })}
+                    >
+                      <option value="daily">Zilnic</option>
+                      <option value="weekly">Saptamanal</option>
+                      <option value="monthly">Lunar</option>
+                    </select>
+                  </div>
 
-              {recurrence.endType === 'count' && (
-                <div className={styles.modalField}>
-                  <label>Numar de repetari</label>
-                  <input
-                    type="number"
-                    min="2"
-                    max="52"
-                    value={recurrence.count}
-                    onChange={(e) => setRecurrence({ ...recurrence, count: parseInt(e.target.value) || 2 })}
-                  />
+                  <div className={styles.modalField}>
+                    <label>
+                      Interval (la fiecare{' '}
+                      {recurrence.frequency === 'daily'
+                        ? 'zile'
+                        : recurrence.frequency === 'weekly'
+                          ? 'saptamani'
+                          : 'luni'}
+                      )
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="12"
+                      value={recurrence.interval}
+                      onChange={(e) => setRecurrence({ ...recurrence, interval: parseInt(e.target.value, 10) || 1 })}
+                    />
+                  </div>
+
+                  <div className={styles.modalField}>
+                    <label>Sfarsit</label>
+                    <select
+                      value={recurrence.endType}
+                      onChange={(e) => setRecurrence({ ...recurrence, endType: e.target.value as any })}
+                    >
+                      <option value="count">Dupa un numar de repetari</option>
+                      <option value="date">La o data specifica</option>
+                    </select>
+                  </div>
+
+                  {recurrence.endType === 'count' && (
+                    <div className={styles.modalField}>
+                      <label>Numar de repetari</label>
+                      <input
+                        type="number"
+                        min="2"
+                        max="52"
+                        value={recurrence.count}
+                        onChange={(e) => setRecurrence({ ...recurrence, count: parseInt(e.target.value, 10) || 2 })}
+                      />
+                    </div>
+                  )}
+
+                  {recurrence.endType === 'date' && (
+                    <div className={styles.modalField}>
+                      <label>Data de sfarsit</label>
+                      <input
+                        type="date"
+                        value={recurrence.endDate}
+                        onChange={(e) => setRecurrence({ ...recurrence, endDate: e.target.value })}
+                        min={format(selectedSlot.start, 'yyyy-MM-dd')}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
-
-              {recurrence.endType === 'date' && (
-                <div className={styles.modalField}>
-                  <label>Data de sfarsit</label>
-                  <input
-                    type="date"
-                    value={recurrence.endDate}
-                    onChange={(e) => setRecurrence({ ...recurrence, endDate: e.target.value })}
-                    min={format(selectedSlot.start, 'yyyy-MM-dd')}
-                  />
-                </div>
-              )}
-            </div>
+            </>
           )}
         </div>
 
@@ -293,7 +334,7 @@ export function CreateAppointmentModal({
             Anuleaza
           </button>
           <button onClick={handleSubmit} className={styles.saveButton}>
-            Salveaza
+            {modalSubmitLabel}
           </button>
         </div>
       </div>

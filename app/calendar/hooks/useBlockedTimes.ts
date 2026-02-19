@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { logger } from '@/lib/logger';
 
 interface BlockedTime {
   id: number;
@@ -49,7 +50,13 @@ export function useBlockedTimes(
         setBlockedTimes(result.blockedTimes || []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
-        console.error('Error fetching blocked times:', err);
+        logger.error('Calendar hook: failed to fetch blocked times', err instanceof Error ? err : new Error(String(err)), {
+          userId,
+          providerId: providerId || null,
+          resourceId: resourceId || null,
+          startDate: startDate?.toISOString(),
+          endDate: endDate?.toISOString(),
+        });
       } finally {
         setLoading(false);
       }

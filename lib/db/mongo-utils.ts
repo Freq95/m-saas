@@ -33,13 +33,32 @@ export async function getNextNumericId(
         : 0;
 
   const counterKey = `${collectionName}:${idField}`;
-  const result: any = await counters.findOneAndUpdate(
+  const nowIso = new Date().toISOString();
+
+  // Ensure counter doc exists without conflicting updates on the same path.
+  await counters.updateOne(
     { _id: counterKey },
     {
       $setOnInsert: {
         seq: currentMax,
-        created_at: new Date().toISOString(),
+        created_at: nowIso,
       },
+    },
+    { upsert: true }
+  );
+
+  // Ensure counter is not behind current collection max (safety for legacy data/imports).
+  await counters.updateOne(
+    { _id: counterKey },
+    {
+      $max: { seq: currentMax },
+      $set: { updated_at: nowIso },
+    }
+  );
+
+  const result: any = await counters.findOneAndUpdate(
+    { _id: counterKey },
+    {
       $inc: { seq: 1 },
       $set: { updated_at: new Date().toISOString() },
     },

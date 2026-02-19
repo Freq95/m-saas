@@ -50,7 +50,7 @@ export const createAppointmentSchema = z.object({
   providerId: z.number().int().positive().optional(),
   resourceId: z.number().int().positive().optional(),
   category: z.string().max(120).optional(),
-  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+  color: z.string().max(120).optional(),
   notes: z.string().max(2000).optional(),
   exportToGoogle: z.boolean().optional().default(false),
   googleAccessToken: z.string().optional(),
@@ -59,6 +59,14 @@ export const createAppointmentSchema = z.object({
 export const updateAppointmentSchema = z.object({
   startTime: dateTimeSchema.optional(),
   endTime: dateTimeSchema.optional(),
+  serviceId: z.number().int().positive().optional(),
+  clientName: z.string().min(1).max(255).optional(),
+  clientEmail: emailSchema.optional(),
+  clientPhone: phoneSchema,
+  providerId: z.number().int().positive().optional().nullable(),
+  resourceId: z.number().int().positive().optional().nullable(),
+  category: z.string().max(120).optional().nullable(),
+  color: z.string().max(120).optional().nullable(),
   status: z.enum(['scheduled', 'completed', 'cancelled', 'no-show']).optional(),
   notes: z.string().max(2000).optional(),
 });

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ClientCreateModal from '@/components/ClientCreateModal';
+import { logger } from '@/lib/logger';
 import styles from './page.module.css';
 import navStyles from '../dashboard/page.module.css';
 
@@ -70,7 +71,12 @@ export default function ClientsPageClient({
       setClients(result.clients || []);
       setPagination(result.pagination || null);
     } catch (error) {
-      console.error('Error fetching clients:', error);
+      logger.error('Clients page: failed to fetch clients', error instanceof Error ? error : new Error(String(error)), {
+        search: currentSearch,
+        sortBy: currentSortBy,
+        sortOrder: currentSortOrder,
+        page: currentPage,
+      });
     } finally {
       setLoading(false);
     }

@@ -12,33 +12,72 @@ type ClientPayload = {
   notes: string | null;
 };
 
+type ClientFormData = {
+  name: string;
+  email: string;
+  phone: string;
+  notes: string;
+};
+
 type ClientCreateModalProps = {
   isOpen: boolean;
   onClose: () => void;
+  mode?: 'create' | 'edit';
+  clientId?: number;
+  initialData?: Partial<ClientPayload> | null;
   onCreated?: (client: ClientPayload) => void;
+  onUpdated?: (client: ClientPayload) => void;
   title?: string;
+  submitLabel?: string;
 };
 
 export default function ClientCreateModal({
   isOpen,
   onClose,
+  mode = 'create',
+  clientId,
+  initialData,
   onCreated,
+  onUpdated,
   title = 'Adauga client nou',
+  submitLabel,
 }: ClientCreateModalProps) {
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    notes: '',
+  const [formData, setFormData] = useState<ClientFormData>({
+    name: initialData?.name || '',
+    email: initialData?.email || '',
+    phone: initialData?.phone || '',
+    notes: initialData?.notes || '',
   });
+
+  const isEditMode = mode === 'edit';
 
   useEffect(() => {
     setMounted(true);
     return () => setMounted(false);
   }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setErrorMessage('');
+    if (isEditMode) {
+      setFormData({
+        name: initialData?.name || '',
+        email: initialData?.email || '',
+        phone: initialData?.phone || '',
+        notes: initialData?.notes || '',
+      });
+      return;
+    }
+    setFormData({
+      name: '',
+      email: '',
+      phone: '',
+      notes: '',
+    });
+  }, [isOpen, isEditMode, initialData]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -64,7 +103,16 @@ export default function ClientCreateModal({
 
   const resetAndClose = () => {
     if (loading) return;
-    setFormData({ name: '', email: '', phone: '', notes: '' });
+    if (isEditMode) {
+      setFormData({
+        name: initialData?.name || '',
+        email: initialData?.email || '',
+        phone: initialData?.phone || '',
+        notes: initialData?.notes || '',
+      });
+    } else {
+      setFormData({ name: '', email: '', phone: '', notes: '' });
+    }
     setErrorMessage('');
     onClose();
   };
@@ -79,8 +127,12 @@ export default function ClientCreateModal({
     setLoading(true);
     setErrorMessage('');
     try {
-      const response = await fetch('/api/clients', {
-        method: 'POST',
+      if (isEditMode && !clientId) {
+        throw new Error('Client invalid pentru editare.');
+      }
+
+      const response = await fetch(isEditMode ? `/api/clients/${clientId}` : '/api/clients', {
+        method: isEditMode ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: 1,
@@ -96,15 +148,25 @@ export default function ClientCreateModal({
         throw new Error(result?.error || 'Nu s-a putut crea clientul.');
       }
 
-      const createdClient = result?.client as ClientPayload;
-      setFormData({ name: '', email: '', phone: '', notes: '' });
-      if (createdClient && onCreated) {
-        onCreated(createdClient);
-      } else {
+      const savedClient = result?.client as ClientPayload;
+      if (isEditMode) {
+        if (savedClient && onUpdated) {
+          onUpdated(savedClient);
+          return;
+        }
         onClose();
+        return;
       }
+
+      setFormData({ name: '', email: '', phone: '', notes: '' });
+      if (savedClient && onCreated) {
+        onCreated(savedClient);
+        return;
+      }
+      onClose();
     } catch (error: any) {
-      setErrorMessage(error?.message || 'A aparut o eroare la creare.');
+      const fallback = isEditMode ? 'A aparut o eroare la actualizare.' : 'A aparut o eroare la creare.';
+      setErrorMessage(error?.message || fallback);
     } finally {
       setLoading(false);
     }
@@ -176,7 +238,7 @@ export default function ClientCreateModal({
               Anuleaza
             </button>
             <button type="submit" className={styles.submitButton} disabled={loading || !formData.name.trim()}>
-              {loading ? 'Se salveaza...' : 'Salveaza client'}
+              {loading ? 'Se salveaza...' : (submitLabel || (isEditMode ? 'Salveaza modificarile' : 'Salveaza client'))}
             </button>
           </div>
         </form>

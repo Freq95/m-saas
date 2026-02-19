@@ -7,7 +7,7 @@
 
 ```typescript
 // Before:
-import { useCalendar, useAppointments } from './hooks';
+import { useCalendar, useAppointmentsSWR as useAppointments } from './hooks';
 
 // After:
 import { useCalendar, useAppointmentsSWR as useAppointments } from './hooks';
@@ -129,7 +129,7 @@ Change line 8 in `CalendarPageClient.tsx`:
 import { useCalendar, useAppointmentsSWR as useAppointments } from './hooks';
 
 // Back to:
-import { useCalendar, useAppointments } from './hooks';
+import { useCalendar, useAppointmentsSWR as useAppointments } from './hooks';
 ```
 
 ### To Disable Drag-and-Drop:

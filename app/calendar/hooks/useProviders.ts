@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Provider } from './useCalendar';
+import { logger } from '@/lib/logger';
 
 interface UseProvidersResult {
   providers: Provider[];
@@ -26,7 +27,9 @@ export function useProviders(userId: number = 1): UseProvidersResult {
         setProviders(result.providers || []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
-        console.error('Error fetching providers:', err);
+        logger.error('Calendar hook: failed to fetch providers', err instanceof Error ? err : new Error(String(err)), {
+          userId,
+        });
       } finally {
         setLoading(false);
       }

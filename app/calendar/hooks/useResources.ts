@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Resource } from './useCalendar';
+import { logger } from '@/lib/logger';
 
 interface UseResourcesResult {
   resources: Resource[];
@@ -26,7 +27,9 @@ export function useResources(userId: number = 1): UseResourcesResult {
         setResources(result.resources || []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
-        console.error('Error fetching resources:', err);
+        logger.error('Calendar hook: failed to fetch resources', err instanceof Error ? err : new Error(String(err)), {
+          userId,
+        });
       } finally {
         setLoading(false);
       }
