@@ -5,6 +5,8 @@ import { exportToGoogleCalendar } from '@/lib/google-calendar';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { getAppointmentsData } from '@/lib/server/calendar';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { getCached } from '@/lib/redis';
+import { appointmentsListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
 
 // GET /api/appointments - Get appointments
 export async function GET(request: NextRequest) {
@@ -29,9 +31,16 @@ export async function GET(request: NextRequest) {
     }
 
     const { startDate, endDate, providerId, resourceId, status } = validationResult.data;
-    const appointments = await getAppointmentsData({ userId, tenantId, startDate, endDate, providerId, resourceId, status });
+    const cacheKey = appointmentsListCacheKey(
+      { tenantId, userId },
+      { startDate, endDate, providerId, resourceId, status }
+    );
+    const payload = await getCached(cacheKey, 120, async () => {
+      const appointments = await getAppointmentsData({ userId, tenantId, startDate, endDate, providerId, resourceId, status });
+      return { appointments };
+    });
 
-    return createSuccessResponse({ appointments });
+    return createSuccessResponse(payload);
   } catch (error) {
     return handleApiError(error, 'Failed to fetch appointments');
   }
@@ -146,6 +155,7 @@ export async function POST(request: NextRequest) {
 
     // Link appointment to client and update stats
     await linkAppointmentToClient(appointmentId, client.id, tenantId);
+    await invalidateReadCaches({ tenantId, userId });
 
     const appointment = stripMongoId(appointmentDoc) as any;
 

@@ -3,14 +3,20 @@ import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mong
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { getServicesData } from '@/lib/server/calendar';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { getCached } from '@/lib/redis';
+import { servicesListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
 
 // GET /api/services - Get services
 export async function GET(request: NextRequest) {
   try {
     const { userId, tenantId } = await getAuthUser();
-    const services = await getServicesData(userId, tenantId);
+    const cacheKey = servicesListCacheKey({ tenantId, userId });
+    const payload = await getCached(cacheKey, 1800, async () => {
+      const services = await getServicesData(userId, tenantId);
+      return { services };
+    });
 
-    return createSuccessResponse({ services });
+    return createSuccessResponse(payload);
   } catch (error) {
     return handleApiError(error, 'Failed to fetch services');
   }
@@ -53,6 +59,7 @@ export async function POST(request: NextRequest) {
     };
 
     await db.collection('services').insertOne(serviceDoc);
+    await invalidateReadCaches({ tenantId, userId });
 
     return createSuccessResponse({ service: stripMongoId(serviceDoc) }, 201);
   } catch (error) {

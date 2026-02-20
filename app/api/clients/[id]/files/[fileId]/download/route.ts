@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
-import * as fs from 'fs';
 import { handleApiError, createErrorResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { getStorageProvider } from '@/lib/storage';
 
 // GET /api/clients/[id]/files/[fileId]/download - Download a file
 export async function GET(
@@ -29,19 +29,20 @@ export async function GET(
       return createErrorResponse('File not found', 404);
     }
 
-    if (!fs.existsSync(file.file_path)) {
-      return createErrorResponse('File not found on disk', 404);
+    if (file.storage_key) {
+      const storage = getStorageProvider();
+      const signedUrl = await storage.getSignedUrl(
+        String(file.storage_key),
+        3600,
+        {
+          contentDisposition: `attachment; filename="${file.original_filename}"`,
+          contentType: file.mime_type || 'application/octet-stream',
+        }
+      );
+      return NextResponse.redirect(signedUrl);
     }
 
-    const fileBuffer = fs.readFileSync(file.file_path);
-
-    return new NextResponse(fileBuffer, {
-      headers: {
-        'Content-Type': file.mime_type || 'application/octet-stream',
-        'Content-Disposition': `attachment; filename="${file.original_filename}"`,
-        'Content-Length': file.file_size.toString(),
-      },
-    });
+    return createErrorResponse('File is not available in cloud storage. Run file migration and retry.', 410);
   } catch (error) {
     return handleApiError(error, 'Failed to download file');
   }

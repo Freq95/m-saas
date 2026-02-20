@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { invalidateReadCaches } from '@/lib/cache-keys';
 
 // GET /api/services/[id] - Get a single service
 export async function GET(
@@ -80,6 +81,7 @@ export async function PATCH(
     if (!service) {
       return createErrorResponse('Not found or not authorized', 404);
     }
+    await invalidateReadCaches({ tenantId, userId });
     return createSuccessResponse({ service: stripMongoId(service) });
   } catch (error) {
     return handleApiError(error, 'Failed to update service');
@@ -116,6 +118,7 @@ export async function DELETE(
     if (result.deletedCount === 0) {
       return createErrorResponse('Not found or not authorized', 404);
     }
+    await invalidateReadCaches({ tenantId, userId });
 
     return createSuccessResponse({ success: true });
   } catch (error) {

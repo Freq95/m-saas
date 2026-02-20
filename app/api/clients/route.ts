@@ -4,6 +4,8 @@ import { getClientsData } from '@/lib/server/clients';
 import { findOrCreateClient } from '@/lib/client-matching';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { getCached } from '@/lib/redis';
+import { clientsListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
 
 // GET /api/clients - Get all clients with filtering and sorting
 export async function GET(request: NextRequest) {
@@ -17,15 +19,21 @@ export async function GET(request: NextRequest) {
     // Pagination parameters
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
-    const data = await getClientsData({
-      userId,
-      tenantId,
-      search,
-      sortBy,
-      sortOrder,
-      page,
-      limit,
-    });
+    const cacheKey = clientsListCacheKey(
+      { tenantId, userId },
+      { search, sortBy, sortOrder, page, limit }
+    );
+    const data = await getCached(cacheKey, 120, async () =>
+      getClientsData({
+        userId,
+        tenantId,
+        search,
+        sortBy,
+        sortOrder,
+        page,
+        limit,
+      })
+    );
 
     return createSuccessResponse(data);
   } catch (error) {
@@ -77,6 +85,7 @@ export async function POST(request: NextRequest) {
       updates.notes = notes;
     }
 
+    let responseClient = client;
     if (Object.keys(updates).length > 0) {
       updates.updated_at = new Date().toISOString();
       await db.collection('clients').updateOne(
@@ -86,13 +95,12 @@ export async function POST(request: NextRequest) {
 
       const updatedClient = await db.collection('clients').findOne({ id: client.id, tenant_id: tenantId });
       if (updatedClient) {
-        return NextResponse.json({
-          client: stripMongoId(updatedClient),
-        });
+        responseClient = stripMongoId(updatedClient);
       }
     }
+    await invalidateReadCaches({ tenantId, userId });
     return createSuccessResponse({
-      client,
+      client: responseClient,
     }, 201);
   } catch (error) {
     return handleApiError(error, 'Failed to create client');

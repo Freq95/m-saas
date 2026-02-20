@@ -129,7 +129,8 @@ export interface ClientFile {
   client_id: number;
   filename: string;
   original_filename: string;
-  file_path: string;
+  storage_key?: string | null;
+  file_path?: string | null; // legacy local storage fallback
   file_size: number;
   mime_type: string | null;
   description: string | null;

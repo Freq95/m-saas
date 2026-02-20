@@ -1,0 +1,610 @@
+{
+  "metadata": {
+    "timestampIso": "2026-02-20T10:54:39.521Z",
+    "runId": "20260220-105439",
+    "runtimeLabel": "local-prod",
+    "targetBaseUrl": "http://127.0.0.1:3000",
+    "gitCommit": "a1ab4ea",
+    "nodeVersion": "v18.20.0",
+    "benchmarkConfigPath": "D:\\m-saas\\scripts\\benchmark\\config.baseline.json",
+    "benchmarkConfigHash": "3601fb90999b",
+    "envFlags": {
+      "redisConfigured": false,
+      "cronConfigured": false,
+      "sentryConfigured": false
+    }
+  },
+  "modules": {
+    "apiCore": {
+      "endpointMetrics": [
+        {
+          "endpointName": "api.appointments.range",
+          "method": "GET",
+          "path": "/api/appointments?startDate=2026-01-01T00:00:00.000Z&endDate=2026-12-31T23:59:59.999Z",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 124.96,
+          "maxMs": 1157.17,
+          "avgMs": 547.38,
+          "p50Ms": 628.88,
+          "p90Ms": 855.33,
+          "p95Ms": 1016.5,
+          "p99Ms": 1106.5,
+          "throughputRps": 17.96,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "api.appointments.range",
+          "method": "GET",
+          "path": "/api/appointments?startDate=2026-01-01T00:00:00.000Z&endDate=2026-12-31T23:59:59.999Z",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 425.04,
+          "maxMs": 4879.95,
+          "avgMs": 2594.49,
+          "p50Ms": 2839.89,
+          "p90Ms": 3191.99,
+          "p95Ms": 3299.64,
+          "p99Ms": 3533.46,
+          "throughputRps": 18.6,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "api.clients.list",
+          "method": "GET",
+          "path": "/api/clients?page=1&limit=20",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 79.31,
+          "maxMs": 929.99,
+          "avgMs": 422.86,
+          "p50Ms": 131.08,
+          "p90Ms": 897.68,
+          "p95Ms": 909.29,
+          "p99Ms": 929.55,
+          "throughputRps": 23.45,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "api.clients.list",
+          "method": "GET",
+          "path": "/api/clients?page=1&limit=20",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 1820.33,
+          "maxMs": 2138.65,
+          "avgMs": 1975,
+          "p50Ms": 1990.17,
+          "p90Ms": 2015.33,
+          "p95Ms": 2024.84,
+          "p99Ms": 2065.59,
+          "throughputRps": 25.2,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "api.services.list",
+          "method": "GET",
+          "path": "/api/services",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 53.83,
+          "maxMs": 922.08,
+          "avgMs": 281.03,
+          "p50Ms": 97.47,
+          "p90Ms": 859.33,
+          "p95Ms": 885.77,
+          "p99Ms": 921.22,
+          "throughputRps": 30.76,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "api.services.list",
+          "method": "GET",
+          "path": "/api/services",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 950.19,
+          "maxMs": 3010.07,
+          "avgMs": 1375.59,
+          "p50Ms": 1034,
+          "p90Ms": 1993.57,
+          "p95Ms": 2007.65,
+          "p99Ms": 2101.41,
+          "throughputRps": 32.92,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "api.dashboard.7d",
+          "method": "GET",
+          "path": "/api/dashboard?days=7",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 435.66,
+          "maxMs": 2109.02,
+          "avgMs": 1249.26,
+          "p50Ms": 1143.09,
+          "p90Ms": 1793.83,
+          "p95Ms": 1880.33,
+          "p99Ms": 2094.55,
+          "throughputRps": 7.76,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "api.dashboard.7d",
+          "method": "GET",
+          "path": "/api/dashboard?days=7",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 2558.77,
+          "maxMs": 8315.89,
+          "avgMs": 5203.36,
+          "p50Ms": 5035.76,
+          "p90Ms": 6564.41,
+          "p95Ms": 7162.39,
+          "p99Ms": 7389.93,
+          "throughputRps": 9.17,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "api.providers.list",
+          "method": "GET",
+          "path": "/api/providers",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 55.53,
+          "maxMs": 909.48,
+          "avgMs": 292.14,
+          "p50Ms": 94.55,
+          "p90Ms": 844.76,
+          "p95Ms": 881.34,
+          "p99Ms": 908.69,
+          "throughputRps": 33.72,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "api.providers.list",
+          "method": "GET",
+          "path": "/api/providers",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 810.9,
+          "maxMs": 2115.76,
+          "avgMs": 1428.83,
+          "p50Ms": 1043.99,
+          "p90Ms": 1989.15,
+          "p95Ms": 2006.75,
+          "p99Ms": 2021.04,
+          "throughputRps": 33.7,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "api.resources.list",
+          "method": "GET",
+          "path": "/api/resources",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 59.45,
+          "maxMs": 908.13,
+          "avgMs": 317.34,
+          "p50Ms": 91.62,
+          "p90Ms": 878.73,
+          "p95Ms": 894.87,
+          "p99Ms": 901.94,
+          "throughputRps": 31.06,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "api.resources.list",
+          "method": "GET",
+          "path": "/api/resources",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 86.58,
+          "maxMs": 2071.53,
+          "avgMs": 1321.13,
+          "p50Ms": 1024.3,
+          "p90Ms": 1992.32,
+          "p95Ms": 2001.23,
+          "p99Ms": 2020.45,
+          "throughputRps": 37.42,
+          "statuses": {
+            "200": 300
+          }
+        }
+      ]
+    },
+    "apiWrite": {
+      "endpointMetrics": [
+        {
+          "endpointName": "api.clients.create",
+          "method": "POST",
+          "path": "/api/clients",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 128.87,
+          "maxMs": 986.3,
+          "avgMs": 640.43,
+          "p50Ms": 875.81,
+          "p90Ms": 930.02,
+          "p95Ms": 943.82,
+          "p99Ms": 976.57,
+          "throughputRps": 14.84,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "api.clients.create",
+          "method": "POST",
+          "path": "/api/clients",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 1101.33,
+          "maxMs": 3121.2,
+          "avgMs": 2397.41,
+          "p50Ms": 2054.77,
+          "p90Ms": 3030.71,
+          "p95Ms": 3041.74,
+          "p99Ms": 3097.79,
+          "throughputRps": 20.07,
+          "statuses": {
+            "200": 300
+          }
+        }
+      ],
+      "snapshots": [
+        {
+          "name": "api.read-after-write.clients",
+          "method": "GET",
+          "path": "/api/clients?search=",
+          "status": 200,
+          "durationMs": 168.76,
+          "ok": true
+        },
+        {
+          "name": "api.team.invite.snapshot",
+          "method": "POST",
+          "path": "/api/team/invite",
+          "status": 201,
+          "durationMs": 1291.31,
+          "ok": true
+        }
+      ]
+    },
+    "uiPages": {
+      "endpointMetrics": [
+        {
+          "endpointName": "ui.dashboard",
+          "method": "GET",
+          "path": "/dashboard",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 684.56,
+          "maxMs": 1605.52,
+          "avgMs": 1071.31,
+          "p50Ms": 1051.29,
+          "p90Ms": 1319.53,
+          "p95Ms": 1447.3,
+          "p99Ms": 1600.53,
+          "throughputRps": 8.79,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "ui.dashboard",
+          "method": "GET",
+          "path": "/dashboard",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 2176.6,
+          "maxMs": 7856.89,
+          "avgMs": 4952.7,
+          "p50Ms": 4718.82,
+          "p90Ms": 6746.31,
+          "p95Ms": 6959.74,
+          "p99Ms": 7276.91,
+          "throughputRps": 9.64,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "ui.clients",
+          "method": "GET",
+          "path": "/clients",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 14.61,
+          "maxMs": 28.74,
+          "avgMs": 23.49,
+          "p50Ms": 23.79,
+          "p90Ms": 25.88,
+          "p95Ms": 26.16,
+          "p99Ms": 28.53,
+          "throughputRps": 414.53,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "ui.clients",
+          "method": "GET",
+          "path": "/clients",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 61.11,
+          "maxMs": 154.6,
+          "avgMs": 114.5,
+          "p50Ms": 118.39,
+          "p90Ms": 128.73,
+          "p95Ms": 137.71,
+          "p99Ms": 143.62,
+          "throughputRps": 419.11,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "ui.calendar",
+          "method": "GET",
+          "path": "/calendar",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 281.56,
+          "maxMs": 1362.2,
+          "avgMs": 829.87,
+          "p50Ms": 833.31,
+          "p90Ms": 1145.39,
+          "p95Ms": 1330.69,
+          "p99Ms": 1352.83,
+          "throughputRps": 11.95,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "ui.calendar",
+          "method": "GET",
+          "path": "/calendar",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 1526.48,
+          "maxMs": 7881.13,
+          "avgMs": 4593.48,
+          "p50Ms": 4604.01,
+          "p90Ms": 4909.88,
+          "p95Ms": 6839.45,
+          "p99Ms": 7511.62,
+          "throughputRps": 10.65,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "ui.inbox",
+          "method": "GET",
+          "path": "/inbox",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 304.11,
+          "maxMs": 1082.32,
+          "avgMs": 713.24,
+          "p50Ms": 705.08,
+          "p90Ms": 904.61,
+          "p95Ms": 1003.16,
+          "p99Ms": 1047.64,
+          "throughputRps": 13.74,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "ui.inbox",
+          "method": "GET",
+          "path": "/inbox",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 1350.12,
+          "maxMs": 5465.21,
+          "avgMs": 3001.48,
+          "p50Ms": 2968.25,
+          "p90Ms": 3729.39,
+          "p95Ms": 4021.76,
+          "p99Ms": 4449.62,
+          "throughputRps": 15.99,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "ui.settings.email",
+          "method": "GET",
+          "path": "/settings/email",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 67.8,
+          "maxMs": 152.03,
+          "avgMs": 100.63,
+          "p50Ms": 101.99,
+          "p90Ms": 118.87,
+          "p95Ms": 136.39,
+          "p99Ms": 151.89,
+          "throughputRps": 98.7,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "ui.settings.email",
+          "method": "GET",
+          "path": "/settings/email",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 173.06,
+          "maxMs": 792.08,
+          "avgMs": 396.39,
+          "p50Ms": 311.37,
+          "p90Ms": 691.89,
+          "p95Ms": 717.65,
+          "p99Ms": 780.54,
+          "throughputRps": 120.93,
+          "statuses": {
+            "200": 300
+          }
+        }
+      ]
+    },
+    "edgeChecks": {
+      "checks": [
+        {
+          "name": "seat-limit-pending-members",
+          "passed": true,
+          "details": {
+            "firstInviteStatus": 201,
+            "firstInviteMs": 1129.52,
+            "secondInviteStatus": 403,
+            "secondInviteMs": 116.09
+          }
+        },
+        {
+          "name": "revoked-invite-rejected",
+          "passed": true,
+          "details": {
+            "inviteStatus": 201,
+            "inviteMs": 883.17,
+            "removeStatus": 200,
+            "acceptStatus": 409,
+            "acceptMs": 79.13
+          }
+        },
+        {
+          "name": "cross-tenant-nested-denied",
+          "passed": true,
+          "details": {
+            "createStatus": 200,
+            "ownerBStatus": 404,
+            "clientId": 567
+          }
+        },
+        {
+          "name": "staff-forbidden-endpoints",
+          "passed": true,
+          "details": {
+            "statuses": [
+              {
+                "name": "edge.staff.forbidden.team",
+                "status": 403,
+                "durationMs": 53.83
+              },
+              {
+                "name": "edge.staff.forbidden.invite",
+                "status": 403,
+                "durationMs": 54.29
+              },
+              {
+                "name": "edge.staff.forbidden.settings",
+                "status": 403,
+                "durationMs": 52.22
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

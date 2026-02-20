@@ -1,16 +1,8 @@
 import { NextRequest } from 'next/server';
 import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
-import * as fs from 'fs';
-import * as path from 'path';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
-
-const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'clients');
-
-// Ensure upload directory exists
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
+import { buildClientStorageKey, getStorageProvider } from '@/lib/storage';
 
 // GET /api/clients/[id]/files - Get files for a client
 export async function GET(
@@ -91,16 +83,11 @@ export async function POST(
       return createErrorResponse('File type not allowed', 400);
     }
 
-    // Generate unique filename
-    const timestamp = Date.now();
-    const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-    const filename = `${clientId}_${timestamp}_${sanitizedName}`;
-    const filepath = path.join(UPLOAD_DIR, filename);
-
-    // Save file
+    const storage = getStorageProvider();
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    fs.writeFileSync(filepath, buffer);
+    const storageKey = buildClientStorageKey(String(tenantId), clientId, file.name);
+    await storage.upload(storageKey, buffer, file.type || 'application/octet-stream');
 
     const now = new Date().toISOString();
     const fileId = await getNextNumericId('client_files');
@@ -109,9 +96,9 @@ export async function POST(
       id: fileId,
       tenant_id: tenantId,
       client_id: clientId,
-      filename,
+      filename: storageKey.split('/').pop() || file.name,
       original_filename: file.name,
-      file_path: filepath,
+      storage_key: storageKey,
       file_size: file.size,
       mime_type: file.type,
       description: description || null,

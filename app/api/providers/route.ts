@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { getCached } from '@/lib/redis';
+import { providersListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
 
 // Cleanup classification: feature-flagged (advanced scheduling domain, no core UI dependency).
 // GET /api/providers - List all providers for a user
@@ -8,12 +10,15 @@ export async function GET(request: NextRequest) {
   try {
     const { userId, tenantId } = await getAuthUser();
 
-    const db = await getMongoDbOrThrow();
-    const providers = await db
-      .collection('providers')
-      .find({ user_id: Number(userId), tenant_id: tenantId, is_active: true })
-      .sort({ name: 1 })
-      .toArray();
+    const cacheKey = providersListCacheKey({ tenantId, userId: Number(userId) });
+    const providers = await getCached(cacheKey, 1800, async () => {
+      const db = await getMongoDbOrThrow();
+      return db
+        .collection('providers')
+        .find({ user_id: Number(userId), tenant_id: tenantId, is_active: true })
+        .sort({ name: 1 })
+        .toArray();
+    });
 
     return NextResponse.json({ providers });
   } catch (error) {
@@ -67,6 +72,7 @@ export async function POST(request: NextRequest) {
     };
 
     await db.collection('providers').insertOne(provider);
+    await invalidateReadCaches({ tenantId, userId: Number(userId) });
 
     return NextResponse.json({ provider }, { status: 201 });
   } catch (error) {

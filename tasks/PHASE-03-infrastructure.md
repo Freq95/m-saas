@@ -393,3 +393,40 @@ Commit:
 ```bash
 git add -A && git commit -m "PHASE-03: Cloud storage, Redis cache, background jobs, deployment config"
 ```
+
+---
+
+## Execution Order (Chapter-by-Chapter, One-by-One)
+
+Use this order for implementation and review:
+
+1. Chapter 0: Benchmark baseline freeze
+   - Capture clean baseline with benchmark switch enabled.
+   - Record run ID in `STATUS.md` and `SESSION-IMPLEMENTATION-LOG.md`.
+2. Chapter 1: Task 3.1 storage migration
+3. Chapter 2: Task 3.2 Redis foundation + distributed rate limiting
+4. Chapter 3: Task 3.3 hot endpoint caching
+5. Chapter 4: Task 3.4 background jobs/cron
+6. Chapter 5: Task 3.5 Sentry integration
+7. Chapter 6: Task 3.6 security headers/CSP
+8. Chapter 7: Task 3.7 deployment/env contract
+9. Chapter 8: hotspot performance refactor pass
+   - prioritize: `api.dashboard.7d`, `/dashboard`, `/calendar`, `/inbox`, `/api/clients` write path.
+10. Chapter 9: benchmark compare + closeout docs
+
+### Claude Review Gate (Required)
+- Before coding each chapter:
+  - Claude reviews scope + acceptance criteria for that chapter.
+  - Confirm no regressions against Phase 2 tenancy/role rules.
+- After completing each chapter:
+  - Run `npm run typecheck` and `npm run build`.
+  - Run relevant smoke/benchmark checks.
+  - Claude reviews changed files before proceeding to next chapter.
+
+### Baseline/Compare Contract
+- Baseline run must be captured with benchmark switch:
+  - `.env`: `BENCHMARK_MODE=true`
+  - `.env`: `BENCHMARK_TOKEN=<secret>`
+- Use:
+  - `npm run bench:baseline`
+  - `npm run bench:compare -- --against <baselineRunId>`

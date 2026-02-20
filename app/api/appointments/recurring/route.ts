@@ -3,6 +3,7 @@ import { getMongoDbOrThrow, getNextNumericId } from '@/lib/db/mongo-utils';
 import { checkAppointmentConflict } from '@/lib/calendar-conflicts';
 import type { RecurrenceRule } from '@/lib/types/calendar';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { invalidateReadCaches } from '@/lib/cache-keys';
 
 // Cleanup classification: feature-flagged (advanced scheduling domain, no core UI dependency).
 // POST /api/appointments/recurring - Create recurring appointments
@@ -129,6 +130,8 @@ export async function POST(request: NextRequest) {
       await db.collection('appointments').insertOne(appointment);
       createdAppointments.push(appointment);
     }
+
+    await invalidateReadCaches({ tenantId, userId: normalizedUserId });
 
     return NextResponse.json(
       {

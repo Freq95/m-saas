@@ -34,6 +34,105 @@
 - Smoke tests passed:
   - tenant isolation (`scripts/smoke-tenant-isolation.ts`)
   - role access controls (`scripts/smoke-role-access.ts`)
+- Added Phase 3 benchmark baseline framework:
+  - `npm run bench:baseline`
+  - `npm run bench:compare -- --against <runId|raw.json>`
+  - `npm run bench:report -- --input <raw.json>`
+  - `npm run bench:gui`
+  - outputs in `reports/benchmarks/<runId>/` and `reports/benchmarks/latest/`
+- Added benchmark-only rate-limit bypass switch for reliable API benchmarking:
+  - middleware checks `BENCHMARK_MODE=true` and matching `x-benchmark-token`
+  - benchmark runner sends token automatically when `BENCHMARK_TOKEN` is set
+  - default behavior is unchanged when switch is off
+- Benchmark note:
+  - first captured run `20260220-085452` is affected by API `429` rate-limiting
+  - use bypass switch and recapture baseline before Phase 3 delta comparisons
+- Phase 3 Chapter 1 implemented (Cloudflare R2 storage migration):
+  - `lib/storage.ts` abstraction added
+  - client file upload/download/preview/delete now use `storage_key` and signed URLs
+  - migration script added: `npm run db:migrate:files:r2`
+  - conversation attachment/image "save to client" now uploads to R2
+  - legacy `file_path` fallback retained for unmigrated records
+  - migration result: `migrated=11`, `skippedNoFile=5`, `failed=0`
+- Security follow-up required (Claude review):
+  - verify/document object-encryption posture (R2 at-rest + optional app-layer encryption for sensitive assets)
+  - define formal access/audit review process (least privilege, key rotation cadence, access review ownership, incident playbook)
+- Phase 3 Chapter 2 implemented (Redis + distributed rate limiting):
+  - `lib/redis.ts` added (`getRedis`, `getCached`, `invalidateCache`)
+  - middleware now uses Upstash sliding-window rate limiting in production
+  - in-memory limiter retained as fallback when Redis unavailable/error
+  - benchmark bypass rules preserved
+  - `.env.example` updated with Upstash vars
+- Phase 3 Chapter 3 implemented (Redis read caching + invalidation on core flows):
+  - cached GET endpoints: `/api/appointments`, `/api/clients`, `/api/services`, `/api/providers`, `/api/resources`, `/api/dashboard`
+  - added centralized cache key/invalidation helper: `lib/cache-keys.ts`
+  - cache invalidation wired on mutations for appointments/clients/services/providers/resources routes
+  - Redis helper hardened: cache read/write failures now gracefully fall back to DB responses
+- Post-review bug-fix batch applied:
+  - fixed missing cache invalidation in conversation attachment/image save-to-client routes
+  - fixed duplicate invalidation and response-shape mismatch in `POST /api/clients`
+  - removed local-disk fallback from client file download/preview/delete routes (serverless-safe; `410` when `storage_key` missing)
+  - moved Yahoo sync attachment persistence from local disk to cloud `storage_key`
+- Phase 3 Chapter 4 partial implemented (Yahoo background sync only):
+  - extracted shared Yahoo sync service (`lib/yahoo-sync-runner.ts`)
+  - new cron fan-out endpoint: `POST /api/cron/email-sync`
+  - new worker endpoint: `POST /api/jobs/email-sync/yahoo` (per integration, timeout protected)
+  - QStash queue integration with inline fallback when token is absent
+  - added `vercel.json` cron schedule for `/api/cron/email-sync` every 10 minutes
+  - Romania quiet-hours guard added: no cron processing between `22:00` and `05:59` (`Europe/Bucharest`)
+  - reminders job intentionally deferred
+  - local QStash callback test is limited by loopback URL restriction; full queued callback test deferred to deployed public HTTPS environment
+- Phase 3 Chapter 4 post-review hardening fixes applied:
+  - cron fan-out sort changed from `updated_at` to `last_sync_at` to reduce starvation risk
+  - cron catch block now logs failures with `integrationId`/`tenantId` context via `logger.error(...)`
+  - tenant context now propagates across cron -> queue -> worker -> Yahoo resolver path
+  - Yahoo resolver (`resolveYahooConfigByIntegrationId`) now supports optional tenant-scoped lookup for convention consistency
+---
+## Benchmark Runbook (Phase 3)
+- Start app in prod mode:
+  - `npm run build`
+  - `npm run start`
+- Enable benchmark bypass (local benchmarking only):
+  - `.env`: `BENCHMARK_MODE=true`
+  - `.env`: `BENCHMARK_TOKEN=<secret>`
+- Capture baseline:
+  - `npm run bench:baseline`
+- Compare after changes:
+  - `npm run bench:compare -- --against <baselineRunId>`
+- Inspect results:
+  - `reports/benchmarks/<runId>/summary.md`
+  - `npm run bench:gui`
+
+---
+## Redis Setup (Simple)
+1. Create an Upstash Redis database (REST API enabled).
+2. Put credentials in `.env`:
+   - `UPSTASH_REDIS_REST_URL=<from Upstash>`
+   - `UPSTASH_REDIS_REST_TOKEN=<from Upstash>`
+3. Restart app:
+   - `npm run build`
+   - `npm run start`
+4. Smoke-check app still works:
+   - open `/dashboard`, `/clients`, `/calendar`
+5. Run benchmark baseline:
+   - ensure `.env` has `BENCHMARK_MODE=true` and `BENCHMARK_TOKEN=<secret>`
+   - run `npm run bench:baseline`
+6. Confirm no rate-limit noise in summary:
+   - `reports/benchmarks/<runId>/summary.md`
+   - API endpoints should not show mass `429` errors.
+
+---
+## Phase 3 Execution (Review First)
+- Canonical implementation order is documented in:
+  - `tasks/PHASE-03-infrastructure.md` under:
+    - `Execution Order (Chapter-by-Chapter, One-by-One)`
+    - `Claude Review Gate (Required)`
+    - `Baseline/Compare Contract`
+- Rule:
+  - Implement one chapter at a time.
+  - Claude reviews before and after each chapter.
+  - Do not start next chapter until chapter acceptance criteria pass.
+
 ---
 ## Feature Checklist
 ###  **Implemented & Working**

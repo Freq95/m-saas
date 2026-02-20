@@ -4,6 +4,7 @@ import { updateClientStats } from '@/lib/client-matching';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { checkAppointmentConflict } from '@/lib/calendar-conflicts';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { invalidateReadCaches } from '@/lib/cache-keys';
 
 const CONFLICT_MESSAGE_BY_TYPE: Record<string, string> = {
   provider_appointment: 'Providerul are deja o programare in acest interval.',
@@ -282,6 +283,7 @@ export async function PATCH(
     if (status === 'completed' && appointmentDoc.client_id) {
       await updateClientStats(appointmentDoc.client_id, tenantId);
     }
+    await invalidateReadCaches({ tenantId, userId });
     return createSuccessResponse({ appointment: stripMongoId(appointmentDoc) });
   } catch (error) {
     return handleApiError(error, 'Failed to update appointment');
@@ -310,6 +312,7 @@ export async function DELETE(
     if (result.deletedCount === 0) {
       return createErrorResponse('Not found or not authorized', 404);
     }
+    await invalidateReadCaches({ tenantId, userId });
     return createSuccessResponse({ success: true });
   } catch (error) {
     return handleApiError(error, 'Failed to delete appointment');

@@ -3,6 +3,7 @@ import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getClientProfileData } from '@/lib/server/client-profile';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { invalidateReadCaches } from '@/lib/cache-keys';
 
 // GET /api/clients/[id] - Get client details with history
 export async function GET(
@@ -99,6 +100,7 @@ export async function PATCH(
     if (!result) {
       return createErrorResponse('Not found or not authorized', 404);
     }
+    await invalidateReadCaches({ tenantId, userId });
 
     return createSuccessResponse({
       client: stripMongoId(result),
@@ -144,6 +146,7 @@ export async function DELETE(
     if (result.matchedCount === 0) {
       return createErrorResponse('Not found or not authorized', 404);
     }
+    await invalidateReadCaches({ tenantId, userId });
     return createSuccessResponse({ success: true });
   } catch (error) {
     return handleApiError(error, 'Failed to delete client');

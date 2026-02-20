@@ -1,0 +1,976 @@
+{
+  "metadata": {
+    "timestampIso": "2026-02-20T17:56:09.058Z",
+    "runId": "20260220-175609",
+    "runtimeLabel": "local-prod",
+    "targetBaseUrl": "http://127.0.0.1:3000",
+    "gitCommit": "a1ab4ea",
+    "nodeVersion": "v18.20.0",
+    "benchmarkConfigPath": "D:\\m-saas\\scripts\\benchmark\\config.baseline.json",
+    "benchmarkConfigHash": "3601fb90999b",
+    "envFlags": {
+      "redisConfigured": false,
+      "cronConfigured": false,
+      "sentryConfigured": false
+    }
+  },
+  "modules": {
+    "apiCore": {
+      "endpointMetrics": [
+        {
+          "endpointName": "api.appointments.range",
+          "method": "GET",
+          "path": "/api/appointments?startDate=2026-01-01T00:00:00.000Z&endDate=2026-12-31T23:59:59.999Z",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 271.57,
+          "maxMs": 3054.97,
+          "avgMs": 1405.07,
+          "p50Ms": 1187.07,
+          "p90Ms": 2503.73,
+          "p95Ms": 2645.86,
+          "p99Ms": 2805.87,
+          "throughputRps": 6.99,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "api.appointments.range",
+          "method": "GET",
+          "path": "/api/appointments?startDate=2026-01-01T00:00:00.000Z&endDate=2026-12-31T23:59:59.999Z",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 381.09,
+          "maxMs": 3435.84,
+          "avgMs": 1714.38,
+          "p50Ms": 1732.44,
+          "p90Ms": 2265.05,
+          "p95Ms": 2430.71,
+          "p99Ms": 3020.06,
+          "throughputRps": 27.35,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "api.clients.list",
+          "method": "GET",
+          "path": "/api/clients?page=1&limit=20",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 74.45,
+          "maxMs": 690.62,
+          "avgMs": 212.02,
+          "p50Ms": 140.43,
+          "p90Ms": 524.94,
+          "p95Ms": 636.45,
+          "p99Ms": 689.56,
+          "throughputRps": 45.79,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "api.clients.list",
+          "method": "GET",
+          "path": "/api/clients?page=1&limit=20",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 638.23,
+          "maxMs": 1917.71,
+          "avgMs": 955.75,
+          "p50Ms": 984.86,
+          "p90Ms": 1022.07,
+          "p95Ms": 1032.78,
+          "p99Ms": 1628.4,
+          "throughputRps": 45.31,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "api.services.list",
+          "method": "GET",
+          "path": "/api/services",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 79.14,
+          "maxMs": 814.82,
+          "avgMs": 224.25,
+          "p50Ms": 121.09,
+          "p90Ms": 718.23,
+          "p95Ms": 725.18,
+          "p99Ms": 808.72,
+          "throughputRps": 39.88,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "api.services.list",
+          "method": "GET",
+          "path": "/api/services",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 300.33,
+          "maxMs": 1915.92,
+          "avgMs": 915.76,
+          "p50Ms": 979.7,
+          "p90Ms": 1031.77,
+          "p95Ms": 1045.2,
+          "p99Ms": 1085.35,
+          "throughputRps": 49.65,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "api.dashboard.7d",
+          "method": "GET",
+          "path": "/api/dashboard?days=7",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 67.18,
+          "maxMs": 3390.34,
+          "avgMs": 673.91,
+          "p50Ms": 177.9,
+          "p90Ms": 1983.86,
+          "p95Ms": 2636.05,
+          "p99Ms": 3313.24,
+          "throughputRps": 14.58,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "api.dashboard.7d",
+          "method": "GET",
+          "path": "/api/dashboard?days=7",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 228.83,
+          "maxMs": 2022.56,
+          "avgMs": 940.62,
+          "p50Ms": 959.46,
+          "p90Ms": 1125.99,
+          "p95Ms": 1176.37,
+          "p99Ms": 1337.76,
+          "throughputRps": 50.41,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "api.providers.list",
+          "method": "GET",
+          "path": "/api/providers",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 67.35,
+          "maxMs": 1092.94,
+          "avgMs": 213.32,
+          "p50Ms": 88.88,
+          "p90Ms": 740.77,
+          "p95Ms": 750.36,
+          "p99Ms": 827.11,
+          "throughputRps": 36.65,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "api.providers.list",
+          "method": "GET",
+          "path": "/api/providers",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 224.57,
+          "maxMs": 1928.95,
+          "avgMs": 907.44,
+          "p50Ms": 990.58,
+          "p90Ms": 1022.58,
+          "p95Ms": 1035.11,
+          "p99Ms": 1104.28,
+          "throughputRps": 49.86,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "api.resources.list",
+          "method": "GET",
+          "path": "/api/resources",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 60.84,
+          "maxMs": 830.04,
+          "avgMs": 213.7,
+          "p50Ms": 101.65,
+          "p90Ms": 718.4,
+          "p95Ms": 751.09,
+          "p99Ms": 812.21,
+          "throughputRps": 35.97,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "api.resources.list",
+          "method": "GET",
+          "path": "/api/resources",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 232.8,
+          "maxMs": 1939.14,
+          "avgMs": 906.38,
+          "p50Ms": 989.15,
+          "p90Ms": 1030.52,
+          "p95Ms": 1037.82,
+          "p99Ms": 1047.61,
+          "throughputRps": 49.72,
+          "statuses": {
+            "200": 300
+          }
+        }
+      ]
+    },
+    "apiWrite": {
+      "endpointMetrics": [
+        {
+          "endpointName": "api.clients.create",
+          "method": "POST",
+          "path": "/api/clients",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 514.71,
+          "maxMs": 3231.12,
+          "avgMs": 1601.43,
+          "p50Ms": 1469.2,
+          "p90Ms": 2357,
+          "p95Ms": 2825.88,
+          "p99Ms": 2972.04,
+          "throughputRps": 5.79,
+          "statuses": {
+            "201": 100
+          }
+        },
+        {
+          "endpointName": "api.clients.create",
+          "method": "POST",
+          "path": "/api/clients",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 1195.43,
+          "maxMs": 5848.18,
+          "avgMs": 3392.02,
+          "p50Ms": 3155.01,
+          "p90Ms": 4871.4,
+          "p95Ms": 5030.14,
+          "p99Ms": 5815.65,
+          "throughputRps": 14.25,
+          "statuses": {
+            "201": 300
+          }
+        }
+      ],
+      "snapshots": [
+        {
+          "name": "api.read-after-write.clients",
+          "method": "GET",
+          "path": "/api/clients?search=",
+          "status": 200,
+          "durationMs": 175.72,
+          "ok": true
+        },
+        {
+          "name": "api.team.invite.snapshot",
+          "method": "POST",
+          "path": "/api/team/invite",
+          "status": 201,
+          "durationMs": 1013.54,
+          "ok": true
+        }
+      ]
+    },
+    "uiPages": {
+      "endpointMetrics": [
+        {
+          "endpointName": "ui.dashboard",
+          "method": "GET",
+          "path": "/dashboard",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 508.5,
+          "maxMs": 1721.08,
+          "avgMs": 1200.36,
+          "p50Ms": 1185.1,
+          "p90Ms": 1537.36,
+          "p95Ms": 1575.31,
+          "p99Ms": 1659.18,
+          "throughputRps": 8.04,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "ui.dashboard",
+          "method": "GET",
+          "path": "/dashboard",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 1486.41,
+          "maxMs": 8289.58,
+          "avgMs": 5267.04,
+          "p50Ms": 5627.35,
+          "p90Ms": 6805.72,
+          "p95Ms": 7183.96,
+          "p99Ms": 8051.41,
+          "throughputRps": 9.09,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "ui.clients",
+          "method": "GET",
+          "path": "/clients",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 16.5,
+          "maxMs": 24.36,
+          "avgMs": 20.47,
+          "p50Ms": 20.31,
+          "p90Ms": 22.11,
+          "p95Ms": 22.93,
+          "p99Ms": 23.73,
+          "throughputRps": 479.5,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "ui.clients",
+          "method": "GET",
+          "path": "/clients",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 54.06,
+          "maxMs": 126.15,
+          "avgMs": 100.69,
+          "p50Ms": 102.11,
+          "p90Ms": 114.01,
+          "p95Ms": 115.39,
+          "p99Ms": 120.5,
+          "throughputRps": 476.36,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "ui.calendar",
+          "method": "GET",
+          "path": "/calendar",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 267.23,
+          "maxMs": 1553.9,
+          "avgMs": 886.66,
+          "p50Ms": 882.61,
+          "p90Ms": 1184.95,
+          "p95Ms": 1380.03,
+          "p99Ms": 1488.61,
+          "throughputRps": 11.11,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "ui.calendar",
+          "method": "GET",
+          "path": "/calendar",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 1529.98,
+          "maxMs": 8403.79,
+          "avgMs": 4923.47,
+          "p50Ms": 5022.2,
+          "p90Ms": 5548.49,
+          "p95Ms": 6970.41,
+          "p99Ms": 7835.14,
+          "throughputRps": 10.03,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "ui.inbox",
+          "method": "GET",
+          "path": "/inbox",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 333.62,
+          "maxMs": 1162.3,
+          "avgMs": 742.91,
+          "p50Ms": 780.53,
+          "p90Ms": 972.87,
+          "p95Ms": 996.84,
+          "p99Ms": 1055.79,
+          "throughputRps": 13.13,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "ui.inbox",
+          "method": "GET",
+          "path": "/inbox",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 1544.89,
+          "maxMs": 4100.8,
+          "avgMs": 2915.34,
+          "p50Ms": 3022.47,
+          "p90Ms": 3467.51,
+          "p95Ms": 3672.89,
+          "p99Ms": 4057.71,
+          "throughputRps": 16.4,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "ui.settings.email",
+          "method": "GET",
+          "path": "/settings/email",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 73.88,
+          "maxMs": 117.71,
+          "avgMs": 98.96,
+          "p50Ms": 98.6,
+          "p90Ms": 111.8,
+          "p95Ms": 113.46,
+          "p99Ms": 116.31,
+          "throughputRps": 100.25,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "ui.settings.email",
+          "method": "GET",
+          "path": "/settings/email",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 203.87,
+          "maxMs": 721.98,
+          "avgMs": 347.21,
+          "p50Ms": 329.85,
+          "p90Ms": 424.14,
+          "p95Ms": 653.78,
+          "p99Ms": 693.46,
+          "throughputRps": 136.69,
+          "statuses": {
+            "200": 300
+          }
+        }
+      ]
+    },
+    "edgeChecks": {
+      "checks": [
+        {
+          "name": "seat-limit-pending-members",
+          "passed": true,
+          "details": {
+            "firstInviteStatus": 201,
+            "firstInviteMs": 615.25,
+            "secondInviteStatus": 403,
+            "secondInviteMs": 119.95
+          }
+        },
+        {
+          "name": "revoked-invite-rejected",
+          "passed": true,
+          "details": {
+            "inviteStatus": 201,
+            "inviteMs": 509.46,
+            "removeStatus": 200,
+            "acceptStatus": 409,
+            "acceptMs": 74.49
+          }
+        },
+        {
+          "name": "cross-tenant-nested-denied",
+          "passed": true,
+          "details": {
+            "createStatus": 201,
+            "ownerBStatus": 404,
+            "clientId": 567
+          }
+        },
+        {
+          "name": "staff-forbidden-endpoints",
+          "passed": true,
+          "details": {
+            "statuses": [
+              {
+                "name": "edge.staff.forbidden.team",
+                "status": 403,
+                "durationMs": 51.29
+              },
+              {
+                "name": "edge.staff.forbidden.invite",
+                "status": 403,
+                "durationMs": 51.51
+              },
+              {
+                "name": "edge.staff.forbidden.settings",
+                "status": 403,
+                "durationMs": 51.5
+              }
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "delta": {
+    "againstRunId": "20260220-110718",
+    "neutralThresholdPct": 5,
+    "metrics": [
+      {
+        "endpointName": "api.appointments.range",
+        "tier": "light",
+        "path": "/api/appointments?startDate=2026-01-01T00:00:00.000Z&endDate=2026-12-31T23:59:59.999Z",
+        "p95BeforeMs": 1009.55,
+        "p95AfterMs": 2645.86,
+        "p95DeltaPct": 162.08,
+        "throughputBeforeRps": 16.78,
+        "throughputAfterRps": 6.99,
+        "throughputDeltaPct": -58.34,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "regressed"
+      },
+      {
+        "endpointName": "api.appointments.range",
+        "tier": "medium",
+        "path": "/api/appointments?startDate=2026-01-01T00:00:00.000Z&endDate=2026-12-31T23:59:59.999Z",
+        "p95BeforeMs": 3252.83,
+        "p95AfterMs": 2430.71,
+        "p95DeltaPct": -25.27,
+        "throughputBeforeRps": 18.66,
+        "throughputAfterRps": 27.35,
+        "throughputDeltaPct": 46.57,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "improved"
+      },
+      {
+        "endpointName": "api.clients.list",
+        "tier": "light",
+        "path": "/api/clients?page=1&limit=20",
+        "p95BeforeMs": 904.31,
+        "p95AfterMs": 636.45,
+        "p95DeltaPct": -29.62,
+        "throughputBeforeRps": 23.44,
+        "throughputAfterRps": 45.79,
+        "throughputDeltaPct": 95.35,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "improved"
+      },
+      {
+        "endpointName": "api.clients.list",
+        "tier": "medium",
+        "path": "/api/clients?page=1&limit=20",
+        "p95BeforeMs": 2045.21,
+        "p95AfterMs": 1032.78,
+        "p95DeltaPct": -49.5,
+        "throughputBeforeRps": 25.13,
+        "throughputAfterRps": 45.31,
+        "throughputDeltaPct": 80.3,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "improved"
+      },
+      {
+        "endpointName": "api.services.list",
+        "tier": "light",
+        "path": "/api/services",
+        "p95BeforeMs": 849.35,
+        "p95AfterMs": 725.18,
+        "p95DeltaPct": -14.62,
+        "throughputBeforeRps": 37.97,
+        "throughputAfterRps": 39.88,
+        "throughputDeltaPct": 5.03,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "improved"
+      },
+      {
+        "endpointName": "api.services.list",
+        "tier": "medium",
+        "path": "/api/services",
+        "p95BeforeMs": 2019.8,
+        "p95AfterMs": 1045.2,
+        "p95DeltaPct": -48.25,
+        "throughputBeforeRps": 30.43,
+        "throughputAfterRps": 49.65,
+        "throughputDeltaPct": 63.16,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "improved"
+      },
+      {
+        "endpointName": "api.dashboard.7d",
+        "tier": "light",
+        "path": "/api/dashboard?days=7",
+        "p95BeforeMs": 1792.12,
+        "p95AfterMs": 2636.05,
+        "p95DeltaPct": 47.09,
+        "throughputBeforeRps": 7.62,
+        "throughputAfterRps": 14.58,
+        "throughputDeltaPct": 91.34,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "neutral"
+      },
+      {
+        "endpointName": "api.dashboard.7d",
+        "tier": "medium",
+        "path": "/api/dashboard?days=7",
+        "p95BeforeMs": 6891.94,
+        "p95AfterMs": 1176.37,
+        "p95DeltaPct": -82.93,
+        "throughputBeforeRps": 9.22,
+        "throughputAfterRps": 50.41,
+        "throughputDeltaPct": 446.75,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "improved"
+      },
+      {
+        "endpointName": "api.providers.list",
+        "tier": "light",
+        "path": "/api/providers",
+        "p95BeforeMs": 872.05,
+        "p95AfterMs": 750.36,
+        "p95DeltaPct": -13.95,
+        "throughputBeforeRps": 34.4,
+        "throughputAfterRps": 36.65,
+        "throughputDeltaPct": 6.54,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "improved"
+      },
+      {
+        "endpointName": "api.providers.list",
+        "tier": "medium",
+        "path": "/api/providers",
+        "p95BeforeMs": 2014.76,
+        "p95AfterMs": 1035.11,
+        "p95DeltaPct": -48.62,
+        "throughputBeforeRps": 33.84,
+        "throughputAfterRps": 49.86,
+        "throughputDeltaPct": 47.34,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "improved"
+      },
+      {
+        "endpointName": "api.resources.list",
+        "tier": "light",
+        "path": "/api/resources",
+        "p95BeforeMs": 877.99,
+        "p95AfterMs": 751.09,
+        "p95DeltaPct": -14.45,
+        "throughputBeforeRps": 37.47,
+        "throughputAfterRps": 35.97,
+        "throughputDeltaPct": -4,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "improved"
+      },
+      {
+        "endpointName": "api.resources.list",
+        "tier": "medium",
+        "path": "/api/resources",
+        "p95BeforeMs": 1977.71,
+        "p95AfterMs": 1037.82,
+        "p95DeltaPct": -47.52,
+        "throughputBeforeRps": 33.98,
+        "throughputAfterRps": 49.72,
+        "throughputDeltaPct": 46.32,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "improved"
+      },
+      {
+        "endpointName": "api.clients.create",
+        "tier": "light",
+        "path": "/api/clients",
+        "p95BeforeMs": 1000.37,
+        "p95AfterMs": 2825.88,
+        "p95DeltaPct": 182.48,
+        "throughputBeforeRps": 15.49,
+        "throughputAfterRps": 5.79,
+        "throughputDeltaPct": -62.62,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "regressed"
+      },
+      {
+        "endpointName": "api.clients.create",
+        "tier": "medium",
+        "path": "/api/clients",
+        "p95BeforeMs": 3054.28,
+        "p95AfterMs": 5030.14,
+        "p95DeltaPct": 64.69,
+        "throughputBeforeRps": 19.97,
+        "throughputAfterRps": 14.25,
+        "throughputDeltaPct": -28.64,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "regressed"
+      },
+      {
+        "endpointName": "ui.dashboard",
+        "tier": "light",
+        "path": "/dashboard",
+        "p95BeforeMs": 1528.79,
+        "p95AfterMs": 1575.31,
+        "p95DeltaPct": 3.04,
+        "throughputBeforeRps": 8.95,
+        "throughputAfterRps": 8.04,
+        "throughputDeltaPct": -10.17,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "regressed"
+      },
+      {
+        "endpointName": "ui.dashboard",
+        "tier": "medium",
+        "path": "/dashboard",
+        "p95BeforeMs": 7084.91,
+        "p95AfterMs": 7183.96,
+        "p95DeltaPct": 1.4,
+        "throughputBeforeRps": 9.05,
+        "throughputAfterRps": 9.09,
+        "throughputDeltaPct": 0.44,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "neutral"
+      },
+      {
+        "endpointName": "ui.clients",
+        "tier": "light",
+        "path": "/clients",
+        "p95BeforeMs": 24.34,
+        "p95AfterMs": 22.93,
+        "p95DeltaPct": -5.79,
+        "throughputBeforeRps": 464.2,
+        "throughputAfterRps": 479.5,
+        "throughputDeltaPct": 3.3,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "improved"
+      },
+      {
+        "endpointName": "ui.clients",
+        "tier": "medium",
+        "path": "/clients",
+        "p95BeforeMs": 110.76,
+        "p95AfterMs": 115.39,
+        "p95DeltaPct": 4.18,
+        "throughputBeforeRps": 487.32,
+        "throughputAfterRps": 476.36,
+        "throughputDeltaPct": -2.25,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "neutral"
+      },
+      {
+        "endpointName": "ui.calendar",
+        "tier": "light",
+        "path": "/calendar",
+        "p95BeforeMs": 1313.33,
+        "p95AfterMs": 1380.03,
+        "p95DeltaPct": 5.08,
+        "throughputBeforeRps": 11.63,
+        "throughputAfterRps": 11.11,
+        "throughputDeltaPct": -4.47,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "regressed"
+      },
+      {
+        "endpointName": "ui.calendar",
+        "tier": "medium",
+        "path": "/calendar",
+        "p95BeforeMs": 6390.69,
+        "p95AfterMs": 6970.41,
+        "p95DeltaPct": 9.07,
+        "throughputBeforeRps": 10.81,
+        "throughputAfterRps": 10.03,
+        "throughputDeltaPct": -7.22,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "regressed"
+      },
+      {
+        "endpointName": "ui.inbox",
+        "tier": "light",
+        "path": "/inbox",
+        "p95BeforeMs": 961.87,
+        "p95AfterMs": 996.84,
+        "p95DeltaPct": 3.64,
+        "throughputBeforeRps": 13.95,
+        "throughputAfterRps": 13.13,
+        "throughputDeltaPct": -5.88,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "regressed"
+      },
+      {
+        "endpointName": "ui.inbox",
+        "tier": "medium",
+        "path": "/inbox",
+        "p95BeforeMs": 3719.28,
+        "p95AfterMs": 3672.89,
+        "p95DeltaPct": -1.25,
+        "throughputBeforeRps": 16.33,
+        "throughputAfterRps": 16.4,
+        "throughputDeltaPct": 0.43,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "neutral"
+      },
+      {
+        "endpointName": "ui.settings.email",
+        "tier": "light",
+        "path": "/settings/email",
+        "p95BeforeMs": 121.8,
+        "p95AfterMs": 113.46,
+        "p95DeltaPct": -6.85,
+        "throughputBeforeRps": 102.98,
+        "throughputAfterRps": 100.25,
+        "throughputDeltaPct": -2.65,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "improved"
+      },
+      {
+        "endpointName": "ui.settings.email",
+        "tier": "medium",
+        "path": "/settings/email",
+        "p95BeforeMs": 678.45,
+        "p95AfterMs": 653.78,
+        "p95DeltaPct": -3.64,
+        "throughputBeforeRps": 126.43,
+        "throughputAfterRps": 136.69,
+        "throughputDeltaPct": 8.12,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "improved"
+      }
+    ]
+  }
+}

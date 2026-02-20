@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
-import * as fs from 'fs';
 import { handleApiError, createErrorResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { getStorageProvider } from '@/lib/storage';
 
 // GET /api/clients/[id]/files/[fileId]/preview - Preview a file in browser
 export async function GET(
@@ -29,28 +29,28 @@ export async function GET(
       return createErrorResponse('File not found', 404);
     }
 
-    if (!fs.existsSync(file.file_path)) {
-      return createErrorResponse('File not found on disk', 404);
-    }
-
-    const fileBuffer = fs.readFileSync(file.file_path);
-
     const mimeType = file.mime_type || 'application/octet-stream';
     const canPreview = mimeType.startsWith('image/') ||
       mimeType === 'application/pdf' ||
       mimeType.startsWith('text/') ||
       mimeType === 'application/json';
 
-    return new NextResponse(fileBuffer, {
-      headers: {
-        'Content-Type': mimeType,
-        'Content-Disposition': canPreview
-          ? `inline; filename="${file.original_filename}"`
-          : `attachment; filename="${file.original_filename}"`,
-        'Content-Length': file.file_size.toString(),
-        'X-Content-Type-Options': 'nosniff',
-      },
-    });
+    if (file.storage_key) {
+      const storage = getStorageProvider();
+      const signedUrl = await storage.getSignedUrl(
+        String(file.storage_key),
+        3600,
+        {
+          contentDisposition: canPreview
+            ? `inline; filename="${file.original_filename}"`
+            : `attachment; filename="${file.original_filename}"`,
+          contentType: mimeType,
+        }
+      );
+      return NextResponse.redirect(signedUrl);
+    }
+
+    return createErrorResponse('File is not available in cloud storage. Run file migration and retry.', 410);
   } catch (error) {
     return handleApiError(error, 'Failed to preview file');
   }

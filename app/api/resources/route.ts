@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { getCached } from '@/lib/redis';
+import { resourcesListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
 
 // Cleanup classification: feature-flagged (advanced scheduling domain, no core UI dependency).
 // GET /api/resources - List all resources for a user
@@ -8,12 +10,15 @@ export async function GET(request: NextRequest) {
   try {
     const { userId, tenantId } = await getAuthUser();
 
-    const db = await getMongoDbOrThrow();
-    const resources = await db
-      .collection('resources')
-      .find({ user_id: Number(userId), tenant_id: tenantId, is_active: true })
-      .sort({ name: 1 })
-      .toArray();
+    const cacheKey = resourcesListCacheKey({ tenantId, userId: Number(userId) });
+    const resources = await getCached(cacheKey, 1800, async () => {
+      const db = await getMongoDbOrThrow();
+      return db
+        .collection('resources')
+        .find({ user_id: Number(userId), tenant_id: tenantId, is_active: true })
+        .sort({ name: 1 })
+        .toArray();
+    });
 
     return NextResponse.json({ resources });
   } catch (error) {
@@ -65,6 +70,7 @@ export async function POST(request: NextRequest) {
     };
 
     await db.collection('resources').insertOne(resource);
+    await invalidateReadCaches({ tenantId, userId: Number(userId) });
 
     return NextResponse.json({ resource }, { status: 201 });
   } catch (error) {

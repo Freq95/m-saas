@@ -3,15 +3,9 @@ import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mong
 import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { linkConversationToClient } from '@/lib/client-matching';
 import { parseStoredMessage, serializeMessage } from '@/lib/email-types';
-import * as fs from 'fs';
-import * as path from 'path';
 import { getAuthUser } from '@/lib/auth-helpers';
-
-const CLIENT_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'clients');
-
-if (!fs.existsSync(CLIENT_UPLOAD_DIR)) {
-  fs.mkdirSync(CLIENT_UPLOAD_DIR, { recursive: true });
-}
+import { buildClientStorageKey, getStorageProvider } from '@/lib/storage';
+import { invalidateReadCaches } from '@/lib/cache-keys';
 
 function extensionFromMimeType(mimeType: string): string {
   const map: Record<string, string> = {
@@ -188,10 +182,9 @@ export async function POST(
 
     const extension = extensionFromMimeType(mimeType);
     const originalFilename = `inline-image-${messageId}-${imageIndex + 1}.${extension}`;
-    const storedFilename = `${targetClientId}_${Date.now()}_${originalFilename}`;
-    const clientFilePath = path.join(CLIENT_UPLOAD_DIR, storedFilename);
-
-    fs.writeFileSync(clientFilePath, imageBuffer);
+    const storage = getStorageProvider();
+    const storageKey = buildClientStorageKey(String(tenantId), targetClientId, originalFilename);
+    await storage.upload(storageKey, imageBuffer, mimeType);
 
     const now = new Date().toISOString();
     const fileId = await getNextNumericId('client_files');
@@ -200,9 +193,9 @@ export async function POST(
       id: fileId,
       tenant_id: tenantId,
       client_id: targetClientId,
-      filename: storedFilename,
+      filename: storageKey.split('/').pop() || originalFilename,
       original_filename: originalFilename,
-      file_path: clientFilePath,
+      storage_key: storageKey,
       file_size: imageBuffer.length,
       mime_type: mimeType,
       description: `Saved inline image from conversation #${conversationId}`,
@@ -219,6 +212,7 @@ export async function POST(
       { id: targetClientId, tenant_id: tenantId },
       { $set: { last_activity_date: now, updated_at: now } }
     );
+    await invalidateReadCaches({ tenantId, userId });
 
     await markImageAsSaved(targetClientId, fileId, now);
     return createSuccessResponse({

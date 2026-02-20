@@ -2,15 +2,9 @@ import { NextRequest } from 'next/server';
 import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
 import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { linkConversationToClient } from '@/lib/client-matching';
-import * as fs from 'fs';
-import * as path from 'path';
 import { getAuthUser } from '@/lib/auth-helpers';
-
-const CLIENT_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'clients');
-
-if (!fs.existsSync(CLIENT_UPLOAD_DIR)) {
-  fs.mkdirSync(CLIENT_UPLOAD_DIR, { recursive: true });
-}
+import { buildClientStorageKey, getStorageProvider } from '@/lib/storage';
+import { invalidateReadCaches } from '@/lib/cache-keys';
 
 // POST /api/conversations/[id]/attachments/[attachmentId]/save
 // Save a persisted inbound email attachment to an existing or new client profile.
@@ -49,9 +43,7 @@ export async function POST(
       return createErrorResponse('Attachment not found for conversation', 404);
     }
 
-    if (!attachment.file_path || !fs.existsSync(attachment.file_path)) {
-      return createErrorResponse('Attachment file not found on disk', 404);
-    }
+    const storage = getStorageProvider();
 
     let targetClientId: number | null = null;
 
@@ -133,12 +125,16 @@ export async function POST(
     }
 
     const originalFilename = attachment.original_filename || attachment.filename || 'attachment';
-    const sanitizedOriginal = String(originalFilename).replace(/[^a-zA-Z0-9.-]/g, '_');
-    const storedFilename = `${targetClientId}_${Date.now()}_${sanitizedOriginal}`;
-    const clientFilePath = path.join(CLIENT_UPLOAD_DIR, storedFilename);
+    let sourceBuffer: Buffer | null = null;
+    if (attachment.storage_key) {
+      sourceBuffer = await storage.download(String(attachment.storage_key));
+    }
+    if (!sourceBuffer || sourceBuffer.length === 0) {
+      return createErrorResponse('Attachment file not found in storage', 404);
+    }
 
-    const sourceBuffer = fs.readFileSync(attachment.file_path);
-    fs.writeFileSync(clientFilePath, sourceBuffer);
+    const storageKey = buildClientStorageKey(String(tenantId), targetClientId, String(originalFilename));
+    await storage.upload(storageKey, sourceBuffer, attachment.mime_type || 'application/octet-stream');
 
     const now = new Date().toISOString();
     const fileId = await getNextNumericId('client_files');
@@ -148,9 +144,9 @@ export async function POST(
       id: fileId,
       tenant_id: tenantId,
       client_id: targetClientId,
-      filename: storedFilename,
+      filename: storageKey.split('/').pop() || String(originalFilename),
       original_filename: originalFilename,
-      file_path: clientFilePath,
+      storage_key: storageKey,
       file_size: attachment.file_size || sourceBuffer.length,
       mime_type: attachment.mime_type || 'application/octet-stream',
       description: `Saved from email conversation #${conversationId}`,
@@ -166,6 +162,7 @@ export async function POST(
       { id: targetClientId, tenant_id: tenantId },
       { $set: { last_activity_date: now, updated_at: now } }
     );
+    await invalidateReadCaches({ tenantId, userId });
 
     await db.collection('message_attachments').updateOne(
       { id: attachmentId, tenant_id: tenantId },

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
-import * as fs from 'fs';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { getStorageProvider } from '@/lib/storage';
 
 // PATCH /api/clients/[id]/files/[fileId] - Update file description
 export async function PATCH(
@@ -70,9 +70,9 @@ export async function DELETE(
       return createErrorResponse('File not found', 404);
     }
 
-    // Delete file from disk
-    if (file.file_path && fs.existsSync(file.file_path)) {
-      fs.unlinkSync(file.file_path);
+    if (file.storage_key) {
+      const storage = getStorageProvider();
+      await storage.delete(String(file.storage_key));
     }
 
     const result = await db.collection(collectionName).deleteOne({ id: fileId, user_id: userId, tenant_id: tenantId });

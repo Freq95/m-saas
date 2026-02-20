@@ -1,0 +1,135 @@
+{
+  "targetBaseUrl": "http://127.0.0.1:3000",
+  "runtimeLabel": "local-prod",
+  "managedServer": {
+    "enabled": false,
+    "port": 3000
+  },
+  "tiers": {
+    "light": {
+      "concurrency": 10,
+      "requests": 100
+    },
+    "medium": {
+      "concurrency": 50,
+      "requests": 300
+    }
+  },
+  "warmup": {
+    "requestsPerEndpoint": 30
+  },
+  "timeouts": {
+    "requestMs": 10000
+  },
+  "endpoints": {
+    "apiCore": [
+      {
+        "name": "api.appointments.range",
+        "path": "/api/appointments?startDate=2026-01-01T00:00:00.000Z&endDate=2026-12-31T23:59:59.999Z",
+        "actor": "ownerA"
+      },
+      {
+        "name": "api.clients.list",
+        "path": "/api/clients?page=1&limit=20",
+        "actor": "ownerA"
+      },
+      {
+        "name": "api.services.list",
+        "path": "/api/services",
+        "actor": "ownerA"
+      },
+      {
+        "name": "api.dashboard.7d",
+        "path": "/api/dashboard?days=7",
+        "actor": "ownerA"
+      },
+      {
+        "name": "api.providers.list",
+        "path": "/api/providers",
+        "actor": "ownerA"
+      },
+      {
+        "name": "api.resources.list",
+        "path": "/api/resources",
+        "actor": "ownerA"
+      }
+    ],
+    "apiWrite": {
+      "clients": {
+        "name": "api.clients.create",
+        "path": "/api/clients",
+        "actor": "ownerA"
+      },
+      "teamInvite": {
+        "name": "api.team.invite.snapshot",
+        "path": "/api/team/invite",
+        "actor": "ownerA"
+      },
+      "readAfterWritePath": "/api/clients?search="
+    },
+    "uiPages": [
+      {
+        "name": "ui.dashboard",
+        "path": "/dashboard",
+        "actor": "ownerA"
+      },
+      {
+        "name": "ui.clients",
+        "path": "/clients",
+        "actor": "ownerA"
+      },
+      {
+        "name": "ui.calendar",
+        "path": "/calendar",
+        "actor": "ownerA"
+      },
+      {
+        "name": "ui.inbox",
+        "path": "/inbox",
+        "actor": "ownerA"
+      },
+      {
+        "name": "ui.settings.email",
+        "path": "/settings/email",
+        "actor": "ownerA"
+      }
+    ]
+  },
+  "authUsers": {
+    "ownerA": {
+      "email": "owner.tenant.a@example.com",
+      "password": "TenantA!Pass123"
+    },
+    "ownerB": {
+      "email": "owner.tenant.b@example.com",
+      "password": "TenantB!Pass123"
+    },
+    "staffA": {
+      "email": "staff.tenant.a@example.com",
+      "password": "StaffA!Pass123"
+    }
+  },
+  "dataSetup": {
+    "tenantA": {
+      "name": "Tenant A Clinic",
+      "slug": "tenant-a-clinic"
+    },
+    "tenantB": {
+      "name": "Tenant B Clinic",
+      "slug": "tenant-b-clinic"
+    },
+    "minimums": {
+      "services": 20,
+      "clients": 200,
+      "conversations": 200,
+      "messages": 600,
+      "appointments": 400
+    }
+  },
+  "artifacts": {
+    "rootDir": "reports/benchmarks"
+  },
+  "compare": {
+    "neutralThresholdPct": 5
+  }
+}
