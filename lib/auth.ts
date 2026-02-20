@@ -47,7 +47,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           dbUserId: String(user._id),
           email: user.email,
           name: user.name || '',
-          role: String(user.role || 'viewer'),
+          role: String(user.role || 'staff'),
           tenantId: user.tenant_id ? String(user.tenant_id) : null,
         };
       },
@@ -58,7 +58,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.userId = String(user.id || '');
         token.dbUserId = String(user.dbUserId || '');
-        token.role = String(user.role || 'viewer');
+        token.role = String(user.role || 'staff');
         token.tenantId = user.tenantId ? String(user.tenantId) : null;
       }
       return token;
@@ -67,7 +67,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = String(token.userId || '');
         session.user.dbUserId = String(token.dbUserId || '');
-        session.user.role = String(token.role || 'viewer');
+        session.user.role = String(token.role || 'staff');
         session.user.tenantId = token.tenantId ? String(token.tenantId) : null;
       }
       return session;

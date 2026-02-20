@@ -57,9 +57,7 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
           <option value="">All roles</option>
           <option value="super_admin">super_admin</option>
           <option value="owner">owner</option>
-          <option value="admin">admin</option>
           <option value="staff">staff</option>
-          <option value="viewer">viewer</option>
         </select>
         <select name="status" defaultValue={status}>
           <option value="">All status</option>

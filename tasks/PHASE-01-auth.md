@@ -22,6 +22,20 @@ Currently `DEFAULT_USER_ID = 1` is hardcoded everywhere. No login, no sessions, 
 4. **Clinic owner** invites staff from within their tenant (same invite flow)
 5. **Login** is email + password only. No OAuth, no magic links.
 
+### MVP Role Model (Simplified):
+| Role | Scope | Description |
+|------|-------|-------------|
+| `super_admin` | Platform-wide | Platform owner. Creates tenants, manages everything. No tenant_id. |
+| `owner` | Tenant-scoped | Clinic owner. Has ALL permissions within their tenant: manage team (invite/remove staff), manage clinic settings, manage own calendar/appointments, own client/patient list & CRM. Only role that can invite new team members. |
+| `staff` | Tenant-scoped | Clinic staff (dentist, hygienist, etc.). Can view own calendar, manage own appointments, own client/patient list & CRM. Cannot see other staff calendars. Cannot access clinic settings. Cannot invite team members. |
+| `viewer` | — | Defined but NOT implemented for MVP. Reserved for future use. |
+
+**Removed for MVP:** `admin` role (merged into `owner`). Owner now has all admin attributes.
+**Not implemented for MVP:** `viewer` role. No UI or permission checks needed.
+**Calendar visibility:** Staff sees only their own calendar. Owner sees only their own calendar (shared tenant calendar deferred to post-MVP).
+**`is_provider` flag:** Documented for future use (distinguishes bookable dentists from non-bookable receptionists). Not implemented for MVP.
+**Staff invite:** Owner-only. Staff cannot invite other team members.
+
 ---
 
 ## Setup
@@ -77,7 +91,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           id: user._id.toString(),
           email: user.email,
           name: user.name,
-          role: user.role,            // 'super_admin' | 'owner' | 'admin' | 'staff' | 'viewer'
+          role: user.role,            // 'super_admin' | 'owner' | 'staff'
           tenantId: user.tenant_id?.toString() || null,
         };
       },
@@ -176,7 +190,9 @@ export class AuthError extends Error {
   }
 }
 
-export type UserRole = 'super_admin' | 'owner' | 'admin' | 'staff' | 'viewer';
+// MVP roles: super_admin, owner, staff
+// 'admin' removed (merged into owner). 'viewer' reserved but not implemented.
+export type UserRole = 'super_admin' | 'owner' | 'staff';
 
 interface AuthContext {
   userId: ObjectId;
@@ -219,8 +235,8 @@ export async function getSuperAdmin(): Promise<{ userId: ObjectId; email: string
   };
 }
 
-// Role hierarchy check
-const ROLE_HIERARCHY: UserRole[] = ['viewer', 'staff', 'admin', 'owner', 'super_admin'];
+// MVP role hierarchy (admin removed, viewer not implemented)
+const ROLE_HIERARCHY: UserRole[] = ['staff', 'owner', 'super_admin'];
 
 export function requireRole(userRole: UserRole, minimumRole: UserRole) {
   if (ROLE_HIERARCHY.indexOf(userRole) < ROLE_HIERARCHY.indexOf(minimumRole)) {

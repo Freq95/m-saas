@@ -87,7 +87,10 @@ ls scripts/create-super-admin.ts
 
 ### Manual review:
 - [ ] Read `lib/auth.ts` — verify Credentials provider ONLY (no Google OAuth)
-- [ ] Read `lib/auth-helpers.ts` — verify `getAuthUser()` and `getSuperAdmin()` helpers
+- [ ] Read `lib/auth-helpers.ts` — verify:
+  - `getAuthUser()` and `getSuperAdmin()` helpers
+  - `UserRole` type is `'super_admin' | 'owner' | 'staff'` (no `admin`, no `viewer`)
+  - `ROLE_HIERARCHY` is `['staff', 'owner', 'super_admin']` (no `admin`, no `viewer`)
 - [ ] Read `lib/invite.ts` — verify token creation, validation, 48h expiry, email sending
 - [ ] Read `lib/email.ts` — verify Resend integration with graceful fallback
 - [ ] Read `middleware.ts` — verify:
@@ -99,6 +102,7 @@ ls scripts/create-super-admin.ts
 - [ ] Read `app/(admin)/admin/tenants/new/page.tsx` — verify create tenant form:
   - Clinic name, owner email, owner name, plan selector, **max_seats field (number, min 1, default 1)**
   - Creates tenant (with `max_seats`) + user + team_member + invite token
+  - Owner user gets `role: 'owner'` (not `admin`)
   - Sends invite email
 - [ ] Read `app/(admin)/admin/tenants/[id]/page.tsx` — verify tenant detail:
   - Shows **seat usage** (e.g. "3 / 5 seats used")
@@ -112,6 +116,7 @@ ls scripts/create-super-admin.ts
 - [ ] Spot-check 5 API routes — verify they use `getAuthUser()` not `DEFAULT_USER_ID`
 - [ ] Verify admin routes use `getSuperAdmin()` guard
 - [ ] Verify NO public registration exists anywhere
+- [ ] Verify NO references to `admin` role in code (only `super_admin`, `owner`, `staff`)
 
 ---
 
@@ -147,13 +152,17 @@ grep -r "max_seats" --include="*.ts" app/api/admin/tenants/ app/api/team/
 - [ ] Verify `getAuthUser()` populates tenantId from user record
 - [ ] Verify team invitation flow (create invite, accept invite)
 - [ ] Check that index migration script includes `tenant_id` compound indexes
-- [ ] **Read `app/api/team/invite/route.ts` — verify seat limit enforcement:**
-  - Counts active+pending (non-removed) team_members for the tenant
+- [ ] **Read `app/api/team/invite/route.ts` — verify:**
+  - Only `owner` role can invite (staff gets 403)
+  - All invitees get `staff` role (no role selection — no `admin` role in MVP)
+  - Seat limit enforcement: counts active+pending (non-removed) team_members
   - Compares against `tenant.max_seats`
   - Returns 403 with clear message when at limit
   - Removing a member (status → 'removed') frees a seat for future invites
-- [ ] **Read `app/api/team/route.ts` — verify seat usage displayed:**
+- [ ] **Read `app/api/team/route.ts` — verify:**
   - GET response includes current member count and max_seats
+  - Only owner can access team list (staff gets 403)
+- [ ] **Verify no `admin` role references in tenant-scoped code** (only `super_admin`, `owner`, `staff`)
 
 ### Critical verification:
 - [ ] **Create two test users with different tenants**
@@ -161,6 +170,7 @@ grep -r "max_seats" --include="*.ts" app/api/admin/tenants/ app/api/team/
 - [ ] **User A creates an appointment → User B cannot see it via API**
 - [ ] **Seat limit test:** Set tenant max_seats=2, add owner (1/2), invite staff (2/2), try to invite another → should get 403
 - [ ] **Seat reduction test:** Super-admin reduces max_seats to 1 (below current 2 active) → allowed, but new invites blocked
+- [ ] **Staff permission test:** Staff cannot access `/api/team/invite` (403), cannot access clinic settings (403)
 
 ---
 

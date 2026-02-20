@@ -60,7 +60,7 @@ export async function POST(
     const body = await request.json();
     const email = typeof body?.email === 'string' ? body.email.toLowerCase().trim() : '';
     const name = typeof body?.name === 'string' ? body.name.trim() : '';
-    const role = ['owner', 'admin', 'staff', 'viewer'].includes(body?.role) ? body.role : 'staff';
+    const role = ['owner', 'staff'].includes(body?.role) ? body.role : 'staff';
     const sendInvite = body?.sendInvite !== false;
 
     if (!email || !name) return createErrorResponse('email and name are required', 400);

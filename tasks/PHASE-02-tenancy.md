@@ -364,30 +364,34 @@ createIndexes().catch(console.error);
 
 ---
 
-## Task 2.5: Staff invite flow (tenant-scoped)
+## Task 2.5: Staff invite flow (tenant-scoped, owner-only)
 
 The super-admin creates tenants and clinic owners (Phase 1). Now clinic owners need to invite their own staff.
+
+**MVP Role Rules:**
+- Only `owner` can invite new team members (staff cannot invite)
+- Owner can only invite as `staff` role (no admin role exists in MVP)
+- Staff sees only their own calendar, own clients, own appointments
+- Staff cannot access clinic settings or team management
 
 ### Create `app/api/team/invite/route.ts`:
 ```typescript
 export async function POST(request: NextRequest) {
   const { userId, tenantId, role } = await getAuthUser();
 
-  // Only owner and admin can invite
-  requireRole(role, 'admin');
-
-  const { email, name, memberRole } = await request.json();
-
-  // Validate: can't invite with higher role than yourself
-  // owner can invite anyone; admin can invite staff/viewer only
-  if (role === 'admin' && ['owner', 'admin'].includes(memberRole)) {
-    return createErrorResponse('Cannot invite users with equal or higher role', 403);
+  // Only owner can invite — staff cannot invite
+  if (role !== 'owner') {
+    return createErrorResponse('Only the clinic owner can invite team members', 403);
   }
+
+  const { email, name } = await request.json();
+
+  // MVP: all invitees get 'staff' role (no admin role exists)
+  const memberRole = 'staff';
 
   const db = await getMongoDbOrThrow();
 
   // ── Seat limit check ──────────────────────────────────────────
-  // Count active + pending (non-removed) members for this tenant
   const activeMembers = await db.collection('team_members').countDocuments({
     tenant_id: tenantId,
     status: { $ne: 'removed' },
@@ -439,7 +443,6 @@ export async function POST(request: NextRequest) {
   });
 
   // Create invite token and send email
-  const tenant = await db.collection('tenants').findOne({ _id: tenantId });
   const token = await createInviteToken(email, userResult.insertedId, tenantId, memberRole, userId);
   await sendInviteEmail(email, name, tenant?.name || 'Unknown', token);
 
@@ -448,22 +451,21 @@ export async function POST(request: NextRequest) {
 ```
 
 ### Create `app/api/team/route.ts`:
-- GET: List team members for current tenant (admin+ only)
+- GET: List team members for current tenant (owner only)
 
 ### Create `app/api/team/[memberId]/route.ts`:
-- PATCH: Update member role (admin+ only, can't change owner)
-- DELETE: Remove member (admin+ only, can't remove owner, soft-delete: status → 'removed')
+- DELETE: Remove member (owner only, can't remove self/owner, soft-delete: status → 'removed')
+- Note: No PATCH for role changes in MVP (only staff role exists)
 
 ### Acceptance criteria:
-- [ ] Clinic owner can invite staff via email
-- [ ] Admin can invite staff/viewer but not owner/admin
+- [ ] Only clinic owner can invite staff (staff gets 403)
+- [ ] All invitees are assigned `staff` role (no role selection in MVP)
 - [ ] **Invite blocked when active+pending members >= `max_seats`** (returns 403 with clear message)
 - [ ] **Seat count includes both active and pending (non-removed) members**
 - [ ] **Removing a member frees up a seat (allows new invite)**
 - [ ] Invite email is sent with set-password link
-- [ ] Team member list shows all members with roles and statuses
+- [ ] Team member list shows all members with roles and statuses (owner only)
 - [ ] **Team member list shows seat usage (e.g. "3 / 5 seats")**
-- [ ] Role changes work with hierarchy enforcement
 - [ ] Owner cannot be removed
 - [ ] Build passes
 

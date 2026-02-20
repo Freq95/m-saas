@@ -249,13 +249,13 @@ const CreateAppointmentModal = dynamic(
 
 ### Create `app/api/tenant/route.ts`:
 - GET: Current tenant settings
-- PATCH: Update settings (owner/admin only)
+- PATCH: Update settings (owner only — no admin role in MVP)
 
 ### Acceptance criteria:
 - [ ] Settings page renders with current values
 - [ ] Working hours editable per day
 - [ ] Changes persist to database
-- [ ] Only owner/admin can modify
+- [ ] Only owner can modify (staff gets 403)
 - [ ] Build passes
 
 ---

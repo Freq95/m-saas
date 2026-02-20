@@ -12,7 +12,7 @@ type UserDetailClientProps = {
 export default function UserDetailClient({ user, tenant, memberships }: UserDetailClientProps) {
   const router = useRouter();
   const [name, setName] = useState(user.name || '');
-  const [role, setRole] = useState(user.role || 'viewer');
+  const [role, setRole] = useState(user.role || 'staff');
   const [status, setStatus] = useState(user.status || 'active');
   const [error, setError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
@@ -118,9 +118,7 @@ export default function UserDetailClient({ user, tenant, memberships }: UserDeta
           <select value={role} onChange={(e) => setRole(e.target.value)}>
             <option value="super_admin">super_admin</option>
             <option value="owner">owner</option>
-            <option value="admin">admin</option>
             <option value="staff">staff</option>
-            <option value="viewer">viewer</option>
           </select>
         </label>
         <label style={{ display: 'grid', gap: 6 }}>

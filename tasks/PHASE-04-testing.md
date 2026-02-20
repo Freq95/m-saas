@@ -208,7 +208,7 @@ export async function logAudit(
 - File uploads → `logAudit(..., 'file.uploaded', ...)`
 
 ### Create `app/api/audit/route.ts`:
-- GET: List audit logs for current tenant (owner/admin only)
+- GET: List audit logs for current tenant (owner only — no admin role in MVP)
 - Support filters: date range, action type, user, resource
 
 ### Add index:

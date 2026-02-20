@@ -238,11 +238,8 @@ export default function TenantDetailClient({ tenant, owner, members, seatUsage }
         <form onSubmit={addUser} style={{ display: 'grid', gap: 8, maxWidth: 420 }}>
           <input name="name" placeholder="Name" required />
           <input type="email" name="email" placeholder="Email" required />
-          <select name="role" defaultValue="staff">
-            <option value="staff">staff</option>
-            <option value="admin">admin</option>
-            <option value="viewer">viewer</option>
-          </select>
+          <input type="hidden" name="role" value="staff" />
+          <span style={{ fontSize: 13, color: '#666' }}>Role: staff (only role available in MVP)</span>
           <button type="submit" disabled={working || atLimit}>Send invite</button>
         </form>
       </section>

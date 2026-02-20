@@ -12,7 +12,9 @@ export class AuthError extends Error {
   }
 }
 
-export type UserRole = 'super_admin' | 'owner' | 'admin' | 'staff' | 'viewer';
+// MVP roles: super_admin (platform), owner (clinic), staff (clinic).
+// 'admin' removed (merged into owner). 'viewer' reserved but not implemented.
+export type UserRole = 'super_admin' | 'owner' | 'staff';
 
 export interface AuthContext {
   userId: number;
@@ -27,7 +29,7 @@ export interface AuthContext {
   membershipStatus: string;
 }
 
-const ROLE_HIERARCHY: UserRole[] = ['viewer', 'staff', 'admin', 'owner', 'super_admin'];
+const ROLE_HIERARCHY: UserRole[] = ['staff', 'owner', 'super_admin'];
 
 export async function getAuthUser(): Promise<AuthContext> {
   const session = await auth();
@@ -88,7 +90,7 @@ export async function getAuthUser(): Promise<AuthContext> {
     tenantId,
     email: user.email || session.user.email || '',
     name: user.name || session.user.name || '',
-    role: (user.role || session.user.role || 'viewer') as UserRole,
+    role: (user.role || session.user.role || 'staff') as UserRole,
     userStatus: user.status || 'unknown',
     tenantStatus: tenant.status || 'unknown',
     membershipStatus: membership.status || 'unknown',
