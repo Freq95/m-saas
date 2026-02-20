@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // GET /api/clients/[id]/history - Get unified timeline of all client activities
 export async function GET(
@@ -7,11 +8,14 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
 
     const client = await db.collection('clients').findOne({
       id: clientId,
+      user_id: userId,
+      tenant_id: tenantId,
       deleted_at: { $exists: false },
     });
     if (!client) {
@@ -24,8 +28,8 @@ export async function GET(
     const timeline: any[] = [];
 
     const [appointments, services] = await Promise.all([
-      db.collection('appointments').find({ client_id: clientId }).sort({ start_time: -1 }).toArray(),
-      db.collection('services').find({}).toArray(),
+      db.collection('appointments').find({ client_id: clientId, tenant_id: tenantId }).sort({ start_time: -1 }).toArray(),
+      db.collection('services').find({ tenant_id: tenantId }).toArray(),
     ]);
 
     const serviceById = new Map<number, any>(
@@ -49,7 +53,7 @@ export async function GET(
 
     const conversations = await db
       .collection('conversations')
-      .find({ client_id: clientId })
+      .find({ client_id: clientId, tenant_id: tenantId })
       .sort({ updated_at: -1 })
       .toArray();
 
@@ -58,7 +62,7 @@ export async function GET(
     if (conversationIds.length > 0) {
       const messages = await db
         .collection('messages')
-        .find({ conversation_id: { $in: conversationIds } })
+        .find({ conversation_id: { $in: conversationIds }, tenant_id: tenantId })
         .toArray();
       for (const message of messages) {
         const count = messageCounts.get(message.conversation_id) || 0;
@@ -83,14 +87,14 @@ export async function GET(
 
     let notes = await db
       .collection('client_notes')
-      .find({ client_id: clientId })
+      .find({ client_id: clientId, tenant_id: tenantId })
       .sort({ created_at: -1 })
       .toArray();
 
     if (notes.length === 0) {
       notes = await db
         .collection('contact_notes')
-        .find({ contact_id: clientId })
+        .find({ contact_id: clientId, tenant_id: tenantId })
         .sort({ created_at: -1 })
         .toArray();
     }
@@ -108,7 +112,7 @@ export async function GET(
 
     const tasks = await db
       .collection('tasks')
-      .find({ $or: [{ client_id: clientId }, { contact_id: clientId }] })
+      .find({ tenant_id: tenantId, $or: [{ client_id: clientId }, { contact_id: clientId }] })
       .sort({ due_date: -1, created_at: -1 })
       .toArray();
 
@@ -127,14 +131,14 @@ export async function GET(
 
     let files = await db
       .collection('client_files')
-      .find({ client_id: clientId })
+      .find({ client_id: clientId, tenant_id: tenantId })
       .sort({ created_at: -1 })
       .toArray();
 
     if (files.length === 0) {
       files = await db
         .collection('contact_files')
-        .find({ contact_id: clientId })
+        .find({ contact_id: clientId, tenant_id: tenantId })
         .sort({ created_at: -1 })
         .toArray();
     }

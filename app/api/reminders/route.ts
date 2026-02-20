@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // Validation schemas
 const createReminderSchema = z.object({
@@ -14,13 +15,14 @@ const createReminderSchema = z.object({
 // GET /api/reminders - Get all reminders
 export async function GET(request: NextRequest) {
   try {
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const searchParams = request.nextUrl.searchParams;
 
     // Validate query parameters
     const { remindersQuerySchema } = await import('@/lib/validation');
     const queryParams = {
-      userId: searchParams.get('userId') || '1',
+      userId: String(userId),
       status: searchParams.get('status') || undefined,
     };
 
@@ -29,11 +31,11 @@ export async function GET(request: NextRequest) {
       return handleApiError(validationResult.error, 'Invalid query parameters');
     }
 
-    const { userId, status } = validationResult.data;
+    const { status } = validationResult.data;
     const appointmentId = searchParams.get('appointmentId');
     const channel = searchParams.get('channel');
 
-    const appointmentFilter: Record<string, any> = { user_id: userId };
+    const appointmentFilter: Record<string, any> = { user_id: userId, tenant_id: tenantId };
     if (appointmentId) appointmentFilter.id = parseInt(appointmentId);
 
     const appointments = await db.collection('appointments').find(appointmentFilter).toArray();
@@ -45,6 +47,7 @@ export async function GET(request: NextRequest) {
 
     const reminderFilter: Record<string, any> = {
       appointment_id: { $in: appointmentIds },
+      tenant_id: tenantId,
     };
     if (status) reminderFilter.status = status;
     if (channel) reminderFilter.channel = channel;
@@ -79,6 +82,7 @@ export async function GET(request: NextRequest) {
 // POST /api/reminders - Create a new reminder
 export async function POST(request: NextRequest) {
   try {
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const body = await request.json();
 
@@ -97,7 +101,7 @@ export async function POST(request: NextRequest) {
     const { appointmentId, channel, message, scheduledAt } = validationResult.data;
 
     // Verify appointment exists
-    const appointment = await db.collection('appointments').findOne({ id: appointmentId });
+    const appointment = await db.collection('appointments').findOne({ id: appointmentId, user_id: userId, tenant_id: tenantId });
 
     if (!appointment) {
       return NextResponse.json(
@@ -112,6 +116,8 @@ export async function POST(request: NextRequest) {
     const reminderDoc = {
       _id: reminderId,
       id: reminderId,
+      tenant_id: tenantId,
+      user_id: userId,
       appointment_id: appointmentId,
       channel,
       message: message || null,

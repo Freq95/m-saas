@@ -41,7 +41,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const appointmentId = Number(params.id);
 
@@ -49,14 +49,14 @@ export async function GET(
       return createErrorResponse('Invalid appointment ID', 400);
     }
 
-    const appointmentDoc = await db.collection('appointments').findOne({ id: appointmentId, user_id: userId });
+    const appointmentDoc = await db.collection('appointments').findOne({ id: appointmentId, user_id: userId, tenant_id: tenantId });
     if (!appointmentDoc) {
       return createErrorResponse('Appointment not found', 404);
     }
 
     const [clientDoc, serviceDoc] = await Promise.all([
-      appointmentDoc.client_id ? db.collection('clients').findOne({ id: appointmentDoc.client_id }) : null,
-      appointmentDoc.service_id ? db.collection('services').findOne({ id: appointmentDoc.service_id }) : null,
+      appointmentDoc.client_id ? db.collection('clients').findOne({ id: appointmentDoc.client_id, tenant_id: tenantId }) : null,
+      appointmentDoc.service_id ? db.collection('services').findOne({ id: appointmentDoc.service_id, tenant_id: tenantId }) : null,
     ]);
 
     const appointment = {
@@ -79,7 +79,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const appointmentId = Number(params.id);
     const body = await request.json();
@@ -116,6 +116,7 @@ export async function PATCH(
     const existingAppointment = await db.collection('appointments').findOne({
       id: appointmentId,
       user_id: userId,
+      tenant_id: tenantId,
     });
     if (!existingAppointment) {
       return createErrorResponse('Not found or not authorized', 404);
@@ -163,6 +164,7 @@ export async function PATCH(
       // Check for conflicts (excluding this appointment)
       const conflictCheck = await checkAppointmentConflict(
         existingAppointment.user_id,
+        tenantId,
         targetProviderId || undefined,
         targetResourceId || undefined,
         newStartTime,
@@ -233,6 +235,7 @@ export async function PATCH(
       const { findOrCreateClient } = await import('@/lib/client-matching');
       const linkedClient = await findOrCreateClient(
         existingAppointment.user_id,
+        tenantId,
         normalizedName,
         normalizedEmail || undefined,
         normalizedPhone || undefined
@@ -259,7 +262,7 @@ export async function PATCH(
     updates.updated_at = new Date().toISOString();
 
     const updateResult = await db.collection('appointments').updateOne(
-      { id: appointmentId, user_id: userId },
+      { id: appointmentId, user_id: userId, tenant_id: tenantId },
       { $set: updates }
     );
     if (updateResult.matchedCount === 0) {
@@ -269,6 +272,7 @@ export async function PATCH(
     const appointmentDoc = await db.collection('appointments').findOne({
       id: appointmentId,
       user_id: userId,
+      tenant_id: tenantId,
     });
     if (!appointmentDoc) {
       return createErrorResponse('Appointment not found', 404);
@@ -276,7 +280,7 @@ export async function PATCH(
 
     // If status changed to 'completed', update client stats
     if (status === 'completed' && appointmentDoc.client_id) {
-      await updateClientStats(appointmentDoc.client_id);
+      await updateClientStats(appointmentDoc.client_id, tenantId);
     }
     return createSuccessResponse({ appointment: stripMongoId(appointmentDoc) });
   } catch (error) {
@@ -290,7 +294,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const appointmentId = Number(params.id);
 
@@ -301,6 +305,7 @@ export async function DELETE(
     const result = await db.collection('appointments').deleteOne({
       id: appointmentId,
       user_id: userId,
+      tenant_id: tenantId,
     });
     if (result.deletedCount === 0) {
       return createErrorResponse('Not found or not authorized', 404);

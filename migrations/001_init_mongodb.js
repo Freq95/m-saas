@@ -16,15 +16,24 @@ function getDbName(uri) {
 }
 
 const collections = [
+  'tenants',
+  'team_members',
+  'invite_tokens',
   'users',
   'clients',
   'conversations',
   'messages',
+  'audit_logs',
   'tags',
   'conversation_tags',
   'services',
   'appointments',
   'tasks',
+  'providers',
+  'resources',
+  'blocked_times',
+  'waitlist',
+  'message_attachments',
   'client_notes',
   'client_files',
   'reminders',
@@ -36,63 +45,98 @@ const collections = [
 ];
 
 const indexPlan = {
-  users: [{ key: { email: 1 } }],
+  tenants: [
+    { key: { slug: 1 }, unique: true },
+    { key: { status: 1 } },
+  ],
+  team_members: [
+    { key: { tenant_id: 1, user_id: 1 }, unique: true },
+    { key: { tenant_id: 1, status: 1 } },
+    { key: { tenant_id: 1, email: 1 } },
+  ],
+  invite_tokens: [
+    { key: { token: 1 }, unique: true },
+    { key: { expires_at: 1 }, expireAfterSeconds: 0 },
+    { key: { email: 1, used_at: 1 } },
+  ],
+  users: [{ key: { email: 1 } }, { key: { tenant_id: 1, role: 1 } }],
   clients: [
-    { key: { user_id: 1, last_activity_date: -1 } },
-    { key: { user_id: 1, last_appointment_date: -1 } },
-    { key: { user_id: 1, total_spent: -1 } },
-    { key: { user_id: 1, name: 1 } },
-    { key: { user_id: 1, email: 1 } },
-    { key: { user_id: 1, phone: 1 } },
+    { key: { tenant_id: 1, user_id: 1, last_activity_date: -1 } },
+    { key: { tenant_id: 1, user_id: 1, last_appointment_date: -1 } },
+    { key: { tenant_id: 1, user_id: 1, total_spent: -1 } },
+    { key: { tenant_id: 1, user_id: 1, name: 1 } },
+    { key: { tenant_id: 1, user_id: 1, email: 1 } },
+    { key: { tenant_id: 1, user_id: 1, phone: 1 } },
   ],
   conversations: [
-    { key: { user_id: 1, created_at: -1 } },
-    { key: { user_id: 1, status: 1 } },
-    { key: { client_id: 1 } },
+    { key: { tenant_id: 1, user_id: 1, created_at: -1 } },
+    { key: { tenant_id: 1, user_id: 1, status: 1 } },
+    { key: { tenant_id: 1, client_id: 1 } },
   ],
   messages: [
-    { key: { conversation_id: 1, sent_at: -1 } },
-    { key: { conversation_id: 1, created_at: -1 } },
+    { key: { tenant_id: 1, conversation_id: 1, sent_at: -1 } },
+    { key: { tenant_id: 1, conversation_id: 1, created_at: -1 } },
   ],
-  tags: [{ key: { name: 1 } }],
+  tags: [{ key: { tenant_id: 1, name: 1 } }],
   conversation_tags: [
-    { key: { conversation_id: 1 } },
-    { key: { tag_id: 1 } },
-    { key: { conversation_id: 1, tag_id: 1 }, unique: true },
+    { key: { tenant_id: 1, conversation_id: 1 } },
+    { key: { tenant_id: 1, tag_id: 1 } },
+    { key: { tenant_id: 1, conversation_id: 1, tag_id: 1 }, unique: true },
   ],
-  services: [{ key: { user_id: 1 } }],
+  services: [{ key: { tenant_id: 1, user_id: 1 } }],
   appointments: [
-    { key: { user_id: 1, start_time: 1 } },
-    { key: { user_id: 1, status: 1 } },
-    { key: { client_id: 1 } },
+    { key: { tenant_id: 1, user_id: 1, start_time: 1 } },
+    { key: { tenant_id: 1, user_id: 1, status: 1 } },
+    { key: { tenant_id: 1, client_id: 1 } },
   ],
   tasks: [
-    { key: { user_id: 1, status: 1 } },
-    { key: { contact_id: 1 } },
-    { key: { client_id: 1 } },
-    { key: { due_date: 1 } },
+    { key: { tenant_id: 1, user_id: 1, status: 1 } },
+    { key: { tenant_id: 1, contact_id: 1 } },
+    { key: { tenant_id: 1, client_id: 1 } },
+    { key: { tenant_id: 1, due_date: 1 } },
+  ],
+  providers: [
+    { key: { tenant_id: 1, user_id: 1, is_active: 1 } },
+  ],
+  resources: [
+    { key: { tenant_id: 1, user_id: 1, is_active: 1 } },
+  ],
+  blocked_times: [
+    { key: { tenant_id: 1, user_id: 1, start_time: 1 } },
+  ],
+  waitlist: [
+    { key: { tenant_id: 1, user_id: 1, created_at: -1 } },
+  ],
+  message_attachments: [
+    { key: { tenant_id: 1, conversation_id: 1, message_id: 1 } },
   ],
   client_notes: [
-    { key: { client_id: 1, created_at: -1 } },
+    { key: { tenant_id: 1, client_id: 1, created_at: -1 } },
   ],
   client_files: [
-    { key: { client_id: 1, created_at: -1 } },
+    { key: { tenant_id: 1, client_id: 1, created_at: -1 } },
   ],
   reminders: [
-    { key: { user_id: 1 } },
-    { key: { appointment_id: 1 } },
+    { key: { tenant_id: 1, user_id: 1 } },
+    { key: { tenant_id: 1, appointment_id: 1 } },
   ],
   email_integrations: [
-    { key: { user_id: 1, provider: 1 }, unique: true },
+    { key: { tenant_id: 1, provider: 1 }, unique: true },
   ],
   google_calendar_sync: [
-    { key: { user_id: 1 } },
-    { key: { appointment_id: 1 } },
-    { key: { google_event_id: 1 } },
+    { key: { tenant_id: 1, user_id: 1 } },
+    { key: { tenant_id: 1, appointment_id: 1 } },
+    { key: { tenant_id: 1, google_event_id: 1 } },
   ],
-  contact_files: [{ key: { contact_id: 1 } }],
-  contact_custom_fields: [{ key: { contact_id: 1 } }],
-  contact_notes: [{ key: { contact_id: 1 } }],
+  contact_files: [{ key: { tenant_id: 1, contact_id: 1 } }],
+  contact_custom_fields: [{ key: { tenant_id: 1, contact_id: 1 } }],
+  contact_notes: [{ key: { tenant_id: 1, contact_id: 1 } }],
+  audit_logs: [
+    { key: { tenant_id: 1, created_at: -1 } },
+    { key: { action: 1, created_at: -1 } },
+    { key: { actor_user_id: 1, created_at: -1 } },
+    { key: { target_type: 1, target_id: 1, created_at: -1 } },
+  ],
 };
 
 async function run() {

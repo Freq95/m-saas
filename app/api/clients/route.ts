@@ -9,7 +9,7 @@ import { getAuthUser } from '@/lib/auth-helpers';
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const search = searchParams.get('search') || '';
     const sortBy = searchParams.get('sortBy') || 'last_appointment_date';
     const sortOrder = searchParams.get('sortOrder') || 'DESC';
@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const data = await getClientsData({
       userId,
+      tenantId,
       search,
       sortBy,
       sortOrder,
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const { name, email, phone, notes } = validationResult.data;
 
     // Use findOrCreateClient to avoid duplicates
@@ -59,6 +60,7 @@ export async function POST(request: NextRequest) {
     try {
       client = await findOrCreateClient(
         userId,
+        tenantId,
         name,
         email,
         phone
@@ -78,11 +80,11 @@ export async function POST(request: NextRequest) {
     if (Object.keys(updates).length > 0) {
       updates.updated_at = new Date().toISOString();
       await db.collection('clients').updateOne(
-        { id: client.id },
+        { id: client.id, tenant_id: tenantId },
         { $set: updates }
       );
 
-      const updatedClient = await db.collection('clients').findOne({ id: client.id });
+      const updatedClient = await db.collection('clients').findOne({ id: client.id, tenant_id: tenantId });
       if (updatedClient) {
         return NextResponse.json({
           client: stripMongoId(updatedClient),

@@ -21,13 +21,14 @@ export async function processReminders() {
     db.collection('appointments').find({
       status: 'scheduled',
       reminder_sent: false,
+      tenant_id: { $exists: true },
       start_time: {
         $gte: now.toISOString(),
         $lte: reminderTime.toISOString(),
       },
     }).toArray(),
-    db.collection('services').find({}).toArray(),
-    db.collection('users').find({ status: 'active' }).toArray(),
+    db.collection('services').find({ tenant_id: { $exists: true } }).toArray(),
+    db.collection('users').find({ status: 'active', tenant_id: { $exists: true } }).toArray(),
   ]);
 
   const activeTenantIds = new Set<string>(
@@ -40,7 +41,9 @@ export async function processReminders() {
     ).map((tenant: any) => String(tenant._id))
   );
 
-  const serviceById = new Map<number, any>(services.map((s: any) => [s.id, s]));
+  const serviceByTenantAndId = new Map<string, any>(
+    services.map((s: any) => [`${String(s.tenant_id)}:${s.id}`, s])
+  );
   const userById = new Map<number, any>(
     users
       .filter((u: any) => !u.tenant_id || activeTenantIds.has(String(u.tenant_id)))
@@ -48,7 +51,7 @@ export async function processReminders() {
   );
 
   for (const appointment of appointments) {
-    const service = serviceById.get(appointment.service_id);
+    const service = serviceByTenantAndId.get(`${String(appointment.tenant_id)}:${appointment.service_id}`);
     const user = userById.get(appointment.user_id);
     if (!user) {
       continue;
@@ -68,6 +71,8 @@ export async function processReminders() {
           await db.collection('reminders').insertOne({
             _id: reminderId,
             id: reminderId,
+            tenant_id: appointment.tenant_id,
+            user_id: appointment.user_id,
             appointment_id: appointment.id,
             channel: 'sms',
             sent_at: sentAt,
@@ -76,7 +81,7 @@ export async function processReminders() {
             updated_at: sentAt,
           });
           await db.collection('appointments').updateOne(
-            { id: appointment.id },
+            { id: appointment.id, tenant_id: appointment.tenant_id },
             { $set: { reminder_sent: true, updated_at: sentAt } }
           );
           continue;
@@ -97,6 +102,8 @@ export async function processReminders() {
           await db.collection('reminders').insertOne({
             _id: reminderId,
             id: reminderId,
+            tenant_id: appointment.tenant_id,
+            user_id: appointment.user_id,
             appointment_id: appointment.id,
             channel: 'email',
             sent_at: sentAt,
@@ -105,13 +112,15 @@ export async function processReminders() {
             updated_at: sentAt,
           });
           await db.collection('appointments').updateOne(
-            { id: appointment.id },
+            { id: appointment.id, tenant_id: appointment.tenant_id },
             { $set: { reminder_sent: true, updated_at: sentAt } }
           );
         } else {
           await db.collection('reminders').insertOne({
             _id: reminderId,
             id: reminderId,
+            tenant_id: appointment.tenant_id,
+            user_id: appointment.user_id,
             appointment_id: appointment.id,
             channel: 'email',
             status: 'failed',
@@ -126,6 +135,8 @@ export async function processReminders() {
         await db.collection('reminders').insertOne({
           _id: reminderId,
           id: reminderId,
+          tenant_id: appointment.tenant_id,
+          user_id: appointment.user_id,
           appointment_id: appointment.id,
           channel: 'email',
           status: 'failed',

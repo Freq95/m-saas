@@ -1,5 +1,6 @@
 import { getMongoDbOrThrow } from './db/mongo-utils';
 import type { ConflictCheck } from './types/calendar';
+import { ObjectId } from 'mongodb';
 
 /**
  * Check if a time slot overlaps with existing appointments
@@ -43,6 +44,7 @@ function toDate(value: unknown): Date | null {
  */
 export async function checkAppointmentConflict(
   userId: number,
+  tenantId: ObjectId,
   providerId: number | undefined,
   resourceId: number | undefined,
   startTime: Date,
@@ -59,6 +61,7 @@ export async function checkAppointmentConflict(
       .collection('appointments')
       .find({
         user_id: userId,
+        tenant_id: tenantId,
         status: 'scheduled',
         start_time: { $lte: endTime.toISOString() },
         end_time: { $gte: startTime.toISOString() },
@@ -79,6 +82,7 @@ export async function checkAppointmentConflict(
       .collection('blocked_times')
       .find({
         user_id: userId,
+        tenant_id: tenantId,
         $and: [
           { $or: [{ provider_id: { $exists: false } }, { provider_id: null }] },
           { $or: [{ resource_id: { $exists: false } }, { resource_id: null }] },
@@ -152,7 +156,7 @@ export async function checkAppointmentConflict(
     }
 
     // Check provider working hours
-    const provider = await db.collection('providers').findOne({ id: providerId, user_id: userId });
+    const provider = await db.collection('providers').findOne({ id: providerId, user_id: userId, tenant_id: tenantId });
     if (provider) {
       const dayOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][
         startTime.getDay()
@@ -184,6 +188,7 @@ export async function checkAppointmentConflict(
       .collection('appointments')
       .find({
         user_id: userId,
+        tenant_id: tenantId,
         resource_id: resourceId,
         status: 'scheduled',
         start_time: {
@@ -211,6 +216,7 @@ export async function checkAppointmentConflict(
       .collection('blocked_times')
       .find({
         user_id: userId,
+        tenant_id: tenantId,
         $or: [
           { resource_id: resourceId },
           { resource_id: { $exists: false } }, // All-resource blocks
@@ -245,6 +251,7 @@ export async function checkAppointmentConflict(
       // Quick check if this slot is free
       const hasConflict = await checkAppointmentConflict(
         userId,
+        tenantId,
         providerId,
         resourceId,
         searchStart,

@@ -10,18 +10,18 @@ export async function PATCH(
   { params }: { params: { id: string; fileId: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const fileId = parseInt(params.fileId);
     const body = await request.json();
 
     const { description } = body;
 
-    let file = await db.collection('client_files').findOne({ id: fileId, user_id: userId });
+    let file = await db.collection('client_files').findOne({ id: fileId, user_id: userId, tenant_id: tenantId });
     let collectionName = 'client_files';
 
     if (!file) {
-      file = await db.collection('contact_files').findOne({ id: fileId, user_id: userId });
+      file = await db.collection('contact_files').findOne({ id: fileId, user_id: userId, tenant_id: tenantId });
       collectionName = 'contact_files';
     }
 
@@ -34,14 +34,14 @@ export async function PATCH(
 
     const now = new Date().toISOString();
     const result = await db.collection(collectionName).updateOne(
-      { id: fileId, user_id: userId },
+      { id: fileId, user_id: userId, tenant_id: tenantId },
       { $set: { description: description || null, updated_at: now } }
     );
     if (result.matchedCount === 0) {
       return createErrorResponse('Not found or not authorized', 404);
     }
 
-    const updated = await db.collection(collectionName).findOne({ id: fileId, user_id: userId });
+    const updated = await db.collection(collectionName).findOne({ id: fileId, user_id: userId, tenant_id: tenantId });
     return createSuccessResponse({ file: updated ? stripMongoId(updated) : stripMongoId(file) });
   } catch (error) {
     return handleApiError(error, 'Failed to update file');
@@ -54,15 +54,15 @@ export async function DELETE(
   { params }: { params: { id: string; fileId: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const fileId = parseInt(params.fileId);
 
-    let file = await db.collection('client_files').findOne({ id: fileId, user_id: userId });
+    let file = await db.collection('client_files').findOne({ id: fileId, user_id: userId, tenant_id: tenantId });
     let collectionName = 'client_files';
 
     if (!file) {
-      file = await db.collection('contact_files').findOne({ id: fileId, user_id: userId });
+      file = await db.collection('contact_files').findOne({ id: fileId, user_id: userId, tenant_id: tenantId });
       collectionName = 'contact_files';
     }
 
@@ -75,7 +75,7 @@ export async function DELETE(
       fs.unlinkSync(file.file_path);
     }
 
-    const result = await db.collection(collectionName).deleteOne({ id: fileId, user_id: userId });
+    const result = await db.collection(collectionName).deleteOne({ id: fileId, user_id: userId, tenant_id: tenantId });
     if (result.deletedCount === 0) {
       return createErrorResponse('Not found or not authorized', 404);
     }

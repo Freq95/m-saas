@@ -5,6 +5,7 @@ import { linkConversationToClient } from '@/lib/client-matching';
 import { parseStoredMessage, serializeMessage } from '@/lib/email-types';
 import * as fs from 'fs';
 import * as path from 'path';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 const CLIENT_UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'clients');
 
@@ -31,6 +32,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const conversationId = parseInt(params.id, 10);
     if (Number.isNaN(conversationId) || conversationId <= 0) {
@@ -50,12 +52,12 @@ export async function POST(
       return createErrorResponse('imageIndex is required', 400);
     }
 
-    const conversation = await db.collection('conversations').findOne({ id: conversationId });
+    const conversation = await db.collection('conversations').findOne({ id: conversationId, tenant_id: tenantId, user_id: userId });
     if (!conversation) {
       return createErrorResponse('Conversation not found', 404);
     }
 
-    const message = await db.collection('messages').findOne({ id: messageId, conversation_id: conversationId });
+    const message = await db.collection('messages').findOne({ id: messageId, conversation_id: conversationId, tenant_id: tenantId });
     if (!message) {
       return createErrorResponse('Message not found', 404);
     }
@@ -89,7 +91,7 @@ export async function POST(
     let targetClientId: number | null = null;
 
     if (requestedClientId) {
-      const existingClient = await db.collection('clients').findOne({ id: requestedClientId });
+      const existingClient = await db.collection('clients').findOne({ id: requestedClientId, tenant_id: tenantId });
       if (!existingClient) {
         return createErrorResponse('Client not found', 404);
       }
@@ -114,7 +116,7 @@ export async function POST(
     }
 
     if (conversation.client_id !== targetClientId) {
-      await linkConversationToClient(conversationId, targetClientId);
+      await linkConversationToClient(conversationId, targetClientId, tenantId);
     }
 
     const markImageAsSaved = async (savedClientId: number, savedFileId: number, savedAt: string) => {
@@ -134,7 +136,7 @@ export async function POST(
       };
 
       await db.collection('messages').updateOne(
-        { id: messageId, conversation_id: conversationId },
+        { id: messageId, conversation_id: conversationId, tenant_id: tenantId },
         {
           $set: {
             content: serializeMessage(updatedStored),
@@ -151,6 +153,7 @@ export async function POST(
       const existingByLastSaved = await db.collection('client_files').findOne({
         id: targetImage.last_saved_client_file_id,
         client_id: targetClientId,
+        tenant_id: tenantId,
       });
       if (existingByLastSaved) {
         const now = new Date().toISOString();
@@ -166,6 +169,7 @@ export async function POST(
 
     const existingDuplicate = await db.collection('client_files').findOne({
       client_id: targetClientId,
+      tenant_id: tenantId,
       source_type: 'conversation_inline_image',
       source_conversation_id: conversationId,
       source_message_id: messageId,
@@ -194,6 +198,7 @@ export async function POST(
     const fileDoc = {
       _id: fileId,
       id: fileId,
+      tenant_id: tenantId,
       client_id: targetClientId,
       filename: storedFilename,
       original_filename: originalFilename,
@@ -211,7 +216,7 @@ export async function POST(
 
     await db.collection('client_files').insertOne(fileDoc);
     await db.collection('clients').updateOne(
-      { id: targetClientId },
+      { id: targetClientId, tenant_id: tenantId },
       { $set: { last_activity_date: now, updated_at: now } }
     );
 

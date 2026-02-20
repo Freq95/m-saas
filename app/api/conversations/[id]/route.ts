@@ -12,7 +12,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const conversationId = parseInt(params.id);
 
     const { searchParams } = request.nextUrl;
@@ -23,6 +23,7 @@ export async function GET(
     // Get conversation
     const messageData = await getConversationMessagesData(conversationId, {
       userId,
+      tenantId,
       limit,
       offset,
       beforeId: beforeId ? parseInt(beforeId) : undefined,
@@ -51,7 +52,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const conversationId = parseInt(params.id);
     const body = await request.json();
@@ -60,6 +61,7 @@ export async function PATCH(
     const existingConv = await db.collection('conversations').findOne({
       id: conversationId,
       user_id: userId,
+      tenant_id: tenantId,
     });
     if (!existingConv) {
       return createErrorResponse('Not found or not authorized', 404);
@@ -99,10 +101,10 @@ export async function PATCH(
 
     if (validatedData.tags !== undefined && Array.isArray(validatedData.tags)) {
       tagsUpdated = true;
-      await db.collection('conversation_tags').deleteMany({ conversation_id: conversationId });
+      await db.collection('conversation_tags').deleteMany({ conversation_id: conversationId, tenant_id: tenantId });
 
       if (validatedData.tags.length > 0) {
-        const allTags = await db.collection('tags').find({}).toArray();
+        const allTags = await db.collection('tags').find({ tenant_id: tenantId }).toArray();
         const tagsByName = new Map<string, any>();
         for (const tag of allTags) {
           if (typeof tag.name === 'string') {
@@ -116,6 +118,7 @@ export async function PATCH(
           .map((tag: any) => ({
             _id: `${conversationId}:${tag.id}`,
             conversation_id: conversationId,
+            tenant_id: tenantId,
             tag_id: tag.id,
           }));
 
@@ -128,7 +131,7 @@ export async function PATCH(
     if (Object.keys(updates).length > 0 || tagsUpdated) {
       updates.updated_at = new Date().toISOString();
       const result = await db.collection('conversations').updateOne(
-        { id: conversationId, user_id: userId },
+        { id: conversationId, user_id: userId, tenant_id: tenantId },
         { $set: updates }
       );
       if (result.matchedCount === 0) {
@@ -139,16 +142,17 @@ export async function PATCH(
     const updatedDoc = await db.collection('conversations').findOne({
       id: conversationId,
       user_id: userId,
+      tenant_id: tenantId,
     });
     if (!updatedDoc) {
       return createErrorResponse('Not found or not authorized', 404);
     }
 
-    const tagsResult = await db.collection('tags').find({}).toArray();
+    const tagsResult = await db.collection('tags').find({ tenant_id: tenantId }).toArray();
     const allTags = tagsResult.map(stripMongoId);
     const convTagsResult = await db
       .collection('conversation_tags')
-      .find({ conversation_id: conversationId })
+      .find({ conversation_id: conversationId, tenant_id: tenantId })
       .toArray();
     const tagIds = convTagsResult.map((r: any) => r.tag_id);
     const tags = allTags

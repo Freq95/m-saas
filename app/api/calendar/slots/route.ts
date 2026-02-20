@@ -7,7 +7,7 @@ import { getAuthUser } from '@/lib/auth-helpers';
 // GET /api/calendar/slots - Get available time slots
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const searchParams = request.nextUrl.searchParams;
 
     // Validate query parameters
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     // Get service duration
     let serviceDuration = 60; // default
     if (serviceId) {
-      const serviceDoc = await db.collection('services').findOne({ id: Number(serviceId) });
+      const serviceDoc = await db.collection('services').findOne({ id: Number(serviceId), tenant_id: tenantId });
       if (serviceDoc?.duration_minutes) {
         serviceDuration = serviceDoc.duration_minutes;
       }
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 
     if (suggested) {
       // Get 2-3 suggested slots for next few days
-      const suggestions = await getSuggestedSlots(userId, serviceDuration, 7, {
+      const suggestions = await getSuggestedSlots(userId, tenantId, serviceDuration, 7, {
         providerId,
         resourceId,
       });
@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
       });
     } else if (date) {
       // Get slots for specific date
-      const slots = await getAvailableSlots(userId, new Date(date), serviceDuration, { start: '09:00', end: '18:00' }, {
+      const slots = await getAvailableSlots(userId, tenantId, new Date(date), serviceDuration, { start: '09:00', end: '18:00' }, {
         providerId,
         resourceId,
       });

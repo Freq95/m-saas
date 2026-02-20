@@ -1,6 +1,7 @@
 import { getMongoDbOrThrow } from './db/mongo-utils';
 import { format, addMinutes, startOfDay, endOfDay } from 'date-fns';
 import { ro } from 'date-fns/locale';
+import { ObjectId } from 'mongodb';
 
 export interface TimeSlot {
   start: Date;
@@ -44,6 +45,7 @@ function appliesToScope(blocked: any, options: SlotFilterOptions): boolean {
  */
 export async function getAvailableSlots(
   userId: number,
+  tenantId: ObjectId,
   date: Date,
   serviceDuration: number,
   workingHours: { start: string; end: string } = { start: '09:00', end: '18:00' },
@@ -57,6 +59,7 @@ export async function getAvailableSlots(
   // Get all appointments for the day
   const appointmentFilter: Record<string, any> = {
     user_id: userId,
+    tenant_id: tenantId,
     status: 'scheduled',
     start_time: {
       $gte: dayStart.toISOString(),
@@ -79,7 +82,7 @@ export async function getAvailableSlots(
     start: new Date(row.start_time),
     end: new Date(row.end_time),
   }));
-  const blockedTimes = await db.collection('blocked_times').find({ user_id: userId }).toArray();
+  const blockedTimes = await db.collection('blocked_times').find({ user_id: userId, tenant_id: tenantId }).toArray();
 
   // Generate time slots (every 15 minutes)
   const slots: TimeSlot[] = [];
@@ -129,6 +132,7 @@ export async function getAvailableSlots(
  */
 export async function getSuggestedSlots(
   userId: number,
+  tenantId: ObjectId,
   serviceDuration: number,
   daysAhead: number = 7,
   options: SlotFilterOptions = {}
@@ -140,7 +144,7 @@ export async function getSuggestedSlots(
     const date = new Date(today);
     date.setDate(date.getDate() + i);
     
-    const slots = await getAvailableSlots(userId, date, serviceDuration, { start: '09:00', end: '18:00' }, options);
+    const slots = await getAvailableSlots(userId, tenantId, date, serviceDuration, { start: '09:00', end: '18:00' }, options);
     const availableSlots = slots.filter(s => s.available).slice(0, 3);
 
     if (availableSlots.length > 0) {
@@ -211,6 +215,7 @@ function doTimeSlotsOverlap(
  */
 export async function isSlotAvailable(
   userId: number,
+  tenantId: ObjectId,
   startTime: Date,
   endTime: Date,
   options: SlotFilterOptions = {}
@@ -230,6 +235,7 @@ export async function isSlotAvailable(
   // No complex OR conditions that might have parsing issues
   const appointmentFilter: Record<string, any> = {
     user_id: userId,
+    tenant_id: tenantId,
     status: 'scheduled',
     start_time: {
       $gte: searchWindowStart.toISOString(),
@@ -257,6 +263,7 @@ export async function isSlotAvailable(
     
     const extraFilter: Record<string, any> = {
       user_id: userId,
+      tenant_id: tenantId,
       status: 'scheduled',
       start_time: {
         $gte: dayBeforeStart.toISOString(),
@@ -298,7 +305,7 @@ export async function isSlotAvailable(
     }
   }
 
-  const blockedTimes = await db.collection('blocked_times').find({ user_id: userId }).toArray();
+  const blockedTimes = await db.collection('blocked_times').find({ user_id: userId, tenant_id: tenantId }).toArray();
   for (const blocked of blockedTimes) {
     if (!appliesToScope(blocked, options)) continue;
     const blockedStart = toDate(blocked.start_time);

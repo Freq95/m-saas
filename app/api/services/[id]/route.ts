@@ -9,11 +9,11 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const serviceId = parseInt(params.id);
 
-    const service = await db.collection('services').findOne({ id: serviceId, user_id: userId });
+    const service = await db.collection('services').findOne({ id: serviceId, user_id: userId, tenant_id: tenantId });
 
     if (!service) {
       return NextResponse.json(
@@ -34,7 +34,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const serviceId = parseInt(params.id);
     const body = await request.json();
@@ -69,14 +69,14 @@ export async function PATCH(
 
     updates.updated_at = new Date().toISOString();
     const updateResult = await db.collection('services').updateOne(
-      { id: serviceId, user_id: userId },
+      { id: serviceId, user_id: userId, tenant_id: tenantId },
       { $set: updates }
     );
     if (updateResult.matchedCount === 0) {
       return createErrorResponse('Not found or not authorized', 404);
     }
 
-    const service = await db.collection('services').findOne({ id: serviceId, user_id: userId });
+    const service = await db.collection('services').findOne({ id: serviceId, user_id: userId, tenant_id: tenantId });
     if (!service) {
       return createErrorResponse('Not found or not authorized', 404);
     }
@@ -92,7 +92,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const serviceId = parseInt(params.id);
 
@@ -100,6 +100,7 @@ export async function DELETE(
     const appointmentCount = await db.collection('appointments').countDocuments({
       service_id: serviceId,
       user_id: userId,
+      tenant_id: tenantId,
     });
     if (appointmentCount > 0) {
       return NextResponse.json(
@@ -111,7 +112,7 @@ export async function DELETE(
       );
     }
 
-    const result = await db.collection('services').deleteOne({ id: serviceId, user_id: userId });
+    const result = await db.collection('services').deleteOne({ id: serviceId, user_id: userId, tenant_id: tenantId });
     if (result.deletedCount === 0) {
       return createErrorResponse('Not found or not authorized', 404);
     }

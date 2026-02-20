@@ -4,12 +4,13 @@ import { saveEmailIntegration } from '@/lib/email-integrations';
 import { testYahooConnection } from '@/lib/yahoo-mail';
 import { createYahooIntegrationSchema } from '@/lib/validation';
 import { logger } from '@/lib/logger';
-import { getAuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, requireRole } from '@/lib/auth-helpers';
 
 // POST /api/settings/email-integrations/yahoo
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId, role } = await getAuthUser();
+    requireRole(role, 'owner');
     const body = await request.json();
     
     const validationResult = createYahooIntegrationSchema.safeParse(body);
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Save integration
-    const integration = await saveEmailIntegration(userId, 'yahoo', email, password);
+    const integration = await saveEmailIntegration(userId, tenantId, 'yahoo', email, password);
     
     return createSuccessResponse({ integration }, 201);
   } catch (error) {

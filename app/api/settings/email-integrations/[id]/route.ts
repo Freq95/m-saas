@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { deleteEmailIntegration } from '@/lib/email-integrations';
 import { integrationIdParamSchema } from '@/lib/validation';
-import { getAuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, requireRole } from '@/lib/auth-helpers';
 
 // DELETE /api/settings/email-integrations/[id]
 export async function DELETE(
@@ -10,7 +10,8 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId, role } = await getAuthUser();
+    requireRole(role, 'owner');
     // Validate route parameter
     const paramValidation = integrationIdParamSchema.safeParse({ id: params.id });
     if (!paramValidation.success) {
@@ -18,7 +19,7 @@ export async function DELETE(
     }
     
     const integrationId = paramValidation.data.id;
-    const deleted = await deleteEmailIntegration(integrationId, userId);
+    const deleted = await deleteEmailIntegration(integrationId, userId, tenantId);
     
     if (!deleted) {
       return createErrorResponse('Integration not found', 404);

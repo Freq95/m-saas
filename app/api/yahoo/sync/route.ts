@@ -19,7 +19,7 @@ if (!fs.existsSync(EMAIL_ATTACHMENT_DIR)) {
 export async function POST(request: NextRequest) {
   try {
     const authUser: AuthContext = await getAuthUser();
-    const { userId } = authUser;
+    const { userId, tenantId } = authUser;
     const body = await request.json();
 
     // Validate input
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     const { todayOnly, since: sinceParam, enableAiTagging, markAsRead } = validationResult.data;
 
     // Get config from database (with env fallback)
-    const config = await getYahooConfig(userId);
+    const config = await getYahooConfig(userId, tenantId);
 
     if (!config) {
       return createErrorResponse(
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     const integrationDoc = userId
       ? await db
           .collection('email_integrations')
-          .find({ user_id: userId, provider: 'yahoo', email: config.email, is_active: true })
+          .find({ user_id: userId, tenant_id: tenantId, provider: 'yahoo', email: config.email, is_active: true })
           .sort({ created_at: -1 })
           .limit(1)
           .next()
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
 
     let tagsByName: Map<string, any> | null = null;
     if (enableAiTagging) {
-      const allTags = await db.collection('tags').find({}).toArray();
+      const allTags = await db.collection('tags').find({ tenant_id: tenantId }).toArray();
       tagsByName = new Map<string, any>();
       for (const tag of allTags) {
         if (typeof tag.name === 'string') {
@@ -122,6 +122,7 @@ export async function POST(request: NextRequest) {
           const escapedEmail = emailAddress.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           const existingClient = await db.collection('clients').findOne({
             user_id: userId,
+            tenant_id: tenantId,
             email: { $regex: `^${escapedEmail}$`, $options: 'i' },
           });
           if (existingClient) {
@@ -136,7 +137,7 @@ export async function POST(request: NextRequest) {
 
         const existingConv = await db
           .collection('conversations')
-          .find({ user_id: userId, channel: 'email', contact_email: emailAddress })
+          .find({ user_id: userId, tenant_id: tenantId, channel: 'email', contact_email: emailAddress })
           .sort({ created_at: -1 })
           .limit(1)
           .next();
@@ -154,6 +155,7 @@ export async function POST(request: NextRequest) {
             _id: conversationId,
             id: conversationId,
             user_id: userId,
+            tenant_id: tenantId,
             channel: 'email',
             channel_id: email.messageId || email.uid?.toString() || '',
             contact_name: name,
@@ -172,6 +174,7 @@ export async function POST(request: NextRequest) {
             .collection('messages')
             .findOne({
               conversation_id: conversationId,
+              tenant_id: tenantId,
               $or: [
                 email.messageId ? { external_id: email.messageId } : undefined,
                 email.uid ? { source_uid: email.uid } : undefined,
@@ -211,6 +214,7 @@ export async function POST(request: NextRequest) {
                 _id: attachmentId,
                 id: attachmentId,
                 user_id: userId,
+                tenant_id: tenantId,
                 conversation_id: conversationId,
                 message_id: messageId,
                 original_filename: originalFilename,
@@ -262,6 +266,7 @@ export async function POST(request: NextRequest) {
           await db.collection('messages').insertOne({
             _id: messageId,
             id: messageId,
+            tenant_id: tenantId,
             conversation_id: conversationId,
             direction: 'inbound',
             content: serializeMessage(storedMessage),
@@ -274,14 +279,14 @@ export async function POST(request: NextRequest) {
 
           // Keep conversation fresh for sorting
           await db.collection('conversations').updateOne(
-            { id: conversationId },
+            { id: conversationId, tenant_id: tenantId },
             { $set: { updated_at: sentAtIso } }
           );
 
           // Ensure conversation is linked to client if available and missing
           if (client && !existingClientId) {
             try {
-              await linkConversationToClient(conversationId, client.id);
+              await linkConversationToClient(conversationId, client.id, tenantId);
             } catch (linkError) {
               logger.warn('Yahoo sync: Failed to link conversation to client', {
                 conversationId,
@@ -300,6 +305,7 @@ export async function POST(request: NextRequest) {
                 .map((tag: any) => ({
                   _id: `${conversationId}:${tag.id}`,
                   conversation_id: conversationId,
+                  tenant_id: tenantId,
                   tag_id: tag.id,
                 }));
 
@@ -343,7 +349,7 @@ export async function POST(request: NextRequest) {
         }
 
         await db.collection('email_integrations').updateOne(
-          { id: integrationDoc.id },
+          { id: integrationDoc.id, tenant_id: tenantId },
           { $set: setValues }
         );
       } catch (err) {
@@ -372,9 +378,9 @@ export async function POST(request: NextRequest) {
 export async function GET(_request: NextRequest) {
   try {
     const authUser: AuthContext = await getAuthUser();
-    const { userId } = authUser;
+    const { userId, tenantId } = authUser;
 
-    const config = await getYahooConfig(userId);
+    const config = await getYahooConfig(userId, tenantId);
 
     if (!config) {
       return createSuccessResponse({

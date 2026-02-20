@@ -14,7 +14,7 @@ export async function GET(
 
     const db = await getMongoDbOrThrow();
     const [user, tenant] = await Promise.all([
-      db.collection('users').findOne({ _id: invite.user_id }),
+      db.collection('users').findOne({ _id: invite.user_id, tenant_id: invite.tenant_id }),
       db.collection('tenants').findOne({ _id: invite.tenant_id }),
     ]);
 
@@ -54,6 +54,9 @@ export async function POST(
     if (!existingMember) {
       return createErrorResponse('Invite membership is no longer valid. Ask your administrator to resend invite.', 409);
     }
+    if (existingMember.status === 'removed') {
+      return createErrorResponse('This membership was revoked. Ask your administrator to resend invite.', 409);
+    }
 
     try {
       await markInviteUsed(params.token);
@@ -65,7 +68,7 @@ export async function POST(
     const nowIso = new Date().toISOString();
 
     const userUpdateResult = await db.collection('users').updateOne(
-      { _id: invite.user_id },
+      { _id: invite.user_id, tenant_id: invite.tenant_id },
       { $set: { password_hash: passwordHash, status: 'active', updated_at: nowIso } }
     );
     if (userUpdateResult.matchedCount === 0) {

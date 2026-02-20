@@ -1,7 +1,9 @@
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
+import { ObjectId } from 'mongodb';
 
 type AppointmentQuery = {
   userId?: number;
+  tenantId?: ObjectId;
   startDate?: string | Date;
   endDate?: string | Date;
   providerId?: number;
@@ -15,6 +17,7 @@ export async function getAppointmentsData(query: AppointmentQuery = {}) {
     throw new Error('userId is required');
   }
   const userId = query.userId;
+  const tenantId = query.tenantId;
   const startDate = query.startDate instanceof Date ? query.startDate.toISOString() : query.startDate;
   const endDate = query.endDate instanceof Date ? query.endDate.toISOString() : query.endDate;
   const providerId = query.providerId;
@@ -22,6 +25,9 @@ export async function getAppointmentsData(query: AppointmentQuery = {}) {
   const status = query.status;
 
   const filter: Record<string, unknown> = { user_id: userId };
+  if (tenantId) {
+    filter.tenant_id = tenantId;
+  }
   if (startDate || endDate) {
     const range: Record<string, string> = {};
     if (startDate) range.$gte = startDate;
@@ -45,7 +51,7 @@ export async function getAppointmentsData(query: AppointmentQuery = {}) {
       .sort({ start_time: 1 })
       .toArray()
       .then((docs: any[]) => docs.map(stripMongoId)),
-    db.collection('services').find({ user_id: userId }).toArray().then((docs: any[]) => docs.map(stripMongoId)),
+    db.collection('services').find(tenantId ? { user_id: userId, tenant_id: tenantId } : { user_id: userId }).toArray().then((docs: any[]) => docs.map(stripMongoId)),
   ]);
 
   const serviceById = new Map<number, any>(
@@ -63,11 +69,11 @@ export async function getAppointmentsData(query: AppointmentQuery = {}) {
   });
 }
 
-export async function getServicesData(userId: number) {
+export async function getServicesData(userId: number, tenantId?: ObjectId) {
   const db = await getMongoDbOrThrow();
   const services = await db
     .collection('services')
-    .find({ user_id: userId })
+    .find(tenantId ? { user_id: userId, tenant_id: tenantId } : { user_id: userId })
     .sort({ name: 1 })
     .toArray();
   return services.map(stripMongoId);

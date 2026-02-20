@@ -5,7 +5,7 @@ import { fetchYahooEmails } from '@/lib/yahoo-mail';
 import { logger } from '@/lib/logger';
 import { decrypt } from '@/lib/encryption';
 import { integrationIdParamSchema } from '@/lib/validation';
-import { getAuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, requireRole } from '@/lib/auth-helpers';
 
 // POST /api/settings/email-integrations/[id]/fetch-last-email
 export async function POST(
@@ -13,7 +13,8 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId, role } = await getAuthUser();
+    requireRole(role, 'owner');
     // Validate route parameter
     const paramValidation = integrationIdParamSchema.safeParse({ id: params.id });
     if (!paramValidation.success) {
@@ -22,7 +23,7 @@ export async function POST(
     
     const integrationId = paramValidation.data.id;
     // Get integration
-    const integration = await getEmailIntegrationById(integrationId, userId);
+    const integration = await getEmailIntegrationById(integrationId, userId, tenantId);
     
     if (!integration) {
       logger.warn('Integration not found for fetch email', { integrationId, userId });

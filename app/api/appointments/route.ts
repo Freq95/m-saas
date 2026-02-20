@@ -9,7 +9,7 @@ import { getAuthUser } from '@/lib/auth-helpers';
 // GET /api/appointments - Get appointments
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const searchParams = request.nextUrl.searchParams;
 
     // Validate query parameters
@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { startDate, endDate, providerId, resourceId, status } = validationResult.data;
-    const appointments = await getAppointmentsData({ userId, startDate, endDate, providerId, resourceId, status });
+    const appointments = await getAppointmentsData({ userId, tenantId, startDate, endDate, providerId, resourceId, status });
 
     return createSuccessResponse({ appointments });
   } catch (error) {
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
 // POST /api/appointments - Create appointment
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const body = await request.json();
 
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     if (endTime) {
       end = typeof endTime === 'string' ? new Date(endTime) : endTime;
     } else {
-      const serviceDoc = await db.collection('services').findOne({ id: serviceId, user_id: userId });
+      const serviceDoc = await db.collection('services').findOne({ id: serviceId, user_id: userId, tenant_id: tenantId });
       const durationMinutes = serviceDoc?.duration_minutes || 60;
       end = new Date(start);
       end.setMinutes(end.getMinutes() + durationMinutes);
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if slot is available
-    const available = await isSlotAvailable(Number(userId), start, end, {
+    const available = await isSlotAvailable(Number(userId), tenantId, start, end, {
       providerId,
       resourceId,
     });
@@ -110,6 +110,7 @@ export async function POST(request: NextRequest) {
     const { findOrCreateClient, linkAppointmentToClient } = await import('@/lib/client-matching');
     const client = await findOrCreateClient(
       userId,
+      tenantId,
       clientName,
       clientEmail,
       clientPhone
@@ -120,6 +121,7 @@ export async function POST(request: NextRequest) {
     const appointmentDoc = {
       _id: appointmentId,
       id: appointmentId,
+      tenant_id: tenantId,
       user_id: userId,
       conversation_id: conversationId || null,
       service_id: serviceId,
@@ -143,7 +145,7 @@ export async function POST(request: NextRequest) {
     await db.collection('appointments').insertOne(appointmentDoc);
 
     // Link appointment to client and update stats
-    await linkAppointmentToClient(appointmentId, client.id);
+    await linkAppointmentToClient(appointmentId, client.id, tenantId);
 
     const appointment = stripMongoId(appointmentDoc) as any;
 

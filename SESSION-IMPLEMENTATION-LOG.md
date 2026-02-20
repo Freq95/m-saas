@@ -136,5 +136,70 @@ Scope: Auth + super-admin + invite flow + audit + tenant/user lifecycle controls
     - `app/api/admin/tenants/[id]/users/route.ts`
     - `app/api/admin/tenants/[id]/resend-invite/route.ts`
   - Admin UI now shows clear notices when invite email was not sent:
-    - `app/(admin)/admin/tenants/new/CreateTenantForm.tsx`
-    - `app/(admin)/admin/tenants/[id]/TenantDetailClient.tsx`
+  - `app/(admin)/admin/tenants/new/CreateTenantForm.tsx`
+  - `app/(admin)/admin/tenants/[id]/TenantDetailClient.tsx`
+
+## 13) Phase 2 Multi-Tenancy + Role Enforcement (2026-02-20)
+- Implemented row-level tenant isolation across tenant-scoped APIs and server helpers.
+- Added and wired migration/index scripts:
+  - `scripts/migrate-add-tenant-id.ts`
+  - `scripts/create-tenant-indexes.ts`
+  - `package.json` scripts: `db:migrate:tenant`, `db:indexes`
+- Updated base migration to include tenancy collections/indexes from Phase 1:
+  - `migrations/001_init_mongodb.js` now includes `tenants`, `team_members`, `invite_tokens`.
+- Added team management APIs for MVP role rules:
+  - `app/api/team/invite/route.ts` (owner-only invite, hardcoded `staff`, seat-limit check)
+  - `app/api/team/route.ts` (owner-only team list + seat usage)
+  - `app/api/team/[memberId]/route.ts` (owner-only remove; cannot remove self/owner; soft remove)
+- Enforced owner-only clinic settings/team access for staff:
+  - Email integration settings endpoints now require owner role.
+- Added tenant scoping to affected runtime paths, including:
+  - appointments, blocked-times, calendar slots
+  - clients and nested files/notes/history/activities/export
+  - conversations and nested messages/read/attachments/images/suggest-response
+  - services, tasks, reminders, providers, resources, waitlist
+  - dashboard server queries
+  - invite token finalize flow
+  - yahoo sync and webhook email ingest paths
+- Shared helper updates to propagate `tenantId` filtering:
+  - `lib/calendar.ts`, `lib/calendar-conflicts.ts`, `lib/client-matching.ts`
+  - `lib/server/calendar.ts`, `lib/server/clients.ts`, `lib/server/client-profile.ts`
+  - `lib/server/dashboard.ts`, `lib/server/inbox.ts`
+  - `lib/email-integrations.ts`, `lib/yahoo-mail.ts`, `lib/reminders.ts`
+
+### Verification Completed
+- Build and typecheck:
+  - `npm run typecheck` passed
+  - `npm run build` passed
+- DB migration executed successfully (`npm run db:migrate:tenant`) with backfill counts confirmed.
+- Index creation executed and verified:
+  - `email_integrations` has unique `tenant_id_1_provider_1`
+  - legacy `user_id_1_provider_1` unique index removed
+- Tenant-id backfill check:
+  - `appointments`, `clients`, `conversations`, `messages`, `services`, `tasks`, `email_integrations`, `client_files` all show `missing tenant_id = 0`
+- Smoke tests:
+  - `scripts/smoke-tenant-isolation.ts` passed:
+    - Tenant A created client, Tenant B list did not leak, Tenant B direct GET returned 404
+  - `scripts/smoke-role-access.ts` passed:
+    - staff invite 403, team list 403, settings/email-integrations 403
+
+## 14) Phase 2 Post-Review Fixes (2026-02-20)
+- Fixed invite acceptance after membership removal:
+  - `app/api/invite/[token]/route.ts`
+  - Added explicit guard for `existingMember.status === 'removed'` returning `409`.
+- Fixed seat allocation guard for owner invite flow:
+  - `app/api/team/invite/route.ts`
+  - Added `maxSeats <= 0` check returning `403` ("no seat allocation"), then normal `activeMembers >= maxSeats` enforcement.
+- Updated initial Mongo migration indexes to tenant-first strategy and expanded coverage:
+  - `migrations/001_init_mongodb.js`
+  - Added missing collections/indexes for: `providers`, `resources`, `blocked_times`, `waitlist`, `message_attachments`, `audit_logs`.
+  - Converted tenant-scoped indexes to lead with `tenant_id`.
+  - Updated `email_integrations` unique index to `{ tenant_id: 1, provider: 1 }`.
+  - Updated `team_members` email index to tenant-scoped `{ tenant_id: 1, email: 1 }`.
+- Added legacy index cleanup in tenant index script:
+  - `scripts/create-tenant-indexes.ts`
+  - Drops `email_integrations.user_id_1_provider_1` if present.
+
+### Post-Review Validation
+- `npm run typecheck` passed.
+- `npm run build` passed.

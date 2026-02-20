@@ -9,8 +9,8 @@ import { getAuthUser } from '@/lib/auth-helpers';
 // GET /api/conversations - Get all conversations from storage
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = await getAuthUser();
-    const conversations = await getConversationsData(userId);
+    const { userId, tenantId } = await getAuthUser();
+    const conversations = await getConversationsData(userId, tenantId);
 
     return createSuccessResponse({ conversations });
   } catch (error) {
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
 // POST /api/conversations - Create new conversation
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const body = await request.json();
 
@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
     const conversationDoc = {
       _id: conversationId,
       id: conversationId,
+      tenant_id: tenantId,
       user_id: userId,
       channel,
       channel_id: channelId || '',
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest) {
       await db.collection('messages').insertOne({
         _id: messageId,
         id: messageId,
+        tenant_id: tenantId,
         conversation_id: conversationId,
         direction: 'inbound',
         content: initialMessage,

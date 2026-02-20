@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // GET /api/clients/[id]/activities - Get activity timeline for a client
 export async function GET(
@@ -7,24 +8,29 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
     const searchParams = request.nextUrl.searchParams;
     const type = searchParams.get('type'); // 'all' | 'notes' | 'emails' | 'tasks' | 'appointments'
 
     const activities: any[] = [];
+    const client = await db.collection('clients').findOne({ id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } });
+    if (!client) {
+      return NextResponse.json({ error: 'Client not found' }, { status: 404 });
+    }
 
     // Get notes
     if (!type || type === 'all' || type === 'notes') {
       let notes = await db
         .collection('client_notes')
-        .find({ client_id: clientId })
+        .find({ client_id: clientId, tenant_id: tenantId })
         .toArray();
 
       if (notes.length === 0) {
         notes = await db
           .collection('contact_notes')
-          .find({ contact_id: clientId })
+          .find({ contact_id: clientId, tenant_id: tenantId })
           .toArray();
       }
 
@@ -41,7 +47,7 @@ export async function GET(
     if (!type || type === 'all' || type === 'emails') {
       const conversations = await db
         .collection('conversations')
-        .find({ client_id: clientId, channel: 'email' })
+        .find({ client_id: clientId, channel: 'email', tenant_id: tenantId })
         .sort({ updated_at: -1 })
         .toArray();
 
@@ -52,7 +58,7 @@ export async function GET(
       if (conversationIds.length > 0) {
         const messages = await db
           .collection('messages')
-          .find({ conversation_id: { $in: conversationIds } })
+          .find({ conversation_id: { $in: conversationIds }, tenant_id: tenantId })
           .sort({ created_at: -1 })
           .toArray();
 
@@ -87,8 +93,8 @@ export async function GET(
     // Get appointments
     if (!type || type === 'all' || type === 'appointments') {
       const [appointments, services] = await Promise.all([
-        db.collection('appointments').find({ client_id: clientId }).sort({ start_time: -1 }).toArray(),
-        db.collection('services').find({}).toArray(),
+        db.collection('appointments').find({ client_id: clientId, tenant_id: tenantId }).sort({ start_time: -1 }).toArray(),
+        db.collection('services').find({ tenant_id: tenantId }).toArray(),
       ]);
 
       const serviceById = new Map<number, any>(
@@ -113,6 +119,7 @@ export async function GET(
       const tasks = await db
         .collection('tasks')
         .find({
+          tenant_id: tenantId,
           $or: [{ client_id: clientId }, { contact_id: clientId }],
         })
         .sort({ due_date: -1, created_at: -1 })

@@ -14,6 +14,11 @@ export async function POST(request: NextRequest) {
     if (!Number.isFinite(normalizedUserId) || normalizedUserId <= 0) {
       throw new Error('Webhook payload must include a valid numeric userId');
     }
+    const userDoc = await db.collection('users').findOne({ id: normalizedUserId });
+    if (!userDoc?.tenant_id) {
+      throw new Error('Webhook user has no tenant');
+    }
+    const tenantId = userDoc.tenant_id;
 
     // Extract contact info
     const emailMatch = from.match(/<(.+)>/);
@@ -27,6 +32,7 @@ export async function POST(request: NextRequest) {
     const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const existingClientDoc = await db.collection('clients').findOne({
       user_id: normalizedUserId,
+      tenant_id: tenantId,
       email: { $regex: `^${escapedEmail}$`, $options: 'i' },
     });
     if (existingClientDoc) {
@@ -35,7 +41,7 @@ export async function POST(request: NextRequest) {
 
     const existingConv = await db
       .collection('conversations')
-      .find({ user_id: normalizedUserId, channel: 'email', contact_email: email })
+      .find({ user_id: normalizedUserId, tenant_id: tenantId, channel: 'email', contact_email: email })
       .sort({ created_at: -1 })
       .limit(1)
       .next();
@@ -46,7 +52,7 @@ export async function POST(request: NextRequest) {
       conversationId = existingConv.id;
       // Link to client if a matching client was found and conversation isn't linked yet
       if (!existingConv.client_id && clientId) {
-        await linkConversationToClient(conversationId, clientId);
+        await linkConversationToClient(conversationId, clientId, tenantId);
       }
     } else {
       const now = new Date().toISOString();
@@ -55,6 +61,7 @@ export async function POST(request: NextRequest) {
         _id: conversationId,
         id: conversationId,
         user_id: normalizedUserId,
+        tenant_id: tenantId,
         channel: 'email',
         contact_name: name,
         contact_email: email,
@@ -64,7 +71,7 @@ export async function POST(request: NextRequest) {
         updated_at: now,
       });
       if (clientId) {
-        await linkConversationToClient(conversationId, clientId);
+        await linkConversationToClient(conversationId, clientId, tenantId);
       }
     }
 
@@ -74,6 +81,7 @@ export async function POST(request: NextRequest) {
     await db.collection('messages').insertOne({
       _id: messageId,
       id: messageId,
+      tenant_id: tenantId,
       conversation_id: conversationId,
       direction: 'inbound',
       content,
@@ -85,7 +93,7 @@ export async function POST(request: NextRequest) {
     // Auto-tag
     const suggestedTags = await suggestTags(content);
     if (suggestedTags.length > 0) {
-      const allTags = await db.collection('tags').find({}).toArray();
+      const allTags = await db.collection('tags').find({ tenant_id: tenantId }).toArray();
       const tagsByName = new Map<string, any>();
       for (const tag of allTags) {
         if (typeof tag.name === 'string') {
@@ -99,6 +107,7 @@ export async function POST(request: NextRequest) {
         .map((tag: any) => ({
           _id: `${conversationId}:${tag.id}`,
           conversation_id: conversationId,
+          tenant_id: tenantId,
           tag_id: tag.id,
         }));
 

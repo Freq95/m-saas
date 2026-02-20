@@ -10,13 +10,13 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const clientId = parseInt(params.id);
     if (isNaN(clientId) || clientId <= 0) {
       return createErrorResponse('Invalid client ID', 400);
     }
 
-    const profile = await getClientProfileData(clientId, userId);
+    const profile = await getClientProfileData(clientId, tenantId, userId);
     if (!profile) {
       return createErrorResponse('Client not found', 404);
     }
@@ -38,13 +38,14 @@ export async function PATCH(
     if (isNaN(clientId) || clientId <= 0) {
       return createErrorResponse('Invalid client ID', 400);
     }
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const body = await request.json();
 
     // Verify client exists and belongs to this user before updating
     const existing = await db.collection('clients').findOne({
       id: clientId,
       user_id: userId,
+      tenant_id: tenantId,
       deleted_at: { $exists: false },
     });
     if (!existing) {
@@ -85,13 +86,14 @@ export async function PATCH(
     updates.updated_at = new Date().toISOString();
 
     await db.collection('clients').updateOne(
-      { id: clientId, user_id: userId, deleted_at: { $exists: false } },
+      { id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } },
       { $set: updates }
     );
 
     const result = await db.collection('clients').findOne({
       id: clientId,
       user_id: userId,
+      tenant_id: tenantId,
       deleted_at: { $exists: false },
     });
     if (!result) {
@@ -118,12 +120,13 @@ export async function DELETE(
       return createErrorResponse('Invalid client ID', 400);
     }
 
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
 
     // Verify client exists and belongs to this user
     const existing = await db.collection('clients').findOne({
       id: clientId,
       user_id: userId,
+      tenant_id: tenantId,
       deleted_at: { $exists: false },
     });
     if (!existing) {
@@ -132,7 +135,7 @@ export async function DELETE(
 
     // Soft delete using timestamp and cleanup legacy fields
     const result = await db.collection('clients').updateOne(
-      { id: clientId, user_id: userId, deleted_at: { $exists: false } },
+      { id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } },
       {
         $set: { deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() },
         $unset: { status: '', source: '' },

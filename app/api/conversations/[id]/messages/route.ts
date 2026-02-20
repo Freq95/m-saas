@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
 import { getYahooConfig, sendYahooEmail } from '@/lib/yahoo-mail';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // POST /api/conversations/[id]/messages - Send message
 export async function POST(
@@ -9,6 +10,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const conversationId = parseInt(params.id);
     const body = await request.json();
@@ -23,7 +25,7 @@ export async function POST(
     const { content, direction } = validationResult.data;
 
     // Get conversation to check channel
-    const conversationDoc = await db.collection('conversations').findOne({ id: conversationId });
+    const conversationDoc = await db.collection('conversations').findOne({ id: conversationId, tenant_id: tenantId, user_id: userId });
 
     if (!conversationDoc) {
       return createErrorResponse('Conversation not found', 404);
@@ -37,6 +39,7 @@ export async function POST(
     const newMessage = {
       _id: messageId,
       id: messageId,
+      tenant_id: tenantId,
       conversation_id: conversationId,
       direction,
       content,
@@ -50,7 +53,7 @@ export async function POST(
     // If it's an outbound email message, send via Yahoo
     if (direction === 'outbound' && conversation.channel === 'email' && conversation.contact_email) {
       try {
-        const yahooConfig = await getYahooConfig(Number(conversation.user_id));
+        const yahooConfig = await getYahooConfig(Number(conversation.user_id), conversation.tenant_id);
         if (yahooConfig) {
           await sendYahooEmail(
             yahooConfig,
@@ -68,7 +71,7 @@ export async function POST(
 
     // Update conversation updated_at
     await db.collection('conversations').updateOne(
-      { id: conversationId },
+      { id: conversationId, tenant_id: tenantId, user_id: userId },
       { $set: { updated_at: now } }
     );
     return createSuccessResponse({ message: stripMongoId(newMessage) }, 201);

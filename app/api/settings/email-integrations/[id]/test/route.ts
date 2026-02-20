@@ -4,7 +4,7 @@ import { getEmailIntegrationById, getEmailIntegrationConfig } from '@/lib/email-
 import { fetchYahooEmails } from '@/lib/yahoo-mail';
 import { logger } from '@/lib/logger';
 import { integrationIdParamSchema } from '@/lib/validation';
-import { getAuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, requireRole } from '@/lib/auth-helpers';
 
 // POST /api/settings/email-integrations/[id]/test
 export async function POST(
@@ -12,7 +12,8 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId, role } = await getAuthUser();
+    requireRole(role, 'owner');
     // Validate route parameter
     const paramValidation = integrationIdParamSchema.safeParse({ id: params.id });
     if (!paramValidation.success) {
@@ -21,7 +22,7 @@ export async function POST(
     
     const integrationId = paramValidation.data.id;
     // Get integration to check provider
-    const integration = await getEmailIntegrationById(integrationId, userId);
+    const integration = await getEmailIntegrationById(integrationId, userId, tenantId);
     
     if (!integration) {
       logger.warn('Integration not found for test', { integrationId, userId });

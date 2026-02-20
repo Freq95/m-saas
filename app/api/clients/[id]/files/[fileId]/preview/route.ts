@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import * as fs from 'fs';
 import { handleApiError, createErrorResponse } from '@/lib/error-handler';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // GET /api/clients/[id]/files/[fileId]/preview - Preview a file in browser
 export async function GET(
@@ -9,13 +10,19 @@ export async function GET(
   { params }: { params: { id: string; fileId: string } }
 ) {
   try {
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const fileId = parseInt(params.fileId);
     const clientId = parseInt(params.id);
 
-    let file = await db.collection('client_files').findOne({ id: fileId, client_id: clientId });
+    const client = await db.collection('clients').findOne({ id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } });
+    if (!client) {
+      return createErrorResponse('Client not found', 404);
+    }
+
+    let file = await db.collection('client_files').findOne({ id: fileId, client_id: clientId, tenant_id: tenantId });
     if (!file) {
-      file = await db.collection('contact_files').findOne({ id: fileId, contact_id: clientId });
+      file = await db.collection('contact_files').findOne({ id: fileId, contact_id: clientId, tenant_id: tenantId });
     }
 
     if (!file) {

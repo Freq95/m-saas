@@ -1,9 +1,11 @@
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { DEFAULT_PAGE_SIZE } from '@/lib/constants';
 import type { Client as ClientType } from '@/lib/types';
+import { ObjectId } from 'mongodb';
 
 type ClientsQuery = {
   userId?: number;
+  tenantId?: ObjectId;
   search?: string;
   sortBy?: string;
   sortOrder?: string;
@@ -28,7 +30,11 @@ export async function getClientsData(query: ClientsQuery = {}): Promise<ClientsR
   if (!query.userId) {
     throw new Error('userId is required');
   }
+  if (!query.tenantId) {
+    throw new Error('tenantId is required');
+  }
   const userId = query.userId;
+  const tenantId = query.tenantId;
   const search = query.search ?? '';
   const sortBy = query.sortBy ?? 'last_activity_date';
   const sortOrder = query.sortOrder ?? 'DESC';
@@ -38,6 +44,7 @@ export async function getClientsData(query: ClientsQuery = {}): Promise<ClientsR
 
   const filter: Record<string, unknown> = {
     user_id: userId,
+    tenant_id: tenantId,
     // Always exclude soft-deleted clients
     deleted_at: { $exists: false },
   };

@@ -4,6 +4,7 @@
  */
 
 import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from './db/mongo-utils';
+import { ObjectId } from 'mongodb';
 
 export interface Client {
   id: number;
@@ -53,6 +54,7 @@ function normalizeClientDoc(doc: any): Client {
  */
 export async function findOrCreateClient(
   userId: number,
+  tenantId: ObjectId,
   name: string,
   email?: string,
   phone?: string
@@ -68,6 +70,7 @@ export async function findOrCreateClient(
   if (normalizedEmail) {
     const escaped = normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const client = await db.collection('clients').findOne({
+      tenant_id: tenantId,
       user_id: userId,
       deleted_at: { $exists: false },
       email: { $regex: `^${escaped}$`, $options: 'i' },
@@ -79,6 +82,7 @@ export async function findOrCreateClient(
 
   if (!existingClient && normalizedPhone) {
     const client = await db.collection('clients').findOne({
+      tenant_id: tenantId,
       user_id: userId,
       deleted_at: { $exists: false },
       phone: normalizedPhone,
@@ -106,10 +110,10 @@ export async function findOrCreateClient(
     if (Object.keys(updates).length > 0) {
       updates.updated_at = new Date().toISOString();
       await db.collection('clients').updateOne(
-        { id: existingClient.id },
+        { id: existingClient.id, tenant_id: tenantId },
         { $set: updates }
       );
-      const updated = await db.collection('clients').findOne({ id: existingClient.id });
+      const updated = await db.collection('clients').findOne({ id: existingClient.id, tenant_id: tenantId });
       if (updated) {
         existingClient = normalizeClientDoc(updated);
       }
@@ -123,6 +127,7 @@ export async function findOrCreateClient(
   const newClientDoc = {
     _id: newClientId,
     id: newClientId,
+    tenant_id: tenantId,
     user_id: userId,
     name: normalizedName,
     email: normalizedEmail,
@@ -146,16 +151,16 @@ export async function findOrCreateClient(
  * Update client statistics
  * Call this when appointments are created/completed
  */
-export async function updateClientStats(clientId: number): Promise<void> {
+export async function updateClientStats(clientId: number, tenantId: ObjectId): Promise<void> {
   const db = await getMongoDbOrThrow();
 
-  const client = await db.collection('clients').findOne({ id: clientId, deleted_at: { $exists: false } });
+  const client = await db.collection('clients').findOne({ id: clientId, tenant_id: tenantId, deleted_at: { $exists: false } });
   if (!client) return;
 
   const [appointments, services, conversations] = await Promise.all([
-    db.collection('appointments').find({ client_id: clientId }).toArray(),
-    db.collection('services').find({}).toArray(),
-    db.collection('conversations').find({ client_id: clientId }).toArray(),
+    db.collection('appointments').find({ client_id: clientId, tenant_id: tenantId }).toArray(),
+    db.collection('services').find({ tenant_id: tenantId }).toArray(),
+    db.collection('conversations').find({ client_id: clientId, tenant_id: tenantId }).toArray(),
   ]);
 
   const serviceById = new Map<number, any>(
@@ -188,7 +193,7 @@ export async function updateClientStats(clientId: number): Promise<void> {
     : null;
 
   await db.collection('clients').updateOne(
-    { id: clientId, deleted_at: { $exists: false } },
+    { id: clientId, tenant_id: tenantId, deleted_at: { $exists: false } },
     {
       $set: {
         total_spent: totalSpent,
@@ -207,16 +212,17 @@ export async function updateClientStats(clientId: number): Promise<void> {
  */
 export async function linkConversationToClient(
   conversationId: number,
-  clientId: number
+  clientId: number,
+  tenantId: ObjectId
 ): Promise<void> {
   const db = await getMongoDbOrThrow();
 
   await db.collection('conversations').updateOne(
-    { id: conversationId },
+    { id: conversationId, tenant_id: tenantId },
     { $set: { client_id: clientId, updated_at: new Date().toISOString() } }
   );
 
-  await updateClientStats(clientId);
+  await updateClientStats(clientId, tenantId);
 }
 
 /**
@@ -224,16 +230,17 @@ export async function linkConversationToClient(
  */
 export async function linkAppointmentToClient(
   appointmentId: number,
-  clientId: number
+  clientId: number,
+  tenantId: ObjectId
 ): Promise<void> {
   const db = await getMongoDbOrThrow();
 
   await db.collection('appointments').updateOne(
-    { id: appointmentId },
+    { id: appointmentId, tenant_id: tenantId },
     { $set: { client_id: clientId, updated_at: new Date().toISOString() } }
   );
 
-  await updateClientStats(clientId);
+  await updateClientStats(clientId, tenantId);
 }
 
 /**
@@ -249,6 +256,7 @@ export interface ClientSegments {
 
 export async function getClientSegments(
   userId: number,
+  tenantId: ObjectId,
   options: {
     vipThreshold?: number; // Default: 1000 RON
     inactiveDays?: number; // Default: 30 days
@@ -271,6 +279,7 @@ export async function getClientSegments(
   newDate.setDate(newDate.getDate() - newDays);
 
   const clients: Client[] = (await db.collection('clients').find({
+    tenant_id: tenantId,
     user_id: userId,
     deleted_at: { $exists: false },
   }).toArray())
@@ -299,6 +308,7 @@ export async function getClientSegments(
     .sort((a: Client, b: Client) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   const appointmentRows = await db.collection('appointments').find({
+    tenant_id: tenantId,
     user_id: userId,
     status: { $in: ['scheduled', 'completed'] },
     client_id: { $ne: null },

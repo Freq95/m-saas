@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow, getNextNumericId } from '@/lib/db/mongo-utils';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 function toDate(value: unknown): Date | null {
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
@@ -18,16 +19,16 @@ function overlapsRange(startA: Date, endA: Date, startB: Date, endB: Date): bool
 // GET /api/blocked-times - Get blocked times for a date range
 export async function GET(request: NextRequest) {
   try {
+    const { userId, tenantId } = await getAuthUser();
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
     const providerId = searchParams.get('providerId');
     const resourceId = searchParams.get('resourceId');
 
-    if (!userId || !startDate || !endDate) {
+    if (!startDate || !endDate) {
       return NextResponse.json(
-        { error: 'userId, startDate, and endDate are required' },
+        { error: 'startDate and endDate are required' },
         { status: 400 }
       );
     }
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
 
     const blockedTimes = await db
       .collection('blocked_times')
-      .find({ user_id: userIdNumber })
+      .find({ user_id: userIdNumber, tenant_id: tenantId })
       .sort({ start_time: 1 })
       .toArray();
 
@@ -87,12 +88,13 @@ export async function GET(request: NextRequest) {
 // POST /api/blocked-times - Create a blocked time
 export async function POST(request: NextRequest) {
   try {
+    const { userId, tenantId } = await getAuthUser();
     const body = await request.json();
-    const { userId, providerId, resourceId, startTime, endTime, reason, recurrence } = body;
+    const { providerId, resourceId, startTime, endTime, reason, recurrence } = body;
 
-    if (!userId || !startTime || !endTime || !reason) {
+    if (!startTime || !endTime || !reason) {
       return NextResponse.json(
-        { error: 'userId, startTime, endTime, and reason are required' },
+        { error: 'startTime, endTime, and reason are required' },
         { status: 400 }
       );
     }
@@ -126,6 +128,7 @@ export async function POST(request: NextRequest) {
     const blockedTime: any = {
       _id: nextId,
       id: nextId,
+      tenant_id: tenantId,
       user_id: userIdNumber,
       start_time: startDateObj.toISOString(),
       end_time: endDateObj.toISOString(),

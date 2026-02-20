@@ -1,17 +1,22 @@
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { parseStoredMessage } from '@/lib/email-types';
+import { ObjectId } from 'mongodb';
 
 type MessagePagination = {
   userId?: number;
+  tenantId?: ObjectId;
   limit?: number;
   offset?: number;
   beforeId?: number;
 };
 
-export async function getConversationsData(userId: number) {
+export async function getConversationsData(userId: number, tenantId?: ObjectId) {
   const db = await getMongoDbOrThrow();
 
   const conversationFilter: Record<string, unknown> = { user_id: userId };
+  if (tenantId) {
+    conversationFilter.tenant_id = tenantId;
+  }
 
   const conversations = (await db
     .collection('conversations')
@@ -28,14 +33,14 @@ export async function getConversationsData(userId: number) {
   const [allMessages, allTags, allConvTags] = await Promise.all([
     db
       .collection('messages')
-      .find({ conversation_id: { $in: conversationIds } })
+      .find(tenantId ? { conversation_id: { $in: conversationIds }, tenant_id: tenantId } : { conversation_id: { $in: conversationIds } })
       .sort({ sent_at: -1, created_at: -1 })
       .toArray()
       .then((docs: any[]) => docs.map(stripMongoId)),
-    db.collection('tags').find({}).toArray().then((docs: any[]) => docs.map(stripMongoId)),
+    db.collection('tags').find(tenantId ? { tenant_id: tenantId } : {}).toArray().then((docs: any[]) => docs.map(stripMongoId)),
     db
       .collection('conversation_tags')
-      .find({ conversation_id: { $in: conversationIds } })
+      .find(tenantId ? { conversation_id: { $in: conversationIds }, tenant_id: tenantId } : { conversation_id: { $in: conversationIds } })
       .toArray()
       .then((docs: any[]) => docs.map(stripMongoId)),
   ]);
@@ -102,6 +107,9 @@ export async function getConversationMessagesData(
   if (typeof pagination.userId === 'number') {
     conversationFilter.user_id = pagination.userId;
   }
+  if (pagination.tenantId) {
+    conversationFilter.tenant_id = pagination.tenantId;
+  }
   const conversationDoc = await db.collection('conversations').findOne(conversationFilter);
   const conversation = conversationDoc ? stripMongoId(conversationDoc) : null;
 
@@ -121,6 +129,9 @@ export async function getConversationMessagesData(
   const messageFilter: Record<string, unknown> = {
     conversation_id: conversationId,
   };
+  if (pagination.tenantId) {
+    messageFilter.tenant_id = pagination.tenantId;
+  }
   if (beforeId) {
     messageFilter.id = { $lt: beforeId };
   }
@@ -164,6 +175,7 @@ export async function getConversationMessagesData(
         .collection('message_attachments')
         .find({
           conversation_id: conversationId,
+          tenant_id: pagination.tenantId,
           id: { $in: attachmentIds },
         })
         .toArray(),
@@ -171,6 +183,7 @@ export async function getConversationMessagesData(
         .collection('client_files')
         .find({
           source_type: 'conversation_attachment',
+          tenant_id: pagination.tenantId,
           source_conversation_id: conversationId,
           source_attachment_id: { $in: attachmentIds },
         })
@@ -239,6 +252,7 @@ export async function getConversationMessagesData(
       .collection('client_files')
       .find({
         source_type: 'conversation_inline_image',
+        tenant_id: pagination.tenantId,
         source_conversation_id: conversationId,
         source_message_id: { $in: messageIds },
       })

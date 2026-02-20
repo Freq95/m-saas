@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { ObjectId } from 'mongodb';
 
 // Validation schema
 const updateReminderSchema = z.object({
@@ -11,9 +12,9 @@ const updateReminderSchema = z.object({
   sentAt: z.string().datetime().optional(),
 });
 
-async function getReminderWithAppointment(reminderId: number, userId?: number) {
+async function getReminderWithAppointment(reminderId: number, tenantId: ObjectId, userId?: number) {
   const db = await getMongoDbOrThrow();
-  const reminderFilter: Record<string, unknown> = { id: reminderId };
+  const reminderFilter: Record<string, unknown> = { id: reminderId, tenant_id: tenantId };
   if (typeof userId === 'number') {
     reminderFilter.user_id = userId;
   }
@@ -22,6 +23,7 @@ async function getReminderWithAppointment(reminderId: number, userId?: number) {
   const appointment = await db.collection('appointments').findOne({
     id: reminder.appointment_id,
     user_id: reminder.user_id,
+    tenant_id: tenantId,
   });
   return {
     ...stripMongoId(reminder),
@@ -38,7 +40,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const reminderId = parseInt(params.id);
 
     // Validate ID
@@ -46,7 +48,7 @@ export async function GET(
       return createErrorResponse('Invalid reminder ID', 400);
     }
 
-    const reminder = await getReminderWithAppointment(reminderId, userId);
+    const reminder = await getReminderWithAppointment(reminderId, tenantId, userId);
     if (!reminder) {
       return createErrorResponse('Reminder not found', 404);
     }
@@ -63,7 +65,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const reminderId = parseInt(params.id);
     const body = await request.json();
@@ -86,7 +88,7 @@ export async function PATCH(
     }
 
     // Check if reminder exists
-    const existing = await db.collection('reminders').findOne({ id: reminderId, user_id: userId });
+    const existing = await db.collection('reminders').findOne({ id: reminderId, user_id: userId, tenant_id: tenantId });
     if (!existing) {
       return createErrorResponse('Not found or not authorized', 404);
     }
@@ -99,7 +101,7 @@ export async function PATCH(
     if (Object.keys(updates).length > 0) {
       updates.updated_at = new Date().toISOString();
       const result = await db.collection('reminders').updateOne(
-        { id: reminderId, user_id: userId },
+        { id: reminderId, user_id: userId, tenant_id: tenantId },
         { $set: updates }
       );
       if (result.matchedCount === 0) {
@@ -107,7 +109,7 @@ export async function PATCH(
       }
     }
 
-    const reminder = await getReminderWithAppointment(reminderId, userId);
+    const reminder = await getReminderWithAppointment(reminderId, tenantId, userId);
 
     return createSuccessResponse({
       success: true,
@@ -124,7 +126,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const reminderId = parseInt(params.id);
 
@@ -133,12 +135,12 @@ export async function DELETE(
       return createErrorResponse('Invalid reminder ID', 400);
     }
 
-    const existing = await db.collection('reminders').findOne({ id: reminderId, user_id: userId });
+    const existing = await db.collection('reminders').findOne({ id: reminderId, user_id: userId, tenant_id: tenantId });
     if (!existing) {
       return createErrorResponse('Not found or not authorized', 404);
     }
 
-    const result = await db.collection('reminders').deleteOne({ id: reminderId, user_id: userId });
+    const result = await db.collection('reminders').deleteOne({ id: reminderId, user_id: userId, tenant_id: tenantId });
     if (result.deletedCount === 0) {
       return createErrorResponse('Not found or not authorized', 404);
     }

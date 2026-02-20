@@ -6,6 +6,7 @@
 import Imap from 'imap';
 import { simpleParser } from 'mailparser';
 import nodemailer from 'nodemailer';
+import { ObjectId } from 'mongodb';
 
 interface YahooConfig {
   email: string;
@@ -116,12 +117,13 @@ function extractAttachments(parsed: any): EmailAttachment[] {
  * Get Yahoo Mail configuration from database or environment (fallback)
  * @param userId - User ID to fetch from database. If not provided, uses environment variables.
  */
-export async function getYahooConfig(userId?: number): Promise<YahooConfig | null> {
+export async function getYahooConfig(userId?: number, tenantId?: ObjectId): Promise<YahooConfig | null> {
   // Try database first if userId is provided
   if (userId) {
     try {
       const { getEmailIntegrationConfig } = await import('./email-integrations');
-      const config = await getEmailIntegrationConfig(userId, 'yahoo');
+      if (!tenantId) return null;
+      const config = await getEmailIntegrationConfig(userId, tenantId, 'yahoo');
       
       if (config && config.password) {
         return {

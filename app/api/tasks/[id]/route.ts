@@ -9,7 +9,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const taskId = parseInt(params.id);
 
@@ -18,7 +18,7 @@ export async function GET(
       return createErrorResponse('Invalid task ID', 400);
     }
 
-    const task = await db.collection('tasks').findOne({ id: taskId, user_id: userId });
+    const task = await db.collection('tasks').findOne({ id: taskId, user_id: userId, tenant_id: tenantId });
 
     if (!task) {
       return createErrorResponse('Task not found', 404);
@@ -36,7 +36,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const taskId = parseInt(params.id);
 
@@ -70,14 +70,14 @@ export async function PATCH(
     updates.updated_at = new Date().toISOString();
 
     const updateResult = await db.collection('tasks').updateOne(
-      { id: taskId, user_id: userId },
+      { id: taskId, user_id: userId, tenant_id: tenantId },
       { $set: updates }
     );
     if (updateResult.matchedCount === 0) {
       return createErrorResponse('Not found or not authorized', 404);
     }
 
-    const task = await db.collection('tasks').findOne({ id: taskId, user_id: userId });
+    const task = await db.collection('tasks').findOne({ id: taskId, user_id: userId, tenant_id: tenantId });
     if (!task) {
       return createErrorResponse('Not found or not authorized', 404);
     }
@@ -93,7 +93,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const taskId = parseInt(params.id);
 
@@ -102,7 +102,7 @@ export async function DELETE(
       return createErrorResponse('Invalid task ID', 400);
     }
 
-    const result = await db.collection('tasks').deleteOne({ id: taskId, user_id: userId });
+    const result = await db.collection('tasks').deleteOne({ id: taskId, user_id: userId, tenant_id: tenantId });
     if (result.deletedCount === 0) {
       return createErrorResponse('Not found or not authorized', 404);
     }

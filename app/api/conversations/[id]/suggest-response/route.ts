@@ -14,7 +14,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const conversationId = parseInt(params.id);
 
@@ -24,7 +24,7 @@ export async function GET(
     }
 
     // Get conversation
-    const convDoc = await db.collection('conversations').findOne({ id: conversationId, user_id: userId });
+    const convDoc = await db.collection('conversations').findOne({ id: conversationId, user_id: userId, tenant_id: tenantId });
     if (!convDoc) {
       return createErrorResponse('Conversation not found', 404);
     }
@@ -32,7 +32,7 @@ export async function GET(
     // Get last message from conversation
     const lastMessageDoc = await db
       .collection('messages')
-      .find({ conversation_id: conversationId })
+      .find({ conversation_id: conversationId, tenant_id: tenantId })
       .sort({ sent_at: -1, created_at: -1, id: -1 })
       .limit(1)
       .next();
@@ -46,7 +46,7 @@ export async function GET(
     // Get available time slots for appointment suggestions
     let availableSlots: Array<{ start: string; end: string }> = [];
     try {
-      const slots = await getSuggestedSlots(userId, 60, 7); // 60 min default, next 7 days
+      const slots = await getSuggestedSlots(userId, tenantId, 60, 7); // 60 min default, next 7 days
       availableSlots = slots
         .flatMap(s => s.slots.filter(slot => slot.available))
         .slice(0, 3)

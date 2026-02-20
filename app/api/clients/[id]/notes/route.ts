@@ -9,7 +9,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
 
@@ -18,16 +18,21 @@ export async function GET(
       return createErrorResponse('Invalid client ID', 400);
     }
 
+    const client = await db.collection('clients').findOne({ id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } });
+    if (!client) {
+      return createErrorResponse('Client not found', 404);
+    }
+
     let notes = await db
       .collection('client_notes')
-      .find({ client_id: clientId, user_id: userId })
+      .find({ client_id: clientId, user_id: userId, tenant_id: tenantId })
       .sort({ created_at: -1 })
       .toArray();
 
     if (notes.length === 0) {
       notes = await db
         .collection('contact_notes')
-        .find({ contact_id: clientId, user_id: userId })
+        .find({ contact_id: clientId, user_id: userId, tenant_id: tenantId })
         .sort({ created_at: -1 })
         .toArray();
     }
@@ -44,13 +49,18 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
 
     // Validate ID
     if (isNaN(clientId) || clientId <= 0) {
       return createErrorResponse('Invalid client ID', 400);
+    }
+
+    const client = await db.collection('clients').findOne({ id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } });
+    if (!client) {
+      return createErrorResponse('Client not found', 404);
     }
 
     const body = await request.json();
@@ -69,6 +79,7 @@ export async function POST(
     const noteDoc = {
       _id: noteId,
       id: noteId,
+      tenant_id: tenantId,
       client_id: clientId,
       user_id: userId,
       content,
@@ -80,7 +91,7 @@ export async function POST(
 
     // Update client's last_activity_date
     await db.collection('clients').updateOne(
-      { id: clientId, user_id: userId },
+      { id: clientId, user_id: userId, tenant_id: tenantId },
       { $set: { last_activity_date: now, updated_at: now } }
     );
     return createSuccessResponse({ note: stripMongoId(noteDoc) }, 201);

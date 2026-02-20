@@ -1,17 +1,19 @@
 import { NextRequest } from 'next/server';
 import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // GET /api/tasks - Get tasks for a client or user
 export async function GET(request: NextRequest) {
   try {
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const searchParams = request.nextUrl.searchParams;
 
     // Validate query parameters
     const { tasksQuerySchema } = await import('@/lib/validation');
     const queryParams = {
-      userId: searchParams.get('userId') || '1',
+      userId: String(userId),
       contactId: searchParams.get('contactId') || undefined,
       status: searchParams.get('status') || undefined,
     };
@@ -21,14 +23,11 @@ export async function GET(request: NextRequest) {
       return handleApiError(validationResult.error, 'Invalid query parameters');
     }
 
-    const { userId, contactId, status } = validationResult.data;
+    const { contactId, status } = validationResult.data;
 
-    const filter: Record<string, any> = {};
+    const filter: Record<string, any> = { user_id: userId, tenant_id: tenantId };
     if (contactId) {
       filter.$or = [{ client_id: contactId }, { contact_id: contactId }];
-    }
-    if (userId) {
-      filter.user_id = userId;
     }
     if (status) {
       filter.status = status;
@@ -49,13 +48,14 @@ export async function GET(request: NextRequest) {
 // POST /api/tasks - Create a new task
 export async function POST(request: NextRequest) {
   try {
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const body = await request.json();
 
-    const { userId, contactId, title, description, dueDate, status, priority } = body;
+    const { contactId, title, description, dueDate, status, priority } = body;
 
-    if (!userId || !title) {
-      return createErrorResponse('userId and title are required', 400);
+    if (!title) {
+      return createErrorResponse('title is required', 400);
     }
 
     const now = new Date().toISOString();
@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
     const taskDoc = {
       _id: taskId,
       id: taskId,
+      tenant_id: tenantId,
       user_id: userId,
       client_id: contactId || null,
       contact_id: contactId || null,

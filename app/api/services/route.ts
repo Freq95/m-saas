@@ -7,8 +7,8 @@ import { getAuthUser } from '@/lib/auth-helpers';
 // GET /api/services - Get services
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = await getAuthUser();
-    const services = await getServicesData(userId);
+    const { userId, tenantId } = await getAuthUser();
+    const services = await getServicesData(userId, tenantId);
 
     return createSuccessResponse({ services });
   } catch (error) {
@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
 // POST /api/services - Create service
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const body = await request.json();
 
@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
     const serviceDoc = {
       _id: serviceId,
       id: serviceId,
+      tenant_id: tenantId,
       user_id: userId,
       name,
       duration_minutes: durationMinutes,

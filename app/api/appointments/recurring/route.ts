@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow, getNextNumericId } from '@/lib/db/mongo-utils';
 import { checkAppointmentConflict } from '@/lib/calendar-conflicts';
 import type { RecurrenceRule } from '@/lib/types/calendar';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // Cleanup classification: feature-flagged (advanced scheduling domain, no core UI dependency).
 // POST /api/appointments/recurring - Create recurring appointments
 export async function POST(request: NextRequest) {
   try {
+    const { userId, tenantId } = await getAuthUser();
     const body = await request.json();
     const {
-      userId,
       serviceId,
       clientName,
       clientEmail,
@@ -22,9 +23,9 @@ export async function POST(request: NextRequest) {
       recurrence,
     } = body;
 
-    if (!userId || !serviceId || !clientName || !startTime || !endTime || !recurrence) {
+    if (!serviceId || !clientName || !startTime || !endTime || !recurrence) {
       return NextResponse.json(
-        { error: 'userId, serviceId, clientName, startTime, endTime, and recurrence are required' },
+        { error: 'serviceId, clientName, startTime, endTime, and recurrence are required' },
         { status: 400 }
       );
     }
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest) {
     const conflicts: any[] = [];
 
     // Get service details
-    const service = await db.collection('services').findOne({ id: normalizedServiceId });
+    const service = await db.collection('services').findOne({ id: normalizedServiceId, tenant_id: tenantId });
     const serviceName = service?.name || 'Unknown Service';
 
     // Create each instance
@@ -84,6 +85,7 @@ export async function POST(request: NextRequest) {
       // Check for conflicts
       const conflictCheck = await checkAppointmentConflict(
         normalizedUserId,
+        tenantId,
         normalizedProviderId,
         normalizedResourceId,
         instance.start,
@@ -104,6 +106,7 @@ export async function POST(request: NextRequest) {
       const appointment: any = {
         id: nextId,
         _id: nextId,
+        tenant_id: tenantId,
         user_id: normalizedUserId,
         service_id: normalizedServiceId,
         service_name: serviceName,

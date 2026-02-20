@@ -6,10 +6,12 @@
 import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from './db/mongo-utils';
 import { encrypt, decrypt } from './encryption';
 import { logger } from './logger';
+import { ObjectId } from 'mongodb';
 
 export interface EmailIntegration {
   id: number;
   user_id: number;
+  tenant_id: ObjectId;
   provider: 'yahoo' | 'gmail' | 'outlook';
   email: string;
   encrypted_password?: string;
@@ -38,6 +40,7 @@ function normalizeEmailIntegration(doc: any): EmailIntegration {
  */
 export async function getEmailIntegrationConfig(
   userId: number,
+  tenantId: ObjectId | undefined,
   provider: 'yahoo' | 'gmail' | 'outlook'
 ): Promise<EmailIntegrationConfig | null> {
   const db = await getMongoDbOrThrow();
@@ -45,7 +48,9 @@ export async function getEmailIntegrationConfig(
   try {
     const integration = await db
       .collection('email_integrations')
-      .find({ user_id: userId, provider, is_active: true })
+      .find(tenantId
+        ? { user_id: userId, tenant_id: tenantId, provider, is_active: true }
+        : { user_id: userId, provider, is_active: true })
       .sort({ created_at: -1 })
       .limit(1)
       .next();
@@ -96,6 +101,7 @@ export async function getEmailIntegrationConfig(
  */
 export async function saveEmailIntegration(
   userId: number,
+  tenantId: ObjectId | undefined,
   provider: 'yahoo' | 'gmail' | 'outlook',
   email: string,
   password?: string,
@@ -109,6 +115,7 @@ export async function saveEmailIntegration(
 
     const existing = await db.collection('email_integrations').findOne({
       user_id: userId,
+      ...(tenantId ? { tenant_id: tenantId } : {}),
       provider,
       email,
     });
@@ -142,11 +149,11 @@ export async function saveEmailIntegration(
       if (encryptedAccessToken !== null) setValues.encrypted_access_token = encryptedAccessToken;
 
       await db.collection('email_integrations').updateOne(
-        { id: existing.id },
+        tenantId ? { id: existing.id, tenant_id: tenantId } : { id: existing.id },
         { $set: setValues }
       );
 
-      const updated = await db.collection('email_integrations').findOne({ id: existing.id });
+      const updated = await db.collection('email_integrations').findOne(tenantId ? { id: existing.id, tenant_id: tenantId } : { id: existing.id });
       if (!updated) {
         throw new Error('Failed to load updated integration');
       }
@@ -158,6 +165,7 @@ export async function saveEmailIntegration(
       _id: integrationId,
       id: integrationId,
       user_id: userId,
+      ...(tenantId ? { tenant_id: tenantId } : {}),
       provider,
       email,
       encrypted_password: encryptedPassword,
@@ -181,13 +189,13 @@ export async function saveEmailIntegration(
 /**
  * Get all integrations for a user
  */
-export async function getUserEmailIntegrations(userId: number): Promise<EmailIntegration[]> {
+export async function getUserEmailIntegrations(userId: number, tenantId?: ObjectId): Promise<EmailIntegration[]> {
   const db = await getMongoDbOrThrow();
 
   try {
     const rows = await db
       .collection('email_integrations')
-      .find({ user_id: userId })
+      .find(tenantId ? { user_id: userId, tenant_id: tenantId } : { user_id: userId })
       .sort({ provider: 1, created_at: -1 })
       .toArray();
 
@@ -214,13 +222,14 @@ export async function getUserEmailIntegrations(userId: number): Promise<EmailInt
 /**
  * Delete email integration
  */
-export async function deleteEmailIntegration(integrationId: number, userId: number): Promise<boolean> {
+export async function deleteEmailIntegration(integrationId: number, userId: number, tenantId?: ObjectId): Promise<boolean> {
   const db = await getMongoDbOrThrow();
 
   try {
     const result = await db.collection('email_integrations').deleteOne({
       id: integrationId,
       user_id: userId,
+      ...(tenantId ? { tenant_id: tenantId } : {}),
     });
     return result.deletedCount > 0;
   } catch (error) {
@@ -249,13 +258,14 @@ export async function updateIntegrationSyncTime(integrationId: number): Promise<
 /**
  * Get integration by ID
  */
-export async function getEmailIntegrationById(integrationId: number, userId: number): Promise<EmailIntegration | null> {
+export async function getEmailIntegrationById(integrationId: number, userId: number, tenantId?: ObjectId): Promise<EmailIntegration | null> {
   const db = await getMongoDbOrThrow();
 
   try {
     const row = await db.collection('email_integrations').findOne({
       id: integrationId,
       user_id: userId,
+      ...(tenantId ? { tenant_id: tenantId } : {}),
     });
 
     if (!row) {

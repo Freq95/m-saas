@@ -1,21 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // Cleanup classification: feature-flagged (advanced scheduling domain, no core UI dependency).
 // GET /api/resources - List all resources for a user
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
-
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-    }
+    const { userId, tenantId } = await getAuthUser();
 
     const db = await getMongoDbOrThrow();
     const resources = await db
       .collection('resources')
-      .find({ user_id: parseInt(userId), is_active: true })
+      .find({ user_id: Number(userId), tenant_id: tenantId, is_active: true })
       .sort({ name: 1 })
       .toArray();
 
@@ -29,12 +25,13 @@ export async function GET(request: NextRequest) {
 // POST /api/resources - Create a new resource
 export async function POST(request: NextRequest) {
   try {
+    const { userId, tenantId } = await getAuthUser();
     const body = await request.json();
-    const { userId, name, type } = body;
+    const { name, type } = body;
 
-    if (!userId || !name || !type) {
+    if (!name || !type) {
       return NextResponse.json(
-        { error: 'userId, name, and type are required' },
+        { error: 'name and type are required' },
         { status: 400 }
       );
     }
@@ -51,7 +48,7 @@ export async function POST(request: NextRequest) {
     // Get next ID
     const lastResource = await db
       .collection('resources')
-      .find()
+      .find({ tenant_id: tenantId })
       .sort({ id: -1 })
       .limit(1)
       .toArray();
@@ -59,7 +56,8 @@ export async function POST(request: NextRequest) {
 
     const resource = {
       id: nextId,
-      user_id: parseInt(userId),
+      user_id: Number(userId),
+      tenant_id: tenantId,
       name,
       type,
       is_active: true,

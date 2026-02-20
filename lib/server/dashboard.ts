@@ -1,5 +1,6 @@
 import { format, startOfDay, endOfDay, subDays, isValid } from 'date-fns';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
+import { ObjectId } from 'mongodb';
 
 type DashboardData = {
   messagesPerDay: Array<{ date: string; count: number }>;
@@ -56,23 +57,31 @@ function emptyDashboard(): DashboardData {
   };
 }
 
-export async function getDashboardData(userId: number, days: number): Promise<DashboardData> {
+export async function getDashboardData(
+  userId: number,
+  tenantIdOrDays?: ObjectId | number,
+  days: number = 7
+): Promise<DashboardData> {
   try {
+    const tenantId = typeof tenantIdOrDays === 'number' || tenantIdOrDays === undefined
+      ? undefined
+      : tenantIdOrDays;
+    const resolvedDays = typeof tenantIdOrDays === 'number' ? tenantIdOrDays : days;
     const db = await getMongoDbOrThrow();
 
     const today = new Date();
-    const startDate = startOfDay(subDays(today, days - 1));
+    const startDate = startOfDay(subDays(today, resolvedDays - 1));
     const endDate = endOfDay(today);
     const todayStr = format(today, 'yyyy-MM-dd');
 
     const conversations = await db
       .collection('conversations')
-      .find({ user_id: userId })
+      .find(tenantId ? { user_id: userId, tenant_id: tenantId } : { user_id: userId })
       .toArray();
     const conversationIds = conversations.map((c: any) => c.id);
 
     const allMessages = conversationIds.length > 0
-      ? await db.collection('messages').find({ conversation_id: { $in: conversationIds } }).toArray()
+      ? await db.collection('messages').find(tenantId ? { conversation_id: { $in: conversationIds }, tenant_id: tenantId } : { conversation_id: { $in: conversationIds } }).toArray()
       : [];
 
     const messagesInRange = allMessages.filter((m: any) => {
@@ -83,7 +92,7 @@ export async function getDashboardData(userId: number, days: number): Promise<Da
 
     const allAppointments = await db
       .collection('appointments')
-      .find({ user_id: userId })
+      .find(tenantId ? { user_id: userId, tenant_id: tenantId } : { user_id: userId })
       .toArray();
 
     const appointmentsInRange = allAppointments.filter((a: any) => {
@@ -92,12 +101,12 @@ export async function getDashboardData(userId: number, days: number): Promise<Da
       return startTime >= startDate && startTime <= endDate;
     });
 
-    const services = await db.collection('services').find({}).toArray();
+    const services = await db.collection('services').find(tenantId ? { tenant_id: tenantId } : {}).toArray();
     const servicesMap = new Map(services.map((s: any) => [s.id, s]));
 
     const messagesPerDayMap = new Map<string, number>();
-    for (let i = 0; i < days; i++) {
-      const date = format(subDays(today, days - 1 - i), 'yyyy-MM-dd');
+    for (let i = 0; i < resolvedDays; i++) {
+      const date = format(subDays(today, resolvedDays - 1 - i), 'yyyy-MM-dd');
       messagesPerDayMap.set(date, 0);
     }
     messagesInRange.forEach((m: any) => {
@@ -161,10 +170,12 @@ export async function getDashboardData(userId: number, days: number): Promise<Da
         return aTime.getTime() - bTime.getTime();
       });
 
-    const totalClients = await db.collection('clients').countDocuments({
+    const totalClientsFilter: Record<string, unknown> = {
       user_id: userId,
       deleted_at: { $exists: false },
-    });
+    };
+    if (tenantId) totalClientsFilter.tenant_id = tenantId;
+    const totalClients = await db.collection('clients').countDocuments(totalClientsFilter);
 
     const noShows = appointmentsInRange.filter((a: any) => a.status === 'no_show' || a.status === 'no-show').length;
     const totalAppointments = appointmentsInRange.filter((a: any) =>
@@ -181,15 +192,18 @@ export async function getDashboardData(userId: number, days: number): Promise<Da
 
     const topClients = (await db
       .collection('clients')
-      .find({ user_id: userId, deleted_at: { $exists: false }, total_spent: { $gt: 0 } })
+      .find(tenantId
+        ? { user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false }, total_spent: { $gt: 0 } }
+        : { user_id: userId, deleted_at: { $exists: false }, total_spent: { $gt: 0 } })
       .sort({ total_spent: -1 })
       .limit(5)
       .toArray()).map(stripMongoId);
 
-    const clients = (await db.collection('clients').find({
-      user_id: userId,
-      deleted_at: { $exists: false },
-    }).toArray())
+    const clients = (await db.collection('clients').find(
+      tenantId
+        ? { user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } }
+        : { user_id: userId, deleted_at: { $exists: false } }
+    ).toArray())
       .map(stripMongoId);
 
     const newClientsToday = clients.filter((client: any) => {

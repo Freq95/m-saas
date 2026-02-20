@@ -7,11 +7,11 @@ import { getAuthUser } from '@/lib/auth-helpers';
 export async function GET(request: NextRequest) {
   try {
     const db = await getMongoDbOrThrow();
-    const { userId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
 
     const clients = await db
       .collection('clients')
-      .find({ user_id: userId, deleted_at: { $exists: false } })
+      .find({ user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } })
       .sort({ name: 1 })
       .toArray();
 

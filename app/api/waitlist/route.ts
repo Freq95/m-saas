@@ -1,21 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // Cleanup classification: feature-flagged (advanced scheduling domain, no core UI dependency).
 // GET /api/waitlist - Get waitlist entries for a user
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
-
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
-    }
+    const { userId, tenantId } = await getAuthUser();
 
     const db = await getMongoDbOrThrow();
     const waitlist = await db
       .collection('waitlist')
-      .find({ user_id: parseInt(userId) })
+      .find({ user_id: Number(userId), tenant_id: tenantId })
       .sort({ created_at: -1 })
       .toArray();
 
@@ -29,9 +25,9 @@ export async function GET(request: NextRequest) {
 // POST /api/waitlist - Add entry to waitlist
 export async function POST(request: NextRequest) {
   try {
+    const { userId, tenantId } = await getAuthUser();
     const body = await request.json();
     const {
-      userId,
       clientId,
       serviceId,
       providerId,
@@ -40,9 +36,9 @@ export async function POST(request: NextRequest) {
       notes,
     } = body;
 
-    if (!userId || !clientId || !serviceId) {
+    if (!clientId || !serviceId) {
       return NextResponse.json(
-        { error: 'userId, clientId, and serviceId are required' },
+        { error: 'clientId and serviceId are required' },
         { status: 400 }
       );
     }
@@ -52,7 +48,7 @@ export async function POST(request: NextRequest) {
     // Get next ID
     const lastEntry = await db
       .collection('waitlist')
-      .find()
+      .find({ tenant_id: tenantId })
       .sort({ id: -1 })
       .limit(1)
       .toArray();
@@ -60,7 +56,8 @@ export async function POST(request: NextRequest) {
 
     const entry: any = {
       id: nextId,
-      user_id: parseInt(userId),
+      user_id: Number(userId),
+      tenant_id: tenantId,
       client_id: parseInt(clientId),
       service_id: parseInt(serviceId),
       preferred_days: preferredDays || [],
@@ -83,6 +80,7 @@ export async function POST(request: NextRequest) {
 // DELETE /api/waitlist?entryId=X - Remove from waitlist
 export async function DELETE(request: NextRequest) {
   try {
+    const { userId, tenantId } = await getAuthUser();
     const { searchParams } = new URL(request.url);
     const entryId = searchParams.get('entryId');
 
@@ -91,7 +89,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const db = await getMongoDbOrThrow();
-    const result = await db.collection('waitlist').deleteOne({ id: parseInt(entryId) });
+    const result = await db.collection('waitlist').deleteOne({ id: parseInt(entryId), user_id: Number(userId), tenant_id: tenantId });
 
     if (result.deletedCount === 0) {
       return NextResponse.json({ error: 'Waitlist entry not found' }, { status: 404 });
