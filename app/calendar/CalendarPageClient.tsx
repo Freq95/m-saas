@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import { useSession } from 'next-auth/react';
 import styles from './page.module.css';
 import { useToast } from '@/lib/useToast';
 import { ToastContainer } from '@/components/Toast';
@@ -35,7 +36,6 @@ interface CalendarPageClientProps {
   initialServices: Service[];
   initialDate: string;
   initialViewType?: 'week' | 'workweek' | 'month' | 'day';
-  initialUserId: number;
 }
 
 export default function CalendarPageClient({
@@ -43,9 +43,13 @@ export default function CalendarPageClient({
   initialServices,
   initialDate,
   initialViewType = 'week',
-  initialUserId,
 }: CalendarPageClientProps) {
   const toast = useToast();
+  const { data: session } = useSession();
+  const sessionUserId =
+    session?.user?.id && /^[1-9]\d*$/.test(session.user.id)
+      ? Number.parseInt(session.user.id, 10)
+      : undefined;
   const { state, actions } = useCalendar(initialDate, initialViewType);
   const { weekDays, monthDays, rangeLabel, hours } = useCalendarNavigation({
     currentDate: state.currentDate,
@@ -56,14 +60,14 @@ export default function CalendarPageClient({
     useAppointments({
       currentDate: state.currentDate,
       viewType: state.viewType,
-      userId: initialUserId,
+      userId: sessionUserId,
       providerId: state.selectedProvider?.id,
       resourceId: state.selectedResource?.id,
       initialAppointments,
     });
 
-  const { providers } = useProviders(initialUserId);
-  const { resources } = useResources(initialUserId);
+  const { providers } = useProviders(sessionUserId);
+  const { resources } = useResources(sessionUserId);
 
   // Day view: single-day array for WeekView reuse
   const dayViewDays = useMemo(() => [state.currentDate], [state.currentDate]);
@@ -71,7 +75,7 @@ export default function CalendarPageClient({
   const viewStart = visibleDays[0];
   const viewEnd = visibleDays[visibleDays.length - 1];
   const { blockedTimes } = useBlockedTimes(
-    initialUserId,
+    sessionUserId,
     state.selectedProvider?.id,
     state.selectedResource?.id,
     viewStart,
@@ -396,14 +400,28 @@ export default function CalendarPageClient({
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
+  const showInitialSkeleton = loading && appointments.length === 0 && initialAppointments.length === 0;
+
+  if (showInitialSkeleton) {
+    return (
+      <div className={styles.container}>
+        <main className={styles.main}>
+          <div className="skeleton skeleton-line" style={{ width: '220px', height: '18px', marginBottom: '0.9rem' }} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: '1rem' }}>
+            <div className="skeleton skeleton-card" style={{ height: '560px' }} />
+            <div className="skeleton-stack">
+              <div className="skeleton skeleton-card" style={{ height: '120px' }} />
+              <div className="skeleton skeleton-card" style={{ height: '430px' }} />
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.container}>
       <main className={styles.main}>
-        {loading && (
-          <div className="skeleton-stack" style={{ marginBottom: '0.75rem' }}>
-            <div className="skeleton skeleton-line" style={{ height: '14px', width: '180px' }} />
-          </div>
-        )}
 
         {/* Calendar grid + day panel — always side-by-side for all views */}
         <div className={styles.calendarWithPanel}>

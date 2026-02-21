@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import createDOMPurify from 'dompurify';
 import { format, isSameDay, isToday, isYesterday } from 'date-fns';
 import styles from './page.module.css';
@@ -226,7 +227,6 @@ interface SaveableItem {
 }
 
 interface InboxPageClientProps {
-  initialUserId: number;
   initialConversations: Conversation[];
   initialSelectedConversationId: number | null;
   initialMessages: Message[] | null;
@@ -235,7 +235,6 @@ interface InboxPageClientProps {
 }
 
 export default function InboxPageClient({
-  initialUserId,
   initialConversations,
   initialSelectedConversationId,
   initialMessages,
@@ -243,6 +242,11 @@ export default function InboxPageClient({
   initialOldestMessageId = null,
 }: InboxPageClientProps) {
   const toast = useToast();
+  const { data: session, status: sessionStatus } = useSession();
+  const sessionUserId =
+    session?.user?.id && /^[1-9]\d*$/.test(session.user.id)
+      ? Number.parseInt(session.user.id, 10)
+      : null;
   const searchParams = useSearchParams();
   const conversationParam = searchParams.get('conversation');
 
@@ -490,7 +494,7 @@ export default function InboxPageClient({
       const response = await fetch('/api/yahoo/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: initialUserId, todayOnly: true }),
+        body: JSON.stringify({ todayOnly: true }),
       });
       if (!response.ok) {
         const err = await response.json();
@@ -605,6 +609,11 @@ export default function InboxPageClient({
 
   const loadClientOptions = useCallback(
     async (query: string) => {
+      if (!sessionUserId && sessionStatus !== 'loading') {
+        setLoadingClientOptions(false);
+        setClientOptions(buildSelectedClientOption());
+        return;
+      }
       const requestSeq = ++clientSearchRequestSeqRef.current;
       if (!query.trim()) {
         setLoadingClientOptions(false);
@@ -615,12 +624,14 @@ export default function InboxPageClient({
       try {
         const trimmed = query.trim();
         const searchParams = new URLSearchParams({
-          userId: initialUserId.toString(),
           limit: '30',
           page: '1',
           sortBy: 'name',
           sortOrder: 'ASC',
         });
+        if (sessionUserId) {
+          searchParams.set('userId', sessionUserId.toString());
+        }
         if (trimmed) {
           searchParams.set('search', trimmed);
         }
@@ -670,7 +681,7 @@ export default function InboxPageClient({
         }
       }
     },
-    [buildSelectedClientOption]
+    [buildSelectedClientOption, sessionStatus, sessionUserId]
   );
 
   useEffect(() => {
@@ -1125,7 +1136,53 @@ export default function InboxPageClient({
   }, [messages]);
 
   if (loading) {
-    return <div className={styles.container}>Se încarcă...</div>;
+    return (
+      <div className={styles.container}>
+        <div className={styles.inbox}>
+          <div className={styles.conversationList} style={{ width: '380px' }}>
+            <div className={styles.searchContainer}>
+              <div className="skeleton skeleton-line" style={{ height: '38px', width: '100%', marginBottom: '0.5rem' }} />
+              <div className="skeleton skeleton-line" style={{ height: '36px', width: '100%' }} />
+            </div>
+            <div className={styles.conversationListContent} style={{ padding: '0.4rem' }}>
+              <div className="skeleton-stack">
+                {Array.from({ length: 8 }).map((_, idx) => (
+                  <div key={idx} className="skeleton skeleton-card" style={{ height: '72px' }} />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.divider} />
+
+          <div className={styles.thread}>
+            <div className={styles.threadHeader}>
+              <div className="skeleton-stack" style={{ width: '280px' }}>
+                <div className="skeleton skeleton-line" style={{ height: '16px', width: '58%' }} />
+                <div className="skeleton skeleton-line" style={{ height: '12px', width: '86%' }} />
+              </div>
+            </div>
+
+            <div className={styles.messages} style={{ padding: '0.8rem' }}>
+              <div className="skeleton-stack">
+                {Array.from({ length: 6 }).map((_, idx) => (
+                  <div
+                    key={idx}
+                    className="skeleton skeleton-card"
+                    style={{ height: idx % 2 === 0 ? '56px' : '92px', width: idx % 2 === 0 ? '64%' : '84%' }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className={styles.messageInput}>
+              <div className="skeleton skeleton-line" style={{ height: '42px', width: '100%' }} />
+              <div className="skeleton skeleton-line" style={{ height: '42px', width: '110px' }} />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
