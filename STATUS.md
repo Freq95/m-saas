@@ -1,5 +1,5 @@
 # m-saas Project Status
-**Last Updated:** 2026-02-20
+**Last Updated:** 2026-02-21
 **MVP Version:** V1 (~75% complete)
 **Database:** MongoDB (confirmed in use: lib/db/mongo.ts)
 ---
@@ -15,7 +15,44 @@
 | Reminders |  API Exists, Not Automated | 40% |
 | Auth/Multi-tenant | Implemented (Phase 2 tenant isolation + role controls) | 90% |
 ---
-## Latest Updates (2026-02-20)
+## Latest Updates (2026-02-21)
+- Temporary runtime mode for current testing:
+  - Redis env vars are intentionally commented out in local `.env` (no-Redis production-mode test)
+  - read caching falls back to DB fetch path; distributed rate-limiting falls back to in-memory limiter
+  - current local perf observations should be interpreted as no-Redis behavior, not final deployment baseline
+- Clients page stability and identity hardening:
+  - fixed SSR clients prefetch auth/tenant scope (`app/clients/page.tsx`)
+  - removed hardcoded `userId=1` from clients list fetch and client create/edit modal payloads
+  - simplified clients list fetch flow to avoid duplicate requests and search-refresh jitter
+  - build/typecheck validation passed
+- Inbox failure visibility improved:
+  - added status-aware toast notifications in inbox client for API failures (`429`, `401/403`, generic server error)
+  - added toast dedupe window to prevent notification spam during retries/debounced requests
+  - confirmed production empty inbox symptom was rate-limit (`Too many requests`), not missing DB data
+- Production rate-limit behavior tuned for inbox reads:
+  - middleware now classifies by method + route
+  - `GET /api/conversations*` uses read bucket (higher tolerance)
+  - `/api/yahoo/sync` remains strict sync bucket
+  - write bucket now applies only to mutation methods (`POST/PUT/PATCH/DELETE`)
+  - build/typecheck validation passed
+- Admin + sync reliability polish before deployment:
+  - added super-admin logout action in admin layout/sidebar
+  - added dedicated production rate-limit bucket for `/api/yahoo/sync` (`3/5m`) to reduce false 429 collisions
+  - changed limiter identity to tenant+user (fallback user/IP) instead of IP-only behavior
+  - added inbox sync button spinner loading state
+  - build/typecheck validation passed
+- Hybrid search rollout for inbox + calendar:
+  - inbox conversation search now uses debounced server query (`/api/conversations?search=...`) with local refinement
+  - calendar search now uses debounced server query (`/api/appointments?search=...`) with scoped DB matching
+  - appointments cache key now includes `search` parameter
+  - calendar now keeps current view visible during search refresh (no full-page skeleton reset)
+  - build/typecheck validation passed
+- Client-side loading UX upgrade applied for hotspot pages:
+  - dashboard, calendar, and inbox moved to client-side fetching with skeleton loading states
+  - new `app/dashboard/DashboardPageClient.tsx` with SWR dashboard fetch
+  - calendar/inbox server page prefetch removed (empty initial payloads passed to client components)
+  - global skeleton utility classes added in `app/globals.css`
+  - build/typecheck validation passed
 - Completed Phase 2 multi-tenancy rollout:
   - tenant-scoped API filtering (`tenant_id`) across tenant routes
   - owner-only team/staff management endpoints

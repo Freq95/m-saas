@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { auth } from '@/lib/auth';
+import AdminSignOutButton from '@/components/AdminSignOutButton';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -29,6 +30,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           <Link href="/admin/audit">Audit Logs</Link>
           <Link href="/admin/docs">Docs</Link>
         </nav>
+        <AdminSignOutButton />
       </aside>
       <main style={{ padding: 20 }}>{children}</main>
     </div>

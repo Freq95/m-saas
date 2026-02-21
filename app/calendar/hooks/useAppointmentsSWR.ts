@@ -11,6 +11,7 @@ interface UseAppointmentsOptions {
   userId?: number;
   providerId?: number;
   resourceId?: number;
+  search?: string;
   initialAppointments?: Appointment[];
 }
 
@@ -91,6 +92,7 @@ export function useAppointmentsSWR({
   userId,
   providerId,
   resourceId,
+  search,
   initialAppointments = [],
 }: UseAppointmentsOptions): UseAppointmentsResult {
   const { data: session, status } = useSession();
@@ -131,6 +133,11 @@ export function useAppointmentsSWR({
     queryParams.append('resourceId', resourceId.toString());
   }
 
+  const trimmedSearch = search?.trim();
+  if (trimmedSearch) {
+    queryParams.append('search', trimmedSearch);
+  }
+
   const url = effectiveUserId ? `/api/appointments?${queryParams.toString()}` : null;
 
   // Use SWR with caching configuration
@@ -141,6 +148,7 @@ export function useAppointmentsSWR({
     mutate,
   } = useSWR<Appointment[]>(url, fetcher, {
     fallbackData: initialAppointments,
+    keepPreviousData: true,
     revalidateOnFocus: false, // Don't refetch when window regains focus
     dedupingInterval: 10000, // 10 seconds deduplication
     revalidateOnReconnect: true, // Refetch when reconnecting

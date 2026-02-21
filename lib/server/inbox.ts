@@ -10,12 +10,31 @@ type MessagePagination = {
   beforeId?: number;
 };
 
-export async function getConversationsData(userId: number, tenantId?: ObjectId) {
+type ConversationsQuery = {
+  userId: number;
+  tenantId?: ObjectId;
+  search?: string;
+};
+
+export async function getConversationsData(query: ConversationsQuery) {
   const db = await getMongoDbOrThrow();
+  const userId = query.userId;
+  const tenantId = query.tenantId;
+  const search = query.search?.trim();
 
   const conversationFilter: Record<string, unknown> = { user_id: userId };
   if (tenantId) {
     conversationFilter.tenant_id = tenantId;
+  }
+  if (search) {
+    const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'i');
+    conversationFilter.$or = [
+      { contact_name: regex },
+      { contact_email: regex },
+      { contact_phone: regex },
+      { subject: regex },
+    ];
   }
 
   const conversationsQuery = db

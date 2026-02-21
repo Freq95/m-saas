@@ -284,11 +284,46 @@ export default function InboxPageClient({
   const [isSavingSelection, setIsSavingSelection] = useState(false);
   const [updatingReadState, setUpdatingReadState] = useState(false);
   const clientSearchRequestSeqRef = useRef(0);
+  const inboxSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastApiErrorToastRef = useRef<{ key: string; at: number } | null>(null);
   
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const initialMessagesRef = useRef<Message[] | null>(initialMessages);
   const initialMessagesConversationIdRef = useRef<number | null>(initialSelectedConversation?.id ?? initialSelectedConversationId);
+
+  const readErrorMessage = async (response: Response): Promise<string | null> => {
+    try {
+      const payload = await response.json();
+      if (payload && typeof payload.error === 'string') return payload.error;
+      if (payload && typeof payload.message === 'string') return payload.message;
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const showApiErrorToast = useCallback(
+    (scope: string, status: number, message?: string | null) => {
+      const normalizedMessage = (message || '').trim();
+      const fallback =
+        status === 429
+          ? 'Prea multe cereri. Incearca din nou in cateva secunde.'
+          : status === 401 || status === 403
+            ? 'Sesiunea nu este valida pentru aceasta actiune. Reautentifica-te.'
+            : 'A aparut o eroare la comunicarea cu serverul.';
+      const finalMessage = normalizedMessage || fallback;
+      const key = `${scope}:${status}:${finalMessage}`;
+      const now = Date.now();
+      const previous = lastApiErrorToastRef.current;
+      if (previous && previous.key === key && now - previous.at < 8000) {
+        return;
+      }
+      lastApiErrorToastRef.current = { key, at: now };
+      toast.error(finalMessage);
+    },
+    [toast]
+  );
 
   useEffect(() => {
     // Disabled auto-load to allow manual Yahoo sync testing.
@@ -316,6 +351,24 @@ export default function InboxPageClient({
       handleSelectConversation(match);
     }
   }, [conversationParam, allConversations, selectedConversation]);
+
+  useEffect(() => {
+    if (loading) return;
+
+    if (inboxSearchDebounceRef.current) {
+      clearTimeout(inboxSearchDebounceRef.current);
+    }
+
+    inboxSearchDebounceRef.current = setTimeout(() => {
+      fetchConversations(searchQuery.trim());
+    }, 250);
+
+    return () => {
+      if (inboxSearchDebounceRef.current) {
+        clearTimeout(inboxSearchDebounceRef.current);
+      }
+    };
+  }, [searchQuery, loading]);
 
   useEffect(() => {
     if (!selectedConversation) return;
@@ -362,11 +415,22 @@ export default function InboxPageClient({
     setConversations(filtered);
   }, [searchQuery, allConversations]);
 
-  const fetchConversations = async () => {
+  const fetchConversations = async (serverSearch?: string) => {
     try {
-      const response = await fetch('/api/conversations', {
+      const params = new URLSearchParams();
+      const trimmedSearch = serverSearch?.trim();
+      if (trimmedSearch) {
+        params.set('search', trimmedSearch);
+      }
+      const queryString = params.toString();
+      const response = await fetch(`/api/conversations${queryString ? `?${queryString}` : ''}`, {
         cache: 'no-store',
       });
+      if (!response.ok) {
+        const errorMessage = await readErrorMessage(response);
+        showApiErrorToast('conversations', response.status, errorMessage);
+        return;
+      }
       const result = await response.json();
       if (result.conversations && Array.isArray(result.conversations)) {
         setAllConversations(result.conversations);
@@ -426,6 +490,11 @@ export default function InboxPageClient({
       }
 
       const response = await fetch(url.toString(), { cache: 'no-store' });
+      if (!response.ok) {
+        const errorMessage = await readErrorMessage(response);
+        showApiErrorToast('messages', response.status, errorMessage);
+        return;
+      }
       const result = await response.json();
       const fetchedMessages = result.messages || [];
       
@@ -498,9 +567,11 @@ export default function InboxPageClient({
       });
       if (!response.ok) {
         const err = await response.json();
-        throw new Error(err.error || err.message || 'Failed to sync inbox');
+        const message = err?.error || err?.message || 'Failed to sync inbox';
+        showApiErrorToast('sync', response.status, message);
+        throw new Error(message);
       }
-      await fetchConversations();
+      await fetchConversations(searchQuery);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to sync inbox';
       setSyncError(message);
@@ -520,11 +591,17 @@ export default function InboxPageClient({
         body: JSON.stringify({ content: newMessage, direction: 'outbound' }),
       });
 
+      if (!response.ok) {
+        const errorMessage = await readErrorMessage(response);
+        showApiErrorToast('send-message', response.status, errorMessage);
+        return;
+      }
+
       if (response.ok) {
         setNewMessage('');
         // Reload messages to show the new one (fetch latest messages)
         fetchMessages(selectedConversation.id, true);
-        fetchConversations();
+        fetchConversations(searchQuery);
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -936,7 +1013,7 @@ export default function InboxPageClient({
         await saveSingleItem(item);
       }
       await fetchMessages(selectedConversation.id, true);
-      await fetchConversations();
+      await fetchConversations(searchQuery);
       toast.success('Elementele selectate au fost salvate in fisa pacientului.');
     } catch (error) {
       console.error('Save selection failed:', error);
@@ -1207,7 +1284,10 @@ export default function InboxPageClient({
               onClick={syncInbox}
               disabled={syncing}
             >
-              {syncing ? 'Sincronizare...' : 'Sincronizează Inbox'}
+              <span className={styles.syncButtonInner}>
+                {syncing && <span className={styles.syncSpinner} aria-hidden="true" />}
+                <span>{syncing ? 'Sincronizare inbox' : 'Sincronizeaza Inbox'}</span>
+              </span>
             </button>
             {syncError && (
               <div className={styles.syncError}>{syncError}</div>

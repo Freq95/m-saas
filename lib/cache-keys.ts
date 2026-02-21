@@ -27,6 +27,7 @@ export function appointmentsListCacheKey(
     providerId?: number;
     resourceId?: number;
     status?: string;
+    search?: string;
   }
 ): string {
   return `${scopePrefix(scope)}:appointments:list:${serializeQuery(params)}`;

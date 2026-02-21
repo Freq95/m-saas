@@ -135,7 +135,6 @@ export default function ClientCreateModal({
         method: isEditMode ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: 1,
           name: formData.name,
           email: formData.email || undefined,
           phone: formData.phone || undefined,

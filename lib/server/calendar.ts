@@ -9,6 +9,7 @@ type AppointmentQuery = {
   providerId?: number;
   resourceId?: number;
   status?: string;
+  search?: string;
 };
 
 const SERVICES_PROJECTION = {
@@ -36,6 +37,7 @@ export async function getAppointmentsData(query: AppointmentQuery = {}) {
   const providerId = query.providerId;
   const resourceId = query.resourceId;
   const status = query.status;
+  const search = query.search?.trim();
 
   const filter: Record<string, unknown> = { user_id: userId };
   if (tenantId) {
@@ -55,6 +57,35 @@ export async function getAppointmentsData(query: AppointmentQuery = {}) {
   }
   if (resourceId) {
     filter.resource_id = resourceId;
+  }
+  if (search) {
+    const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(escaped, 'i');
+    const searchOr: Record<string, unknown>[] = [
+      { client_name: regex },
+      { client_email: regex },
+      { client_phone: regex },
+      { category: regex },
+      { notes: regex },
+    ];
+
+    const matchingServices = await db
+      .collection('services')
+      .find(
+        tenantId
+          ? { user_id: userId, tenant_id: tenantId, name: regex }
+          : { user_id: userId, name: regex }
+      )
+      .project({ id: 1 })
+      .toArray();
+    const matchingServiceIds = matchingServices
+      .map((service: any) => service.id)
+      .filter((id: unknown): id is number => typeof id === 'number');
+
+    if (matchingServiceIds.length > 0) {
+      searchOr.push({ service_id: { $in: matchingServiceIds } });
+    }
+    filter.$or = searchOr;
   }
 
   const appointmentQuery = db

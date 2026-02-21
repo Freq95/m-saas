@@ -10,7 +10,19 @@ import { getAuthUser } from '@/lib/auth-helpers';
 export async function GET(request: NextRequest) {
   try {
     const { userId, tenantId } = await getAuthUser();
-    const conversations = await getConversationsData(userId, tenantId);
+    const searchParams = request.nextUrl.searchParams;
+    const { conversationsQuerySchema } = await import('@/lib/validation');
+    const queryParams = {
+      userId: String(userId),
+      search: searchParams.get('search') || undefined,
+    };
+    const validationResult = conversationsQuerySchema.safeParse(queryParams);
+    if (!validationResult.success) {
+      return handleApiError(validationResult.error, 'Invalid query parameters');
+    }
+
+    const { search } = validationResult.data;
+    const conversations = await getConversationsData({ userId, tenantId, search });
 
     return createSuccessResponse({ conversations });
   } catch (error) {

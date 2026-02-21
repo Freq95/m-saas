@@ -601,3 +601,141 @@ Scope: Auth + super-admin + invite flow + audit + tenant/user lifecycle controls
 - Validation:
   - `npm run build` passed.
   - `npm run typecheck` passed (after clearing stale `tsconfig.tsbuildinfo` cache artifact).
+
+## 27) Client-Side Fetching + Skeleton Loading for Dashboard/Calendar/Inbox (2026-02-21)
+- Implemented client-first rendering to avoid SSR data-blocking on three hotspot pages:
+  - `app/dashboard/page.tsx` now renders client component only.
+  - `app/calendar/page.tsx` now passes empty initial payloads (no SSR prefetch).
+  - `app/inbox/page.tsx` now passes empty initial payloads (no SSR prefetch).
+- Added new dashboard client module:
+  - `app/dashboard/DashboardPageClient.tsx`
+  - uses SWR against `/api/dashboard?days=7`
+  - session-aware fetch key (null until authenticated)
+  - dedicated dashboard skeleton (stats/charts/lists placeholders).
+- Updated calendar client data ownership:
+  - `app/calendar/CalendarPageClient.tsx`
+  - removed `initialUserId` prop usage
+  - switched to `useSession()` derived user context for appointments/providers/resources/blocked-times hooks
+  - replaced thin loading line with calendar-layout skeleton.
+- Updated inbox client data ownership + loading UX:
+  - `app/inbox/InboxPageClient.tsx`
+  - removed `initialUserId` prop usage
+  - session-derived user context for client search query params
+  - Yahoo sync call no longer sends `userId` payload (route resolves from auth context)
+  - replaced plain loading text with inbox-layout skeleton (conversation pane + thread pane).
+- Added missing global skeleton utility classes used by pages:
+  - `app/globals.css`
+  - `.skeleton`, `.skeleton-line`, `.skeleton-card`, `.skeleton-stat`, `.skeleton-chart`, shimmer animation.
+- Build compatibility fix for inbox page:
+  - wrapped inbox client entry in `Suspense` to satisfy `useSearchParams()` boundary requirement.
+
+### Validation
+- `npm run build` passed.
+- `npm run typecheck` passed.
+
+### Review Note
+- This update is UX/perceived-performance focused (faster first paint and progressive loading).
+- It does not change API contracts and does not replace Chapter 9 benchmark closeout (still required separately).
+
+## 28) Admin UX + Production Sync Rate-Limit Stabilization (2026-02-21)
+- Added explicit logout control for super-admin surface:
+  - `components/AdminSignOutButton.tsx`
+  - wired into `app/(admin)/admin/layout.tsx`
+  - resolves lock-in issue where super-admin could not sign out from admin-only routing context.
+- Hardened production API rate-limit behavior for inbox sync in `middleware.ts`:
+  - added dedicated `/api/yahoo/sync` limiter bucket (`sync`) separate from generic write bucket.
+  - sync bucket configured for short-window operation (`3 requests / 5 minutes`).
+  - changed rate-limit identity strategy to prefer tenant+user key, then user key, then IP fallback.
+  - reduces false 429 collisions from shared-IP / missing-forwarded-header scenarios.
+- Validation:
+  - `npm run typecheck` passed.
+  - `npm run build` passed.
+
+## 29) Inbox Sync Button Loading UX Polish (2026-02-21)
+- Improved inbox sync button loading state:
+  - `app/inbox/InboxPageClient.tsx`
+  - `app/inbox/page.module.css`
+- Replaced plain text-only loading (`Sincronizare...`) with spinner + stable label in button.
+- Added lightweight spinner styles and animation:
+  - `.syncButtonInner`
+  - `.syncSpinner`
+  - `@keyframes syncSpin`
+- Validation:
+  - `npm run typecheck` passed.
+
+## 30) Hybrid Search Upgrade (Inbox + Calendar) + In-Place Calendar Refresh (2026-02-21)
+- Implemented hybrid search for inbox conversations:
+  - server-side query support:
+    - `app/api/conversations/route.ts` now accepts and validates `search`
+    - `lib/server/inbox.ts` applies tenant/user-scoped DB filtering on:
+      - `contact_name`
+      - `contact_email`
+      - `contact_phone`
+      - `subject`
+    - `lib/validation.ts` updated (`conversationsQuerySchema.search`)
+  - client-side behavior:
+    - `app/inbox/InboxPageClient.tsx` now performs debounced server search requests while preserving local instant filtering on current list data.
+- Implemented hybrid search for calendar appointments:
+  - server-side query support:
+    - `app/api/appointments/route.ts` now accepts and validates `search`
+    - `lib/server/calendar.ts` applies tenant/user-scoped DB search across:
+      - `client_name`
+      - `client_email`
+      - `client_phone`
+      - `category`
+      - `notes`
+      - matched service names via service-id lookup
+    - `lib/validation.ts` updated (`appointmentsQuerySchema.search`)
+  - cache segregation:
+    - `lib/cache-keys.ts` appointments cache key now includes `search` parameter to avoid collisions.
+  - client-side wiring:
+    - `app/calendar/hooks/useAppointmentsSWR.ts` sends `search` param to API.
+    - `app/calendar/CalendarPageClient.tsx` debounces search input before fetch.
+- UX polish after hybrid rollout:
+  - removed full-page skeleton refresh during calendar search:
+    - `app/calendar/hooks/useAppointmentsSWR.ts` enabled `keepPreviousData: true`
+    - `app/calendar/CalendarPageClient.tsx` now shows full skeleton only on first load and keeps current calendar visible while search data refreshes in place.
+
+### Validation
+- `npm run build` passed.
+- `npm run typecheck` passed.
+
+## 31) Clients Stability + Inbox Error Visibility + Production Rate-Limit Tuning (2026-02-21)
+- Fixed clients page SSR prefetch/auth scoping:
+  - `app/clients/page.tsx`
+  - added session validation, tenant validation, and explicit `getClientsData({ userId, tenantId })` call.
+  - removed silent fallback pattern that could render transient empty-state UI before real data load.
+- Fixed clients list fetch behavior and removed hardcoded identity:
+  - `app/clients/ClientsPageClient.tsx`
+  - removed hardcoded `userId=1` query param.
+  - simplified overlapping effects to a single debounced fetch flow (search/sort/page), reducing duplicate requests and refresh jitter.
+  - kept first-load skeleton behavior while preserving table content during subsequent refreshes.
+- Fixed hardcoded identity in client create/edit modal payload:
+  - `components/ClientCreateModal.tsx`
+  - removed `userId: 1` from POST/PATCH request body (server derives auth context).
+- Added explicit inbox toast errors for API failures:
+  - `app/inbox/InboxPageClient.tsx`
+  - now surfaces user-facing toasts for conversation fetch, message fetch, send message, and Yahoo sync failures.
+  - added status-aware messages for `429` (rate limit), `401/403` (auth/session), and generic server errors.
+  - added short dedupe window to prevent repeated identical toasts from spamming during retries/debounced search.
+- Tuned production middleware rate-limit bucket classification:
+  - `middleware.ts`
+  - write limiter now applies only to mutation methods (`POST/PUT/PATCH/DELETE`), not all requests by path prefix.
+  - explicit inbox read routes (`GET /api/conversations*`) are classified as `read` bucket.
+  - `/api/yahoo/sync` remains in strict `sync` bucket.
+
+### Validation
+- `npm run typecheck` passed.
+- `npm run build` passed.
+
+### Runtime Diagnosis Note
+- Production inbox empty-state issue reproduced with toast message `Too many requests`.
+- Root cause: production-only middleware throttling on inbox API calls (not missing inbox data in MongoDB).
+- DB verification confirmed both `email_integrations` and `conversations` records exist for active tenant/user scopes.
+
+### Temporary Environment Note
+- Redis is currently intentionally disabled in local `.env` for no-Redis production-mode testing.
+- Current behavior in this temporary mode:
+  - cache helpers fall back to direct DB fetches (no shared Redis caching)
+  - middleware rate-limiting falls back to in-memory limiter (non-distributed)
+- Benchmark/perf comparisons captured in this mode should be treated as no-Redis diagnostics, not final production reference numbers.

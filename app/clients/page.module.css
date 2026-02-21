@@ -133,6 +133,7 @@
 
 .tableContainer {
   overflow-x: auto;
+  position: relative;
 }
 
 .table {

@@ -132,6 +132,7 @@ export const appointmentsQuerySchema = z.object({
   providerId: z.string().regex(/^\d+$/).transform(Number).optional(),
   resourceId: z.string().regex(/^\d+$/).transform(Number).optional(),
   status: z.enum(['scheduled', 'completed', 'cancelled', 'no-show']).optional(),
+  search: z.string().max(120).optional(),
 });
 
 export const servicesQuerySchema = z.object({
@@ -140,6 +141,7 @@ export const servicesQuerySchema = z.object({
 
 export const conversationsQuerySchema = z.object({
   userId: z.string().regex(/^\d+$/).transform(Number).optional(),
+  search: z.string().max(120).optional(),
 });
 
 export const dashboardQuerySchema = z.object({

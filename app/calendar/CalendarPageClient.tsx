@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import styles from './page.module.css';
 import { useToast } from '@/lib/useToast';
@@ -45,6 +45,9 @@ export default function CalendarPageClient({
   initialViewType = 'week',
 }: CalendarPageClientProps) {
   const toast = useToast();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+  const [hasFinishedInitialLoad, setHasFinishedInitialLoad] = useState(initialAppointments.length > 0);
   const { data: session } = useSession();
   const sessionUserId =
     session?.user?.id && /^[1-9]\d*$/.test(session.user.id)
@@ -56,6 +59,13 @@ export default function CalendarPageClient({
     viewType: state.viewType,
   });
 
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery.trim());
+    }, 250);
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
+
   const { appointments, loading, refetch, createAppointment, updateAppointment, deleteAppointment } =
     useAppointments({
       currentDate: state.currentDate,
@@ -63,8 +73,15 @@ export default function CalendarPageClient({
       userId: sessionUserId,
       providerId: state.selectedProvider?.id,
       resourceId: state.selectedResource?.id,
+      search: debouncedSearchQuery,
       initialAppointments,
     });
+
+  useEffect(() => {
+    if (!loading) {
+      setHasFinishedInitialLoad(true);
+    }
+  }, [loading]);
 
   const { providers } = useProviders(sessionUserId);
   const { resources } = useResources(sessionUserId);
@@ -84,7 +101,7 @@ export default function CalendarPageClient({
 
   const [selectedDay, setSelectedDay]               = useState<Date>(() => new Date());
   const [services, setServices]                     = useState<Service[]>(initialServices);
-  const [searchQuery, setSearchQuery]               = useState('');
+  const hasRequestedServicesRef = useRef(false);
   const [showCreateModal, setShowCreateModal]       = useState(false);
   const [showPreviewModal, setShowPreviewModal]     = useState(false);
   const [appointmentModalMode, setAppointmentModalMode] = useState<'create' | 'edit'>('create');
@@ -122,7 +139,8 @@ export default function CalendarPageClient({
 
   // Lazy-load services if not provided server-side
   useEffect(() => {
-    if (initialServices.length > 0) return;
+    if (initialServices.length > 0 || hasRequestedServicesRef.current) return;
+    hasRequestedServicesRef.current = true;
     fetch('/api/services')
       .then((r) => r.json())
       .then((d) => setServices(d.services || []))
@@ -400,7 +418,7 @@ export default function CalendarPageClient({
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  const showInitialSkeleton = loading && appointments.length === 0 && initialAppointments.length === 0;
+  const showInitialSkeleton = !hasFinishedInitialLoad && loading;
 
   if (showInitialSkeleton) {
     return (

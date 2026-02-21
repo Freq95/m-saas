@@ -38,14 +38,14 @@ export default function ClientsPageClient({
   const [clients, setClients] = useState<Client[]>(initialClients);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortBy, setSortBy] = useState('last_activity_date');
   const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState<PaginationInfo | null>(initialPagination);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [hasFinishedInitialLoad, setHasFinishedInitialLoad] = useState(initialClients.length > 0);
   const skipInitialFetch = useRef(true);
-  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const searchRef = useRef(search);
 
   const fetchClients = useCallback(async (
     currentSearch: string,
@@ -56,7 +56,6 @@ export default function ClientsPageClient({
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        userId: '1',
         ...(currentSearch && { search: currentSearch }),
         sortBy: currentSortBy,
         sortOrder: currentSortOrder,
@@ -83,28 +82,25 @@ export default function ClientsPageClient({
   }, []);
 
   useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [search]);
+
+  useEffect(() => {
     if (skipInitialFetch.current) {
       skipInitialFetch.current = false;
       return;
     }
-    setPage(1);
-    fetchClients(search, sortBy, sortOrder, 1);
-  }, [sortBy, sortOrder, fetchClients, search]);
+    fetchClients(debouncedSearch, sortBy, sortOrder, page);
+  }, [fetchClients, page, debouncedSearch, sortBy, sortOrder]);
 
   useEffect(() => {
-    if (skipInitialFetch.current) return;
-    fetchClients(search, sortBy, sortOrder, page);
-  }, [fetchClients, page, search, sortBy, sortOrder]);
-
-  const handleSearchChange = (value: string) => {
-    setSearch(value);
-    searchRef.current = value;
-    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
-    searchDebounceRef.current = setTimeout(() => {
-      setPage(1);
-      fetchClients(searchRef.current, sortBy, sortOrder, 1);
-    }, 350);
-  };
+    if (!loading) {
+      setHasFinishedInitialLoad(true);
+    }
+  }, [loading]);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Niciodata';
@@ -151,7 +147,10 @@ export default function ClientsPageClient({
               type="text"
               placeholder="Cauta dupa nume, email sau telefon"
               value={search}
-              onChange={(e) => handleSearchChange(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                if (page !== 1) setPage(1);
+              }}
               className={styles.searchInput}
             />
 
@@ -161,6 +160,7 @@ export default function ClientsPageClient({
                 const [col, order] = e.target.value.split('-');
                 setSortBy(col);
                 setSortOrder(order as 'ASC' | 'DESC');
+                if (page !== 1) setPage(1);
               }}
               className={styles.filterSelect}
             >
@@ -176,7 +176,7 @@ export default function ClientsPageClient({
           </div>
         </div>
 
-        {loading ? (
+        {loading && !hasFinishedInitialLoad ? (
           <div className={styles.tableContainer} style={{ padding: '1rem' }}>
             <div className="skeleton-stack">
               {Array.from({ length: 8 }).map((_, index) => (

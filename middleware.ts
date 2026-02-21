@@ -10,6 +10,8 @@ interface RateLimitEntry {
   resetTime: number;
 }
 
+type RateLimitBucket = 'read' | 'write' | 'sync';
+
 type RateLimitResult = {
   allowed: boolean;
   remaining: number;
@@ -21,12 +23,21 @@ const rateLimitStore = new Map<string, RateLimitEntry>();
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 100;
 const RATE_LIMIT_STRICT_MAX_REQUESTS = 20;
+const RATE_LIMIT_SYNC_WINDOW_MS = 5 * 60 * 1000;
+const RATE_LIMIT_SYNC_MAX_REQUESTS = 3;
 const READ_WINDOW = '15 m';
 const WRITE_WINDOW = '15 m';
+const SYNC_WINDOW = '5 m';
 let redisReadLimiter: Ratelimit | null = null;
 let redisWriteLimiter: Ratelimit | null = null;
+let redisSyncLimiter: Ratelimit | null = null;
 
-function isWriteOperation(pathname: string): boolean {
+function isWriteOperation(pathname: string, method: string): boolean {
+  const normalizedMethod = method.toUpperCase();
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(normalizedMethod)) {
+    return false;
+  }
+
   const writePaths = [
     '/api/appointments',
     '/api/conversations',
@@ -40,23 +51,71 @@ function isWriteOperation(pathname: string): boolean {
   return writePaths.some((path) => pathname.startsWith(path));
 }
 
+function getRateLimitBucket(pathname: string, method: string): RateLimitBucket {
+  if (pathname.startsWith('/api/yahoo/sync')) {
+    return 'sync';
+  }
+
+  // Inbox reads can be high-frequency (search/open thread/pagination); keep these on read limits.
+  if (
+    method.toUpperCase() === 'GET' &&
+    (pathname === '/api/conversations' ||
+      pathname.startsWith('/api/conversations/'))
+  ) {
+    return 'read';
+  }
+
+  return isWriteOperation(pathname, method) ? 'write' : 'read';
+}
+
 function getClientIdentifier(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for');
   const ip = forwarded ? forwarded.split(',')[0] : request.headers.get('x-real-ip') || 'unknown';
   return ip;
 }
 
+function getRateLimitIdentifier(
+  request: NextRequest,
+  token: Awaited<ReturnType<typeof getToken>> | null
+): string {
+  const tokenObj = token && typeof token === 'object' ? (token as Record<string, unknown>) : null;
+  const tenantId = tokenObj && typeof tokenObj.tenantId === 'string' ? tokenObj.tenantId : '';
+  const userId =
+    tokenObj && typeof tokenObj.id === 'string'
+      ? tokenObj.id
+      : tokenObj && typeof tokenObj.sub === 'string'
+        ? tokenObj.sub
+        : '';
+
+  if (tenantId && userId) {
+    return withRedisPrefix(`ratelimit:tenant:${tenantId}:user:${userId}`);
+  }
+
+  if (userId) {
+    return withRedisPrefix(`ratelimit:user:${userId}`);
+  }
+
+  return withRedisPrefix(`ratelimit:ip:${getClientIdentifier(request)}`);
+}
+
 function checkRateLimitInMemory(
   identifier: string,
-  isWrite: boolean
+  bucket: RateLimitBucket
 ): RateLimitResult {
   const now = Date.now();
-  const limit = isWrite ? RATE_LIMIT_STRICT_MAX_REQUESTS : RATE_LIMIT_MAX_REQUESTS;
-  const entry = rateLimitStore.get(identifier);
+  const limit =
+    bucket === 'sync'
+      ? RATE_LIMIT_SYNC_MAX_REQUESTS
+      : bucket === 'write'
+        ? RATE_LIMIT_STRICT_MAX_REQUESTS
+        : RATE_LIMIT_MAX_REQUESTS;
+  const windowMs = bucket === 'sync' ? RATE_LIMIT_SYNC_WINDOW_MS : RATE_LIMIT_WINDOW_MS;
+  const scopedIdentifier = `${bucket}:${identifier}`;
+  const entry = rateLimitStore.get(scopedIdentifier);
 
   if (!entry || now > entry.resetTime) {
-    const resetTime = now + RATE_LIMIT_WINDOW_MS;
-    rateLimitStore.set(identifier, { count: 1, resetTime });
+    const resetTime = now + windowMs;
+    rateLimitStore.set(scopedIdentifier, { count: 1, resetTime });
     return { allowed: true, remaining: limit - 1, resetTime, limit };
   }
 
@@ -68,7 +127,7 @@ function checkRateLimitInMemory(
   return { allowed: true, remaining: limit - entry.count, resetTime: entry.resetTime, limit };
 }
 
-function getRedisLimiters(): { read: Ratelimit; write: Ratelimit } | null {
+function getRedisLimiters(): { read: Ratelimit; write: Ratelimit; sync: Ratelimit } | null {
   const redis = getRedis();
   if (!redis) {
     return null;
@@ -90,20 +149,33 @@ function getRedisLimiters(): { read: Ratelimit; write: Ratelimit } | null {
     });
   }
 
-  return { read: redisReadLimiter, write: redisWriteLimiter };
+  if (!redisSyncLimiter) {
+    redisSyncLimiter = new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(RATE_LIMIT_SYNC_MAX_REQUESTS, SYNC_WINDOW),
+      analytics: false,
+    });
+  }
+
+  return { read: redisReadLimiter, write: redisWriteLimiter, sync: redisSyncLimiter };
 }
 
 async function checkRateLimit(
   identifier: string,
-  isWrite: boolean
+  bucket: RateLimitBucket
 ): Promise<RateLimitResult> {
   const redisLimiters = getRedisLimiters();
   if (!redisLimiters) {
-    return checkRateLimitInMemory(identifier, isWrite);
+    return checkRateLimitInMemory(identifier, bucket);
   }
 
   try {
-    const limiter = isWrite ? redisLimiters.write : redisLimiters.read;
+    const limiter =
+      bucket === 'sync'
+        ? redisLimiters.sync
+        : bucket === 'write'
+          ? redisLimiters.write
+          : redisLimiters.read;
     const result = await limiter.limit(identifier);
     return {
       allowed: result.success,
@@ -113,7 +185,7 @@ async function checkRateLimit(
     };
   } catch {
     // Redis issues should not disable protection; fall back to in-memory limiter.
-    return checkRateLimitInMemory(identifier, isWrite);
+    return checkRateLimitInMemory(identifier, bucket);
   }
 }
 
@@ -130,6 +202,7 @@ const PUBLIC_PATH_PREFIXES = [
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  let token: Awaited<ReturnType<typeof getToken>> | null = null;
   const benchmarkBypassEnabled = process.env.BENCHMARK_MODE === 'true';
   const benchmarkToken = process.env.BENCHMARK_TOKEN;
   const benchmarkBypass =
@@ -143,7 +216,7 @@ export async function middleware(request: NextRequest) {
 
   const isPublic = PUBLIC_PATH_PREFIXES.some((path) => pathname.startsWith(path));
   if (!isPublic) {
-    const token = await getToken({ req: request, secret: process.env.AUTH_SECRET });
+    token = await getToken({ req: request, secret: process.env.AUTH_SECRET });
 
     if (!token) {
       if (pathname.startsWith('/api')) {
@@ -168,9 +241,9 @@ export async function middleware(request: NextRequest) {
   }
 
   if (process.env.NODE_ENV === 'production' && pathname.startsWith('/api') && !benchmarkBypass) {
-    const identifier = withRedisPrefix(`ratelimit:${getClientIdentifier(request)}`);
-    const isWrite = isWriteOperation(pathname);
-    const rateLimit = await checkRateLimit(identifier, isWrite);
+    const identifier = getRateLimitIdentifier(request, token);
+    const bucket = getRateLimitBucket(pathname, request.method);
+    const rateLimit = await checkRateLimit(identifier, bucket);
     if (!rateLimit.allowed) {
       return NextResponse.json(
         {

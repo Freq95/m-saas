@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
       providerId: searchParams.get('providerId') || undefined,
       resourceId: searchParams.get('resourceId') || undefined,
       status: searchParams.get('status') || undefined,
+      search: searchParams.get('search') || undefined,
     };
 
     const validationResult = appointmentsQuerySchema.safeParse(queryParams);
@@ -30,13 +31,22 @@ export async function GET(request: NextRequest) {
       return handleApiError(validationResult.error, 'Invalid query parameters');
     }
 
-    const { startDate, endDate, providerId, resourceId, status } = validationResult.data;
+    const { startDate, endDate, providerId, resourceId, status, search } = validationResult.data;
     const cacheKey = appointmentsListCacheKey(
       { tenantId, userId },
-      { startDate, endDate, providerId, resourceId, status }
+      { startDate, endDate, providerId, resourceId, status, search }
     );
     const payload = await getCached(cacheKey, 120, async () => {
-      const appointments = await getAppointmentsData({ userId, tenantId, startDate, endDate, providerId, resourceId, status });
+      const appointments = await getAppointmentsData({
+        userId,
+        tenantId,
+        startDate,
+        endDate,
+        providerId,
+        resourceId,
+        status,
+        search,
+      });
       return { appointments };
     });
 

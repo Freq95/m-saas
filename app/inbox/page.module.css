@@ -129,6 +129,28 @@
   box-shadow: 0 10px 20px rgba(45, 136, 255, 0.24);
 }
 
+.syncButtonInner {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+}
+
+.syncSpinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(148, 163, 184, 0.4);
+  border-top-color: var(--color-text);
+  border-radius: 999px;
+  animation: syncSpin 0.75s linear infinite;
+}
+
+@keyframes syncSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .syncButton:hover {
   filter: brightness(1.07);
   transform: translateY(-1px);
