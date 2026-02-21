@@ -78,6 +78,25 @@ export async function getClientsData(query: ClientsQuery = {}): Promise<ClientsR
   const clients = (await db
     .collection('clients')
     .find(filter)
+    .project({
+      _id: 1,
+      id: 1,
+      tenant_id: 1,
+      user_id: 1,
+      name: 1,
+      email: 1,
+      phone: 1,
+      notes: 1,
+      total_spent: 1,
+      total_appointments: 1,
+      last_appointment_date: 1,
+      last_conversation_date: 1,
+      last_activity_date: 1,
+      first_contact_date: 1,
+      created_at: 1,
+      updated_at: 1,
+      deleted_at: 1,
+    })
     .sort(sort)
     .skip(offset)
     .limit(limit)

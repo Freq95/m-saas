@@ -1,0 +1,390 @@
+{
+  "metadata": {
+    "timestampIso": "2026-02-21T10:50:01.190Z",
+    "runId": "20260221-105001",
+    "runtimeLabel": "local-prod",
+    "targetBaseUrl": "http://127.0.0.1:3000",
+    "gitCommit": "01f0a70",
+    "nodeVersion": "v18.20.0",
+    "benchmarkConfigPath": "D:\\m-saas\\scripts\\benchmark\\config.baseline.json",
+    "benchmarkConfigHash": "3601fb90999b",
+    "envFlags": {
+      "redisConfigured": false,
+      "cronConfigured": true,
+      "sentryConfigured": false
+    }
+  },
+  "modules": {
+    "uiPages": {
+      "endpointMetrics": [
+        {
+          "endpointName": "ui.dashboard",
+          "method": "GET",
+          "path": "/dashboard",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 873.59,
+          "maxMs": 2107.84,
+          "avgMs": 1304.06,
+          "p50Ms": 1113.35,
+          "p90Ms": 1846.83,
+          "p95Ms": 1934.63,
+          "p99Ms": 1969.78,
+          "throughputRps": 7.49,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "ui.dashboard",
+          "method": "GET",
+          "path": "/dashboard",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 1551.9,
+          "maxMs": 8846.65,
+          "avgMs": 5436.84,
+          "p50Ms": 5788.97,
+          "p90Ms": 6745.59,
+          "p95Ms": 8085.46,
+          "p99Ms": 8225.11,
+          "throughputRps": 8.93,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "ui.clients",
+          "method": "GET",
+          "path": "/clients",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 22.29,
+          "maxMs": 73.07,
+          "avgMs": 32.26,
+          "p50Ms": 28.05,
+          "p90Ms": 47.2,
+          "p95Ms": 61.45,
+          "p99Ms": 71.52,
+          "throughputRps": 303.78,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "ui.clients",
+          "method": "GET",
+          "path": "/clients",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 78.85,
+          "maxMs": 171.76,
+          "avgMs": 131.07,
+          "p50Ms": 129.86,
+          "p90Ms": 141.02,
+          "p95Ms": 142.89,
+          "p99Ms": 160.5,
+          "throughputRps": 354.2,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "ui.calendar",
+          "method": "GET",
+          "path": "/calendar",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 237.81,
+          "maxMs": 1504.68,
+          "avgMs": 855.45,
+          "p50Ms": 879.02,
+          "p90Ms": 1327.22,
+          "p95Ms": 1430.81,
+          "p99Ms": 1502.57,
+          "throughputRps": 11.29,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "ui.calendar",
+          "method": "GET",
+          "path": "/calendar",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 766.53,
+          "maxMs": 8024.81,
+          "avgMs": 4518.57,
+          "p50Ms": 4592.01,
+          "p90Ms": 6346.32,
+          "p95Ms": 6943.57,
+          "p99Ms": 7526.65,
+          "throughputRps": 10.8,
+          "statuses": {
+            "200": 300
+          }
+        },
+        {
+          "endpointName": "ui.inbox",
+          "method": "GET",
+          "path": "/inbox",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 466.92,
+          "maxMs": 4105.81,
+          "avgMs": 1561.83,
+          "p50Ms": 1308.75,
+          "p90Ms": 2485.08,
+          "p95Ms": 3250.29,
+          "p99Ms": 3958.63,
+          "throughputRps": 6.13,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "ui.inbox",
+          "method": "GET",
+          "path": "/inbox",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 281,
+          "errorCount": 19,
+          "errorRatePct": 6.33,
+          "minMs": 2589.92,
+          "maxMs": 10015.4,
+          "avgMs": 6669.6,
+          "p50Ms": 6677.03,
+          "p90Ms": 9351.48,
+          "p95Ms": 10003.35,
+          "p99Ms": 10011.88,
+          "throughputRps": 7.28,
+          "statuses": {
+            "200": 281,
+            "ERROR": 19
+          }
+        },
+        {
+          "endpointName": "ui.settings.email",
+          "method": "GET",
+          "path": "/settings/email",
+          "tier": "light",
+          "requests": 100,
+          "successCount": 100,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 83.28,
+          "maxMs": 163.08,
+          "avgMs": 110.16,
+          "p50Ms": 111.58,
+          "p90Ms": 129.5,
+          "p95Ms": 144,
+          "p99Ms": 154.56,
+          "throughputRps": 90.16,
+          "statuses": {
+            "200": 100
+          }
+        },
+        {
+          "endpointName": "ui.settings.email",
+          "method": "GET",
+          "path": "/settings/email",
+          "tier": "medium",
+          "requests": 300,
+          "successCount": 300,
+          "errorCount": 0,
+          "errorRatePct": 0,
+          "minMs": 218.07,
+          "maxMs": 750.77,
+          "avgMs": 420.73,
+          "p50Ms": 380.67,
+          "p90Ms": 601.88,
+          "p95Ms": 623.7,
+          "p99Ms": 710.87,
+          "throughputRps": 111.42,
+          "statuses": {
+            "200": 300
+          }
+        }
+      ]
+    }
+  },
+  "delta": {
+    "againstRunId": "20260220-110718",
+    "neutralThresholdPct": 5,
+    "metrics": [
+      {
+        "endpointName": "ui.dashboard",
+        "tier": "light",
+        "path": "/dashboard",
+        "p95BeforeMs": 1528.79,
+        "p95AfterMs": 1934.63,
+        "p95DeltaPct": 26.55,
+        "throughputBeforeRps": 8.95,
+        "throughputAfterRps": 7.49,
+        "throughputDeltaPct": -16.31,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "regressed"
+      },
+      {
+        "endpointName": "ui.dashboard",
+        "tier": "medium",
+        "path": "/dashboard",
+        "p95BeforeMs": 7084.91,
+        "p95AfterMs": 8085.46,
+        "p95DeltaPct": 14.12,
+        "throughputBeforeRps": 9.05,
+        "throughputAfterRps": 8.93,
+        "throughputDeltaPct": -1.33,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "regressed"
+      },
+      {
+        "endpointName": "ui.clients",
+        "tier": "light",
+        "path": "/clients",
+        "p95BeforeMs": 24.34,
+        "p95AfterMs": 61.45,
+        "p95DeltaPct": 152.47,
+        "throughputBeforeRps": 464.2,
+        "throughputAfterRps": 303.78,
+        "throughputDeltaPct": -34.56,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "regressed"
+      },
+      {
+        "endpointName": "ui.clients",
+        "tier": "medium",
+        "path": "/clients",
+        "p95BeforeMs": 110.76,
+        "p95AfterMs": 142.89,
+        "p95DeltaPct": 29.01,
+        "throughputBeforeRps": 487.32,
+        "throughputAfterRps": 354.2,
+        "throughputDeltaPct": -27.32,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "regressed"
+      },
+      {
+        "endpointName": "ui.calendar",
+        "tier": "light",
+        "path": "/calendar",
+        "p95BeforeMs": 1313.33,
+        "p95AfterMs": 1430.81,
+        "p95DeltaPct": 8.95,
+        "throughputBeforeRps": 11.63,
+        "throughputAfterRps": 11.29,
+        "throughputDeltaPct": -2.92,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "regressed"
+      },
+      {
+        "endpointName": "ui.calendar",
+        "tier": "medium",
+        "path": "/calendar",
+        "p95BeforeMs": 6390.69,
+        "p95AfterMs": 6943.57,
+        "p95DeltaPct": 8.65,
+        "throughputBeforeRps": 10.81,
+        "throughputAfterRps": 10.8,
+        "throughputDeltaPct": -0.09,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "regressed"
+      },
+      {
+        "endpointName": "ui.inbox",
+        "tier": "light",
+        "path": "/inbox",
+        "p95BeforeMs": 961.87,
+        "p95AfterMs": 3250.29,
+        "p95DeltaPct": 237.91,
+        "throughputBeforeRps": 13.95,
+        "throughputAfterRps": 6.13,
+        "throughputDeltaPct": -56.06,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "regressed"
+      },
+      {
+        "endpointName": "ui.inbox",
+        "tier": "medium",
+        "path": "/inbox",
+        "p95BeforeMs": 3719.28,
+        "p95AfterMs": 10003.35,
+        "p95DeltaPct": 168.96,
+        "throughputBeforeRps": 16.33,
+        "throughputAfterRps": 7.28,
+        "throughputDeltaPct": -55.42,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 6.33,
+        "errorRateDeltaPct": 100,
+        "status": "regressed"
+      },
+      {
+        "endpointName": "ui.settings.email",
+        "tier": "light",
+        "path": "/settings/email",
+        "p95BeforeMs": 121.8,
+        "p95AfterMs": 144,
+        "p95DeltaPct": 18.23,
+        "throughputBeforeRps": 102.98,
+        "throughputAfterRps": 90.16,
+        "throughputDeltaPct": -12.45,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "regressed"
+      },
+      {
+        "endpointName": "ui.settings.email",
+        "tier": "medium",
+        "path": "/settings/email",
+        "p95BeforeMs": 678.45,
+        "p95AfterMs": 623.7,
+        "p95DeltaPct": -8.07,
+        "throughputBeforeRps": 126.43,
+        "throughputAfterRps": 111.42,
+        "throughputDeltaPct": -11.87,
+        "errorRateBeforePct": 0,
+        "errorRateAfterPct": 0,
+        "errorRateDeltaPct": 0,
+        "status": "neutral"
+      }
+    ]
+  }
+}

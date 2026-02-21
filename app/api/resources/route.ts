@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { getCached } from '@/lib/redis';
 import { resourcesListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
+import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
 
 // Cleanup classification: feature-flagged (advanced scheduling domain, no core UI dependency).
 // GET /api/resources - List all resources for a user
@@ -10,20 +11,30 @@ export async function GET(request: NextRequest) {
   try {
     const { userId, tenantId } = await getAuthUser();
 
-    const cacheKey = resourcesListCacheKey({ tenantId, userId: Number(userId) });
+    const cacheKey = resourcesListCacheKey({ tenantId, userId });
     const resources = await getCached(cacheKey, 1800, async () => {
       const db = await getMongoDbOrThrow();
       return db
         .collection('resources')
-        .find({ user_id: Number(userId), tenant_id: tenantId, is_active: true })
+        .find({ user_id: userId, tenant_id: tenantId, is_active: true })
+        .project({
+          _id: 1,
+          id: 1,
+          tenant_id: 1,
+          user_id: 1,
+          name: 1,
+          type: 1,
+          is_active: 1,
+          created_at: 1,
+          updated_at: 1,
+        })
         .sort({ name: 1 })
         .toArray();
     });
 
-    return NextResponse.json({ resources });
+    return createSuccessResponse({ resources });
   } catch (error) {
-    console.error('Error fetching resources:', error);
-    return NextResponse.json({ error: 'Failed to fetch resources' }, { status: 500 });
+    return handleApiError(error, 'Failed to fetch resources');
   }
 }
 
@@ -35,17 +46,11 @@ export async function POST(request: NextRequest) {
     const { name, type } = body;
 
     if (!name || !type) {
-      return NextResponse.json(
-        { error: 'name and type are required' },
-        { status: 400 }
-      );
+      return createErrorResponse('name and type are required', 400);
     }
 
     if (!['chair', 'room', 'equipment'].includes(type)) {
-      return NextResponse.json(
-        { error: 'type must be chair, room, or equipment' },
-        { status: 400 }
-      );
+      return createErrorResponse('type must be chair, room, or equipment', 400);
     }
 
     const db = await getMongoDbOrThrow();
@@ -61,7 +66,7 @@ export async function POST(request: NextRequest) {
 
     const resource = {
       id: nextId,
-      user_id: Number(userId),
+      user_id: userId,
       tenant_id: tenantId,
       name,
       type,
@@ -70,11 +75,10 @@ export async function POST(request: NextRequest) {
     };
 
     await db.collection('resources').insertOne(resource);
-    await invalidateReadCaches({ tenantId, userId: Number(userId) });
+    await invalidateReadCaches({ tenantId, userId });
 
-    return NextResponse.json({ resource }, { status: 201 });
+    return createSuccessResponse({ resource }, 201);
   } catch (error) {
-    console.error('Error creating resource:', error);
-    return NextResponse.json({ error: 'Failed to create resource' }, { status: 500 });
+    return handleApiError(error, 'Failed to create resource');
   }
 }

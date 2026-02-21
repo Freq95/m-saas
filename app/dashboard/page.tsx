@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import styles from './page.module.css';
 import { getDashboardData } from '@/lib/server/dashboard';
 import { auth } from '@/lib/auth';
+import { ObjectId } from 'mongodb';
 
 export const revalidate = 30;
 
@@ -52,8 +53,10 @@ export default async function DashboardPage() {
   if (!session?.user?.id) redirect('/login');
   const userId = Number.parseInt(session.user.id, 10);
   if (!Number.isFinite(userId) || userId <= 0) redirect('/login');
+  if (!session.user.tenantId || !ObjectId.isValid(session.user.tenantId)) redirect('/login');
+  const tenantId = new ObjectId(session.user.tenantId);
 
-  const data: DashboardData = await getDashboardData(userId, 7);
+  const data: DashboardData = await getDashboardData(userId, tenantId, 7);
 
   return (
     <div className={styles.container}>

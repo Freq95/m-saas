@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { getCached } from '@/lib/redis';
 import { providersListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
+import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
 
 // Cleanup classification: feature-flagged (advanced scheduling domain, no core UI dependency).
 // GET /api/providers - List all providers for a user
@@ -10,20 +11,33 @@ export async function GET(request: NextRequest) {
   try {
     const { userId, tenantId } = await getAuthUser();
 
-    const cacheKey = providersListCacheKey({ tenantId, userId: Number(userId) });
+    const cacheKey = providersListCacheKey({ tenantId, userId });
     const providers = await getCached(cacheKey, 1800, async () => {
       const db = await getMongoDbOrThrow();
       return db
         .collection('providers')
-        .find({ user_id: Number(userId), tenant_id: tenantId, is_active: true })
+        .find({ user_id: userId, tenant_id: tenantId, is_active: true })
+        .project({
+          _id: 1,
+          id: 1,
+          tenant_id: 1,
+          user_id: 1,
+          name: 1,
+          email: 1,
+          role: 1,
+          color: 1,
+          working_hours: 1,
+          is_active: 1,
+          created_at: 1,
+          updated_at: 1,
+        })
         .sort({ name: 1 })
         .toArray();
     });
 
-    return NextResponse.json({ providers });
+    return createSuccessResponse({ providers });
   } catch (error) {
-    console.error('Error fetching providers:', error);
-    return NextResponse.json({ error: 'Failed to fetch providers' }, { status: 500 });
+    return handleApiError(error, 'Failed to fetch providers');
   }
 }
 
@@ -35,10 +49,7 @@ export async function POST(request: NextRequest) {
     const { name, email, role, color, workingHours } = body;
 
     if (!name || !email || !role) {
-      return NextResponse.json(
-        { error: 'name, email, and role are required' },
-        { status: 400 }
-      );
+      return createErrorResponse('name, email, and role are required', 400);
     }
 
     const db = await getMongoDbOrThrow();
@@ -54,7 +65,7 @@ export async function POST(request: NextRequest) {
 
     const provider = {
       id: nextId,
-      user_id: Number(userId),
+      user_id: userId,
       tenant_id: tenantId,
       name,
       email,
@@ -72,11 +83,10 @@ export async function POST(request: NextRequest) {
     };
 
     await db.collection('providers').insertOne(provider);
-    await invalidateReadCaches({ tenantId, userId: Number(userId) });
+    await invalidateReadCaches({ tenantId, userId });
 
-    return NextResponse.json({ provider }, { status: 201 });
+    return createSuccessResponse({ provider }, 201);
   } catch (error) {
-    console.error('Error creating provider:', error);
-    return NextResponse.json({ error: 'Failed to create provider' }, { status: 500 });
+    return handleApiError(error, 'Failed to create provider');
   }
 }

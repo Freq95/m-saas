@@ -1,4 +1,4 @@
-import { format, startOfDay, endOfDay, subDays, isValid } from 'date-fns';
+import { format, startOfDay, endOfDay, subDays } from 'date-fns';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { ObjectId } from 'mongodb';
 
@@ -29,32 +29,16 @@ type DashboardData = {
   };
 };
 
-function safeParseDate(dateValue: unknown): Date | null {
-  if (!dateValue) return null;
-  const date = new Date(dateValue as string);
-  return isValid(date) ? date : null;
-}
+type ScopeFilter = {
+  user_id: number;
+  tenant_id?: ObjectId;
+};
 
-function emptyDashboard(): DashboardData {
-  return {
-    messagesPerDay: [],
-    appointmentsPerDay: [],
-    today: {
-      messages: 0,
-      appointments: 0,
-      totalClients: 0,
-      appointmentsList: [],
-    },
-    noShowRate: 0,
-    estimatedRevenue: 0,
-    clients: {
-      topClients: [],
-      newClientsToday: 0,
-      newClientsWeek: 0,
-      inactiveClients: [],
-      growth: [],
-    },
-  };
+function buildScopeFilter(userId: number, tenantId?: ObjectId): ScopeFilter {
+  if (tenantId) {
+    return { user_id: userId, tenant_id: tenantId };
+  }
+  return { user_id: userId };
 }
 
 export async function getDashboardData(
@@ -62,200 +46,303 @@ export async function getDashboardData(
   tenantIdOrDays?: ObjectId | number,
   days: number = 7
 ): Promise<DashboardData> {
-  try {
-    const tenantId = typeof tenantIdOrDays === 'number' || tenantIdOrDays === undefined
-      ? undefined
-      : tenantIdOrDays;
-    const resolvedDays = typeof tenantIdOrDays === 'number' ? tenantIdOrDays : days;
-    const db = await getMongoDbOrThrow();
+  const tenantId = typeof tenantIdOrDays === 'number' || tenantIdOrDays === undefined
+    ? undefined
+    : tenantIdOrDays;
+  const resolvedDays = typeof tenantIdOrDays === 'number' ? tenantIdOrDays : days;
+  const db = await getMongoDbOrThrow();
 
-    const today = new Date();
-    const startDate = startOfDay(subDays(today, resolvedDays - 1));
-    const endDate = endOfDay(today);
-    const todayStr = format(today, 'yyyy-MM-dd');
+  {
+    const now = new Date();
+    const startDate = startOfDay(subDays(now, resolvedDays - 1));
+    const endDate = endOfDay(now);
+    const todayStart = startOfDay(now);
+    const todayEnd = endOfDay(now);
+    const weekStart = startOfDay(subDays(now, 7));
+    const growthStart = startOfDay(subDays(now, 6));
+    const thirtyDaysAgo = subDays(now, 30);
 
-    const conversations = await db
-      .collection('conversations')
-      .find(tenantId ? { user_id: userId, tenant_id: tenantId } : { user_id: userId })
-      .toArray();
-    const conversationIds = conversations.map((c: any) => c.id);
+    const startIso = startDate.toISOString();
+    const endIso = endDate.toISOString();
+    const todayStartIso = todayStart.toISOString();
+    const todayEndIso = todayEnd.toISOString();
+    const weekStartIso = weekStart.toISOString();
+    const growthStartIso = growthStart.toISOString();
+    const thirtyDaysAgoIso = thirtyDaysAgo.toISOString();
+    const todayStr = format(now, 'yyyy-MM-dd');
 
-    const allMessages = conversationIds.length > 0
-      ? await db.collection('messages').find(tenantId ? { conversation_id: { $in: conversationIds }, tenant_id: tenantId } : { conversation_id: { $in: conversationIds } }).toArray()
-      : [];
+    const scopeFilter = buildScopeFilter(userId, tenantId);
+    const activeClientsFilter: Record<string, unknown> = {
+      ...scopeFilter,
+      deleted_at: { $exists: false },
+    };
 
-    const messagesInRange = allMessages.filter((m: any) => {
-      const sentAt = safeParseDate(m.sent_at || m.created_at);
-      if (!sentAt) return false;
-      return sentAt >= startDate && sentAt <= endDate;
-    });
+    const appointmentProjection = {
+      id: 1,
+      service_id: 1,
+      client_name: 1,
+      start_time: 1,
+      end_time: 1,
+      status: 1,
+    };
 
-    const allAppointments = await db
+    const appointmentsRangeQuery = db
       .collection('appointments')
-      .find(tenantId ? { user_id: userId, tenant_id: tenantId } : { user_id: userId })
-      .toArray();
+      .find({
+        ...scopeFilter,
+        start_time: { $gte: startIso, $lte: endIso },
+      })
+      .project(appointmentProjection);
+    const todayAppointmentsQuery = db
+      .collection('appointments')
+      .find({
+        ...scopeFilter,
+        start_time: { $gte: todayStartIso, $lte: todayEndIso },
+      })
+      .project(appointmentProjection)
+      .sort({ start_time: 1 });
+    const conversationsQuery = db
+      .collection('conversations')
+      .find(scopeFilter)
+      .project({ id: 1 });
+    const topClientsQuery = db
+      .collection('clients')
+      .find({
+        ...activeClientsFilter,
+        total_spent: { $gt: 0 },
+      })
+      .project({
+        _id: 1,
+        id: 1,
+        name: 1,
+        email: 1,
+        phone: 1,
+        total_spent: 1,
+        total_appointments: 1,
+        last_appointment_date: 1,
+        last_conversation_date: 1,
+        last_activity_date: 1,
+        first_contact_date: 1,
+        created_at: 1,
+        updated_at: 1,
+      })
+      .sort({ total_spent: -1 })
+      .limit(5);
+    const inactiveClientsPipeline: Record<string, unknown>[] = [
+      { $match: activeClientsFilter },
+      {
+        $addFields: {
+          sort_ts: { $ifNull: ['$last_appointment_date', { $ifNull: ['$last_conversation_date', '$created_at'] }] },
+        },
+      },
+      {
+        $match: {
+          $expr: {
+            $and: [
+              { $lt: [{ $ifNull: ['$last_appointment_date', '1970-01-01T00:00:00.000Z'] }, thirtyDaysAgoIso] },
+              { $lt: [{ $ifNull: ['$last_conversation_date', '1970-01-01T00:00:00.000Z'] }, thirtyDaysAgoIso] },
+            ],
+          },
+        },
+      },
+      { $sort: { sort_ts: -1 } },
+      { $limit: 10 },
+      {
+        $project: {
+          _id: 1,
+          id: 1,
+          name: 1,
+          email: 1,
+          phone: 1,
+          total_spent: 1,
+          total_appointments: 1,
+          last_appointment_date: 1,
+          last_conversation_date: 1,
+          last_activity_date: 1,
+          first_contact_date: 1,
+          created_at: 1,
+          updated_at: 1,
+        },
+      },
+    ];
+    const clientGrowthPipeline: Record<string, unknown>[] = [
+      {
+        $match: {
+          ...activeClientsFilter,
+          created_at: { $gte: growthStartIso, $lte: todayEndIso },
+        },
+      },
+      {
+        $group: {
+          _id: { $substrBytes: ['$created_at', 0, 10] },
+          count: { $sum: 1 },
+        },
+      },
+    ];
 
-    const appointmentsInRange = allAppointments.filter((a: any) => {
-      const startTime = safeParseDate(a.start_time);
-      if (!startTime) return false;
-      return startTime >= startDate && startTime <= endDate;
-    });
+    const [
+      appointmentsInRange,
+      todayAppointmentsRaw,
+      conversations,
+      totalClients,
+      topClientsRaw,
+      inactiveClientsRaw,
+      newClientsToday,
+      newClientsWeek,
+      clientGrowthRows,
+    ] = await Promise.all([
+      appointmentsRangeQuery.toArray(),
+      todayAppointmentsQuery.toArray(),
+      conversationsQuery.toArray(),
+      db.collection('clients').countDocuments(activeClientsFilter),
+      topClientsQuery.toArray(),
+      db.collection('clients').aggregate(inactiveClientsPipeline).toArray(),
+      db.collection('clients').countDocuments({
+        ...activeClientsFilter,
+        created_at: { $gte: todayStartIso, $lte: todayEndIso },
+      }),
+      db.collection('clients').countDocuments({
+        ...activeClientsFilter,
+        created_at: { $gte: weekStartIso },
+      }),
+      db.collection('clients').aggregate(clientGrowthPipeline).toArray(),
+    ]);
 
-    const services = await db.collection('services').find(tenantId ? { tenant_id: tenantId } : {}).toArray();
-    const servicesMap = new Map(services.map((s: any) => [s.id, s]));
+    const conversationIds = conversations
+      .map((c: any) => c.id)
+      .filter((id: unknown): id is number => typeof id === 'number');
 
     const messagesPerDayMap = new Map<string, number>();
     for (let i = 0; i < resolvedDays; i++) {
-      const date = format(subDays(today, resolvedDays - 1 - i), 'yyyy-MM-dd');
+      const date = format(subDays(now, resolvedDays - 1 - i), 'yyyy-MM-dd');
       messagesPerDayMap.set(date, 0);
     }
-    messagesInRange.forEach((m: any) => {
-      const sentAt = safeParseDate(m.sent_at || m.created_at);
-      if (!sentAt) return;
-      const date = format(sentAt, 'yyyy-MM-dd');
-      if (messagesPerDayMap.has(date)) {
-        messagesPerDayMap.set(date, (messagesPerDayMap.get(date) || 0) + 1);
+
+    if (conversationIds.length > 0) {
+      const messagesPipeline: Record<string, unknown>[] = [
+        {
+          $match: tenantId
+            ? { tenant_id: tenantId, conversation_id: { $in: conversationIds } }
+            : { conversation_id: { $in: conversationIds } },
+        },
+        {
+          $project: {
+            sent_at: 1,
+            created_at: 1,
+          },
+        },
+        {
+          $addFields: {
+            event_at: { $ifNull: ['$sent_at', '$created_at'] },
+          },
+        },
+        {
+          $match: {
+            event_at: { $gte: startIso, $lte: endIso },
+          },
+        },
+        {
+          $group: {
+            _id: { $substrBytes: ['$event_at', 0, 10] },
+            count: { $sum: 1 },
+          },
+        },
+      ];
+      const messagesAggCursor = db.collection('messages').aggregate(messagesPipeline);
+      const messageRows = await messagesAggCursor.toArray();
+      for (const row of messageRows as any[]) {
+        if (typeof row?._id === 'string') {
+          messagesPerDayMap.set(row._id, row.count || 0);
+        }
       }
-    });
+    }
+
     const messagesPerDay = Array.from(messagesPerDayMap.entries())
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
     const appointmentsPerDayMap = new Map<string, number>();
-    appointmentsInRange.forEach((a: any) => {
-      const startTime = safeParseDate(a.start_time);
-      if (!startTime) return;
-      const date = format(startTime, 'yyyy-MM-dd');
+    for (const appointment of appointmentsInRange as any[]) {
+      if (typeof appointment?.start_time !== 'string') {
+        continue;
+      }
+      const date = appointment.start_time.slice(0, 10);
       appointmentsPerDayMap.set(date, (appointmentsPerDayMap.get(date) || 0) + 1);
-    });
+    }
     const appointmentsPerDay = Array.from(appointmentsPerDayMap.entries())
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
-    const messagesToday = allMessages.filter((m: any) => {
-      const sentAt = safeParseDate(m.sent_at || m.created_at);
-      if (!sentAt) return false;
-      return format(sentAt, 'yyyy-MM-dd') === todayStr;
-    }).length;
+    const serviceIds = Array.from(
+      new Set(
+        [...appointmentsInRange, ...todayAppointmentsRaw]
+          .map((appointment: any) => appointment.service_id)
+          .filter((serviceId: unknown): serviceId is number => typeof serviceId === 'number')
+      )
+    );
 
-    const todayStart = startOfDay(today);
-    const todayEnd = endOfDay(today);
-    const appointmentsToday = allAppointments.filter((a: any) => {
-      const startTime = safeParseDate(a.start_time);
-      if (!startTime) return false;
-      return startTime >= todayStart && startTime <= todayEnd;
-    }).length;
+    const servicesQuery = db.collection('services')
+      .find(
+        tenantId
+          ? { tenant_id: tenantId, user_id: userId, id: { $in: serviceIds } }
+          : { user_id: userId, id: { $in: serviceIds } }
+      )
+      .project({ id: 1, name: 1, price: 1 });
+    const services = serviceIds.length > 0 ? await servicesQuery.toArray() : [];
+    const servicesMap = new Map<number, any>(services.map((service: any) => [service.id, service]));
 
-    const todayAppointments = allAppointments
-      .filter((a: any) => {
-        const startTime = safeParseDate(a.start_time);
-        if (!startTime) return false;
-        return startTime >= todayStart && startTime <= todayEnd;
-      })
-      .map((a: any) => {
-        const service: any = servicesMap.get(a.service_id);
-        return {
-          id: a.id,
-          client_name: a.client_name,
-          service_name: service?.name || 'Unknown',
-          start_time: a.start_time,
-          end_time: a.end_time,
-          status: a.status,
-        };
-      })
-      .sort((a: any, b: any) => {
-        const aTime = safeParseDate(a.start_time);
-        const bTime = safeParseDate(b.start_time);
-        if (!aTime || !bTime) return 0;
-        return aTime.getTime() - bTime.getTime();
-      });
-
-    const totalClientsFilter: Record<string, unknown> = {
-      user_id: userId,
-      deleted_at: { $exists: false },
-    };
-    if (tenantId) totalClientsFilter.tenant_id = tenantId;
-    const totalClients = await db.collection('clients').countDocuments(totalClientsFilter);
-
-    const noShows = appointmentsInRange.filter((a: any) => a.status === 'no_show' || a.status === 'no-show').length;
-    const totalAppointments = appointmentsInRange.filter((a: any) =>
-      ['scheduled', 'completed', 'no_show', 'no-show', 'cancelled'].includes(a.status)
+    const noShows = (appointmentsInRange as any[]).filter(
+      (appointment: any) => appointment.status === 'no_show' || appointment.status === 'no-show'
+    ).length;
+    const totalAppointments = (appointmentsInRange as any[]).filter((appointment: any) =>
+      ['scheduled', 'completed', 'no_show', 'no-show', 'cancelled'].includes(appointment.status)
     ).length;
     const noShowRate = totalAppointments > 0 ? (noShows / totalAppointments) * 100 : 0;
 
-    const estimatedRevenue = appointmentsInRange
-      .filter((a: any) => ['scheduled', 'completed'].includes(a.status))
-      .reduce((sum: number, a: any) => {
-        const service: any = servicesMap.get(a.service_id);
-        return sum + (service?.price || 0);
+    const estimatedRevenue = (appointmentsInRange as any[])
+      .filter((appointment: any) => ['scheduled', 'completed'].includes(appointment.status))
+      .reduce((sum: number, appointment: any) => {
+        const service = servicesMap.get(appointment.service_id);
+        return sum + (typeof service?.price === 'number' ? service.price : 0);
       }, 0);
 
-    const topClients = (await db
-      .collection('clients')
-      .find(tenantId
-        ? { user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false }, total_spent: { $gt: 0 } }
-        : { user_id: userId, deleted_at: { $exists: false }, total_spent: { $gt: 0 } })
-      .sort({ total_spent: -1 })
-      .limit(5)
-      .toArray()).map(stripMongoId);
+    const todayAppointments = (todayAppointmentsRaw as any[]).map((appointment: any) => {
+      const service = servicesMap.get(appointment.service_id);
+      return {
+        id: appointment.id,
+        client_name: appointment.client_name,
+        service_name: service?.name || 'Unknown',
+        start_time: appointment.start_time,
+        end_time: appointment.end_time,
+        status: appointment.status,
+      };
+    });
 
-    const clients = (await db.collection('clients').find(
-      tenantId
-        ? { user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } }
-        : { user_id: userId, deleted_at: { $exists: false } }
-    ).toArray())
-      .map(stripMongoId);
-
-    const newClientsToday = clients.filter((client: any) => {
-      const created = safeParseDate(client.created_at);
-      if (!created) return false;
-      return format(created, 'yyyy-MM-dd') === todayStr;
-    }).length;
-
-    const weekStart = startOfDay(subDays(today, 7));
-    const newClientsWeek = clients.filter((client: any) => {
-      const created = safeParseDate(client.created_at);
-      if (!created) return false;
-      return created >= weekStart;
-    }).length;
-
-    const thirtyDaysAgo = subDays(today, 30);
-    const inactiveClients = clients
-      .filter((client: any) => {
-        const lastAppointment = safeParseDate(client.last_appointment_date);
-        const lastConversation = safeParseDate(client.last_conversation_date);
-        const appointmentOk = !lastAppointment || lastAppointment < thirtyDaysAgo;
-        const conversationOk = !lastConversation || lastConversation < thirtyDaysAgo;
-        return appointmentOk && conversationOk;
-      })
-      .sort((a: any, b: any) => {
-        const dateA = safeParseDate(a.last_appointment_date || a.last_conversation_date || a.created_at)?.getTime() || 0;
-        const dateB = safeParseDate(b.last_appointment_date || b.last_conversation_date || b.created_at)?.getTime() || 0;
-        return dateB - dateA;
-      })
-      .slice(0, 10);
-
+    const growthCountsByDate = new Map<string, number>();
+    for (const row of clientGrowthRows as any[]) {
+      if (typeof row?._id === 'string') {
+        growthCountsByDate.set(row._id, row.count || 0);
+      }
+    }
     const clientGrowth = [];
     for (let i = 0; i < 7; i++) {
-      const date = subDays(today, 6 - i);
-      const dateStr = format(date, 'yyyy-MM-dd');
-      const count = clients.filter((client: any) => {
-        const created = safeParseDate(client.created_at);
-        if (!created) return false;
-        return format(created, 'yyyy-MM-dd') === dateStr;
-      }).length;
+      const date = format(subDays(now, 6 - i), 'yyyy-MM-dd');
       clientGrowth.push({
-        date: dateStr,
-        count,
+        date,
+        count: growthCountsByDate.get(date) || 0,
       });
     }
+
+    const topClients = topClientsRaw.map(stripMongoId);
+    const inactiveClients = inactiveClientsRaw.map(stripMongoId);
+    const messagesToday = messagesPerDayMap.get(todayStr) || 0;
 
     return {
       messagesPerDay,
       appointmentsPerDay,
       today: {
         messages: messagesToday,
-        appointments: appointmentsToday,
+        appointments: todayAppointments.length,
         totalClients,
         appointmentsList: todayAppointments,
       },
@@ -269,7 +356,5 @@ export async function getDashboardData(
         growth: clientGrowth,
       },
     };
-  } catch {
-    return emptyDashboard();
   }
 }

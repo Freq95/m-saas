@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { handleApiError } from '@/lib/error-handler';
+import { NextRequest } from 'next/server';
+import { createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { getDashboardData } from '@/lib/server/dashboard';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { getCached } from '@/lib/redis';
@@ -25,11 +25,11 @@ export async function GET(request: NextRequest) {
     
     const { days } = validationResult.data;
     const numericDays = Number(days);
-    const cacheKey = dashboardCacheKey({ tenantId, userId: Number(userId) }, numericDays);
+    const cacheKey = dashboardCacheKey({ tenantId, userId }, numericDays);
     const data = await getCached(cacheKey, 900, async () =>
-      getDashboardData(Number(userId), tenantId, numericDays)
+      getDashboardData(userId, tenantId, numericDays)
     );
-    return NextResponse.json(data);
+    return createSuccessResponse(data);
   } catch (error) {
     return handleApiError(error, 'Failed to fetch dashboard data');
   }

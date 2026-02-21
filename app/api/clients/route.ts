@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getClientsData } from '@/lib/server/clients';
 import { findOrCreateClient } from '@/lib/client-matching';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
@@ -92,11 +92,10 @@ export async function POST(request: NextRequest) {
         { id: client.id, tenant_id: tenantId },
         { $set: updates }
       );
-
-      const updatedClient = await db.collection('clients').findOne({ id: client.id, tenant_id: tenantId });
-      if (updatedClient) {
-        responseClient = stripMongoId(updatedClient);
-      }
+      responseClient = {
+        ...client,
+        ...updates,
+      };
     }
     await invalidateReadCaches({ tenantId, userId });
     return createSuccessResponse({

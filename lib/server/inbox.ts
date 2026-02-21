@@ -18,71 +18,132 @@ export async function getConversationsData(userId: number, tenantId?: ObjectId) 
     conversationFilter.tenant_id = tenantId;
   }
 
-  const conversations = (await db
+  const conversationsQuery = db
     .collection('conversations')
     .find(conversationFilter)
-    .sort({ created_at: -1 })
-    .toArray()).map(stripMongoId);
+    .project({
+      _id: 1,
+      id: 1,
+      tenant_id: 1,
+      user_id: 1,
+      channel: 1,
+      channel_id: 1,
+      contact_name: 1,
+      contact_email: 1,
+      contact_phone: 1,
+      subject: 1,
+      client_id: 1,
+      created_at: 1,
+      updated_at: 1,
+    })
+    .sort({ created_at: -1 });
+
+  const conversations = (await conversationsQuery.toArray()).map(stripMongoId);
 
   if (conversations.length === 0) {
     return [];
   }
 
   const conversationIds = conversations.map((conv: any) => conv.id);
+  const messageStatsPipeline: Record<string, unknown>[] = [
+    {
+      $match: tenantId
+        ? { tenant_id: tenantId, conversation_id: { $in: conversationIds } }
+        : { conversation_id: { $in: conversationIds } },
+    },
+    {
+      $project: {
+        conversation_id: 1,
+        direction: 1,
+        is_read: 1,
+        sent_at: 1,
+        created_at: 1,
+      },
+    },
+    {
+      $addFields: {
+        event_at: { $ifNull: ['$sent_at', '$created_at'] },
+      },
+    },
+    {
+      $group: {
+        _id: '$conversation_id',
+        message_count: { $sum: 1 },
+        unread_count: {
+          $sum: {
+            $cond: [
+              { $and: [{ $eq: ['$direction', 'inbound'] }, { $eq: ['$is_read', false] }] },
+              1,
+              0,
+            ],
+          },
+        },
+        last_message_at: { $max: '$event_at' },
+      },
+    },
+  ];
 
-  const [allMessages, allTags, allConvTags] = await Promise.all([
-    db
-      .collection('messages')
-      .find(tenantId ? { conversation_id: { $in: conversationIds }, tenant_id: tenantId } : { conversation_id: { $in: conversationIds } })
-      .sort({ sent_at: -1, created_at: -1 })
-      .toArray()
-      .then((docs: any[]) => docs.map(stripMongoId)),
-    db.collection('tags').find(tenantId ? { tenant_id: tenantId } : {}).toArray().then((docs: any[]) => docs.map(stripMongoId)),
-    db
-      .collection('conversation_tags')
-      .find(tenantId ? { conversation_id: { $in: conversationIds }, tenant_id: tenantId } : { conversation_id: { $in: conversationIds } })
-      .toArray()
-      .then((docs: any[]) => docs.map(stripMongoId)),
+  const messageStatsCursor = db.collection('messages').aggregate(messageStatsPipeline);
+
+  const conversationTagsQuery = db
+    .collection('conversation_tags')
+    .find(tenantId ? { conversation_id: { $in: conversationIds }, tenant_id: tenantId } : { conversation_id: { $in: conversationIds } })
+    .project({ conversation_id: 1, tag_id: 1 });
+
+  const [messageStats, allConvTags] = await Promise.all([
+    messageStatsCursor.toArray(),
+    conversationTagsQuery.toArray().then((docs: any[]) => docs.map(stripMongoId)),
   ]);
 
-  const enriched = conversations.map((conv: any) => {
-    const messages = allMessages.filter((m: any) => m.conversation_id === conv.id);
-    const sortedMessages = messages.sort((a: any, b: any) => {
-      const dateA = new Date(a.sent_at || a.created_at || 0).getTime();
-      const dateB = new Date(b.sent_at || b.created_at || 0).getTime();
-      return dateB - dateA;
-    });
+  const messageStatsByConversation = new Map<number, any>();
+  for (const stat of messageStats as any[]) {
+    messageStatsByConversation.set(stat._id, stat);
+  }
 
-    let lastMessagePreview = '';
-    if (sortedMessages.length > 0) {
-      const stored = parseStoredMessage(sortedMessages[0].content || '');
-      const raw = stored.text || stored.html || '';
-      lastMessagePreview = raw
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
+  const tagIds = Array.from(
+    new Set(
+      allConvTags
+        .map((ct: any) => ct.tag_id)
+        .filter((tagId: unknown): tagId is number => typeof tagId === 'number')
+    )
+  );
+
+  let tagsById = new Map<number, string>();
+  if (tagIds.length > 0) {
+    const tags = await db.collection('tags')
+      .find(tenantId ? { tenant_id: tenantId, id: { $in: tagIds } } : { id: { $in: tagIds } })
+      .project({ id: 1, name: 1 })
+      .toArray();
+    tagsById = new Map<number, string>(
+      tags
+        .map((tag: any) => stripMongoId(tag))
+        .filter((tag: any) => typeof tag.id === 'number' && typeof tag.name === 'string')
+        .map((tag: any) => [tag.id, tag.name])
+    );
+  }
+
+  const tagNamesByConversation = new Map<number, string[]>();
+  for (const ct of allConvTags as any[]) {
+    const convId = ct.conversation_id;
+    const tagName = tagsById.get(ct.tag_id);
+    if (typeof convId !== 'number' || !tagName) {
+      continue;
     }
+    const names = tagNamesByConversation.get(convId) || [];
+    names.push(tagName);
+    tagNamesByConversation.set(convId, names);
+  }
 
-    const tagIds = allConvTags
-      .filter((ct: any) => ct.conversation_id === conv.id)
-      .map((ct: any) => ct.tag_id);
-    const tags = allTags
-      .filter((t: any) => tagIds.includes(t.id))
-      .map((t: any) => t.name);
-
-    const unreadCount = messages.filter(
-      (m: any) => m.direction === 'inbound' && m.is_read === false
-    ).length;
+  const enriched = conversations.map((conv: any) => {
+    const stats = messageStatsByConversation.get(conv.id);
 
     return {
       ...conv,
-      message_count: messages.length,
-      has_unread: unreadCount > 0,
-      last_message_at: sortedMessages.length > 0
-        ? (sortedMessages[0].sent_at || sortedMessages[0].created_at)
-        : (conv.updated_at || conv.created_at),
-      last_message_preview: lastMessagePreview,
-      tags: tags || [],
+      message_count: typeof stats?.message_count === 'number' ? stats.message_count : 0,
+      has_unread: (typeof stats?.unread_count === 'number' ? stats.unread_count : 0) > 0,
+      last_message_at: stats?.last_message_at || conv.updated_at || conv.created_at,
+      last_message_preview: '',
+      tags: tagNamesByConversation.get(conv.id) || [],
     };
   });
 
@@ -94,6 +155,64 @@ export async function getConversationsData(userId: number, tenantId?: ObjectId) 
     const fallbackB = b.updated_at || b.created_at || 0;
     return new Date(fallbackB).getTime() - new Date(fallbackA).getTime();
   });
+
+  // Keep preview UX for most relevant rows while bounding DB/CPU cost at high concurrency.
+  const previewConversationIds = enriched
+    .slice(0, 50)
+    .map((conv: any) => conv.id)
+    .filter((id: unknown): id is number => typeof id === 'number');
+  if (previewConversationIds.length > 0) {
+    const previewRows = await db.collection('messages').aggregate([
+      {
+        $match: tenantId
+          ? { tenant_id: tenantId, conversation_id: { $in: previewConversationIds } }
+          : { conversation_id: { $in: previewConversationIds } },
+      },
+      {
+        $project: {
+          conversation_id: 1,
+          content: 1,
+          created_at: 1,
+          id: 1,
+        },
+      },
+      {
+        $sort: {
+          conversation_id: 1,
+          created_at: -1,
+          id: -1,
+        },
+      },
+      {
+        $group: {
+          _id: '$conversation_id',
+          last_content: { $first: '$content' },
+        },
+      },
+    ]).toArray();
+
+    const previewByConversation = new Map<number, string>();
+    for (const row of previewRows as any[]) {
+      const convId = row?._id;
+      if (typeof convId !== 'number' || typeof row?.last_content !== 'string') {
+        continue;
+      }
+      const stored = parseStoredMessage(row.last_content);
+      const raw = stored.text || stored.html || '';
+      const preview = raw
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .slice(0, 160);
+      previewByConversation.set(convId, preview);
+    }
+
+    for (const conv of enriched as any[]) {
+      if (previewByConversation.has(conv.id)) {
+        conv.last_message_preview = previewByConversation.get(conv.id) || '';
+      }
+    }
+  }
 
   return enriched;
 }
@@ -139,7 +258,19 @@ export async function getConversationMessagesData(
   let cursor = db
     .collection('messages')
     .find(messageFilter)
-    .sort({ sent_at: -1, created_at: -1, id: -1 });
+    .project({
+      _id: 1,
+      id: 1,
+      conversation_id: 1,
+      tenant_id: 1,
+      direction: 1,
+      content: 1,
+      is_read: 1,
+      sent_at: 1,
+      created_at: 1,
+      updated_at: 1,
+    })
+    .sort({ created_at: -1, id: -1 });
 
   if (offset > 0 && !beforeId) {
     cursor = cursor.skip(offset);

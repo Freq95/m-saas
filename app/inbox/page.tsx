@@ -2,6 +2,7 @@ import InboxPageClient from './InboxPageClient';
 import { redirect } from 'next/navigation';
 import { getConversationMessagesData, getConversationsData } from '@/lib/server/inbox';
 import { auth } from '@/lib/auth';
+import { ObjectId } from 'mongodb';
 
 export const revalidate = 30;
 
@@ -14,8 +15,10 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
   if (!session?.user?.id) redirect('/login');
   const userId = Number.parseInt(session.user.id, 10);
   if (!Number.isFinite(userId) || userId <= 0) redirect('/login');
+  if (!session.user.tenantId || !ObjectId.isValid(session.user.tenantId)) redirect('/login');
+  const tenantId = new ObjectId(session.user.tenantId);
 
-  const conversations = await getConversationsData(userId);
+  const conversations = await getConversationsData(userId, tenantId);
 
   let selectedConversationId: number | null = null;
   if (searchParams?.conversation) {
@@ -41,7 +44,11 @@ export default async function InboxPage({ searchParams }: InboxPageProps) {
   let initialOldestMessageId: number | null = null;
 
   if (selectedConversationId !== null) {
-    const messageData = await getConversationMessagesData(selectedConversationId, { limit: 50 });
+    const messageData = await getConversationMessagesData(selectedConversationId, {
+      userId,
+      tenantId,
+      limit: 50,
+    });
     initialMessages = messageData.messages;
     initialHasMoreMessages = messageData.hasMore;
     initialOldestMessageId = messageData.oldestMessageId;

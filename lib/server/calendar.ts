@@ -11,6 +11,19 @@ type AppointmentQuery = {
   status?: string;
 };
 
+const SERVICES_PROJECTION = {
+  _id: 1,
+  id: 1,
+  name: 1,
+  duration_minutes: 1,
+  price: 1,
+  user_id: 1,
+  tenant_id: 1,
+  description: 1,
+  created_at: 1,
+  updated_at: 1,
+};
+
 export async function getAppointmentsData(query: AppointmentQuery = {}) {
   const db = await getMongoDbOrThrow();
   if (!query.userId) {
@@ -44,14 +57,42 @@ export async function getAppointmentsData(query: AppointmentQuery = {}) {
     filter.resource_id = resourceId;
   }
 
+  const appointmentQuery = db
+    .collection('appointments')
+    .find(filter)
+    .project({
+      _id: 1,
+      id: 1,
+      tenant_id: 1,
+      user_id: 1,
+      conversation_id: 1,
+      service_id: 1,
+      client_id: 1,
+      client_name: 1,
+      client_email: 1,
+      client_phone: 1,
+      start_time: 1,
+      end_time: 1,
+      status: 1,
+      provider_id: 1,
+      resource_id: 1,
+      category: 1,
+      color: 1,
+      notes: 1,
+      reminder_sent: 1,
+      created_at: 1,
+      updated_at: 1,
+    })
+    .sort({ start_time: 1 });
+
+  const servicesQuery = db
+    .collection('services')
+    .find(tenantId ? { user_id: userId, tenant_id: tenantId } : { user_id: userId })
+    .project(SERVICES_PROJECTION);
+
   const [appointments, services] = await Promise.all([
-    db
-      .collection('appointments')
-      .find(filter)
-      .sort({ start_time: 1 })
-      .toArray()
-      .then((docs: any[]) => docs.map(stripMongoId)),
-    db.collection('services').find(tenantId ? { user_id: userId, tenant_id: tenantId } : { user_id: userId }).toArray().then((docs: any[]) => docs.map(stripMongoId)),
+    appointmentQuery.toArray().then((docs: any[]) => docs.map(stripMongoId)),
+    servicesQuery.toArray().then((docs: any[]) => docs.map(stripMongoId)),
   ]);
 
   const serviceById = new Map<number, any>(
@@ -71,10 +112,11 @@ export async function getAppointmentsData(query: AppointmentQuery = {}) {
 
 export async function getServicesData(userId: number, tenantId?: ObjectId) {
   const db = await getMongoDbOrThrow();
-  const services = await db
+  const servicesQuery = db
     .collection('services')
     .find(tenantId ? { user_id: userId, tenant_id: tenantId } : { user_id: userId })
-    .sort({ name: 1 })
-    .toArray();
+    .project(SERVICES_PROJECTION)
+    .sort({ name: 1 });
+  const services = await servicesQuery.toArray();
   return services.map(stripMongoId);
 }

@@ -68,25 +68,40 @@ export async function findOrCreateClient(
   let existingClient: Client | null = null;
 
   if (normalizedEmail) {
-    const escaped = normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const client = await db.collection('clients').findOne({
-      tenant_id: tenantId,
-      user_id: userId,
-      deleted_at: { $exists: false },
-      email: { $regex: `^${escaped}$`, $options: 'i' },
-    });
+    const clientsCollection = db.collection('clients');
+    let client = await clientsCollection.findOne(
+      {
+        tenant_id: tenantId,
+        user_id: userId,
+        deleted_at: { $exists: false },
+        email: normalizedEmail,
+      }
+    );
+    if (!client) {
+      const escaped = normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      client = await clientsCollection.findOne(
+        {
+          tenant_id: tenantId,
+          user_id: userId,
+          deleted_at: { $exists: false },
+          email: { $regex: `^${escaped}$`, $options: 'i' },
+        }
+      );
+    }
     if (client) {
       existingClient = normalizeClientDoc(client);
     }
   }
 
   if (!existingClient && normalizedPhone) {
-    const client = await db.collection('clients').findOne({
-      tenant_id: tenantId,
-      user_id: userId,
-      deleted_at: { $exists: false },
-      phone: normalizedPhone,
-    });
+    const client = await db.collection('clients').findOne(
+      {
+        tenant_id: tenantId,
+        user_id: userId,
+        deleted_at: { $exists: false },
+        phone: normalizedPhone,
+      }
+    );
     if (client) {
       existingClient = normalizeClientDoc(client);
     }
