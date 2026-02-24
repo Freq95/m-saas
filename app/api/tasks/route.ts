@@ -13,7 +13,6 @@ export async function GET(request: NextRequest) {
     // Validate query parameters
     const { tasksQuerySchema } = await import('@/lib/validation');
     const queryParams = {
-      userId: String(userId),
       contactId: searchParams.get('contactId') || undefined,
       status: searchParams.get('status') || undefined,
     };

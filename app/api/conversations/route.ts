@@ -13,7 +13,6 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const { conversationsQuerySchema } = await import('@/lib/validation');
     const queryParams = {
-      userId: String(userId),
       search: searchParams.get('search') || undefined,
     };
     const validationResult = conversationsQuerySchema.safeParse(queryParams);

@@ -24,7 +24,7 @@ interface WeekViewProps {
   appointments: Appointment[];
   blockedTimes?: BlockedTime[];
   selectedDay?: Date | null;
-  onSlotClick: (day: Date, hour: number) => void;
+  onSlotClick: (day: Date, hour: number, minute?: 0 | 30) => void;
   onDayHeaderClick?: (day: Date) => void;
   onAppointmentClick: (appointment: Appointment) => void;
   draggedAppointment?: Appointment | null;
@@ -129,7 +129,12 @@ export function WeekView({
   providers = [],
 }: WeekViewProps) {
   const SLOT_HEIGHT = 64;
+  const HALF_SLOT_HEIGHT = SLOT_HEIGHT / 2;
   const columnHeightPx = hours.length * SLOT_HEIGHT;
+  const halfHourSlots = hours.flatMap((hour) => [
+    { hour, minute: 0 as const },
+    { hour, minute: 30 as const },
+  ]);
   const CURRENT_TIME_EDGE_PADDING = 18;
   const gridTemplateColumns = `56px repeat(${weekDays.length}, minmax(0, 1fr))`;
 
@@ -212,9 +217,9 @@ export function WeekView({
 
       <div className={styles.weekBody} ref={weekBodyRef} style={{ gridTemplateColumns }}>
         <div className={styles.timeGutter}>
-          {hours.map((hour) => (
-            <div key={hour} className={styles.timeSlot}>
-              {String(hour).padStart(2, '0')}:00
+          {halfHourSlots.map(({ hour, minute }) => (
+            <div key={`${hour}:${minute}`} className={styles.timeSlot} style={{ height: `${HALF_SLOT_HEIGHT}px` }}>
+              {minute === 0 ? `${String(hour).padStart(2, '0')}:00` : ''}
             </div>
           ))}
 
@@ -246,13 +251,14 @@ export function WeekView({
               className={`${styles.weekDayColumn}${todayFlag ? ` ${styles.isToday}` : ''}`}
               style={{ height: `${columnHeightPx}px` }}
             >
-              {hours.map((hour) => {
-                const slotKey = `${day.toISOString()}-${hour}`;
+              {halfHourSlots.map(({ hour, minute }) => {
+                const slotKey = `${day.toISOString()}-${hour}:${minute}`;
                 return (
                   <div
-                    key={hour}
+                    key={`${hour}:${minute}`}
                     className={`${styles.slot}${dragOverSlot === slotKey ? ` ${styles.dragOver}` : ''}`}
-                    onClick={() => onSlotClick(day, hour)}
+                    style={{ height: `${HALF_SLOT_HEIGHT}px` }}
+                    onClick={() => onSlotClick(day, hour, minute)}
                     onDragOver={(e) => {
                       if (!enableDragDrop) return;
                       e.preventDefault();
@@ -268,11 +274,11 @@ export function WeekView({
                     }}
                     role="button"
                     tabIndex={0}
-                    aria-label={`Creeaza programare ${format(day, 'd MMM', { locale: ro })} ${hour}:00`}
+                    aria-label={`Creeaza programare ${format(day, 'd MMM', { locale: ro })} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        onSlotClick(day, hour);
+                        onSlotClick(day, hour, minute);
                       }
                     }}
                   />

@@ -2,6 +2,7 @@
 
 import { format } from 'date-fns';
 import { ro } from 'date-fns/locale';
+import { useRef } from 'react';
 import styles from '../../page.module.css';
 
 interface Conflict {
@@ -30,10 +31,28 @@ export function ConflictWarningModal({
   onClose,
   onSelectSlot,
 }: ConflictWarningModalProps) {
+  const backdropPressStartedRef = useRef(false);
+
+  const handleBackdropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    backdropPressStartedRef.current = event.target === event.currentTarget;
+  };
+
+  const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const endedOnBackdrop = event.target === event.currentTarget;
+    if (backdropPressStartedRef.current && endedOnBackdrop) {
+      onClose();
+    }
+    backdropPressStartedRef.current = false;
+  };
+
   if (!isOpen) return null;
 
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
+    <div
+      className={styles.modalOverlay}
+      onPointerDown={handleBackdropPointerDown}
+      onClick={handleBackdropClick}
+    >
       <div
         className={styles.modal}
         onClick={(e) => e.stopPropagation()}

@@ -13,7 +13,6 @@ export async function GET(request: NextRequest) {
     // Validate query parameters
     const { calendarSlotsQuerySchema } = await import('@/lib/validation');
     const queryParams = {
-      userId: String(userId),
       date: searchParams.get('date') || undefined,
       providerId: searchParams.get('providerId') || undefined,
       resourceId: searchParams.get('resourceId') || undefined,

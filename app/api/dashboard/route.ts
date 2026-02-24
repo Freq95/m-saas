@@ -14,7 +14,6 @@ export async function GET(request: NextRequest) {
     // Validate query parameters
     const { dashboardQuerySchema } = await import('@/lib/validation');
     const queryParams = {
-      userId: String(userId),
       days: searchParams.get('days') || '7',
     };
     

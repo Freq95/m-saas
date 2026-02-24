@@ -45,6 +45,7 @@ export default function ClientCreateModal({
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [backdropPressStarted, setBackdropPressStarted] = useState(false);
   const [formData, setFormData] = useState<ClientFormData>({
     name: initialData?.name || '',
     email: initialData?.email || '',
@@ -100,6 +101,18 @@ export default function ClientCreateModal({
   }, [isOpen, mounted]);
 
   if (!isOpen || !mounted) return null;
+
+  const handleBackdropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    setBackdropPressStarted(event.target === event.currentTarget);
+  };
+
+  const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const endedOnBackdrop = event.target === event.currentTarget;
+    if (backdropPressStarted && endedOnBackdrop) {
+      resetAndClose();
+    }
+    setBackdropPressStarted(false);
+  };
 
   const resetAndClose = () => {
     if (loading) return;
@@ -172,7 +185,11 @@ export default function ClientCreateModal({
   };
 
   return createPortal(
-    <div className={styles.overlay} onClick={resetAndClose}>
+    <div
+      className={styles.overlay}
+      onPointerDown={handleBackdropPointerDown}
+      onClick={handleBackdropClick}
+    >
       <div className={styles.modal} onClick={(event) => event.stopPropagation()}>
         <div className={styles.header}>
           <h2 className={styles.title}>{title}</h2>

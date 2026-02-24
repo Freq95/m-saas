@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import styles from './page.module.css';
 import navStyles from '../../dashboard/page.module.css';
@@ -70,6 +70,8 @@ export default function ClientProfileClient({
   const [pendingDeleteFileId, setPendingDeleteFileId] = useState<number | null>(null);
   const [noteContent, setNoteContent] = useState('');
   const { toasts, removeToast, error: toastError } = useToast();
+  const addNoteBackdropPressStartedRef = useRef(false);
+  const deleteFileBackdropPressStartedRef = useRef(false);
 
   useEffect(() => {
     setClient(initialClient);
@@ -169,7 +171,7 @@ export default function ClientProfileClient({
       const response = await fetch(`/api/clients/${clientId}/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: 1, content: noteContent }),
+        body: JSON.stringify({ content: noteContent }),
       });
       if (!response.ok) throw new Error('Failed to add note');
       setNoteContent('');
@@ -261,6 +263,31 @@ export default function ClientProfileClient({
       default:
         return styles.statusDefault;
     }
+  };
+
+  const handleAddNoteBackdropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    addNoteBackdropPressStartedRef.current = event.target === event.currentTarget;
+  };
+
+  const handleAddNoteBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const endedOnBackdrop = event.target === event.currentTarget;
+    if (addNoteBackdropPressStartedRef.current && endedOnBackdrop) {
+      setShowAddNote(false);
+      setNoteContent('');
+    }
+    addNoteBackdropPressStartedRef.current = false;
+  };
+
+  const handleDeleteFileBackdropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    deleteFileBackdropPressStartedRef.current = event.target === event.currentTarget;
+  };
+
+  const handleDeleteFileBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const endedOnBackdrop = event.target === event.currentTarget;
+    if (deleteFileBackdropPressStartedRef.current && endedOnBackdrop) {
+      setPendingDeleteFileId(null);
+    }
+    deleteFileBackdropPressStartedRef.current = false;
   };
 
   if (loading) {
@@ -618,7 +645,11 @@ export default function ClientProfileClient({
         </div>
 
         {showAddNote && (
-          <div className={styles.modal}>
+          <div
+            className={styles.modal}
+            onPointerDown={handleAddNoteBackdropPointerDown}
+            onClick={handleAddNoteBackdropClick}
+          >
             <div className={styles.modalContent}>
               <h3>Adauga nota</h3>
               <textarea
@@ -641,7 +672,11 @@ export default function ClientProfileClient({
         )}
 
         {pendingDeleteFileId && (
-          <div className={styles.modal}>
+          <div
+            className={styles.modal}
+            onPointerDown={handleDeleteFileBackdropPointerDown}
+            onClick={handleDeleteFileBackdropClick}
+          >
             <div className={styles.modalContent}>
               <h3>Confirmare stergere</h3>
               <p>Sigur vrei sa stergi acest fisier? Actiunea nu poate fi anulata.</p>

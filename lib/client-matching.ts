@@ -44,13 +44,18 @@ function normalizeClientDoc(doc: any): Client {
   return stripMongoId(doc) as Client;
 }
 
+function normalizeNameForCompare(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
 /**
  * Find or create a client based on contact information
- * Matching priority:
- * 1. Email exact match (highest priority)
- * 2. Phone exact match
- * 3. Name fuzzy match (if email/phone are missing)
- * 4. Create new client if no match found
+ * Matching strategy:
+ * 1. Name match (case-insensitive, trimmed)
+ * 2. Create new client if no name match found
  */
 export async function findOrCreateClient(
   userId: number,
@@ -64,46 +69,93 @@ export async function findOrCreateClient(
   const normalizedEmail = email?.toLowerCase().trim() || null;
   const normalizedPhone = normalizePhone(phone);
   const normalizedName = name.trim();
+  const normalizedNameKey = normalizeNameForCompare(name);
 
   let existingClient: Client | null = null;
 
-  if (normalizedEmail) {
-    const clientsCollection = db.collection('clients');
-    let client = await clientsCollection.findOne(
+  if (normalizedNameKey) {
+    const nameMatches = await db.collection('clients').find(
       {
         tenant_id: tenantId,
         user_id: userId,
         deleted_at: { $exists: false },
-        email: normalizedEmail,
+        name: { $type: 'string' },
+        $expr: {
+          $eq: [
+            { $trim: { input: { $toLower: '$name' } } },
+            normalizedNameKey,
+          ],
+        },
+      },
+    ).sort({ last_activity_date: -1, updated_at: -1, created_at: -1 }).toArray();
+
+    if (nameMatches.length === 1) {
+      const match = nameMatches[0];
+      const matchEmail = typeof match.email === 'string' ? match.email.trim().toLowerCase() : null;
+      if (!(normalizedEmail && matchEmail && matchEmail !== normalizedEmail)) {
+        existingClient = normalizeClientDoc(match);
       }
-    );
-    if (!client) {
-      const escaped = normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      client = await clientsCollection.findOne(
+    } else if (nameMatches.length > 1) {
+      // Disambiguate same-name clients by email/phone when possible.
+      if (normalizedEmail) {
+        const emailMatch = nameMatches.find((client: any) =>
+          typeof client.email === 'string' &&
+          client.email.trim().toLowerCase() === normalizedEmail
+        );
+        if (emailMatch) {
+          existingClient = normalizeClientDoc(emailMatch);
+        }
+      }
+
+      if (!existingClient && normalizedPhone) {
+        const phoneMatch = nameMatches.find((client: any) =>
+          typeof client.phone === 'string' &&
+          normalizePhone(client.phone) === normalizedPhone
+        );
+        if (phoneMatch) {
+          existingClient = normalizeClientDoc(phoneMatch);
+        }
+      }
+      // If still ambiguous, we intentionally create a new client below.
+    } else {
+      // Defensive fallback for Mongo variants where $expr + $trim can miss matches.
+      const escaped = normalizedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regexMatches = await db.collection('clients').find(
         {
           tenant_id: tenantId,
           user_id: userId,
           deleted_at: { $exists: false },
-          email: { $regex: `^${escaped}$`, $options: 'i' },
-        }
-      );
-    }
-    if (client) {
-      existingClient = normalizeClientDoc(client);
-    }
-  }
+          name: { $regex: `^\\s*${escaped}\\s*$`, $options: 'i' },
+        },
+      ).sort({ last_activity_date: -1, updated_at: -1, created_at: -1 }).toArray();
 
-  if (!existingClient && normalizedPhone) {
-    const client = await db.collection('clients').findOne(
-      {
-        tenant_id: tenantId,
-        user_id: userId,
-        deleted_at: { $exists: false },
-        phone: normalizedPhone,
+      if (regexMatches.length === 1) {
+        const match = regexMatches[0];
+        const matchEmail = typeof match.email === 'string' ? match.email.trim().toLowerCase() : null;
+        if (!(normalizedEmail && matchEmail && matchEmail !== normalizedEmail)) {
+          existingClient = normalizeClientDoc(match);
+        }
+      } else if (regexMatches.length > 1) {
+        if (normalizedEmail) {
+          const emailMatch = regexMatches.find((client: any) =>
+            typeof client.email === 'string' &&
+            client.email.trim().toLowerCase() === normalizedEmail
+          );
+          if (emailMatch) {
+            existingClient = normalizeClientDoc(emailMatch);
+          }
+        }
+
+        if (!existingClient && normalizedPhone) {
+          const phoneMatch = regexMatches.find((client: any) =>
+            typeof client.phone === 'string' &&
+            normalizePhone(client.phone) === normalizedPhone
+          );
+          if (phoneMatch) {
+            existingClient = normalizeClientDoc(phoneMatch);
+          }
+        }
       }
-    );
-    if (client) {
-      existingClient = normalizeClientDoc(client);
     }
   }
 

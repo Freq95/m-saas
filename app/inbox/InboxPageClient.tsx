@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import createDOMPurify from 'dompurify';
 import { format, isSameDay, isToday, isYesterday } from 'date-fns';
@@ -242,6 +242,7 @@ export default function InboxPageClient({
   initialOldestMessageId = null,
 }: InboxPageClientProps) {
   const toast = useToast();
+  const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
   const sessionUserId =
     session?.user?.id && /^[1-9]\d*$/.test(session.user.id)
@@ -286,6 +287,7 @@ export default function InboxPageClient({
   const clientSearchRequestSeqRef = useRef(0);
   const inboxSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastApiErrorToastRef = useRef<{ key: string; at: number } | null>(null);
+  const saveModalBackdropPressStartedRef = useRef(false);
   
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -326,6 +328,15 @@ export default function InboxPageClient({
   );
 
   useEffect(() => {
+    if (sessionStatus === 'unauthenticated') {
+      router.replace('/login');
+    }
+  }, [sessionStatus, router]);
+
+  useEffect(() => {
+    if (sessionStatus !== 'authenticated') {
+      return;
+    }
     // Disabled auto-load to allow manual Yahoo sync testing.
     const AUTO_LOAD_CONVERSATIONS = true;
     if (AUTO_LOAD_CONVERSATIONS) {
@@ -340,7 +351,7 @@ export default function InboxPageClient({
     setAllConversations([]);
     setConversations([]);
     setSelectedConversation(null);
-  }, []);
+  }, [sessionStatus, initialConversations]);
 
   useEffect(() => {
     if (!conversationParam || allConversations.length === 0 || selectedConversation) return;
@@ -353,6 +364,7 @@ export default function InboxPageClient({
   }, [conversationParam, allConversations, selectedConversation]);
 
   useEffect(() => {
+    if (sessionStatus !== 'authenticated') return;
     if (loading) return;
 
     if (inboxSearchDebounceRef.current) {
@@ -368,7 +380,7 @@ export default function InboxPageClient({
         clearTimeout(inboxSearchDebounceRef.current);
       }
     };
-  }, [searchQuery, loading]);
+  }, [searchQuery, loading, sessionStatus]);
 
   useEffect(() => {
     if (!selectedConversation) return;
@@ -1148,6 +1160,18 @@ export default function InboxPageClient({
     }
   };
 
+  const handleSaveModalBackdropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    saveModalBackdropPressStartedRef.current = event.target === event.currentTarget;
+  };
+
+  const handleSaveModalBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const endedOnBackdrop = event.target === event.currentTarget;
+    if (saveModalBackdropPressStartedRef.current && endedOnBackdrop) {
+      setSaveModalOpen(false);
+    }
+    saveModalBackdropPressStartedRef.current = false;
+  };
+
   // Format date for message timestamp
   const formatMessageTime = (date: Date | null) => {
     // Validate date before using it
@@ -1479,7 +1503,11 @@ export default function InboxPageClient({
       </div>
 
       {saveModalOpen && (
-        <div className={styles.saveModalBackdrop} onClick={() => setSaveModalOpen(false)}>
+        <div
+          className={styles.saveModalBackdrop}
+          onPointerDown={handleSaveModalBackdropPointerDown}
+          onClick={handleSaveModalBackdropClick}
+        >
           <div className={styles.saveModal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.saveModalHeader}>
               <h4>Salveaza atasamente si poze</h4>

@@ -108,7 +108,7 @@ export default function DashboardPageClient() {
   const { status } = useSession();
   const key = status === 'authenticated' ? '/api/dashboard?days=7' : null;
 
-  const { data, isLoading } = useSWR<DashboardData>(key, fetchDashboard, {
+  const { data, error, isLoading, mutate } = useSWR<DashboardData>(key, fetchDashboard, {
     revalidateOnFocus: false,
     dedupingInterval: 10000,
   });
@@ -121,6 +121,20 @@ export default function DashboardPageClient() {
 
   if (status !== 'authenticated' || isLoading) {
     return <DashboardSkeleton />;
+  }
+
+  if (error && !isLoading) {
+    return (
+      <div className={styles.container}>
+        <main className={styles.main}>
+          <h2 className={styles.title}>Eroare la incarcarea dashboard-ului</h2>
+          <p>Nu am putut incarca datele. Verificati conexiunea si incercati din nou.</p>
+          <button type="button" onClick={() => mutate()} className={styles.retryButton}>
+            Reincearca
+          </button>
+        </main>
+      </div>
+    );
   }
 
   const dashboard = data ?? EMPTY_DASHBOARD;

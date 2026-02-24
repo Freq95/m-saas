@@ -17,7 +17,6 @@ export async function GET(request: NextRequest) {
     // Validate query parameters
     const { appointmentsQuerySchema } = await import('@/lib/validation');
     const queryParams = {
-      userId: String(userId),
       startDate: searchParams.get('startDate') || undefined,
       endDate: searchParams.get('endDate') || undefined,
       providerId: searchParams.get('providerId') || undefined,

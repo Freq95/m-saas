@@ -32,40 +32,18 @@ let redisReadLimiter: Ratelimit | null = null;
 let redisWriteLimiter: Ratelimit | null = null;
 let redisSyncLimiter: Ratelimit | null = null;
 
-function isWriteOperation(pathname: string, method: string): boolean {
-  const normalizedMethod = method.toUpperCase();
-  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(normalizedMethod)) {
-    return false;
-  }
-
-  const writePaths = [
-    '/api/appointments',
-    '/api/conversations',
-    '/api/clients',
-    '/api/services',
-    '/api/tasks',
-    '/api/reminders',
-    '/api/webhooks',
-    '/api/yahoo/sync',
-  ];
-  return writePaths.some((path) => pathname.startsWith(path));
-}
-
 function getRateLimitBucket(pathname: string, method: string): RateLimitBucket {
+  // Sync bucket — highest priority, strictest limits.
   if (pathname.startsWith('/api/yahoo/sync')) {
     return 'sync';
   }
 
-  // Inbox reads can be high-frequency (search/open thread/pagination); keep these on read limits.
-  if (
-    method.toUpperCase() === 'GET' &&
-    (pathname === '/api/conversations' ||
-      pathname.startsWith('/api/conversations/'))
-  ) {
-    return 'read';
+  // Mutation methods use write limits; all others are read.
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase())) {
+    return 'write';
   }
 
-  return isWriteOperation(pathname, method) ? 'write' : 'read';
+  return 'read';
 }
 
 function getClientIdentifier(request: NextRequest): string {
@@ -79,13 +57,16 @@ function getRateLimitIdentifier(
   token: Awaited<ReturnType<typeof getToken>> | null
 ): string {
   const tokenObj = token && typeof token === 'object' ? (token as Record<string, unknown>) : null;
-  const tenantId = tokenObj && typeof tokenObj.tenantId === 'string' ? tokenObj.tenantId : '';
+  const tenantId =
+    tokenObj && typeof tokenObj.tenantId === 'string' && tokenObj.tenantId
+      ? tokenObj.tenantId
+      : null;
   const userId =
-    tokenObj && typeof tokenObj.id === 'string'
+    tokenObj && typeof tokenObj.id === 'string' && tokenObj.id
       ? tokenObj.id
-      : tokenObj && typeof tokenObj.sub === 'string'
+      : tokenObj && typeof tokenObj.sub === 'string' && tokenObj.sub
         ? tokenObj.sub
-        : '';
+        : null;
 
   if (tenantId && userId) {
     return withRedisPrefix(`ratelimit:tenant:${tenantId}:user:${userId}`);
@@ -93,6 +74,10 @@ function getRateLimitIdentifier(
 
   if (userId) {
     return withRedisPrefix(`ratelimit:user:${userId}`);
+  }
+
+  if (token) {
+    console.warn('[RATE-LIMIT] Authenticated request with missing userId in token, falling back to IP');
   }
 
   return withRedisPrefix(`ratelimit:ip:${getClientIdentifier(request)}`);

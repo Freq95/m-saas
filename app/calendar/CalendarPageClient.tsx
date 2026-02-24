@@ -101,6 +101,7 @@ export default function CalendarPageClient({
 
   const [selectedDay, setSelectedDay]               = useState<Date>(() => new Date());
   const [services, setServices]                     = useState<Service[]>(initialServices);
+  const [seedingDemoServices, setSeedingDemoServices] = useState(false);
   const hasRequestedServicesRef = useRef(false);
   const [showCreateModal, setShowCreateModal]       = useState(false);
   const [showPreviewModal, setShowPreviewModal]     = useState(false);
@@ -110,6 +111,9 @@ export default function CalendarPageClient({
     clientEmail: string;
     clientPhone: string;
     serviceId: string;
+    startTime: string;
+    endTime: string;
+    durationMinutes: number;
     notes: string;
     category?: string;
     color?: string;
@@ -147,6 +151,46 @@ export default function CalendarPageClient({
       .catch(() => toast.error('Eroare la incarcarea serviciilor.'));
   }, [initialServices.length, toast]);
 
+  const seedDemoDentalServices = async () => {
+    if (seedingDemoServices) return;
+    setSeedingDemoServices(true);
+    const demoServices = [
+      { name: 'Consultatie initiala', durationMinutes: 30, price: 150, description: 'Evaluare clinica initiala' },
+      { name: 'Detartraj + periaj profesional', durationMinutes: 60, price: 320, description: 'Igienizare profesionala completa' },
+      { name: 'Tratament carie simpla', durationMinutes: 45, price: 280, description: 'Tratament restaurativ carie simpla' },
+      { name: 'Obturatie compozit', durationMinutes: 45, price: 350, description: 'Plomba compozit fotopolimerizabil' },
+      { name: 'Extractie dentara', durationMinutes: 45, price: 420, description: 'Extractie simpla, fara complicatii' },
+      { name: 'Control periodic', durationMinutes: 15, price: 90, description: 'Control de rutina' },
+    ];
+
+    try {
+      const results = await Promise.all(
+        demoServices.map((service) =>
+          fetch('/api/services', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(service),
+          })
+        )
+      );
+      const created = results.filter((res) => res.ok).length;
+      const refreshed = await fetch('/api/services', { cache: 'no-store' });
+      if (refreshed.ok) {
+        const payload = await refreshed.json();
+        setServices(payload.services || []);
+      }
+      if (created > 0) {
+        toast.success(`Servicii demo adaugate: ${created}`);
+      } else {
+        toast.warning('Nu am adaugat servicii noi (posibil sa existe deja).');
+      }
+    } catch {
+      toast.error('Nu am putut adauga serviciile demo.');
+    } finally {
+      setSeedingDemoServices(false);
+    }
+  };
+
   // ESC to close all modals
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -168,11 +212,11 @@ export default function CalendarPageClient({
   };
 
   /** Click on an empty slot — selects day AND opens create modal */
-  const handleSlotClick = (day: Date, hour?: number) => {
+  const handleSlotClick = (day: Date, hour?: number, minute: 0 | 30 = 0) => {
     setSelectedDay(day);
     const start = new Date(day);
-    start.setHours(hour ?? 9, 0, 0, 0);
-    const duration = (services[0]?.duration_minutes ?? 60);
+    start.setHours(hour ?? 9, minute, 0, 0);
+    const duration = 30;
     const end = new Date(start.getTime() + duration * 60_000);
     actions.selectDate(day);
     actions.selectSlot({ start, end });
@@ -218,6 +262,9 @@ export default function CalendarPageClient({
     clientEmail: string;
     clientPhone: string;
     serviceId: string;
+    startTime: string;
+    endTime: string;
+    durationMinutes: number;
     notes: string;
     category?: string;
     color?: string;
@@ -230,14 +277,10 @@ export default function CalendarPageClient({
       count?: number;
     };
   }) => {
-    if (!state.selectedSlot || !formData.clientName.trim() || !formData.serviceId) {
+    if (!formData.clientName.trim() || !formData.serviceId || !formData.startTime || !formData.endTime) {
       toast.warning('Completeaza toate campurile obligatorii (nume client si serviciu).');
       return;
     }
-
-    const service = services.find((s) => s.id.toString() === formData.serviceId);
-    const duration = service?.duration_minutes ?? 60;
-    const endTime = new Date(state.selectedSlot.start.getTime() + duration * 60_000);
 
     if (formData.isRecurring && formData.recurrence) {
       try {
@@ -249,8 +292,8 @@ export default function CalendarPageClient({
             clientName: formData.clientName.trim(),
             clientEmail: formData.clientEmail || undefined,
             clientPhone: formData.clientPhone || undefined,
-            startTime: state.selectedSlot.start.toISOString(),
-            endTime: endTime.toISOString(),
+            startTime: formData.startTime,
+            endTime: formData.endTime,
             providerId: state.selectedProvider?.id,
             resourceId: state.selectedResource?.id,
             notes: formData.notes,
@@ -285,8 +328,8 @@ export default function CalendarPageClient({
         clientName: formData.clientName.trim(),
         clientEmail: formData.clientEmail || undefined,
         clientPhone: formData.clientPhone || undefined,
-        startTime: state.selectedSlot.start.toISOString(),
-        endTime: endTime.toISOString(),
+        startTime: formData.startTime,
+        endTime: formData.endTime,
         notes: formData.notes,
         category: formData.category,
         color: formData.color,
@@ -323,6 +366,9 @@ export default function CalendarPageClient({
       clientEmail: appointment.client_email || '',
       clientPhone: appointment.client_phone || '',
       serviceId: appointment.service_id ? String(appointment.service_id) : '',
+      startTime: start.toISOString(),
+      endTime: end.toISOString(),
+      durationMinutes: Math.max(15, Math.round((end.getTime() - start.getTime()) / 60_000)),
       notes: appointment.notes || '',
       category: appointment.category || undefined,
       color: appointment.color || undefined,
@@ -336,16 +382,17 @@ export default function CalendarPageClient({
     clientEmail: string;
     clientPhone: string;
     serviceId: string;
+    startTime: string;
+    endTime: string;
+    durationMinutes: number;
     notes: string;
     category?: string;
     color?: string;
   }) => {
-    if (!state.selectedAppointment || !state.selectedSlot) return;
+    if (!state.selectedAppointment || !formData.startTime || !formData.endTime) return;
 
-    const service = services.find((s) => s.id.toString() === formData.serviceId);
-    const duration = service?.duration_minutes ?? 60;
-    const newStart = state.selectedSlot.start;
-    const newEnd = new Date(newStart.getTime() + duration * 60_000);
+    const newStart = new Date(formData.startTime);
+    const newEnd = new Date(formData.endTime);
 
     try {
       const res = await fetch(`/api/appointments/${state.selectedAppointment.id}`, {
@@ -509,6 +556,8 @@ export default function CalendarPageClient({
         isOpen={showCreateModal}
         selectedSlot={state.selectedSlot}
         services={services}
+        onSeedDemoServices={seedDemoDentalServices}
+        isSeedingDemoServices={seedingDemoServices}
         mode={appointmentModalMode}
         title={appointmentModalMode === 'edit' ? 'Editeaza programare' : 'Creeaza programare'}
         submitLabel={appointmentModalMode === 'edit' ? 'Salveaza modificarile' : 'Salveaza'}
@@ -546,6 +595,19 @@ export default function CalendarPageClient({
         onClose={() => setShowConflictModal(false)}
         onSelectSlot={(startTime, endTime) => {
           actions.selectSlot({ start: new Date(startTime), end: new Date(endTime) });
+          setEditInitialData((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  startTime,
+                  endTime,
+                  durationMinutes: Math.max(
+                    15,
+                    Math.round((new Date(endTime).getTime() - new Date(startTime).getTime()) / 60_000)
+                  ),
+                }
+              : prev
+          );
           setAppointmentModalMode('edit');
           setShowCreateModal(true);
         }}

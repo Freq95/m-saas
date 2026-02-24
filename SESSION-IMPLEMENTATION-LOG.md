@@ -739,3 +739,120 @@ Scope: Auth + super-admin + invite flow + audit + tenant/user lifecycle controls
   - cache helpers fall back to direct DB fetches (no shared Redis caching)
   - middleware rate-limiting falls back to in-memory limiter (non-distributed)
 - Benchmark/perf comparisons captured in this mode should be treated as no-Redis diagnostics, not final production reference numbers.
+
+## 32) Calendar Booking UX Hardening (Post-Ch8 Polish) (2026-02-21)
+- Improved appointment creation flow with DB-backed client suggestions:
+  - `app/calendar/components/modals/CreateAppointmentModal.tsx`
+  - added debounced client lookup against `/api/clients` and one-click prefill (name/email/phone) from existing cabinet clients.
+- Added explicit confirmation for new client auto-create:
+  - when typed client does not match selected/existing suggestion, modal now asks for confirmation before proceeding.
+  - preserves backend safety: appointment create still uses `findOrCreateClient(...)` so non-selected new clients are created intentionally.
+- Added editable scheduling fields in create/edit modal:
+  - date input + time input (30-minute step) integrated into submit payload (`startTime`, `endTime`).
+  - calendar create/edit handlers now persist modal-selected datetime rather than relying only on previously selected slot.
+- Fixed slot precision in week grid:
+  - `app/calendar/components/WeekView/WeekView.tsx`
+  - slot click now maps by cursor position:
+    - top half = `:00`
+    - bottom half = `:30`
+  - resolves perceived 1-hour selection behavior.
+- Kept default quick-create duration at 30 minutes:
+  - `app/calendar/CalendarPageClient.tsx`
+- Added supporting modal styles for suggestions + confirmation panel:
+  - `app/calendar/page.module.css`
+
+### Validation
+- `npm run typecheck` passed.
+- `npm run build` blocked in this environment by Windows lock on `.next-build/trace` (`EPERM`), pre-existing local runtime artifact issue.
+
+## 33) Calendar Slot + Duration + Services Seed Patch (2026-02-21)
+- Added empty-services fallback in appointment modal:
+  - shows explicit CTA when no services exist
+  - seeds dentist demo services through existing `/api/services` endpoint
+- Added explicit appointment duration selector in modal:
+  - 15-minute increments
+  - minimum 15 minutes
+  - end time derived from selected start + selected duration
+- Reworked week grid slot interaction to true half-hour cells:
+  - real `:00` / `:30` clickable slots
+  - removed visual/interaction behavior that still felt like 1-hour blocks
+
+### Validation
+- `npm run typecheck` passed.
+- `npm run build` hit local Next runtime issue in this environment (`PageNotFoundError: /_document`, ENOENT).
+
+## 34) Calendar Modal Theming + Client Matching Dedup Fix (2026-02-23)
+- Documentation alignment updates:
+  - `STATUS.md` rewritten/cleaned to reflect implemented reality (auth/tenancy done, stale gaps removed, quick-status corrected).
+  - Removed floating duplicate "Claude Review Status" block from this log and kept that status in `STATUS.md`.
+- Calendar appointment modal UI polish:
+  - Replaced native browser controls with app-rendered selectors for:
+    - `Data`
+    - `Ora inceput`
+    - `Ora final`
+    - `Serviciu`
+  - Styled selector dropdowns to match `Nume client` suggestion dropdown visual system.
+  - Placed `Ora inceput` and `Ora final` on the same line (responsive fallback to stacked on mobile).
+  - Retained appointment payload and validation behavior (start/end time + derived duration).
+- Duplicate-client bug fix on appointment create/edit:
+  - Root cause: fallback matching could still create duplicates for existing clients in repeated appointment flows.
+  - Updated `findOrCreateClient(...)` matching policy to name-based matching for appointment-linked creation:
+    - normalized, case-insensitive, trimmed name lookup
+    - create new client only when no name match exists
+  - Result: repeated appointments for same named existing client no longer create duplicate client rows.
+
+### Validation
+- `npm run -s typecheck` passed after each relevant patch set.
+
+## 35) Claude Review Fix Batch (REVIEW-FIXES-REQUIRED) (2026-02-23)
+- Completed all requested critical/high/medium fixes from `REVIEW-FIXES-REQUIRED.md`:
+  - hardcoded note payload identity removed:
+    - `app/clients/[id]/ClientProfileClient.tsx`
+    - note create body no longer sends `userId: 1`.
+  - validation schema cleanup (server-derived auth only):
+    - `lib/validation.ts`
+    - removed `userId` from create/query schemas used by authenticated routes.
+  - route validation payload alignment:
+    - `app/api/appointments/route.ts`
+    - `app/api/conversations/route.ts`
+    - `app/api/dashboard/route.ts`
+    - `app/api/calendar/slots/route.ts`
+    - `app/api/tasks/route.ts`
+    - `app/api/reminders/route.ts`
+    - removed schema `userId` injection from query parsing.
+  - client dedup safety hardening:
+    - `lib/client-matching.ts`
+    - changed matching to:
+      - single name match => reuse
+      - multiple name matches => disambiguate by email, then phone
+      - unresolved ambiguity => create new client (avoid wrong merge).
+    - appointment modal suggestions widened (`limit` 6 -> 20) in:
+      - `app/calendar/components/modals/CreateAppointmentModal.tsx`
+  - rate-limit identity + bucket logic hardening:
+    - `middleware.ts`
+    - removed path-guessing write classifier and `isWriteOperation()`
+    - bucket logic now: `sync` (Yahoo sync path), mutation methods => `write`, else `read`
+    - token identity extraction now requires truthy ids and logs warning when token exists but user id is missing.
+  - appointment modal submit/validation UX safety:
+    - `app/calendar/components/modals/CreateAppointmentModal.tsx`
+    - added `isSubmitting` guard and disabled save while confirm dialog is open
+    - added visible client-search error text
+    - removed silent end-time correction; now shows explicit validation message for invalid start/end edge cases.
+  - dashboard SWR error state:
+    - `app/dashboard/DashboardPageClient.tsx`
+    - `app/dashboard/page.module.css`
+    - added explicit error view + retry action (`mutate()`).
+  - inbox unauth redirect + auth-gated effects:
+    - `app/inbox/InboxPageClient.tsx`
+    - redirects unauthenticated users to `/login`
+    - conversation/search fetch effects now wait for authenticated session.
+  - added search-support indexes migration:
+    - `migrations/002_add_search_indexes.js`
+    - indexes:
+      - `conversations_tenant_user_contact_name`
+      - `appointments_tenant_user_client_name`
+
+### Validation
+- `npm run typecheck` passed.
+- `npm run build` passed.
+- Build warning observed (non-blocking): Edge runtime warning from `@upstash/redis` import trace (`lib/redis.ts`), pre-existing and unchanged by this fix batch.

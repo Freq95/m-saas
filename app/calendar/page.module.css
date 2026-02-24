@@ -237,14 +237,7 @@
 
 /* Half-hour guide line */
 .slot::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: color-mix(in srgb, var(--color-border) 30%, transparent);
-  pointer-events: none;
+  content: none;
 }
 
 /* Current-time indicator */
@@ -715,6 +708,13 @@
   display: flex;
   flex-direction: column;
   gap: 0.38rem;
+  position: relative;
+}
+
+.modalFieldRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
 }
 
 .modalField label {
@@ -744,6 +744,360 @@
   box-shadow: var(--focus-ring);
 }
 
+.modalDatePicker {
+  position: relative;
+}
+
+.modalDateButton {
+  width: 100%;
+  min-height: unset;
+  padding: 0.72rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  opacity: 1;
+  color: var(--color-text);
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  text-transform: none;
+}
+
+.modalDateButton:hover {
+  background: var(--color-surface-strong);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+}
+
+.modalDateButton:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.modalDateButtonIcon {
+  font-size: 0.68rem;
+  color: var(--color-text-soft);
+}
+
+.modalDatePopover {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 15;
+  width: 100%;
+  min-width: 260px;
+  max-width: 320px;
+  background: var(--color-surface);
+  opacity: 1;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 0.65rem;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.modalDateHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.45rem;
+  gap: 0.4rem;
+}
+
+.modalDateMonthLabel {
+  font-size: 0.82rem;
+  font-weight: 620;
+  color: var(--color-text);
+  text-transform: capitalize;
+  letter-spacing: -0.01em;
+}
+
+.modalDateNav {
+  width: 22px;
+  height: 22px;
+  min-height: unset;
+  border-radius: var(--radius-xs);
+  border: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
+  background: transparent;
+  color: var(--color-text-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 0;
+}
+
+.modalDateNav:hover {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
+.modalDateGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.modalDateWeekLabel {
+  text-align: center;
+  font-size: 0.6rem;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-soft);
+  padding: 0.12rem 0;
+}
+
+.modalDateDay {
+  width: 100%;
+  aspect-ratio: 1;
+  min-height: unset;
+  border: none;
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--color-surface-muted) 25%, transparent);
+  color: var(--color-text);
+  font-size: 0.76rem;
+  font-weight: 520;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modalDateDay:hover {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent);
+}
+
+.modalDateDayOther {
+  opacity: 0.35;
+}
+
+.modalDateDayToday {
+  background: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+.modalDateDaySelected {
+  background: var(--color-accent) !important;
+  color: var(--color-accent-contrast) !important;
+  font-weight: 700;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 45%, white);
+}
+
+.modalTimePicker {
+  position: relative;
+}
+
+.modalTimeButton {
+  width: 100%;
+  min-height: unset;
+  padding: 0.72rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  opacity: 1;
+  color: var(--color-text);
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.modalTimeButton:hover {
+  background: var(--color-surface-strong);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+}
+
+.modalTimeButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.modalTimeButton:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.modalTimeButtonIcon {
+  font-size: 0.68rem;
+  color: var(--color-text-soft);
+}
+
+.modalTimePopover {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 15;
+  width: 100%;
+  min-width: 200px;
+  max-width: 260px;
+  background: var(--color-surface);
+  opacity: 1;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  overflow: hidden;
+}
+
+.modalTimeList {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.modalTimeList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modalTimeList::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-border) 85%, transparent);
+  border-radius: 999px;
+}
+
+.modalTimeOption {
+  width: 100%;
+  text-align: left;
+  min-height: unset;
+  padding: 0.55rem 0.7rem;
+  background: transparent;
+  color: var(--color-text);
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.86rem;
+}
+
+.modalTimeOption:last-child {
+  border-bottom: none;
+}
+
+.modalTimeOption:hover {
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+
+.modalTimeOptionSelected {
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  color: var(--color-text);
+  font-weight: 600;
+  box-shadow: none;
+}
+
+.modalServicePicker {
+  position: relative;
+}
+
+.modalServiceButton {
+  width: 100%;
+  min-height: unset;
+  padding: 0.72rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  opacity: 1;
+  color: var(--color-text);
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  text-align: left;
+}
+
+.modalServiceButton:hover {
+  background: var(--color-surface-strong);
+  border-color: color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+}
+
+.modalServiceButton:focus-visible {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+}
+
+.modalServiceButton > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modalServiceButtonIcon {
+  font-size: 0.68rem;
+  color: var(--color-text-soft);
+  flex-shrink: 0;
+}
+
+.modalServicePopover {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 15;
+  width: 100%;
+  min-width: 280px;
+  background: var(--color-surface);
+  opacity: 1;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  overflow: hidden;
+}
+
+.modalServiceList {
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.modalServiceList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modalServiceList::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-border) 85%, transparent);
+  border-radius: 999px;
+}
+
+.modalServiceOption {
+  width: 100%;
+  text-align: left;
+  min-height: unset;
+  padding: 0.55rem 0.68rem;
+  background: transparent;
+  color: var(--color-text);
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 0.84rem;
+}
+
+.modalServiceOption:last-child {
+  border-bottom: none;
+}
+
+.modalServiceOption:hover {
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+
+.modalServiceOptionSelected {
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  color: var(--color-text);
+  font-weight: 600;
+  box-shadow: none;
+}
+
 .checkboxLabel {
   display: flex;
   align-items: center;
@@ -769,6 +1123,103 @@
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
+}
+
+.clientSuggestions {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.clientSuggestionItem {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+  padding: 0.55rem 0.7rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.clientSuggestionItem:last-child {
+  border-bottom: 0;
+}
+
+.clientSuggestionItem:hover {
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+
+.clientSuggestionName {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.clientSuggestionMeta {
+  font-size: 0.75rem;
+  color: var(--color-text-soft);
+}
+
+.clientSuggestionMuted {
+  padding: 0.55rem 0.7rem;
+  font-size: 0.78rem;
+  color: var(--color-text-soft);
+}
+
+.clientSuggestionHint {
+  font-size: 0.72rem;
+  color: var(--color-text-soft);
+}
+
+.clientSuggestionError {
+  font-size: 0.78rem;
+  color: var(--color-error, #dc2626);
+  padding: 0.25rem 0;
+}
+
+.serviceSeedBox {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-muted) 50%, transparent);
+  padding: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.inlineConfirmBox {
+  margin-top: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
+  border-radius: var(--radius-md);
+  padding: 0.85rem;
+}
+
+.inlineConfirmTitle {
+  margin: 0 0 0.35rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.inlineConfirmText {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-soft);
+  line-height: 1.4;
+}
+
+.inlineConfirmActions {
+  margin-top: 0.7rem;
+  display: flex;
+  gap: 0.55rem;
+  justify-content: flex-end;
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -1237,5 +1688,6 @@
   .modal { width: 100%; max-width: none; border-radius: var(--radius-lg) var(--radius-lg) 0 0; margin-top: auto; max-height: 85vh; }
   .deleteSheet { width: 100%; border-radius: var(--radius-lg) var(--radius-lg) 0 0; margin-top: auto; }
   .modalActions { position: sticky; bottom: 0; background: var(--color-surface); padding-top: 0.8rem; }
+  .modalFieldRow { grid-template-columns: 1fr; gap: 1rem; }
 }
 

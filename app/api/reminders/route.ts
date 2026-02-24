@@ -22,7 +22,6 @@ export async function GET(request: NextRequest) {
     // Validate query parameters
     const { remindersQuerySchema } = await import('@/lib/validation');
     const queryParams = {
-      userId: String(userId),
       status: searchParams.get('status') || undefined,
     };
 
