@@ -3,13 +3,14 @@ import { getClientProfileData, getClientStatsData } from '@/lib/server/client-pr
 
 export const revalidate = 30;
 
-export default async function ClientProfilePage({ params }: { params: { id: string } }) {
-  const clientId = Number(params.id);
+export default async function ClientProfilePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  const clientId = Number(id);
 
   if (!clientId || Number.isNaN(clientId)) {
     return (
       <ClientProfileClient
-        clientId={params.id}
+        clientId={id}
         initialClient={null}
         initialAppointments={[]}
         initialConversations={[]}
@@ -22,7 +23,7 @@ export default async function ClientProfilePage({ params }: { params: { id: stri
   if (!profile) {
     return (
       <ClientProfileClient
-        clientId={params.id}
+        clientId={id}
         initialClient={null}
         initialAppointments={[]}
         initialConversations={[]}
@@ -34,7 +35,7 @@ export default async function ClientProfilePage({ params }: { params: { id: stri
 
   return (
     <ClientProfileClient
-      clientId={params.id}
+      clientId={id}
       initialClient={profile.client}
       initialAppointments={profile.appointments}
       initialConversations={profile.conversations}

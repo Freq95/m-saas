@@ -65,13 +65,24 @@ export async function POST(request: NextRequest) {
         integrationId: Number(doc.id),
         tenantId: doc.tenant_id ? String(doc.tenant_id) : null,
       }))
-      .filter((target: { integrationId: number }) => Number.isInteger(target.integrationId) && target.integrationId > 0);
+      .filter(
+        (target: { integrationId: number; tenantId: string | null }) =>
+          Number.isInteger(target.integrationId) &&
+          target.integrationId > 0 &&
+          target.tenantId !== null
+      );
+
+    const skippedMissingTenant = activeYahooIntegrations.length - integrationTargets.length;
+    if (skippedMissingTenant > 0) {
+      logger.warn('Cron: skipped integrations without tenant_id', { skippedMissingTenant });
+    }
 
     if (integrationTargets.length === 0) {
       return createSuccessResponse({
         queued: 0,
         processedInline: 0,
         totalCandidates: 0,
+        skippedMissingTenant,
         mode: process.env.QSTASH_TOKEN ? 'qstash' : 'inline',
       });
     }
@@ -112,6 +123,7 @@ export async function POST(request: NextRequest) {
       processedInline,
       failed,
       totalCandidates: integrationTargets.length,
+      skippedMissingTenant,
       mode: process.env.QSTASH_TOKEN ? 'qstash' : 'inline',
     });
   } catch (error) {

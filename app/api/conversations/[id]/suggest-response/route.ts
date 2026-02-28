@@ -11,12 +11,13 @@ import { getAuthUser } from '@/lib/auth-helpers';
 // GET /api/conversations/[id]/suggest-response - Get AI suggested response
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const resolvedParams = await params;
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
-    const conversationId = parseInt(params.id);
+    const conversationId = parseInt(resolvedParams.id);
 
     // Validate ID
     if (isNaN(conversationId) || conversationId <= 0) {

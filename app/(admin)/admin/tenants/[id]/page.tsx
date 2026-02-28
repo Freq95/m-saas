@@ -4,12 +4,13 @@ import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import TenantDetailClient from './TenantDetailClient';
 
 type TenantDetailPageProps = {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 };
 
 export default async function TenantDetailPage({ params }: TenantDetailPageProps) {
-  if (!ObjectId.isValid(params.id)) notFound();
-  const tenantId = new ObjectId(params.id);
+  const { id } = await params;
+  if (!ObjectId.isValid(id)) notFound();
+  const tenantId = new ObjectId(id);
   const db = await getMongoDbOrThrow();
 
   const tenant = await db.collection('tenants').findOne({ _id: tenantId });

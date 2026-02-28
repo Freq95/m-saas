@@ -24,12 +24,12 @@ async function createTenantIndexes() {
   await db.collection('reminders').createIndex({ tenant_id: 1, status: 1, scheduled_at: 1 });
 
   await db.collection('email_integrations').createIndex(
-    { tenant_id: 1, provider: 1 },
+    { user_id: 1, provider: 1 },
     { unique: true }
   );
-  // Cleanup legacy pre-tenancy unique index if present.
+  // Cleanup legacy per-tenant unique index if present.
   try {
-    await db.collection('email_integrations').dropIndex('user_id_1_provider_1');
+    await db.collection('email_integrations').dropIndex('tenant_id_1_provider_1');
   } catch {
     // ignore if already removed
   }

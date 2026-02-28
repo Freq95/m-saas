@@ -15,10 +15,8 @@ function parseTenantId(id: string): ObjectId | null {
   return ObjectId.isValid(id) ? new ObjectId(id) : null;
 }
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(_request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     await getSuperAdmin();
     const tenantId = parseTenantId(params.id);
@@ -48,10 +46,8 @@ export async function GET(
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
     const tenantId = parseTenantId(params.id);

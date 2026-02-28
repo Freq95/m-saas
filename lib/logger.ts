@@ -13,6 +13,38 @@ interface LogEntry {
   error?: Error;
 }
 
+const REDACT_KEYS = new Set([
+  'password',
+  'token',
+  'secret',
+  'apikey',
+  'encrypted_password',
+  'apppassword',
+]);
+
+function redactValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => redactValue(entry));
+  }
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+  if (value instanceof Error) {
+    return value.message;
+  }
+
+  const input = value as Record<string, unknown>;
+  const output: Record<string, unknown> = {};
+  for (const [key, nested] of Object.entries(input)) {
+    if (REDACT_KEYS.has(key.toLowerCase())) {
+      output[key] = '[REDACTED]';
+    } else {
+      output[key] = redactValue(nested);
+    }
+  }
+  return output;
+}
+
 class Logger {
   private isDevelopment: boolean;
   private logLevel: LogLevel;
@@ -32,7 +64,7 @@ class Logger {
 
   private formatMessage(entry: LogEntry): string {
     const timestamp = entry.timestamp;
-    const contextStr = entry.context ? ` ${JSON.stringify(entry.context)}` : '';
+    const contextStr = entry.context ? ` ${JSON.stringify(redactValue(entry.context))}` : '';
     const errorStr = entry.error ? ` Error: ${entry.error.message}` : '';
     return `[${timestamp}] [${entry.level.toUpperCase()}] ${entry.message}${contextStr}${errorStr}`;
   }

@@ -4,6 +4,9 @@ import '../styles/theme.css'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import AppChrome from '@/components/AppChrome'
 import AuthSessionProvider from '@/components/AuthSessionProvider'
+import { validateServerEnv } from '@/lib/env-validation'
+
+validateServerEnv()
 
 export const metadata: Metadata = {
   title: 'OpsGenie pentru Micro-Servicii',

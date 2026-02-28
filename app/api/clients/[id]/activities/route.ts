@@ -3,10 +3,8 @@ import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { getAuthUser } from '@/lib/auth-helpers';
 
 // GET /api/clients/[id]/activities - Get activity timeline for a client
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();

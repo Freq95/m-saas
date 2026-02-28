@@ -6,10 +6,8 @@ import { getAuthUser } from '@/lib/auth-helpers';
 import { invalidateReadCaches } from '@/lib/cache-keys';
 
 // GET /api/clients/[id] - Get client details with history
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
     const clientId = parseInt(params.id);
@@ -29,10 +27,8 @@ export async function GET(
 }
 
 // PATCH /api/clients/[id] - Update client
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
@@ -111,10 +107,8 @@ export async function PATCH(
 }
 
 // DELETE /api/clients/[id] - Soft delete client (using deleted_at timestamp)
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);

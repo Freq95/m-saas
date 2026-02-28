@@ -5,10 +5,8 @@ import { getAuthUser } from '@/lib/auth-helpers';
 import { buildClientStorageKey, getStorageProvider } from '@/lib/storage';
 
 // GET /api/clients/[id]/files - Get files for a client
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
@@ -45,10 +43,8 @@ export async function GET(
 }
 
 // POST /api/clients/[id]/files - Upload a file for a client
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();

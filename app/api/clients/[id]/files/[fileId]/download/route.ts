@@ -7,8 +7,9 @@ import { getStorageProvider } from '@/lib/storage';
 // GET /api/clients/[id]/files/[fileId]/download - Download a file
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string; fileId: string } }
+  props: { params: Promise<{ id: string; fileId: string }> }
 ) {
+  const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();

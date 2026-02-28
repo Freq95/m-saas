@@ -4,10 +4,8 @@ import { createErrorResponse, createSuccessResponse, handleApiError } from '@/li
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { markInviteUsed, validateInviteToken } from '@/lib/invite';
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: { token: string } }
-) {
+export async function GET(_request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const invite = await validateInviteToken(params.token);
     if (!invite) return createErrorResponse('Invalid or expired invite', 404);
@@ -29,10 +27,8 @@ export async function GET(
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { token: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const body = await request.json();
     const password = typeof body?.password === 'string' ? body.password : '';

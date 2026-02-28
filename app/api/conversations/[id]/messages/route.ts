@@ -7,12 +7,13 @@ import { getAuthUser } from '@/lib/auth-helpers';
 // POST /api/conversations/[id]/messages - Send message
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const resolvedParams = await params;
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
-    const conversationId = parseInt(params.id);
+    const conversationId = parseInt(resolvedParams.id);
     const body = await request.json();
 
     // Validate input
@@ -33,6 +34,21 @@ export async function POST(
 
     const conversation = stripMongoId(conversationDoc);
     const now = new Date().toISOString();
+    const shouldSendEmail =
+      direction === 'outbound' &&
+      conversation.channel === 'email' &&
+      Boolean(conversation.contact_email);
+    let yahooConfig: Awaited<ReturnType<typeof getYahooConfig>> = null;
+
+    if (shouldSendEmail) {
+      yahooConfig = await getYahooConfig(userId, tenantId);
+      if (!yahooConfig) {
+        return createErrorResponse(
+          'No email account connected. Go to Settings -> Email to connect your Yahoo account.',
+          400
+        );
+      }
+    }
 
     // Save message to database
     const messageId = await getNextNumericId('messages');
@@ -51,17 +67,14 @@ export async function POST(
     await db.collection('messages').insertOne(newMessage);
 
     // If it's an outbound email message, send via Yahoo
-    if (direction === 'outbound' && conversation.channel === 'email' && conversation.contact_email) {
+    if (shouldSendEmail && yahooConfig) {
       try {
-        const yahooConfig = await getYahooConfig(Number(conversation.user_id), conversation.tenant_id);
-        if (yahooConfig) {
-          await sendYahooEmail(
-            yahooConfig,
-            conversation.contact_email,
-            `Re: ${conversation.subject || 'Mesaj'}`,
-            content
-          );
-        }
+        await sendYahooEmail(
+          yahooConfig,
+          conversation.contact_email,
+          `Re: ${conversation.subject || 'Mesaj'}`,
+          content
+        );
       } catch (emailError) {
         const { logger } = await import('@/lib/logger');
         logger.error('Error sending email via Yahoo', emailError instanceof Error ? emailError : new Error(String(emailError)), { conversationId });

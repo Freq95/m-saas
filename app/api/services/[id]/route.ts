@@ -5,10 +5,8 @@ import { getAuthUser } from '@/lib/auth-helpers';
 import { invalidateReadCaches } from '@/lib/cache-keys';
 
 // GET /api/services/[id] - Get a single service
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
@@ -30,10 +28,8 @@ export async function GET(
 }
 
 // PATCH /api/services/[id] - Update a service
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
@@ -89,10 +85,8 @@ export async function PATCH(
 }
 
 // DELETE /api/services/[id] - Delete a service
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();

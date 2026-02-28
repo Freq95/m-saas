@@ -40,6 +40,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
   const [loading, setLoading] = useState(initialIntegrations.length === 0);
   const [showYahooForm, setShowYahooForm] = useState(false);
   const [yahooEmail, setYahooEmail] = useState('');
+  const [yahooPassword, setYahooPassword] = useState('');
   const [emailError, setEmailError] = useState<string | null>(null);
   const yahooPasswordRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
@@ -104,7 +105,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
   }
 
   async function saveYahooIntegration() {
-    const password = yahooPasswordRef.current?.value || '';
+    const password = yahooPassword;
     
     if (!yahooEmail || !password) {
       setError('Please enter both email and password');
@@ -124,6 +125,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
     if (yahooPasswordRef.current) {
       yahooPasswordRef.current.value = '';
     }
+    setYahooPassword('');
     
     const requestId = 'save-yahoo';
     const controller = new AbortController();
@@ -205,11 +207,13 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
       if (yahooPasswordRef.current) {
         yahooPasswordRef.current.value = '';
       }
+      setYahooPassword('');
     } finally {
       setSaving(false);
       if (yahooPasswordRef.current) {
         yahooPasswordRef.current.value = '';
       }
+      setYahooPassword('');
     }
   }
 
@@ -363,13 +367,13 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
               <p className={styles.providerDescription}>
                 Connect your Yahoo Mail account using an App Password. 
                 <a 
-                  href="https://help.yahoo.com/kb/generate-third-party-passwords-sln15241.html" 
+                  href="https://login.yahoo.com/myaccount/security/" 
                   target="_blank" 
                   rel="noopener noreferrer" 
                   className={styles.link}
-                  aria-label="Learn how to generate an App Password for Yahoo Mail"
+                  aria-label="Add Yahoo Connection by Creating an App Password"
                 >
-                  Learn how to generate an App Password
+                  Add Yahoo Connection by Creating an App Password
                 </a>
               </p>
             </div>
@@ -526,6 +530,8 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
                     type="password"
                     placeholder="App Password (recommended)"
                     ref={yahooPasswordRef}
+                    value={yahooPassword}
+                    onChange={(e) => setYahooPassword(e.target.value)}
                     className={styles.input}
                     aria-label="Yahoo App Password"
                     aria-required="true"
@@ -540,7 +546,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
                     <button 
                       type="button"
                       onClick={saveYahooIntegration} 
-                      disabled={saving || !yahooEmail || !yahooPasswordRef.current?.value || !!emailError} 
+                      disabled={saving || !yahooEmail.trim() || !yahooPassword || !!emailError} 
                       className={styles.saveButton}
                       aria-label="Save Yahoo Mail integration"
                       aria-busy={saving}
@@ -552,6 +558,8 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
                         setShowYahooForm(false);
                         setError(null);
                         setEmailError(null);
+                        setYahooEmail('');
+                        setYahooPassword('');
                         if (yahooPasswordRef.current) {
                           yahooPasswordRef.current.value = '';
                         }

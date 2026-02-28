@@ -115,9 +115,7 @@ export async function saveEmailIntegration(
 
     const existing = await db.collection('email_integrations').findOne({
       user_id: userId,
-      ...(tenantId ? { tenant_id: tenantId } : {}),
       provider,
-      email,
     });
 
     let encryptedPassword: string | null = null;
@@ -140,6 +138,7 @@ export async function saveEmailIntegration(
 
     if (existing) {
       const setValues: Record<string, unknown> = {
+        email,
         is_active: true,
         updated_at: now,
       };
@@ -149,11 +148,11 @@ export async function saveEmailIntegration(
       if (encryptedAccessToken !== null) setValues.encrypted_access_token = encryptedAccessToken;
 
       await db.collection('email_integrations').updateOne(
-        tenantId ? { id: existing.id, tenant_id: tenantId } : { id: existing.id },
+        { id: existing.id, user_id: userId, provider },
         { $set: setValues }
       );
 
-      const updated = await db.collection('email_integrations').findOne(tenantId ? { id: existing.id, tenant_id: tenantId } : { id: existing.id });
+      const updated = await db.collection('email_integrations').findOne({ id: existing.id, user_id: userId, provider });
       if (!updated) {
         throw new Error('Failed to load updated integration');
       }

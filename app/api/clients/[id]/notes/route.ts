@@ -4,10 +4,8 @@ import { handleApiError, createSuccessResponse, createErrorResponse } from '@/li
 import { getAuthUser } from '@/lib/auth-helpers';
 
 // GET /api/clients/[id]/notes - Get notes for a client
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
@@ -44,10 +42,8 @@ export async function GET(
 }
 
 // POST /api/clients/[id]/notes - Create a note for a client
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();

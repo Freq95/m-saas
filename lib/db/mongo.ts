@@ -1,4 +1,4 @@
-import { MongoClient, type Db } from 'mongodb';
+import { MongoClient, ObjectId, type Db } from 'mongodb';
 
 const DEFAULT_DB_NAME = 'm-saas';
 
@@ -24,9 +24,15 @@ async function getMongoClient(uri: string): Promise<MongoClient> {
   return clientPromise;
 }
 
-export function stripMongoId<T extends Record<string, unknown>>(doc: T): T {
+export function stripMongoId<T extends Record<string, unknown>>(doc: T): Omit<T, '_id'> {
   const { _id, ...rest } = doc;
-  return rest as T;
+  const serialized = Object.fromEntries(
+    Object.entries(rest).map(([key, value]) => [
+      key,
+      value instanceof ObjectId ? value.toString() : value,
+    ])
+  );
+  return serialized as Omit<T, '_id'>;
 }
 
 export async function getMongoDb(): Promise<Db | null> {

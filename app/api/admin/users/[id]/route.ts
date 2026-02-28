@@ -17,10 +17,8 @@ async function ensureNotLastActiveSuperAdmin(db: any, targetUser: any, nextRole?
   }
 }
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(_request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     await getSuperAdmin();
     if (!ObjectId.isValid(params.id)) return createErrorResponse('Invalid user id', 400);
@@ -41,10 +39,8 @@ export async function GET(
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
     if (!ObjectId.isValid(params.id)) return createErrorResponse('Invalid user id', 400);
@@ -138,10 +134,8 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
     if (!ObjectId.isValid(params.id)) return createErrorResponse('Invalid user id', 400);

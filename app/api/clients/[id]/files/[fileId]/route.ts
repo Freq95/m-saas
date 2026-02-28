@@ -7,8 +7,9 @@ import { getStorageProvider } from '@/lib/storage';
 // PATCH /api/clients/[id]/files/[fileId] - Update file description
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string; fileId: string } }
+  props: { params: Promise<{ id: string; fileId: string }> }
 ) {
+  const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
@@ -51,8 +52,9 @@ export async function PATCH(
 // DELETE /api/clients/[id]/files/[fileId] - Delete a file
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; fileId: string } }
+  props: { params: Promise<{ id: string; fileId: string }> }
 ) {
+  const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();

@@ -5,10 +5,11 @@
 
 import { NextResponse } from 'next/server';
 import { AuthError } from '@/lib/auth-helpers';
+import { ZodError } from 'zod';
 
 export interface ApiError {
   error: string;
-  details?: string;
+  details?: unknown;
 }
 
 /**
@@ -17,18 +18,20 @@ export interface ApiError {
 export function createErrorResponse(
   error: string,
   status: number = 500,
-  details?: string | Error
+  details?: unknown
 ): NextResponse<ApiError> {
   const errorDetails = 
     details instanceof Error 
       ? (process.env.NODE_ENV === 'development' ? details.message : undefined)
       : (process.env.NODE_ENV === 'development' ? details : undefined);
 
+  const payload: ApiError = { error };
+  if (typeof errorDetails !== 'undefined') {
+    payload.details = errorDetails;
+  }
+
   return NextResponse.json(
-    {
-      error,
-      ...(errorDetails && { details: errorDetails }),
-    },
+    payload,
     { status }
   );
 }
@@ -43,12 +46,12 @@ export function handleApiError(error: unknown, defaultMessage: string = 'An erro
 
   if (error instanceof Error) {
     // Validation errors
-    if (error.name === 'ZodError') {
-      return createErrorResponse(
-        'Invalid input',
-        400,
-        error.message
-      );
+    if (error instanceof ZodError) {
+      const safeErrors = error.issues.map((issue) => ({
+        field: issue.path.join('.'),
+        message: issue.message,
+      }));
+      return createErrorResponse('Invalid input', 400, safeErrors);
     }
 
     // Not found errors

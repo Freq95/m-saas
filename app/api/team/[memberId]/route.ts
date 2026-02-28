@@ -4,10 +4,8 @@ import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
 
-export async function DELETE(
-  _request: NextRequest,
-  { params }: { params: { memberId: string } }
-) {
+export async function DELETE(_request: NextRequest, props: { params: Promise<{ memberId: string }> }) {
+  const params = await props.params;
   try {
     const { dbUserId, tenantId, role } = await getAuthUser();
     if (role !== 'owner') {

@@ -7,6 +7,7 @@ import Imap from 'imap';
 import { simpleParser } from 'mailparser';
 import nodemailer from 'nodemailer';
 import { ObjectId } from 'mongodb';
+import { logger } from './logger';
 
 interface YahooConfig {
   email: string;
@@ -114,45 +115,28 @@ function extractAttachments(parsed: any): EmailAttachment[] {
 }
 
 /**
- * Get Yahoo Mail configuration from database or environment (fallback)
- * @param userId - User ID to fetch from database. If not provided, uses environment variables.
+ * Get Yahoo Mail configuration from database (no environment fallback).
  */
 export async function getYahooConfig(userId?: number, tenantId?: ObjectId): Promise<YahooConfig | null> {
-  // Try database first if userId is provided
-  if (userId) {
-    try {
-      const { getEmailIntegrationConfig } = await import('./email-integrations');
-      if (!tenantId) return null;
-      const config = await getEmailIntegrationConfig(userId, tenantId, 'yahoo');
-      
-      if (config && config.password) {
-        return {
-          email: config.email,
-          password: config.password,
-          appPassword: config.password, // Assume app password
-        };
-      }
-    } catch (error) {
-      // Fall through to environment variables if database lookup fails
-      const { logger } = await import('./logger');
-      logger.warn('Failed to get Yahoo config from database, falling back to environment', { error, userId });
-    }
-  }
-  
-  // Fallback to environment variables
-  const email = process.env.YAHOO_EMAIL;
-  const password = process.env.YAHOO_PASSWORD || process.env.YAHOO_APP_PASSWORD;
-  const appPassword = process.env.YAHOO_APP_PASSWORD;
-
-  if (!email || !password) {
+  if (!userId || !tenantId) {
     return null;
   }
 
-  return {
-    email,
-    password: appPassword || password,
-    appPassword,
-  };
+  try {
+    const { getEmailIntegrationConfig } = await import('./email-integrations');
+    const config = await getEmailIntegrationConfig(userId, tenantId, 'yahoo');
+    if (!config?.password) {
+      return null;
+    }
+    return {
+      email: config.email,
+      password: config.password,
+      appPassword: config.password,
+    };
+  } catch (error) {
+    logger.warn('Failed to get Yahoo config from database', { error, userId });
+    return null;
+  }
 }
 
 /**
@@ -170,7 +154,6 @@ export async function fetchYahooEmails(
       host: 'imap.mail.yahoo.com',
       port: 993,
       tls: true,
-      tlsOptions: { rejectUnauthorized: false },
     });
 
     const emails: EmailMessage[] = [];
@@ -190,21 +173,24 @@ export async function fetchYahooEmails(
             ? [['SINCE', since]]  // All emails since date (read + unread)
             : ['UNSEEN']);        // Only unread if no date/cursor specified
 
-        console.log('Yahoo IMAP: Searching with criteria:', searchCriteria);
+        logger.debug('Yahoo IMAP search started', {
+          useUidCursor: Boolean(sinceUid && sinceUid > 0),
+          hasSinceDate: Boolean(since),
+        });
         imap.search(searchCriteria, (err, results) => {
           if (err) {
-            console.error('Yahoo IMAP search error:', err);
+            logger.error('Yahoo IMAP search failed', err instanceof Error ? err : new Error(String(err)));
             imap.end();
             return reject(err);
           }
           
           if (!results || results.length === 0) {
-            console.log('Yahoo IMAP: No emails found with criteria:', searchCriteria);
+            logger.info('Yahoo IMAP search returned no messages');
             imap.end();
             return resolve(emails);
           }
 
-          console.log(`Yahoo IMAP: Found ${results.length} emails`);
+          logger.info('Yahoo IMAP search found messages', { count: results.length });
 
           const fetch = imap.fetch(results, {
             bodies: '',
@@ -233,7 +219,7 @@ export async function fetchYahooEmails(
               stream.on('end', () => {
                 simpleParser(bodyBuffer, (err: any, parsed: any) => {
                   if (err) {
-                    console.error('Yahoo IMAP: Error parsing email:', err);
+                    logger.error('Yahoo IMAP parse failed', err instanceof Error ? err : new Error(String(err)));
                     parsingComplete = true;
                     processedCount++;
                     checkIfDone();
@@ -307,14 +293,14 @@ export async function fetchYahooEmails(
                     parsingComplete = true;
                     
                     if (emailData.uid && emailData.from) {
-                      console.log('Yahoo IMAP: Parsed email from:', emailData.from, 'subject:', emailData.subject);
+                      logger.debug('Yahoo IMAP parsed message', { uid: emailData.uid });
                       emails.push(emailData as EmailMessage);
                     } else {
-                      console.warn('Yahoo IMAP: Skipped email - missing uid or from. uid:', emailData.uid, 'from:', emailData.from);
+                      logger.warn('Yahoo IMAP skipped message due to missing fields', { uid: emailData.uid ?? null });
                     }
                   } else {
                     parsingComplete = true;
-                    console.warn('Yahoo IMAP: Skipped email - missing parsed data or uid');
+                    logger.warn('Yahoo IMAP skipped message due to missing parsed payload');
                   }
 
                   processedCount++;
@@ -330,7 +316,7 @@ export async function fetchYahooEmails(
                 // Wait a bit for parsing to complete
                 setTimeout(() => {
                   if (!parsingComplete) {
-                    console.warn('Yahoo IMAP: Message end before parsing complete');
+                    logger.warn('Yahoo IMAP message ended before parse completion');
                     processedCount++;
                     checkIfDone();
                   }
@@ -341,7 +327,10 @@ export async function fetchYahooEmails(
 
           function checkIfDone() {
             if (processedCount >= totalEmails) {
-              console.log(`Yahoo IMAP: Processed all ${totalEmails} emails, got ${emails.length} valid emails`);
+              logger.info('Yahoo IMAP processing complete', {
+                total: totalEmails,
+                parsed: emails.length,
+              });
               imap.end();
               resolve(emails);
             }
@@ -351,9 +340,12 @@ export async function fetchYahooEmails(
             // Give a bit more time for any pending parsing
             setTimeout(() => {
               if (processedCount < totalEmails) {
-                console.warn(`Yahoo IMAP: Fetch ended but only processed ${processedCount}/${totalEmails} emails`);
+                logger.warn('Yahoo IMAP fetch ended before all messages processed', {
+                  processedCount,
+                  totalEmails,
+                });
               }
-              console.log(`Yahoo IMAP: Final count - ${emails.length} emails parsed`);
+              logger.info('Yahoo IMAP fetch final count', { parsed: emails.length });
               imap.end();
               resolve(emails);
             }, 2000);
@@ -389,7 +381,6 @@ export async function markEmailAsRead(
       host: 'imap.mail.yahoo.com',
       port: 993,
       tls: true,
-      tlsOptions: { rejectUnauthorized: false },
     });
 
     imap.once('ready', () => {
@@ -436,9 +427,6 @@ export async function sendYahooEmail(
       user: config.email,
       pass: config.password,
     },
-    tls: {
-      rejectUnauthorized: false,
-    },
   });
 
   const mailOptions = {
@@ -451,9 +439,9 @@ export async function sendYahooEmail(
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log('Email sent:', info.messageId);
+    logger.info('Yahoo SMTP send completed');
   } catch (error) {
-    console.error('Error sending email:', error);
+    logger.error('Yahoo SMTP send failed', error instanceof Error ? error : new Error(String(error)));
     throw error;
   }
 }
@@ -470,7 +458,6 @@ export async function testYahooConnection(config: YahooConfig): Promise<boolean>
       host: 'imap.mail.yahoo.com',
       port: 993,
       tls: true,
-      tlsOptions: { rejectUnauthorized: false },
     });
 
     const timeout = setTimeout(() => {

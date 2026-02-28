@@ -77,10 +77,8 @@ async function restoreTenantCascade(db: any, tenantId: ObjectId) {
   }
 }
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(_request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     await getSuperAdmin();
     const tenantId = parseTenantId(params.id);
@@ -125,10 +123,8 @@ export async function GET(
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
     const tenantId = parseTenantId(params.id);
@@ -209,10 +205,8 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
-  _request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(_request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
     const tenantId = parseTenantId(params.id);

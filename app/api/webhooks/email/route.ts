@@ -1,14 +1,42 @@
 import { NextRequest } from 'next/server';
+import crypto from 'crypto';
 import { getMongoDbOrThrow, getNextNumericId } from '@/lib/db/mongo-utils';
 import { suggestTags } from '@/lib/ai-agent';
 import { linkConversationToClient } from '@/lib/client-matching';
-import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
+import { handleApiError, createErrorResponse, createSuccessResponse } from '@/lib/error-handler';
+
+function verifyWebhookSignature(rawBody: string, signature: string): boolean {
+  const secret = process.env.WEBHOOK_SECRET;
+  if (!secret || !signature) {
+    return false;
+  }
+
+  const expected = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+  const expectedBuf = Buffer.from(expected, 'utf8');
+  const signatureBuf = Buffer.from(signature, 'utf8');
+
+  if (expectedBuf.length !== signatureBuf.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(expectedBuf, signatureBuf);
+}
 
 // POST /api/webhooks/email - Webhook for receiving emails (Gmail/Outlook)
 export async function POST(request: NextRequest) {
   try {
+    if (!process.env.WEBHOOK_SECRET) {
+      return createErrorResponse('Webhook endpoint is disabled', 503);
+    }
+
+    const rawBody = await request.text();
+    const signature = request.headers.get('x-webhook-signature') ?? '';
+    if (!verifyWebhookSignature(rawBody, signature)) {
+      return createErrorResponse('Unauthorized', 401);
+    }
+
     const db = await getMongoDbOrThrow();
-    const body = await request.json();
+    const body = JSON.parse(rawBody);
     const { userId, from, to, subject, text, html } = body;
     const normalizedUserId = Number.parseInt(String(userId || ''), 10);
     if (!Number.isFinite(normalizedUserId) || normalizedUserId <= 0) {

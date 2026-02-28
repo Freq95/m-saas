@@ -1,20 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getEmailIntegrationById } from '@/lib/email-integrations';
 import { fetchYahooEmails } from '@/lib/yahoo-mail';
 import { logger } from '@/lib/logger';
 import { decrypt } from '@/lib/encryption';
 import { integrationIdParamSchema } from '@/lib/validation';
-import { getAuthUser, requireRole } from '@/lib/auth-helpers';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 // POST /api/settings/email-integrations/[id]/fetch-last-email
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
-    const { userId, tenantId, role } = await getAuthUser();
-    requireRole(role, 'owner');
+    const { userId, tenantId } = await getAuthUser();
     // Validate route parameter
     const paramValidation = integrationIdParamSchema.safeParse({ id: params.id });
     if (!paramValidation.success) {

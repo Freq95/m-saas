@@ -6,10 +6,8 @@ import { getSuperAdmin } from '@/lib/auth-helpers';
 import { createInviteToken, sendInviteEmail } from '@/lib/invite';
 import { logAdminAudit } from '@/lib/audit';
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
     if (!ObjectId.isValid(params.id)) return createErrorResponse('Invalid tenant id', 400);

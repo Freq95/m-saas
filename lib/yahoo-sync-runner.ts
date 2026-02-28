@@ -184,16 +184,16 @@ async function runYahooSyncCore(
 
       const emailMatch = email.from.match(/<(.+)>/);
       const emailAddress = emailMatch ? emailMatch[1] : email.from;
+      const normalizedEmailAddress = emailAddress.toLowerCase();
       const name = email.from.replace(/<.+>/, '').trim() || emailAddress.split('@')[0];
 
       let client: { id: number } | null = null;
       const { linkConversationToClient } = await import('@/lib/client-matching');
       try {
-        const escapedEmail = emailAddress.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const existingClient = await db.collection('clients').findOne({
           user_id: userId,
           tenant_id: tenantId,
-          email: { $regex: `^${escapedEmail}$`, $options: 'i' },
+          email: { $eq: normalizedEmailAddress },
         });
         if (existingClient) {
           client = { id: existingClient.id };

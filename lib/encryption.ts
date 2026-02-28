@@ -6,42 +6,53 @@
 import crypto from 'crypto';
 
 const ALGORITHM = 'aes-256-gcm';
-const KEY_LENGTH = 32;
 const IV_LENGTH = 16;
-const KEY_SALT = 'vecinu-saas-salt-v1';
+const DEFAULT_KEY_VERSION = 'v1';
+
+function getKeyEnvName(version: string): string {
+  return `ENCRYPTION_KEY_${version.toUpperCase()}`;
+}
+
+function getKeyHexForVersion(version: string): string {
+  const versionedEnv = process.env[getKeyEnvName(version)];
+  if (versionedEnv) {
+    return versionedEnv;
+  }
+  if (version === DEFAULT_KEY_VERSION && process.env.ENCRYPTION_KEY) {
+    return process.env.ENCRYPTION_KEY;
+  }
+  throw new Error(
+    `Missing encryption key for version "${version}". Expected ${getKeyEnvName(version)}`
+  );
+}
 
 /**
  * Get encryption key from environment.
- * ENCRYPTION_KEY should be a 32-byte hex string (64 characters) or passphrase.
+ * Keys must be 32-byte hex strings (64 characters).
+ * Supports ENCRYPTION_KEY (legacy v1 default) and ENCRYPTION_KEY_<VERSION>.
  */
-export function getEncryptionKey(): Buffer {
-  const key = process.env.ENCRYPTION_KEY;
-  if (!key) {
+export function getEncryptionKey(version: string = DEFAULT_KEY_VERSION): Buffer {
+  const keyHex = getKeyHexForVersion(version);
+  if (!/^[0-9a-f]{64}$/i.test(keyHex)) {
     throw new Error(
-      'ENCRYPTION_KEY environment variable is required. ' +
+      `Encryption key ${version} must be a 64-character hex string (32 bytes). ` +
       'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
     );
   }
 
-  // If key is hex string, convert it
-  if (key.length === 64) {
-    return Buffer.from(key, 'hex');
-  }
-
-  // Otherwise, derive key from string
-  return crypto.scryptSync(key, KEY_SALT, KEY_LENGTH);
+  return Buffer.from(keyHex, 'hex');
 }
 
 /**
  * Encrypt text using AES-256-GCM
- * Returns format: iv:tag:encrypted
+ * Returns format: version:iv:tag:encrypted
  */
 export function encrypt(text: string): string {
   if (!text) {
     throw new Error('Cannot encrypt empty text');
   }
   
-  const key = getEncryptionKey();
+  const key = getEncryptionKey(DEFAULT_KEY_VERSION);
   const iv = crypto.randomBytes(IV_LENGTH);
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
   
@@ -50,13 +61,14 @@ export function encrypt(text: string): string {
   
   const tag = cipher.getAuthTag();
   
-  // Return: iv:tag:encrypted
-  return `${iv.toString('hex')}:${tag.toString('hex')}:${encrypted}`;
+  // Return: version:iv:tag:encrypted
+  return `${DEFAULT_KEY_VERSION}:${iv.toString('hex')}:${tag.toString('hex')}:${encrypted}`;
 }
 
 /**
  * Decrypt encrypted data
- * Expects format: iv:tag:encrypted
+ * Expects format: version:iv:tag:encrypted
+ * Also supports legacy format: iv:tag:encrypted (treated as v1).
  */
 export function decrypt(encryptedData: string): string {
   if (!encryptedData) {
@@ -64,14 +76,22 @@ export function decrypt(encryptedData: string): string {
   }
   
   const parts = encryptedData.split(':');
-  
-  if (parts.length !== 3) {
-    throw new Error('Invalid encrypted data format. Expected iv:tag:encrypted');
+  let version: string;
+  let ivHex: string;
+  let tagHex: string;
+  let encrypted: string;
+
+  if (parts.length === 4) {
+    [version, ivHex, tagHex, encrypted] = parts;
+  } else if (parts.length === 3) {
+    // Backward compatibility for data stored before key versioning.
+    version = DEFAULT_KEY_VERSION;
+    [ivHex, tagHex, encrypted] = parts;
+  } else {
+    throw new Error('Invalid encrypted data format. Expected version:iv:tag:encrypted');
   }
   
-  const [ivHex, tagHex, encrypted] = parts;
-  
-  if (!ivHex || !tagHex || !encrypted) {
+  if (!version || !ivHex || !tagHex || !encrypted) {
     throw new Error('Invalid encrypted data format');
   }
   
@@ -86,6 +106,5 @@ export function decrypt(encryptedData: string): string {
     return decrypted;
   };
 
-  return tryDecrypt(getEncryptionKey());
+  return tryDecrypt(getEncryptionKey(version));
 }
-

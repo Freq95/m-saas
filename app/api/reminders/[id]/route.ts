@@ -35,10 +35,8 @@ async function getReminderWithAppointment(reminderId: number, tenantId: ObjectId
 }
 
 // GET /api/reminders/[id] - Get a specific reminder
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
     const reminderId = parseInt(params.id);
@@ -60,10 +58,8 @@ export async function GET(
 }
 
 // PATCH /api/reminders/[id] - Update a reminder
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
@@ -121,10 +117,8 @@ export async function PATCH(
 }
 
 // DELETE /api/reminders/[id] - Delete a reminder
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();

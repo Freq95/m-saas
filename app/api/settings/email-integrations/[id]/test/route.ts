@@ -1,19 +1,65 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
+import { Ratelimit } from '@upstash/ratelimit';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
-import { getEmailIntegrationById, getEmailIntegrationConfig } from '@/lib/email-integrations';
-import { fetchYahooEmails } from '@/lib/yahoo-mail';
+import { getEmailIntegrationById } from '@/lib/email-integrations';
 import { logger } from '@/lib/logger';
 import { integrationIdParamSchema } from '@/lib/validation';
-import { getAuthUser, requireRole } from '@/lib/auth-helpers';
+import { getAuthUser } from '@/lib/auth-helpers';
+import { getRedis } from '@/lib/redis';
+import { withRedisPrefix } from '@/lib/redis-prefix';
+
+const TEST_LIMIT = 5;
+const TEST_WINDOW_MS = 10 * 60 * 1000;
+const testFallbackStore = new Map<string, { count: number; resetAt: number }>();
+let testLimiter: Ratelimit | null = null;
+
+function getTestLimiter(): Ratelimit | null {
+  const redis = getRedis();
+  if (!redis) return null;
+  if (!testLimiter) {
+    testLimiter = new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(TEST_LIMIT, '10 m'),
+      prefix: withRedisPrefix('rl:email:integration:test'),
+      analytics: false,
+    });
+  }
+  return testLimiter;
+}
+
+async function isTestRateLimited(identifier: string): Promise<boolean> {
+  const limiter = getTestLimiter();
+  if (limiter) {
+    const result = await limiter.limit(identifier);
+    return !result.success;
+  }
+
+  const now = Date.now();
+  const existing = testFallbackStore.get(identifier);
+  if (!existing || now > existing.resetAt) {
+    testFallbackStore.set(identifier, { count: 1, resetAt: now + TEST_WINDOW_MS });
+    return false;
+  }
+  if (existing.count >= TEST_LIMIT) {
+    return true;
+  }
+  existing.count += 1;
+  return false;
+}
 
 // POST /api/settings/email-integrations/[id]/test
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
-    const { userId, tenantId, role } = await getAuthUser();
-    requireRole(role, 'owner');
+    const { userId, tenantId } = await getAuthUser();
+    const ip =
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      request.headers.get('x-real-ip') ||
+      'unknown';
+    const rateLimitId = `${userId}:${ip}`;
+    if (await isTestRateLimited(rateLimitId)) {
+      return createErrorResponse('Rate limit exceeded', 429);
+    }
     // Validate route parameter
     const paramValidation = integrationIdParamSchema.safeParse({ id: params.id });
     if (!paramValidation.success) {

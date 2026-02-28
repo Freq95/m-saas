@@ -10,13 +10,14 @@ import { invalidateReadCaches } from '@/lib/cache-keys';
 // Save a persisted inbound email attachment to an existing or new client profile.
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string; attachmentId: string } }
+  { params }: { params: Promise<{ id: string; attachmentId: string }> }
 ) {
   try {
+    const resolvedParams = await params;
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
-    const conversationId = parseInt(params.id, 10);
-    const attachmentId = parseInt(params.attachmentId, 10);
+    const conversationId = parseInt(resolvedParams.id, 10);
+    const attachmentId = parseInt(resolvedParams.attachmentId, 10);
 
     if (Number.isNaN(conversationId) || conversationId <= 0) {
       return createErrorResponse('Invalid conversation ID', 400);

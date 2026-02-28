@@ -4,10 +4,8 @@ import { handleApiError, createSuccessResponse, createErrorResponse } from '@/li
 import { getAuthUser } from '@/lib/auth-helpers';
 
 // GET /api/tasks/[id] - Get a single task
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
@@ -31,10 +29,8 @@ export async function GET(
 }
 
 // PATCH /api/tasks/[id] - Update a task
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
@@ -88,10 +84,8 @@ export async function PATCH(
 }
 
 // DELETE /api/tasks/[id] - Delete a task
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();

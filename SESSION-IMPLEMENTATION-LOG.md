@@ -856,3 +856,152 @@ Scope: Auth + super-admin + invite flow + audit + tenant/user lifecycle controls
 - `npm run typecheck` passed.
 - `npm run build` passed.
 - Build warning observed (non-blocking): Edge runtime warning from `@upstash/redis` import trace (`lib/redis.ts`), pre-existing and unchanged by this fix batch.
+
+## 36) Email Integration Security + UX Fixes (2026-02-24)
+- Implemented the full email integration hardening plan to remove credential fallback risk and move behavior to per-user ownership.
+- Removed Yahoo `.env` fallback path:
+  - `lib/yahoo-mail.ts`
+  - `getYahooConfig(userId, tenantId)` is now DB-only and returns `null` when no active user integration exists.
+- Switched integration save/update semantics to per-user provider scope:
+  - `lib/email-integrations.ts`
+  - `saveEmailIntegration(...)` now resolves existing integration by `{ user_id, provider }` and updates that record.
+- Opened email integration settings APIs to authenticated owner + staff users (removed owner-only gate):
+  - `app/api/settings/email-integrations/route.ts`
+  - `app/api/settings/email-integrations/yahoo/route.ts`
+  - `app/api/settings/email-integrations/[id]/route.ts`
+  - `app/api/settings/email-integrations/[id]/test/route.ts`
+  - `app/api/settings/email-integrations/[id]/fetch-last-email/route.ts`
+- Fixed Yahoo send endpoint to use tenant-scoped auth context (no missing-tenant call):
+  - `app/api/yahoo/send/route.ts`
+  - now calls `getYahooConfig(userId, tenantId)` and returns clear 400 when not connected.
+- Fixed conversation outbound email to use logged-in sender credentials (not conversation creator credentials):
+  - `app/api/conversations/[id]/messages/route.ts`
+  - now blocks outbound send with explicit 400 when no connected account exists.
+- Added per-user index migration script:
+  - `scripts/migrate-email-integrations-per-user.js`
+  - drops `tenant_id_1_provider_1` and creates unique `user_id_1_provider_1`.
+- Updated tenant index bootstrap to align with new uniqueness model:
+  - `scripts/create-tenant-indexes.ts`
+- Email settings UI fixes/polish:
+  - `app/settings/email/EmailSettingsPageClient.tsx`
+  - fixed Yahoo Save button disabled-state bug by using controlled password state (instead of ref-only value checks).
+  - updated Yahoo help link to `https://login.yahoo.com/myaccount/security/`.
+  - updated helper link text and matching `aria-label` to:
+    - `Add Yahoo Connection by Creating an App Password`.
+
+### Validation
+- `npm run typecheck` passed after implementation and UI follow-up changes.
+- Per-user index migration executed successfully in runtime environment:
+  - `Dropped old index: tenant_id_1_provider_1`
+  - `Created new index: user_id_1_provider_1 (unique)`
+  - `Migration complete`
+
+## 37) Security Audit Remediation Batches + Dependency Policy (2026-02-24)
+- Completed remaining security hardening from `SECURITY-AUDIT.md` (code-level findings).
+- Implemented in ordered batches:
+  - removed Yahoo TLS cert bypass flags
+  - secured webhook endpoint with HMAC SHA-256 (`WEBHOOK_SECRET`) and disable behavior when missing
+  - added HTTP security headers + CSP in `next.config.js`
+  - removed benchmark bypass from middleware
+  - switched cron secret comparison to timing-safe verification
+  - replaced all `console.*` in Yahoo mail path with structured logger calls (no PII)
+  - replaced regex email lookup in sync runner with exact lowercase `$eq`
+  - enforced strict 64-char hex encryption key policy
+  - added send endpoint rate limit (20/hour per user)
+  - sanitized Zod error payloads returned to clients
+  - filtered null `tenant_id` integrations in cron fan-out
+  - added logger redaction for sensitive keys
+  - added audit log writes for email integration create/delete
+  - added integration delete cleanup for Yahoo message attachments in R2 + DB
+  - changed production rate-limit fallback to fail-closed (`503`) when Redis backend is unavailable
+  - added strict rate limit on integration test endpoint (5 per 10 min)
+  - added startup env validation (`ENCRYPTION_KEY`, `AUTH_SECRET`, `MONGODB_URI`, `CRON_SECRET`)
+  - added explicit CORS policy comment in `next.config.js`
+
+### Dependency / Runtime Decisions (per directive)
+- **Do not migrate `imap` to `imapflow`** (explicitly preserved existing IMAP implementation).
+- Added `package.json` overrides:
+  - `utf7`, `minimatch`, `glob`
+- Added Node policy:
+  - `engines.node = 20.x`
+- Updated framework packages:
+  - `next@latest`
+  - `eslint-config-next@latest`
+- Kept modern lint/tooling stack; did not pin backwards for Node 18.
+
+### Audit Result Snapshot
+- Before this pass: `npm audit` showed `34` vulnerabilities.
+- After overrides + Next update: `29` vulnerabilities.
+- Remaining items are primarily AWS SDK transitive and IMAP chain advisories.
+- Per instruction, AWS SDK transitive findings are currently treated as accepted risk (no immediate code migration action).
+
+### Key Rotation Note
+- Added a dedicated **Key Rotation Runbook** section in `SECURITY-AUDIT.md`.
+- Backfill/re-encryption is intentionally deferred until an actual key rotation event.
+- Current decrypt logic remains backward-compatible with legacy unversioned encrypted payloads.
+
+### Validation
+- `npx tsc --noEmit` passed after each code change batch.
+
+## 38) Next.js 16 Dynamic Route Params Migration (Conversations Scope) (2026-02-24)
+- Addressed runtime failure after Next.js upgrade:
+  - `Route "/api/conversations/[id]" used params.id. params is a Promise...`
+- Updated conversation dynamic API handlers to await async route params:
+  - `app/api/conversations/[id]/route.ts` (GET, PATCH)
+  - `app/api/conversations/[id]/messages/route.ts`
+  - `app/api/conversations/[id]/read/route.ts`
+  - `app/api/conversations/[id]/suggest-response/route.ts`
+  - `app/api/conversations/[id]/images/save/route.ts`
+  - `app/api/conversations/[id]/attachments/[attachmentId]/save/route.ts`
+- Convention used in each handler:
+  - signature `context: { params: Promise<{ ... }> }`
+  - `const resolvedParams = await params` before reading route IDs.
+- Middleware convention migration recorded as completed in same window:
+  - renamed `middleware.ts` to `proxy.ts`
+  - exported function renamed to `proxy`.
+
+### Validation
+- Runtime: conversation detail endpoint no longer throws async-params error locally.
+- Typecheck: `npx tsc --noEmit` still fails due to many other dynamic API routes not yet migrated to Next 16 async params contract (outside conversations scope).
+- Conclusion: conversation crash fixed; full Next 16 route migration remains pending as a separate batch.
+
+## 39) Critical Stabilization: Middleware Loader + Full Next 16 Params Migration (2026-02-24)
+- Fixed critical middleware loading regression introduced by `proxy.ts` rename:
+  - restored root middleware file to `middleware.ts`
+  - restored handler signature export to `export async function middleware(...)`
+- Security/runtime impact addressed:
+  - middleware protections are active again (route auth guards + rate-limit layer now executed).
+
+### Next 16 Dynamic API Route Migration (Remaining 24 Routes)
+- Applied mechanical migration in all previously failing dynamic routes:
+  - old: `{ params }: { params: { ... } }` + direct `params.*`
+  - new: `props: { params: Promise<{ ... }> }` + `const resolvedParams = await props.params`
+- Migrated files include:
+  - `app/api/admin/tenants/[id]/route.ts`
+  - `app/api/admin/tenants/[id]/resend-invite/route.ts`
+  - `app/api/admin/tenants/[id]/restore/route.ts`
+  - `app/api/admin/tenants/[id]/users/route.ts`
+  - `app/api/admin/users/[id]/route.ts`
+  - `app/api/admin/users/[id]/restore/route.ts`
+  - `app/api/appointments/[id]/route.ts`
+  - `app/api/clients/[id]/route.ts`
+  - `app/api/clients/[id]/activities/route.ts`
+  - `app/api/clients/[id]/files/route.ts`
+  - `app/api/clients/[id]/files/[fileId]/route.ts`
+  - `app/api/clients/[id]/files/[fileId]/download/route.ts`
+  - `app/api/clients/[id]/files/[fileId]/preview/route.ts`
+  - `app/api/clients/[id]/history/route.ts`
+  - `app/api/clients/[id]/notes/route.ts`
+  - `app/api/clients/[id]/stats/route.ts`
+  - `app/api/settings/email-integrations/[id]/route.ts`
+  - `app/api/settings/email-integrations/[id]/test/route.ts`
+  - `app/api/settings/email-integrations/[id]/fetch-last-email/route.ts`
+  - `app/api/invite/[token]/route.ts`
+  - `app/api/reminders/[id]/route.ts`
+  - `app/api/services/[id]/route.ts`
+  - `app/api/tasks/[id]/route.ts`
+  - `app/api/team/[memberId]/route.ts`
+
+### Validation
+- `npx tsc --noEmit` passed (zero TypeScript errors).
+- Result: build-blocking dynamic route type errors cleared.

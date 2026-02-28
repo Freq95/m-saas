@@ -5,10 +5,8 @@ import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getSuperAdmin } from '@/lib/auth-helpers';
 import { logAdminAudit } from '@/lib/audit';
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
     if (!ObjectId.isValid(params.id)) return createErrorResponse('Invalid user id', 400);

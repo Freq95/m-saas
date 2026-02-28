@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { getCached } from '@/lib/redis';
 import { providersListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
@@ -32,7 +32,8 @@ export async function GET(request: NextRequest) {
           updated_at: 1,
         })
         .sort({ name: 1 })
-        .toArray();
+        .toArray()
+        .then((docs: Record<string, unknown>[]) => docs.map(stripMongoId));
     });
 
     return createSuccessResponse({ providers });

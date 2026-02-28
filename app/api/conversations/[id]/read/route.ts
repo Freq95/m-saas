@@ -7,12 +7,13 @@ import { getAuthUser } from '@/lib/auth-helpers';
 // Body: { read: boolean }
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const resolvedParams = await params;
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
-    const conversationId = parseInt(params.id, 10);
+    const conversationId = parseInt(resolvedParams.id, 10);
     if (Number.isNaN(conversationId) || conversationId <= 0) {
       return createErrorResponse('Invalid conversation ID', 400);
     }

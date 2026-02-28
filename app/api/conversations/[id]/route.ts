@@ -9,11 +9,12 @@ import { getAuthUser } from '@/lib/auth-helpers';
 // GET /api/conversations/[id] - Get conversation with messages
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const resolvedParams = await params;
     const { userId, tenantId } = await getAuthUser();
-    const conversationId = parseInt(params.id);
+    const conversationId = parseInt(resolvedParams.id);
 
     const { searchParams } = request.nextUrl;
     const limit = parseInt(searchParams.get('limit') || '50');
@@ -49,12 +50,13 @@ export async function GET(
 // PATCH /api/conversations/[id] - Update conversation
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const resolvedParams = await params;
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
-    const conversationId = parseInt(params.id);
+    const conversationId = parseInt(resolvedParams.id);
     const body = await request.json();
 
     // Validate conversation exists

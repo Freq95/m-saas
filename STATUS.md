@@ -1,9 +1,9 @@
 # m-saas Project Status
 
-**Last Updated:** 2026-02-23
+**Last Updated:** 2026-02-24
 **MVP Version:** V1 (~90% complete)
 **Database:** MongoDB
-**Framework:** Next.js 14 App Router
+**Framework:** Next.js App Router (updated to latest in security remediation pass)
 
 ---
 
@@ -41,6 +41,47 @@ All 12 fixes from REVIEW-FIXES-REQUIRED.md verified:
 - **Medium:** End-time boundary validation; client search error shown inline; duration rounding shows error instead of silent correction
 
 **Local caveat:** Redis intentionally disabled for local testing; Windows `.next-build/trace` lock can intermittently block local builds
+
+### Section 36 Email Integration Security + UX — IMPLEMENTED (2026-02-24)
+- Removed Yahoo credential `.env` fallback in runtime send/sync config resolution (`lib/yahoo-mail.ts` now DB-only lookup).
+- Migrated integration uniqueness model to per-user provider (`user_id + provider`) and aligned save/update behavior.
+- Added migration script and executed successfully:
+  - dropped `tenant_id_1_provider_1`
+  - created unique `user_id_1_provider_1`
+- Opened email integration settings endpoints to authenticated owner + staff (removed owner-only restriction).
+- Fixed outbound send routes to use authenticated `userId + tenantId` credentials:
+  - `/api/yahoo/send`
+  - `/api/conversations/[id]/messages`
+- Added clear 400 response when no Yahoo integration is connected (no fallback send).
+- Fixed Yahoo Settings form Save button disabled-state bug (controlled password field).
+- Updated Yahoo help link and accessibility label to:
+  - `https://login.yahoo.com/myaccount/security/`
+  - `Add Yahoo Connection by Creating an App Password`.
+
+### Section 38 MongoDB ObjectId RSC Serialization Fix — IMPLEMENTED (2026-02-28)
+- Fixed Next.js RSC boundary error: `Only plain objects can be passed to Client Components from Server Components`
+- Root cause: `tenant_id` and other fields stored as MongoDB `ObjectId` instances were passing through the Server → Client boundary
+- **`lib/db/mongo.ts`** — Updated `stripMongoId()` to convert all `ObjectId` instances to strings (previously only removed `_id`, leaving other ObjectId fields intact)
+- **`app/api/providers/route.ts`** — Added missing `stripMongoId` call on `.toArray()` results before caching; previously returned raw MongoDB docs with unserializable ObjectId fields
+- TypeScript check: `npx tsc --noEmit` → 0 errors
+
+### Section 37 Security Audit Remediation — IMPLEMENTED (2026-02-24)
+- Completed remaining code-level remediation from `SECURITY-AUDIT.md`:
+  - webhook HMAC auth, TLS hardening, security headers/CSP
+  - benchmark bypass removal, timing-safe cron secret check
+  - logging hardening + redaction, Zod response sanitization
+  - send/test rate limits, cron null-tenant filtering
+  - integration create/delete audit logs and delete-time attachment cleanup
+  - startup env validation for required secrets/config
+- Encryption now supports versioned ciphertext prefix (`v1:iv:tag:ciphertext`) with legacy decrypt compatibility.
+- Dependency policy updates:
+  - `package.json` overrides added for `utf7`, `minimatch`, `glob`
+  - `engines.node` set to `20.x`
+  - `next` and `eslint-config-next` updated to latest
+- `npm audit` reduced from `34` to `29` vulnerabilities after this pass.
+- **Policy decision:** no `imap -> imapflow` migration.
+- **Accepted risk (current):** remaining AWS SDK transitive vulnerability chain pending separate dependency lifecycle pass.
+- **Manual infra follow-up:** set Vercel runtime to Node 20 and align dev machines to Node 20 LTS.
 
 ---
 
@@ -118,7 +159,7 @@ All 12 fixes from REVIEW-FIXES-REQUIRED.md verified:
 - In-memory fallback when Redis unavailable
 - Buckets: read (high tolerance), write (mutations only), sync (strict 3/5min)
 - Identity: tenant+user key preferred, fallback to user, then IP
-- Benchmark bypass mode for reliable API benchmarking
+- No benchmark bypass in production middleware
 
 ### Infrastructure
 - Cloudflare R2 storage for file uploads (migrated from local disk)
@@ -206,5 +247,79 @@ npm run bench:gui
 
 ---
 
+---
+
+## Production Launch Checklist (Vercel — not yet configured)
+
+These items require manual action in the Vercel dashboard at launch time. They cannot be verified in code.
+
+### Required before going live
+
+- [ ] **Node.js runtime** — set to `20.x` in Vercel project settings → General → Node.js Version. The `engines.node` field in `package.json` declares intent but Vercel uses its own dashboard setting independently.
+
+- [ ] **`WEBHOOK_SECRET` env var** — `/api/webhooks/email` returns 503 if this is missing. Add to Vercel Environment Variables before enabling any email webhook. Generate:
+  ```
+  node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+  ```
+
+- [ ] **All secrets from `.env`** — copy every required variable to Vercel Environment Variables:
+  - `MONGODB_URI`
+  - `AUTH_SECRET` (32+ bytes, cryptographically random)
+  - `ENCRYPTION_KEY` (exactly 64 hex chars — 32 bytes)
+  - `CRON_SECRET`
+  - `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`
+  - `QSTASH_TOKEN` (if using distributed cron)
+  - `WEBHOOK_SECRET`
+  - Cloudflare R2 / storage provider keys
+
+- [ ] **`BENCHMARK_MODE` absent** — confirm this env var is not set (or is `false`) in the Vercel production environment.
+
+- [ ] **HSTS preload** — `Strict-Transport-Security: preload` is already in `next.config.js`. Once the production domain is stable, submit it to [hstspreload.org](https://hstspreload.org).
+
+- [ ] **`npm audit` on CI** — add `npm audit --audit-level=high` to the build step so new critical/high vulnerabilities block deployments automatically.
+
+### Recommended post-launch (first 30 days)
+
+- [ ] **MongoDB network access** — restrict Atlas IP allowlist to Vercel egress IPs only. Do not leave `0.0.0.0/0` open in production.
+- [ ] **Upstash Redis** — disable public access; use token-based auth only.
+- [ ] **Error monitoring** — integrate Sentry or equivalent so exceptions surface without requiring log access.
+- [ ] **Rotate `ENCRYPTION_KEY`** — schedule first key rotation within 90 days of launch. Follow the Key Rotation Runbook in `SECURITY-AUDIT.md`.
+
+---
+
 *For setup instructions and API reference, see [GUIDE.md](GUIDE.md)*
 *For detailed session history, see [SESSION-IMPLEMENTATION-LOG.md](SESSION-IMPLEMENTATION-LOG.md)*
+
+## Section 38 Next.js 16 Route Handler Compatibility (Conversations) - PARTIAL (2026-02-24)
+- Fixed runtime error in dynamic conversation routes after Next.js 16 upgrade where route `params` became async.
+- Updated handlers to Next 16 contract (`params: Promise<...>` + `await params`) in:
+  - `/api/conversations/[id]`
+  - `/api/conversations/[id]/messages`
+  - `/api/conversations/[id]/read`
+  - `/api/conversations/[id]/suggest-response`
+  - `/api/conversations/[id]/images/save`
+  - `/api/conversations/[id]/attachments/[attachmentId]/save`
+- Middleware convention migration already applied:
+  - `middleware.ts` -> `proxy.ts`
+  - exported handler renamed to `proxy`.
+- Validation:
+  - runtime error for `/api/conversations/[id]` resolved locally.
+  - `npx tsc --noEmit` still reports remaining Next 16 route-context typing errors in other dynamic API routes (admin/clients/services/tasks/settings/invite/etc.), requiring a full route migration pass.
+
+## Section 39 Critical Stabilization: Middleware + Next 16 Dynamic Routes - IMPLEMENTED (2026-02-24)
+- Restored active middleware execution in production/runtime:
+  - reverted file convention to `middleware.ts` (root)
+  - restored handler export name to `middleware`
+- Removed regression where middleware protections were not loaded.
+- Completed Next.js 16 dynamic route migration for remaining API handlers (24 routes):
+  - converted route context typing from sync params to async params (`params: Promise<...>`)
+  - awaited params inside handlers before reading route keys
+  - replaced direct `params.id`/`params.token`/`params.memberId` access patterns
+- Areas completed:
+  - `/api/admin/tenants/[id]` (+ `resend-invite`, `restore`, `users`)
+  - `/api/admin/users/[id]` (+ `restore`)
+  - `/api/clients/[id]` (+ `activities`, `files`, `files/[fileId]`, `download`, `preview`, `history`, `notes`, `stats`)
+  - `/api/settings/email-integrations/[id]` (+ `test`, `fetch-last-email`)
+  - `/api/appointments/[id]`, `/api/invite/[token]`, `/api/reminders/[id]`, `/api/services/[id]`, `/api/tasks/[id]`, `/api/team/[memberId]`
+- Validation:
+  - `npx tsc --noEmit` passes with zero errors.
