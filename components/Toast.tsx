@@ -53,8 +53,6 @@ interface ToastContainerProps {
 }
 
 export function ToastContainer({ toasts, onClose }: ToastContainerProps) {
-  if (toasts.length === 0) return null;
-
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -62,7 +60,7 @@ export function ToastContainer({ toasts, onClose }: ToastContainerProps) {
     return () => setMounted(false);
   }, []);
 
-  if (!mounted) return null;
+  if (!mounted || toasts.length === 0) return null;
 
   return createPortal(
     <div className={styles.container} aria-live="polite" aria-atomic="true">

@@ -60,11 +60,10 @@ export default function ClientProfileClient({
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
   const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
   const [files, setFiles] = useState<any[]>([]);
-  const [activities, setActivities] = useState<any[]>([]);
+  const [notes, setNotes] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(initialStats);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'activities' | 'appointments' | 'conversations' | 'files'>('overview');
-  const [activityFilter, setActivityFilter] = useState<'all' | 'notes' | 'emails' | 'appointments'>('all');
+  const [activeTab, setActiveTab] = useState<'overview' | 'appointments' | 'conversations' | 'files'>('overview');
   const [showAddNote, setShowAddNote] = useState(false);
   const [showEditClient, setShowEditClient] = useState(false);
   const [pendingDeleteFileId, setPendingDeleteFileId] = useState<number | null>(null);
@@ -94,17 +93,15 @@ export default function ClientProfileClient({
   useEffect(() => {
     if (!clientId) return;
     fetchFiles();
-    fetchActivities();
+    fetchNotes();
   }, [clientId]);
 
   useEffect(() => {
     if (!clientId) return;
-    if (activeTab === 'activities') {
-      fetchActivities();
-    } else if (activeTab === 'files') {
+    if (activeTab === 'files') {
       fetchFiles();
     }
-  }, [activeTab, activityFilter, clientId]);
+  }, [activeTab, clientId]);
 
   const fetchClientData = async () => {
     try {
@@ -125,16 +122,15 @@ export default function ClientProfileClient({
     }
   };
 
-  const fetchActivities = async () => {
+  const fetchNotes = async () => {
     try {
-      const response = await fetch(`/api/clients/${clientId}/activities?type=${activityFilter}`);
-      if (!response.ok) throw new Error('Failed to fetch activities');
-      const result = await response.json();
-      setActivities(result.activities || []);
+      const res = await fetch(`/api/clients/${clientId}/activities?type=notes`);
+      if (!res.ok) throw new Error('Failed to fetch notes');
+      const result = await res.json();
+      setNotes(result.activities || []);
     } catch (error) {
-      logger.error('Client profile: failed to fetch activities', error instanceof Error ? error : new Error(String(error)), {
+      logger.error('Client profile: failed to fetch notes', error instanceof Error ? error : new Error(String(error)), {
         clientId,
-        filter: activityFilter,
       });
     }
   };
@@ -176,8 +172,8 @@ export default function ClientProfileClient({
       if (!response.ok) throw new Error('Failed to add note');
       setNoteContent('');
       setShowAddNote(false);
+      fetchNotes();
       fetchClientData();
-      if (activeTab === 'activities') fetchActivities();
     } catch (error) {
       logger.error('Client profile: failed to add note', error instanceof Error ? error : new Error(String(error)), {
         clientId,
@@ -198,7 +194,6 @@ export default function ClientProfileClient({
       });
       if (!response.ok) throw new Error('Failed to upload file');
       fetchFiles();
-      if (activeTab === 'activities') fetchActivities();
     } catch (error) {
       logger.error('Client profile: failed to upload file', error instanceof Error ? error : new Error(String(error)), {
         clientId,
@@ -221,7 +216,6 @@ export default function ClientProfileClient({
       });
       if (!response.ok) throw new Error('Failed to delete file');
       fetchFiles();
-      if (activeTab === 'activities') fetchActivities();
     } catch (error) {
       logger.error('Client profile: failed to delete file', error instanceof Error ? error : new Error(String(error)), {
         clientId,
@@ -248,6 +242,16 @@ export default function ClientProfileClient({
       style: 'currency',
       currency: 'RON',
     }).format(amount);
+  };
+
+  const formatAppointmentStatus = (status: string): string => {
+    const labels: Record<string, string> = {
+      completed: 'Finalizat',
+      scheduled: 'Programat',
+      cancelled: 'Anulat',
+      'no-show': 'Absent',
+    };
+    return labels[status] ?? status;
   };
 
   const getAppointmentStatusClass = (status: string) => {
@@ -303,7 +307,7 @@ export default function ClientProfileClient({
       <div className={styles.container}>
         <div className={styles.error}>
           <p>Clientul nu a fost gasit.</p>
-          <Link href="/clients" className={styles.backButton} prefetch>
+          <Link href="/clients" className={styles.actionButton} prefetch>
             Inapoi la lista
           </Link>
         </div>
@@ -315,9 +319,26 @@ export default function ClientProfileClient({
     <div className={navStyles.container}>
       <div className={styles.container}>
         <div className={styles.header}>
-          <Link href="/clients" className={styles.backLink} prefetch>
-            Inapoi
-          </Link>
+          <nav className={styles.breadcrumb} aria-label="breadcrumb">
+            <Link href="/clients" className={styles.breadcrumbLink} prefetch>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M15 18l-6-6 6-6" />
+              </svg>
+              Clienti
+            </Link>
+            <span className={styles.breadcrumbSep} aria-hidden="true">/</span>
+            <span className={styles.breadcrumbCurrent}>{client.name}</span>
+          </nav>
           <div className={styles.headerContent}>
             <div>
               <h1>{client.name}</h1>
@@ -335,15 +356,6 @@ export default function ClientProfileClient({
                   }
                   return null;
                 })()}
-                {(() => {
-                  const created = new Date(client.first_contact_date);
-                  const daysSince = Math.floor((Date.now() - created.getTime()) / (1000 * 60 * 60 * 24));
-                  if (daysSince <= 7) {
-                    return <span className={`${styles.badge} ${styles.badgeLead}`}>NOU</span>;
-                  }
-                  return null;
-                })()}
-                {client.email && <span className={styles.email}>{client.email}</span>}
                 {client.phone && <span className={styles.phone}>{client.phone}</span>}
               </div>
             </div>
@@ -354,9 +366,6 @@ export default function ClientProfileClient({
                 onClick={() => setShowEditClient(true)}
               >
                 Editeaza
-              </button>
-              <button onClick={() => setShowAddNote(true)} className={styles.actionButton}>
-                + Nota
               </button>
               <label className={styles.actionButton}>
                 + Fisier
@@ -369,52 +378,27 @@ export default function ClientProfileClient({
           </div>
         </div>
 
-        <div className={styles.stats}>
-          <div className={styles.statCard}>
-            <div className={styles.statLabel}>Total cheltuit</div>
-            <div className={styles.statValue}>{formatCurrency(client.total_spent)}</div>
-          </div>
-          <div className={styles.statCard}>
-            <div className={styles.statLabel}>Programari</div>
-            <div className={styles.statValue}>{client.total_appointments}</div>
-          </div>
-          <div className={styles.statCard}>
-            <div className={styles.statLabel}>Ultima vizita</div>
-            <div className={styles.statValue}>{formatDate(client.last_appointment_date)}</div>
-          </div>
-          <div className={styles.statCard}>
-            <div className={styles.statLabel}>Prima contactare</div>
-            <div className={styles.statValue}>{formatDate(client.first_contact_date)}</div>
-          </div>
-        </div>
-
         <div className={styles.tabs}>
           <button
-            className={activeTab === 'overview' ? styles.tabActive : styles.tab}
+            className={`${styles.tab}${activeTab === 'overview' ? ` ${styles.tabActive}` : ''}`}
             onClick={() => setActiveTab('overview')}
           >
             Prezentare generala
           </button>
           <button
-            className={activeTab === 'activities' ? styles.tabActive : styles.tab}
-            onClick={() => setActiveTab('activities')}
-          >
-            Activitate ({activities.length})
-          </button>
-          <button
-            className={activeTab === 'appointments' ? styles.tabActive : styles.tab}
+            className={`${styles.tab}${activeTab === 'appointments' ? ` ${styles.tabActive}` : ''}`}
             onClick={() => setActiveTab('appointments')}
           >
             Programari ({appointments.length})
           </button>
           <button
-            className={activeTab === 'conversations' ? styles.tabActive : styles.tab}
+            className={`${styles.tab}${activeTab === 'conversations' ? ` ${styles.tabActive}` : ''}`}
             onClick={() => setActiveTab('conversations')}
           >
             Conversatii ({conversations.length})
           </button>
           <button
-            className={activeTab === 'files' ? styles.tabActive : styles.tab}
+            className={`${styles.tab}${activeTab === 'files' ? ` ${styles.tabActive}` : ''}`}
             onClick={() => setActiveTab('files')}
           >
             Fisiere ({files.length})
@@ -442,29 +426,39 @@ export default function ClientProfileClient({
                 </div>
               </div>
 
-              {stats && (
-                <div className={styles.section}>
-                  <h2>Statistici detaliate</h2>
-                  <div className={styles.statsGrid}>
-                    <div className={styles.statItem}>
-                      <label>Valoare medie programare</label>
-                      <p>{formatCurrency(stats.average_appointment_value || 0)}</p>
-                    </div>
-                    <div className={styles.statItem}>
-                      <label>Frecventa vizite</label>
-                      <p>{stats.visit_frequency?.toFixed(1) || 0} / luna</p>
-                    </div>
-                    <div className={styles.statItem}>
-                      <label>Rata no-show</label>
-                      <p>{stats.no_show_rate?.toFixed(1) || 0}%</p>
-                    </div>
-                    <div className={styles.statItem}>
-                      <label>Programari finalizate</label>
-                      <p>{stats.completed_appointments || 0}</p>
-                    </div>
+              <div className={styles.section}>
+                <h2>Statistici detaliate</h2>
+                <div className={styles.statsGrid}>
+                  <div className={styles.statItem}>
+                    <label>Total cheltuit</label>
+                    <p>{formatCurrency(client.total_spent)}</p>
+                  </div>
+                  <div className={styles.statItem}>
+                    <label>Programari</label>
+                    <p>{client.total_appointments}</p>
+                  </div>
+                  <div className={styles.statItem}>
+                    <label>Ultima vizita</label>
+                    <p>{formatDate(client.last_appointment_date)}</p>
+                  </div>
+                  <div className={styles.statItem}>
+                    <label>Valoare medie programare</label>
+                    <p>{formatCurrency(stats?.average_appointment_value || 0)}</p>
+                  </div>
+                  <div className={styles.statItem}>
+                    <label>Frecventa vizite</label>
+                    <p>{stats?.visit_frequency?.toFixed(1) || 0} / luna</p>
+                  </div>
+                  <div className={styles.statItem}>
+                    <label>Rata no-show</label>
+                    <p>{stats?.no_show_rate?.toFixed(1) || 0}%</p>
+                  </div>
+                  <div className={styles.statItem}>
+                    <label>Programari finalizate</label>
+                    <p>{stats?.completed_appointments || 0}</p>
                   </div>
                 </div>
-              )}
+              </div>
 
               {stats && stats.preferred_services && stats.preferred_services.length > 0 && (
                 <div className={styles.section}>
@@ -483,6 +477,32 @@ export default function ClientProfileClient({
                 </div>
               )}
 
+              <div className={styles.section}>
+                <div className={styles.sectionHeader}>
+                  <h2>Note</h2>
+                  <button
+                    type="button"
+                    className={styles.sectionAction}
+                    onClick={() => setShowAddNote(true)}
+                  >
+                    + Nota noua
+                  </button>
+                </div>
+                {notes.length === 0 ? (
+                  <p className={styles.emptyInline}>Nicio nota adaugata inca.</p>
+                ) : (
+                  <div className={styles.notesList}>
+                    {notes.map((note) => (
+                      <div key={note.id} className={styles.noteItem}>
+                        <p className={styles.noteText}>{note.description || note.title}</p>
+                        <span className={styles.noteMeta}>
+                          {formatDate(note.activity_date || note.created_at)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -497,7 +517,7 @@ export default function ClientProfileClient({
                       <div className={styles.appointmentHeader}>
                         <h3>{apt.service_name}</h3>
                         <span className={`${styles.statusBadge} ${getAppointmentStatusClass(apt.status)}`}>
-                          {apt.status}
+                          {formatAppointmentStatus(apt.status)}
                         </span>
                       </div>
                       <div className={styles.appointmentDetails}>
@@ -540,60 +560,6 @@ export default function ClientProfileClient({
             </div>
           )}
 
-          {activeTab === 'activities' && (
-            <div className={styles.activities}>
-              <div className={styles.activityFilters}>
-                <button
-                  className={activityFilter === 'all' ? styles.filterActive : styles.filter}
-                  onClick={() => setActivityFilter('all')}
-                >
-                  Toate
-                </button>
-                <button
-                  className={activityFilter === 'notes' ? styles.filterActive : styles.filter}
-                  onClick={() => setActivityFilter('notes')}
-                >
-                  Notite
-                </button>
-                <button
-                  className={activityFilter === 'emails' ? styles.filterActive : styles.filter}
-                  onClick={() => setActivityFilter('emails')}
-                >
-                  Email-uri
-                </button>
-                <button
-                  className={activityFilter === 'appointments' ? styles.filterActive : styles.filter}
-                  onClick={() => setActivityFilter('appointments')}
-                >
-                  Programari
-                </button>
-              </div>
-              {activities.length === 0 ? (
-                <div className={styles.empty}>Nu exista activitati.</div>
-              ) : (
-                <div className={styles.activityList}>
-                  {activities.map((activity) => (
-                    <div key={`${activity.activity_type}-${activity.id}`} className={styles.activityItem}>
-                      <div className={styles.activityIcon}>
-                        {activity.activity_type === 'note' && '??'}
-                        {activity.activity_type === 'email' && '??'}
-                        {activity.activity_type === 'task' && '?'}
-                        {activity.activity_type === 'appointment' && '??'}
-                      </div>
-                      <div className={styles.activityContent}>
-                        <h4>{activity.title}</h4>
-                        {activity.description && <p>{activity.description}</p>}
-                        <span className={styles.activityDate}>
-                          {formatDate(activity.activity_date || activity.created_at)}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
           {activeTab === 'files' && (
             <div className={styles.files}>
               {files.length === 0 ? (
@@ -602,7 +568,21 @@ export default function ClientProfileClient({
                 <div className={styles.list}>
                   {files.map((file) => (
                     <div key={file.id} className={styles.fileItem}>
-                      <div className={styles.fileIcon}>??</div>
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className={styles.itemIcon}
+                        aria-hidden="true"
+                      >
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14 2 14 8 20 8" />
+                      </svg>
                       <div className={styles.fileContent}>
                         <h4>{file.original_filename}</h4>
                         {file.description && <p>{file.description}</p>}
