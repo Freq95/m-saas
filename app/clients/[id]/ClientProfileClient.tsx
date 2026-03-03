@@ -356,7 +356,6 @@ export default function ClientProfileClient({
                   }
                   return null;
                 })()}
-                {client.phone && <span className={styles.phone}>{client.phone}</span>}
               </div>
             </div>
             <div className={styles.headerActions}>
@@ -383,7 +382,7 @@ export default function ClientProfileClient({
             className={`${styles.tab}${activeTab === 'overview' ? ` ${styles.tabActive}` : ''}`}
             onClick={() => setActiveTab('overview')}
           >
-            Prezentare generala
+            Prezentare
           </button>
           <button
             className={`${styles.tab}${activeTab === 'appointments' ? ` ${styles.tabActive}` : ''}`}
@@ -410,72 +409,58 @@ export default function ClientProfileClient({
             <div className={styles.overview}>
               <div className={styles.section}>
                 <h2>Informatii de contact</h2>
-                <div className={styles.infoGrid}>
-                  <div>
+                <div className={styles.statsSecondary}>
+                  <div className={`${styles.statItem} ${styles.statItemSecondary}`}>
                     <label>Email</label>
-                    <p>{client.email || 'N/A'}</p>
+                    {client.email
+                      ? <a href={`mailto:${client.email}`} className={styles.emailLink}>{client.email}</a>
+                      : <p>N/A</p>}
                   </div>
-                  <div>
+                  <div className={`${styles.statItem} ${styles.statItemSecondary}`}>
                     <label>Telefon</label>
                     <p>{client.phone || 'N/A'}</p>
                   </div>
-                  <div>
+                  <div className={`${styles.statItem} ${styles.statItemSecondary}`}>
                     <label>Prima contactare</label>
                     <p>{formatDate(client.first_contact_date)}</p>
                   </div>
                 </div>
-              </div>
-
-              <div className={styles.section}>
+                <div className={styles.statsDivider} />
                 <h2>Statistici detaliate</h2>
-                <div className={styles.statsGrid}>
-                  <div className={styles.statItem}>
-                    <label>Total cheltuit</label>
-                    <p>{formatCurrency(client.total_spent)}</p>
+                <div className={styles.statsPrimary}>
+                  <div className={styles.statPrimaryCard}>
+                    <label className={styles.statPrimaryLabel}>Total cheltuit</label>
+                    <p className={styles.statPrimaryValue}>{formatCurrency(client.total_spent)}</p>
                   </div>
-                  <div className={styles.statItem}>
-                    <label>Programari</label>
-                    <p>{client.total_appointments}</p>
+                  <div className={styles.statPrimaryCard}>
+                    <label className={styles.statPrimaryLabel}>Programari</label>
+                    <p className={styles.statPrimaryValue}>{client.total_appointments}</p>
                   </div>
-                  <div className={styles.statItem}>
-                    <label>Ultima vizita</label>
-                    <p>{formatDate(client.last_appointment_date)}</p>
+                  <div className={styles.statPrimaryCard}>
+                    <label className={styles.statPrimaryLabel}>Ultima vizita</label>
+                    <p className={styles.statPrimaryValue}>{formatDate(client.last_appointment_date)}</p>
                   </div>
-                  <div className={styles.statItem}>
+                </div>
+                <div className={styles.statsDivider} />
+                <div className={styles.statsSecondary}>
+                  <div className={`${styles.statItem} ${styles.statItemSecondary}`}>
                     <label>Valoare medie programare</label>
                     <p>{formatCurrency(stats?.average_appointment_value || 0)}</p>
                   </div>
-                  <div className={styles.statItem}>
+                  <div className={`${styles.statItem} ${styles.statItemSecondary}`}>
                     <label>Frecventa vizite</label>
                     <p>{stats?.visit_frequency?.toFixed(1) || 0} / luna</p>
                   </div>
-                  <div className={styles.statItem}>
+                  <div className={`${styles.statItem} ${styles.statItemSecondary}`}>
                     <label>Rata no-show</label>
                     <p>{stats?.no_show_rate?.toFixed(1) || 0}%</p>
                   </div>
-                  <div className={styles.statItem}>
+                  <div className={`${styles.statItem} ${styles.statItemSecondary}`}>
                     <label>Programari finalizate</label>
                     <p>{stats?.completed_appointments || 0}</p>
                   </div>
                 </div>
               </div>
-
-              {stats && stats.preferred_services && stats.preferred_services.length > 0 && (
-                <div className={styles.section}>
-                  <h2>Servicii preferate</h2>
-                  <div className={styles.preferredServices}>
-                    {stats.preferred_services.map((service: any, idx: number) => (
-                      <div key={idx} className={styles.serviceItem}>
-                        <div className={styles.serviceName}>{service.name}</div>
-                        <div className={styles.serviceStats}>
-                          <span>{service.count} programari</span>
-                          <span>{formatCurrency(service.total_spent)}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               <div className={styles.section}>
                 <div className={styles.sectionHeader}>
