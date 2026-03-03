@@ -26,7 +26,11 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     const timeline: any[] = [];
 
     const [appointments, services] = await Promise.all([
-      db.collection('appointments').find({ client_id: clientId, tenant_id: tenantId }).sort({ start_time: -1 }).toArray(),
+      db.collection('appointments').find({
+        client_id: clientId,
+        tenant_id: tenantId,
+        deleted_at: { $exists: false },
+      }).sort({ start_time: -1 }).toArray(),
       db.collection('services').find({ tenant_id: tenantId }).toArray(),
     ]);
 

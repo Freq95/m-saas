@@ -21,6 +21,7 @@ export async function processReminders() {
     db.collection('appointments').find({
       status: 'scheduled',
       reminder_sent: false,
+      deleted_at: { $exists: false },
       tenant_id: { $exists: true },
       start_time: {
         $gte: now.toISOString(),
@@ -81,7 +82,7 @@ export async function processReminders() {
             updated_at: sentAt,
           });
           await db.collection('appointments').updateOne(
-            { id: appointment.id, tenant_id: appointment.tenant_id },
+            { id: appointment.id, tenant_id: appointment.tenant_id, deleted_at: { $exists: false } },
             { $set: { reminder_sent: true, updated_at: sentAt } }
           );
           continue;
@@ -112,7 +113,7 @@ export async function processReminders() {
             updated_at: sentAt,
           });
           await db.collection('appointments').updateOne(
-            { id: appointment.id, tenant_id: appointment.tenant_id },
+            { id: appointment.id, tenant_id: appointment.tenant_id, deleted_at: { $exists: false } },
             { $set: { reminder_sent: true, updated_at: sentAt } }
           );
         } else {

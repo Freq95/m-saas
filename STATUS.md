@@ -1,6 +1,6 @@
 # m-saas Project Status
 
-**Last Updated:** 2026-02-24
+**Last Updated:** 2026-03-04
 **MVP Version:** V1 (~90% complete)
 **Database:** MongoDB
 **Framework:** Next.js App Router (updated to latest in security remediation pass)
@@ -27,6 +27,28 @@
 ---
 
 ## Claude Review Status
+
+### Soft Delete + Error Pages Hardening — IMPLEMENTED (2026-03-04)
+- Appointment deletion is now soft delete:
+  - `DELETE /api/appointments/[id]` sets `deleted_at`, `deleted_by`, `updated_at` and returns HTTP 204.
+- Soft-deleted appointments are excluded from reads in API routes and calendar server fetch:
+  - `/api/appointments/[id]`
+  - `/api/appointments` (via `lib/server/calendar.ts`)
+  - `/api/clients/[id]/activities`
+  - `/api/clients/[id]/history`
+  - `/api/reminders`
+  - `/api/reminders/[id]`
+  - `/api/services/[id]` (service-in-use appointment count)
+- Soft-deleted appointments are also excluded from operational scheduling logic:
+  - `lib/calendar-conflicts.ts` (conflict checks)
+  - `lib/calendar.ts` (available slots + isSlotAvailable)
+  - `lib/reminders.ts` (24h reminder cron fetch/update)
+- Added global dark-theme error pages:
+  - `app/not-found.tsx` (404 with `Inapoi` + `Dashboard`)
+  - `app/error.tsx` (runtime error boundary with `Incearca din nou` + `Dashboard`)
+- Verification:
+  - `npm run build` passed
+  - `npx tsc --noEmit` passed
 
 ### Phase 3 Chapter 8 — ACCEPTED
 - Cold-path performance refactor + regression fixes complete
@@ -188,7 +210,8 @@ All 12 fixes from REVIEW-FIXES-REQUIRED.md verified:
 - Finds appointments 24h before, can send email reminders
 - Twilio SMS is stubbed (returns false without credentials)
 - **Not automated:** No cron job triggers the processor
-- **Status:** Logic exists, needs cron wiring
+- **Known inconsistency:** `lib/reminders.ts` still uses `nodemailer` with `EMAIL_USER`/`EMAIL_PASS` env vars for email delivery. The rest of the platform uses `lib/email.ts` (Resend). Gracefully skips when unconfigured — not a blocker — but must be migrated to `lib/email.ts` before reminders are wired up for production.
+- **Status:** Logic exists, needs cron wiring + Resend migration
 
 ### Not Started
 - Payment links (Stripe/PayPal)

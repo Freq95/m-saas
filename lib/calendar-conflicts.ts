@@ -62,6 +62,7 @@ export async function checkAppointmentConflict(
       .find({
         user_id: userId,
         tenant_id: tenantId,
+        deleted_at: { $exists: false },
         status: 'scheduled',
         start_time: { $lte: endTime.toISOString() },
         end_time: { $gte: startTime.toISOString() },
@@ -109,7 +110,9 @@ export async function checkAppointmentConflict(
       .collection('appointments')
       .find({
         user_id: userId,
+        tenant_id: tenantId,
         provider_id: providerId,
+        deleted_at: { $exists: false },
         status: 'scheduled',
         start_time: {
           $lte: endTime.toISOString(),
@@ -190,6 +193,7 @@ export async function checkAppointmentConflict(
         user_id: userId,
         tenant_id: tenantId,
         resource_id: resourceId,
+        deleted_at: { $exists: false },
         status: 'scheduled',
         start_time: {
           $lte: endTime.toISOString(),

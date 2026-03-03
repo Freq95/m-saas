@@ -39,7 +39,10 @@ export async function getAppointmentsData(query: AppointmentQuery = {}) {
   const status = query.status;
   const search = query.search?.trim();
 
-  const filter: Record<string, unknown> = { user_id: userId };
+  const filter: Record<string, unknown> = {
+    user_id: userId,
+    deleted_at: { $exists: false },
+  };
   if (tenantId) {
     filter.tenant_id = tenantId;
   }

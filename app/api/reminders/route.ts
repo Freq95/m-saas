@@ -34,7 +34,11 @@ export async function GET(request: NextRequest) {
     const appointmentId = searchParams.get('appointmentId');
     const channel = searchParams.get('channel');
 
-    const appointmentFilter: Record<string, any> = { user_id: userId, tenant_id: tenantId };
+    const appointmentFilter: Record<string, any> = {
+      user_id: userId,
+      tenant_id: tenantId,
+      deleted_at: { $exists: false },
+    };
     if (appointmentId) appointmentFilter.id = parseInt(appointmentId);
 
     const appointments = await db.collection('appointments').find(appointmentFilter).toArray();
@@ -100,7 +104,12 @@ export async function POST(request: NextRequest) {
     const { appointmentId, channel, message, scheduledAt } = validationResult.data;
 
     // Verify appointment exists
-    const appointment = await db.collection('appointments').findOne({ id: appointmentId, user_id: userId, tenant_id: tenantId });
+    const appointment = await db.collection('appointments').findOne({
+      id: appointmentId,
+      user_id: userId,
+      tenant_id: tenantId,
+      deleted_at: { $exists: false },
+    });
 
     if (!appointment) {
       return NextResponse.json(

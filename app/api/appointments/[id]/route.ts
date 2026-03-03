@@ -48,7 +48,12 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       return createErrorResponse('Invalid appointment ID', 400);
     }
 
-    const appointmentDoc = await db.collection('appointments').findOne({ id: appointmentId, user_id: userId, tenant_id: tenantId });
+    const appointmentDoc = await db.collection('appointments').findOne({
+      id: appointmentId,
+      user_id: userId,
+      tenant_id: tenantId,
+      deleted_at: { $exists: false },
+    });
     if (!appointmentDoc) {
       return createErrorResponse('Appointment not found', 404);
     }
@@ -114,6 +119,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       id: appointmentId,
       user_id: userId,
       tenant_id: tenantId,
+      deleted_at: { $exists: false },
     });
     if (!existingAppointment) {
       return createErrorResponse('Not found or not authorized', 404);
@@ -252,7 +258,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     updates.updated_at = new Date().toISOString();
 
     const updateResult = await db.collection('appointments').updateOne(
-      { id: appointmentId, user_id: userId, tenant_id: tenantId },
+      { id: appointmentId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } },
       { $set: updates }
     );
     if (updateResult.matchedCount === 0) {
@@ -263,6 +269,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       id: appointmentId,
       user_id: userId,
       tenant_id: tenantId,
+      deleted_at: { $exists: false },
     });
     if (!appointmentDoc) {
       return createErrorResponse('Appointment not found', 404);
@@ -291,16 +298,26 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
       return createErrorResponse('Invalid appointment ID', 400);
     }
 
-    const result = await db.collection('appointments').deleteOne({
-      id: appointmentId,
-      user_id: userId,
-      tenant_id: tenantId,
-    });
-    if (result.deletedCount === 0) {
+    const result = await db.collection('appointments').updateOne(
+      {
+        id: appointmentId,
+        user_id: userId,
+        tenant_id: tenantId,
+        deleted_at: { $exists: false },
+      },
+      {
+        $set: {
+          deleted_at: new Date().toISOString(),
+          deleted_by: userId,
+          updated_at: new Date().toISOString(),
+        },
+      }
+    );
+    if (result.matchedCount === 0) {
       return createErrorResponse('Not found or not authorized', 404);
     }
     await invalidateReadCaches({ tenantId, userId });
-    return createSuccessResponse({ success: true });
+    return new NextResponse(null, { status: 204 });
   } catch (error) {
     return handleApiError(error, 'Failed to delete appointment');
   }

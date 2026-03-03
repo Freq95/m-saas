@@ -60,6 +60,7 @@ export async function getAvailableSlots(
   const appointmentFilter: Record<string, any> = {
     user_id: userId,
     tenant_id: tenantId,
+    deleted_at: { $exists: false },
     status: 'scheduled',
     start_time: {
       $gte: dayStart.toISOString(),
@@ -236,6 +237,7 @@ export async function isSlotAvailable(
   const appointmentFilter: Record<string, any> = {
     user_id: userId,
     tenant_id: tenantId,
+    deleted_at: { $exists: false },
     status: 'scheduled',
     start_time: {
       $gte: searchWindowStart.toISOString(),
@@ -264,6 +266,7 @@ export async function isSlotAvailable(
     const extraFilter: Record<string, any> = {
       user_id: userId,
       tenant_id: tenantId,
+      deleted_at: { $exists: false },
       status: 'scheduled',
       start_time: {
         $gte: dayBeforeStart.toISOString(),

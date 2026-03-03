@@ -318,6 +318,33 @@ Scope: Auth + super-admin + invite flow + audit + tenant/user lifecycle controls
   - note: avoids manual `JSON.stringify()` because Upstash SDK auto-serializes values
 - Reworked `middleware.ts` rate-limiting:
   - added Redis-backed sliding-window limiters (read/write)
+
+## 19) Appointment Soft Delete + Error Pages + Scheduling Consistency (2026-03-04)
+- Implemented soft delete for appointments in:
+  - `app/api/appointments/[id]/route.ts`
+  - `DELETE` now performs `updateOne` with:
+    - `deleted_at: ISO string`
+    - `deleted_by: userId`
+    - `updated_at: ISO string`
+  - Returns HTTP `204` on success.
+- Added `deleted_at: { $exists: false }` filters to appointment reads/usages in:
+  - `app/api/appointments/[id]/route.ts`
+  - `lib/server/calendar.ts` (used by `GET /api/appointments`)
+  - `app/api/clients/[id]/activities/route.ts`
+  - `app/api/clients/[id]/history/route.ts`
+  - `app/api/reminders/route.ts`
+  - `app/api/reminders/[id]/route.ts`
+  - `app/api/services/[id]/route.ts` (appointment count before service delete)
+- Added soft-delete exclusion in core scheduling/reminder helpers:
+  - `lib/calendar-conflicts.ts` (provider/resource/base conflict queries)
+  - `lib/calendar.ts` (`getAvailableSlots`, `isSlotAvailable`, extra overlap window query)
+  - `lib/reminders.ts` (24h reminder candidate query + update guards)
+- Added app-level dark-theme error surfaces:
+  - `app/not-found.tsx` (404 page with `Inapoi` and `Dashboard` actions)
+  - `app/error.tsx` (global error boundary with `Incearca din nou` and `Dashboard`)
+- Validation:
+  - `npm run build` passed
+  - `npx tsc --noEmit` passed
   - keeps benchmark bypass (`BENCHMARK_MODE` + token header)
   - falls back to in-memory limiter when Redis is not configured or Redis calls fail
   - keeps existing production-only enforcement behavior

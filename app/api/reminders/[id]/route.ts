@@ -24,6 +24,7 @@ async function getReminderWithAppointment(reminderId: number, tenantId: ObjectId
     id: reminder.appointment_id,
     user_id: reminder.user_id,
     tenant_id: tenantId,
+    deleted_at: { $exists: false },
   });
   return {
     ...stripMongoId(reminder),

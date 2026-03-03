@@ -97,6 +97,7 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
       service_id: serviceId,
       user_id: userId,
       tenant_id: tenantId,
+      deleted_at: { $exists: false },
     });
     if (appointmentCount > 0) {
       return NextResponse.json(
