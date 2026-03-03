@@ -30,7 +30,7 @@ interface WeekViewProps {
   draggedAppointment?: Appointment | null;
   onDragStart?: (appointment: Appointment, day: Date) => void;
   onDragEnd?: () => void;
-  onDrop?: (day: Date, hour: number) => void;
+  onDrop?: (day: Date, hour: number, minute?: 0 | 30) => void;
   enableDragDrop?: boolean;
   providers?: Provider[];
 }
@@ -185,7 +185,8 @@ export function WeekView({
   const getBlockedTimesForDay = (day: Date) =>
     blockedTimes.filter((bt) => isSameDay(new Date(bt.start_time), day));
 
-  const showCurrentTime = todayIsVisible && currentTimeTopPx !== null;
+  const showCurrentTimeLine = currentTimeTopPx !== null;
+  const showCurrentTimeGutter = todayIsVisible && currentTimeTopPx !== null;
   const isNearTopEdge = currentTimeTopPx !== null && currentTimeTopPx <= 26;
   const isNearBottomEdge = currentTimeTopPx !== null && currentTimeTopPx >= columnHeightPx - 26;
 
@@ -223,7 +224,7 @@ export function WeekView({
             </div>
           ))}
 
-          {showCurrentTime && (
+          {showCurrentTimeGutter && (
             <div
               className={`${styles.currentTimeGutterIndicator}${isNearTopEdge ? ` ${styles.isNearTop}` : ''}${isNearBottomEdge ? ` ${styles.isNearBottom}` : ''}`}
               style={{ top: `${currentTimeTopPx}px` }}
@@ -270,7 +271,7 @@ export function WeekView({
                       if (!enableDragDrop || !onDrop) return;
                       e.preventDefault();
                       setDragOverSlot(null);
-                      onDrop(day, hour);
+                      onDrop(day, hour, minute);
                     }}
                     role="button"
                     tabIndex={0}
@@ -326,10 +327,14 @@ export function WeekView({
                 );
               })}
 
-              {todayFlag && showCurrentTime && (
-                <div className={styles.currentTimeLine} style={{ top: `${currentTimeTopPx}px` }}>
-                  <span className={styles.currentTimeDot} />
-                </div>
+              {showCurrentTimeLine && (
+                todayFlag ? (
+                  <div className={styles.currentTimeLine} style={{ top: `${currentTimeTopPx}px` }}>
+                    <span className={styles.currentTimeDot} />
+                  </div>
+                ) : (
+                  <div className={styles.currentTimeLineDashed} style={{ top: `${currentTimeTopPx}px` }} />
+                )
               )}
             </div>
           );

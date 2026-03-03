@@ -196,13 +196,6 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       if (resourceId !== undefined) {
         updates.resource_id = targetResourceId;
       }
-    } else {
-      if (providerId !== undefined) {
-        updates.provider_id = providerId === null ? null : providerId;
-      }
-      if (resourceId !== undefined) {
-        updates.resource_id = resourceId === null ? null : resourceId;
-      }
     }
 
     if (notes !== undefined) {

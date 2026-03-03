@@ -69,6 +69,32 @@ export const updateAppointmentSchema = z.object({
   notes: z.string().max(2000).optional(),
 });
 
+const recurrenceSchema = z
+  .object({
+    frequency: z.enum(['daily', 'weekly', 'monthly']),
+    interval: z.number().int().positive().default(1),
+    endType: z.enum(['date', 'count']).optional(),
+    endDate: z.string().date().optional(),
+    end_date: z.string().date().optional(),
+    count: z.number().int().positive().optional(),
+  })
+  .strict();
+
+export const createRecurringAppointmentSchema = z
+  .object({
+    serviceId: z.number().int().positive(),
+    clientName: z.string().min(1, 'Client name is required').max(255),
+    clientEmail: emailSchema.optional(),
+    clientPhone: phoneSchema,
+    startTime: dateTimeSchema,
+    endTime: dateTimeSchema,
+    providerId: z.number().int().positive().optional(),
+    resourceId: z.number().int().positive().optional(),
+    notes: z.string().max(2000).optional(),
+    recurrence: recurrenceSchema,
+  })
+  .strict();
+
 // Client schemas
 export const createClientSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255),

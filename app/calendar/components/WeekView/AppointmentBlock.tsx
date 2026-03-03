@@ -19,6 +19,7 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
   ({ appointment, style, onClick, onDragStart, onDragEnd, isDragging = false, enableDragDrop = false, providers = [] }) => {
     const appointmentStatusClass = appointment.status === 'no-show' ? 'no_show' : appointment.status;
     const badgeStatusClass = appointment.status === 'no_show' ? 'no-show' : appointment.status;
+    const isPast = new Date(appointment.end_time).getTime() < Date.now();
 
     const handleDragStart = (e: React.DragEvent) => {
       e.stopPropagation();
@@ -56,7 +57,7 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
 
     return (
       <div
-        className={`${styles.appointment} ${styles[appointmentStatusClass]} ${isDragging ? styles.dragging : ''}`}
+        className={`${styles.appointment} ${styles[appointmentStatusClass]} ${isPast ? styles.isPast : ''} ${isDragging ? styles.dragging : ''}`}
         style={appointmentStyle}
         draggable={enableDragDrop && badgeStatusClass === 'scheduled'}
         onDragStart={handleDragStart}

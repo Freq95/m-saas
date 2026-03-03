@@ -67,7 +67,7 @@ export function MonthView({
                 {dayAppointments.slice(0, 3).map((apt) => (
                   <div
                     key={apt.id}
-                    className={`${styles.monthAppointment} ${styles[apt.status] ?? ''}`}
+                    className={`${styles.monthAppointment} ${styles[apt.status] ?? ''} ${new Date(apt.end_time).getTime() < Date.now() ? styles.isPast : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       onAppointmentClick(apt);

@@ -446,8 +446,30 @@ export function CreateAppointmentModal({
   const modalSubmitLabel = submitLabel || (mode === 'edit' ? 'Salveaza modificarile' : 'Salveaza');
   const activeCategoryColor = CATEGORIES.find((c) => c.label === selectedCategory)?.color;
 
-  const submitPayload = async (payload: AppointmentFormPayload) => {
-    await onSubmit(payload);
+  const resetCreateFormState = () => {
+    setFormData({
+      clientName: '',
+      clientEmail: '',
+      clientPhone: '',
+      serviceId: defaultServiceId,
+      notes: '',
+    });
+    setSelectedDate(format(selectedSlot.start, 'yyyy-MM-dd'));
+    setDatePickerMonth(new Date(selectedSlot.start));
+    setSelectedTime(format(selectedSlot.start, 'HH:mm'));
+    setSelectedEndTime(format(selectedSlot.end, 'HH:mm'));
+    setIsDatePickerOpen(false);
+    setIsStartTimePickerOpen(false);
+    setIsEndTimePickerOpen(false);
+    setIsServicePickerOpen(false);
+    setTimeValidationError('');
+    setClientSuggestions([]);
+    setClientSuggestionsError('');
+    setShowClientSuggestions(false);
+    setSelectedClientId(null);
+    setSelectedCategory('');
+    setIsRecurring(false);
+    setRecurrence(DEFAULT_RECURRENCE);
   };
 
   const handleSubmit = async () => {
@@ -507,35 +529,13 @@ export function CreateAppointmentModal({
 
     setIsSubmitting(true);
     try {
-      await submitPayload(payload);
+      await onSubmit(payload);
     } finally {
       setIsSubmitting(false);
     }
 
     if (mode === 'create') {
-      setFormData({
-        clientName: '',
-        clientEmail: '',
-        clientPhone: '',
-        serviceId: defaultServiceId,
-        notes: '',
-      });
-      setSelectedDate(format(selectedSlot.start, 'yyyy-MM-dd'));
-      setDatePickerMonth(new Date(selectedSlot.start));
-      setSelectedTime(format(selectedSlot.start, 'HH:mm'));
-      setSelectedEndTime(format(selectedSlot.end, 'HH:mm'));
-      setIsDatePickerOpen(false);
-      setIsStartTimePickerOpen(false);
-      setIsEndTimePickerOpen(false);
-      setIsServicePickerOpen(false);
-      setTimeValidationError('');
-      setClientSuggestions([]);
-      setClientSuggestionsError('');
-      setShowClientSuggestions(false);
-      setSelectedClientId(null);
-      setSelectedCategory('');
-      setIsRecurring(false);
-      setRecurrence(DEFAULT_RECURRENCE);
+      resetCreateFormState();
     }
   };
 
@@ -1007,36 +1007,14 @@ export function CreateAppointmentModal({
                   if (isSubmitting) return;
                   setIsSubmitting(true);
                   try {
-                    await submitPayload(pendingSubmitPayload);
+                    await onSubmit(pendingSubmitPayload);
                   } finally {
                     setIsSubmitting(false);
                   }
                   setShowNewClientConfirm(false);
                   setPendingSubmitPayload(null);
                   if (mode === 'create') {
-                    setFormData({
-                      clientName: '',
-                      clientEmail: '',
-                      clientPhone: '',
-                      serviceId: defaultServiceId,
-                      notes: '',
-                    });
-                    setSelectedDate(format(selectedSlot.start, 'yyyy-MM-dd'));
-                    setDatePickerMonth(new Date(selectedSlot.start));
-                    setSelectedTime(format(selectedSlot.start, 'HH:mm'));
-                    setSelectedEndTime(format(selectedSlot.end, 'HH:mm'));
-                    setIsDatePickerOpen(false);
-                    setIsStartTimePickerOpen(false);
-                    setIsEndTimePickerOpen(false);
-                    setIsServicePickerOpen(false);
-                    setTimeValidationError('');
-                    setClientSuggestions([]);
-                    setClientSuggestionsError('');
-                    setShowClientSuggestions(false);
-                    setSelectedClientId(null);
-                    setSelectedCategory('');
-                    setIsRecurring(false);
-                    setRecurrence(DEFAULT_RECURRENCE);
+                    resetCreateFormState();
                   }
                 }}
               >

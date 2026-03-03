@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow, getNextNumericId } from '@/lib/db/mongo-utils';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { getCached } from '@/lib/redis';
+import { blockedTimesCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
+import { logger } from '@/lib/logger';
 
 function toDate(value: unknown): Date | null {
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
@@ -50,37 +53,49 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid query parameters' }, { status: 400 });
     }
 
-    const blockedTimes = await db
-      .collection('blocked_times')
-      .find({ user_id: userIdNumber, tenant_id: tenantId })
-      .sort({ start_time: 1 })
-      .toArray();
-
-    const filtered = blockedTimes.filter((blockedTime: any) => {
-      if (providerIdNumber !== undefined && blockedTime.provider_id && blockedTime.provider_id !== providerIdNumber) {
-        return false;
+    const cacheKey = blockedTimesCacheKey(
+      { tenantId, userId: userIdNumber },
+      {
+        startDate: startDateObj.toISOString(),
+        endDate: endDateObj.toISOString(),
+        providerId: providerIdNumber,
+        resourceId: resourceIdNumber,
       }
-      if (resourceIdNumber !== undefined && blockedTime.resource_id && blockedTime.resource_id !== resourceIdNumber) {
-        return false;
-      }
+    );
 
-      const start = toDate(blockedTime.start_time);
-      const end = toDate(blockedTime.end_time);
-      if (!start || !end) return false;
-      return overlapsRange(start, end, startDateObj, endDateObj);
-    }).map((blockedTime: any) => {
-      const start = toDate(blockedTime.start_time);
-      const end = toDate(blockedTime.end_time);
-      return {
-        ...blockedTime,
-        start_time: start ? start.toISOString() : blockedTime.start_time,
-        end_time: end ? end.toISOString() : blockedTime.end_time,
-      };
+    const filtered = await getCached(cacheKey, 1800, async () => {
+      const blockedTimes = await db
+        .collection('blocked_times')
+        .find({ user_id: userIdNumber, tenant_id: tenantId })
+        .sort({ start_time: 1 })
+        .toArray();
+
+      return blockedTimes.filter((blockedTime: any) => {
+        if (providerIdNumber !== undefined && blockedTime.provider_id && blockedTime.provider_id !== providerIdNumber) {
+          return false;
+        }
+        if (resourceIdNumber !== undefined && blockedTime.resource_id && blockedTime.resource_id !== resourceIdNumber) {
+          return false;
+        }
+
+        const start = toDate(blockedTime.start_time);
+        const end = toDate(blockedTime.end_time);
+        if (!start || !end) return false;
+        return overlapsRange(start, end, startDateObj, endDateObj);
+      }).map((blockedTime: any) => {
+        const start = toDate(blockedTime.start_time);
+        const end = toDate(blockedTime.end_time);
+        return {
+          ...blockedTime,
+          start_time: start ? start.toISOString() : blockedTime.start_time,
+          end_time: end ? end.toISOString() : blockedTime.end_time,
+        };
+      });
     });
 
     return NextResponse.json({ blockedTimes: filtered });
   } catch (error) {
-    console.error('Error fetching blocked times:', error);
+    logger.error('Blocked times: failed to fetch', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json({ error: 'Failed to fetch blocked times' }, { status: 500 });
   }
 }
@@ -168,9 +183,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    await invalidateReadCaches({ tenantId, userId: userIdNumber });
     return NextResponse.json({ blockedTime, recurrenceGroupId }, { status: 201 });
   } catch (error) {
-    console.error('Error creating blocked time:', error);
+    logger.error('Blocked times: failed to create', error instanceof Error ? error : new Error(String(error)));
     return NextResponse.json({ error: 'Failed to create blocked time' }, { status: 500 });
   }
 }

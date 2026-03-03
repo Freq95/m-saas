@@ -24,6 +24,17 @@ export function AppointmentPreviewModal({
   onQuickStatusChange,
 }: AppointmentPreviewModalProps) {
   const backdropPressStartedRef = useRef(false);
+  const normalizedStatus = appointment?.status === 'no-show' ? 'no_show' : appointment?.status;
+  const statusLabel =
+    appointment?.status === 'scheduled'
+      ? 'Programat'
+      : appointment?.status === 'completed'
+        ? 'Completat'
+        : appointment?.status === 'cancelled'
+          ? 'Anulat'
+          : appointment?.status === 'no-show' || appointment?.status === 'no_show'
+            ? 'Absent'
+            : appointment?.status;
 
   const handleBackdropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     backdropPressStartedRef.current = event.target === event.currentTarget;
@@ -58,7 +69,7 @@ export function AppointmentPreviewModal({
             <p className={styles.previewSubtitle}>{appointment.service_name}</p>
           </div>
           <button className={styles.closeButton} onClick={onClose}>
-            x
+            ×
           </button>
         </div>
 
@@ -81,8 +92,8 @@ export function AppointmentPreviewModal({
             </div>
             <div className={styles.previewRow}>
               <span className={styles.previewLabel}>Status</span>
-              <span className={`${styles.previewStatusBadge} ${styles[appointment.status]}`}>
-                {appointment.status}
+              <span className={`${styles.previewStatusBadge} ${styles[normalizedStatus || 'scheduled']}`}>
+                {statusLabel}
               </span>
             </div>
             {appointment.notes && (

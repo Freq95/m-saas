@@ -58,6 +58,18 @@ export function resourcesListCacheKey(scope: Scope): string {
   return `${scopePrefix(scope)}:resources:list`;
 }
 
+export function blockedTimesCacheKey(
+  scope: Scope,
+  params: {
+    startDate: string;
+    endDate: string;
+    providerId?: number;
+    resourceId?: number;
+  }
+): string {
+  return `${scopePrefix(scope)}:blocked-times:${serializeQuery(params)}`;
+}
+
 export function dashboardCacheKey(scope: Scope, days: number): string {
   return `${scopePrefix(scope)}:dashboard:days=${days}`;
 }
@@ -70,6 +82,7 @@ export async function invalidateReadCaches(scope: Scope): Promise<number> {
     `${base}:services:*`,
     `${base}:providers:*`,
     `${base}:resources:*`,
+    `${base}:blocked-times:*`,
     `${base}:dashboard:*`,
   ];
 

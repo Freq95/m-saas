@@ -4,6 +4,7 @@ import { startOfWeek, addDays, startOfMonth, endOfMonth, startOfDay, endOfDay } 
 import { useSession } from 'next-auth/react';
 import type { Appointment, CalendarViewType } from './useCalendar';
 import { logger } from '@/lib/logger';
+import { parseSessionUserId } from './sessionUser';
 
 interface UseAppointmentsOptions {
   currentDate: Date;
@@ -21,7 +22,7 @@ interface UseAppointmentsResult {
   error: string | null;
   refetch: () => Promise<void>;
   createAppointment: (data: CreateAppointmentInput) => Promise<{ ok: boolean; error?: string }>;
-  updateAppointment: (id: number, data: UpdateAppointmentInput) => Promise<boolean>;
+  updateAppointment: (id: number, data: UpdateAppointmentInput) => Promise<UpdateAppointmentResult>;
   deleteAppointment: (id: number) => Promise<boolean>;
 }
 
@@ -44,6 +45,25 @@ interface UpdateAppointmentInput {
   endTime?: string;
   status?: string;
   notes?: string;
+}
+
+interface ConflictItem {
+  type: string;
+  message: string;
+}
+
+interface ConflictSuggestion {
+  startTime: string;
+  endTime: string;
+  reason: string;
+}
+
+interface UpdateAppointmentResult {
+  ok: boolean;
+  status: number;
+  error?: string;
+  conflicts?: ConflictItem[];
+  suggestions?: ConflictSuggestion[];
 }
 
 // SWR fetcher function
@@ -96,10 +116,7 @@ export function useAppointmentsSWR({
   initialAppointments = [],
 }: UseAppointmentsOptions): UseAppointmentsResult {
   const { data: session, status } = useSession();
-  const sessionUserId =
-    session?.user?.id && /^[1-9]\d*$/.test(session.user.id)
-      ? Number.parseInt(session.user.id, 10)
-      : null;
+  const sessionUserId = parseSessionUserId(session);
   const effectiveUserId = userId ?? sessionUserId;
 
   // Calculate date range
@@ -199,7 +216,7 @@ export function useAppointmentsSWR({
   );
 
   const updateAppointment = useCallback(
-    async (id: number, data: UpdateAppointmentInput): Promise<boolean> => {
+    async (id: number, data: UpdateAppointmentInput): Promise<UpdateAppointmentResult> => {
       try {
         const response = await fetch(`/api/appointments/${id}`, {
           method: 'PATCH',
@@ -207,24 +224,54 @@ export function useAppointmentsSWR({
           body: JSON.stringify(data),
         });
 
+        let errorData: any = null;
         if (!response.ok) {
-          const errorData = await response.json();
+          try {
+            errorData = await response.json();
+          } catch {
+            errorData = null;
+          }
+        }
+
+        if (!response.ok) {
+          if (response.status === 409) {
+            const conflicts = errorData?.conflicts || [];
+            const suggestions = errorData?.suggestions || [];
+            logger.warn('Calendar hook: update appointment conflict', {
+              status: response.status,
+              appointmentId: id,
+              conflictsCount: conflicts.length,
+              suggestionsCount: suggestions.length,
+            });
+            return {
+              ok: false,
+              status: response.status,
+              error: extractApiError(errorData, 'Intervalul ales intra in conflict.'),
+              conflicts,
+              suggestions,
+            };
+          }
+
           logger.error('Calendar hook: update appointment API error', {
             status: response.status,
             appointmentId: id,
             errorData,
           });
-          return false;
+          return {
+            ok: false,
+            status: response.status,
+            error: extractApiError(errorData, 'Nu s-a putut actualiza programarea.'),
+          };
         }
 
         // Optimistically update cache
         await mutate();
-        return true;
+        return { ok: true, status: response.status };
       } catch (err) {
         logger.error('Calendar hook: failed to update appointment', err instanceof Error ? err : new Error(String(err)), {
           appointmentId: id,
         });
-        return false;
+        return { ok: false, status: 0, error: 'Eroare de retea la actualizarea programarii.' };
       }
     },
     [mutate]

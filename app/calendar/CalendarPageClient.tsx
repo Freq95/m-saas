@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import styles from './page.module.css';
 import { useToast } from '@/lib/useToast';
@@ -11,6 +11,8 @@ import {
   useProviders,
   useResources,
   useBlockedTimes,
+  parseSessionUserId,
+  type Appointment,
 } from './hooks';
 import { useDragAndDrop } from './hooks/useDragAndDrop';
 import {
@@ -32,10 +34,21 @@ interface Service {
 }
 
 interface CalendarPageClientProps {
-  initialAppointments: any[];
+  initialAppointments: Appointment[];
   initialServices: Service[];
   initialDate: string;
   initialViewType?: 'week' | 'workweek' | 'month' | 'day';
+}
+
+interface ConflictItem {
+  type: string;
+  message: string;
+}
+
+interface ConflictSuggestion {
+  startTime: string;
+  endTime: string;
+  reason: string;
 }
 
 export default function CalendarPageClient({
@@ -45,19 +58,35 @@ export default function CalendarPageClient({
   initialViewType = 'week',
 }: CalendarPageClientProps) {
   const toast = useToast();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [availableHeight, setAvailableHeight] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [hasFinishedInitialLoad, setHasFinishedInitialLoad] = useState(initialAppointments.length > 0);
   const { data: session } = useSession();
-  const sessionUserId =
-    session?.user?.id && /^[1-9]\d*$/.test(session.user.id)
-      ? Number.parseInt(session.user.id, 10)
-      : undefined;
+  const sessionUserId = parseSessionUserId(session) ?? undefined;
   const { state, actions } = useCalendar(initialDate, initialViewType);
-  const { weekDays, monthDays, rangeLabel, hours } = useCalendarNavigation({
+  const { weekDays, monthDays, hours } = useCalendarNavigation({
     currentDate: state.currentDate,
     viewType: state.viewType,
   });
+
+  useLayoutEffect(() => {
+    const updateHeight = () => {
+      const el = containerRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      setAvailableHeight(Math.max(320, Math.floor(window.innerHeight - top)));
+    };
+
+    updateHeight();
+    const raf = requestAnimationFrame(updateHeight);
+    window.addEventListener('resize', updateHeight);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', updateHeight);
+    };
+  }, []);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -88,7 +117,10 @@ export default function CalendarPageClient({
 
   // Day view: single-day array for WeekView reuse
   const dayViewDays = useMemo(() => [state.currentDate], [state.currentDate]);
-  const visibleDays = state.viewType === 'month' ? monthDays : state.viewType === 'day' ? dayViewDays : weekDays;
+  const visibleDays = useMemo(
+    () => (state.viewType === 'month' ? monthDays : state.viewType === 'day' ? dayViewDays : weekDays),
+    [state.viewType, monthDays, dayViewDays, weekDays]
+  );
   const viewStart = visibleDays[0];
   const viewEnd = visibleDays[visibleDays.length - 1];
   const { blockedTimes } = useBlockedTimes(
@@ -120,7 +152,7 @@ export default function CalendarPageClient({
   } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm]   = useState(false);
   const [showConflictModal, setShowConflictModal]   = useState(false);
-  const [conflictData, setConflictData] = useState<{ conflicts: any[]; suggestions: any[] }>({
+  const [conflictData, setConflictData] = useState<{ conflicts: ConflictItem[]; suggestions: ConflictSuggestion[] }>({
     conflicts: [],
     suggestions: [],
   });
@@ -128,14 +160,25 @@ export default function CalendarPageClient({
   // Drag-and-drop
   const { draggedAppointment, handleDragStart, handleDragEnd, handleDrop } = useDragAndDrop(
     async (appointmentId, newStartTime, newEndTime) => {
-      const ok = await updateAppointment(appointmentId, {
+      const result = await updateAppointment(appointmentId, {
         startTime: newStartTime.toISOString(),
         endTime: newEndTime.toISOString(),
       });
-      ok
-        ? toast.success('Programarea a fost mutata.')
-        : toast.error('Nu s-a putut muta programarea. Verifica conflictele.');
-      return ok;
+      if (result.ok) {
+        toast.success('Programarea a fost mutata.');
+        return true;
+      }
+      if (result.status === 409) {
+        setConflictData({
+          conflicts: result.conflicts || [],
+          suggestions: result.suggestions || [],
+        });
+        setShowConflictModal(true);
+        toast.warning(result.error || 'Intervalul ales intra in conflict.');
+        return false;
+      }
+      toast.error(result.error || 'Nu s-a putut muta programarea. Verifica conflictele.');
+      return false;
     }
   );
 
@@ -218,22 +261,15 @@ export default function CalendarPageClient({
     start.setHours(hour ?? 9, minute, 0, 0);
     const duration = 30;
     const end = new Date(start.getTime() + duration * 60_000);
-    actions.selectDate(day);
     actions.selectSlot({ start, end });
     setAppointmentModalMode('create');
     setEditInitialData(null);
     setShowCreateModal(true);
   };
 
-  const handleAppointmentClick = (appointment: any) => {
+  const handleAppointmentClick = (appointment: Appointment) => {
     actions.selectAppointment(appointment);
     setShowPreviewModal(true);
-  };
-
-  /** Jump to date from header range label click or mini calendar nav */
-  const handleJumpToDate = (date: Date) => {
-    setSelectedDay(date);
-    actions.navigateToDate(date);
   };
 
   const handlePanelStatusChange = async (appointmentId: number, status: string) => {
@@ -449,18 +485,18 @@ export default function CalendarPageClient({
       actions.clearSelection();
       toast.success('Programarea a fost stearsa.');
     } else {
-      toast.error('Nu s-a putut sterge programarea.');
+      throw new Error('Delete appointment failed');
     }
   };
 
   const handleQuickStatusChange = async (status: string) => {
     if (!state.selectedAppointment) return;
-    const ok = await updateAppointment(state.selectedAppointment.id, { status });
-    if (ok) {
+    const result = await updateAppointment(state.selectedAppointment.id, { status });
+    if (result.ok) {
       refetch();
       toast.success('Statusul a fost actualizat.');
     } else {
-      toast.error('Nu s-a putut actualiza statusul.');
+      toast.error(result.error || 'Nu s-a putut actualiza statusul.');
     }
   };
 
@@ -469,7 +505,11 @@ export default function CalendarPageClient({
 
   if (showInitialSkeleton) {
     return (
-      <div className={styles.container}>
+      <div
+        ref={containerRef}
+        className={styles.container}
+        style={availableHeight ? { height: `${availableHeight}px` } : undefined}
+      >
         <main className={styles.main}>
           <div className="skeleton skeleton-line" style={{ width: '220px', height: '18px', marginBottom: '0.9rem' }} />
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: '1rem' }}>
@@ -485,9 +525,12 @@ export default function CalendarPageClient({
   }
 
   return (
-    <div className={styles.container}>
+    <div
+      ref={containerRef}
+      className={styles.container}
+      style={availableHeight ? { height: `${availableHeight}px` } : undefined}
+    >
       <main className={styles.main}>
-
         {/* Calendar grid + day panel — always side-by-side for all views */}
         <div className={styles.calendarWithPanel}>
           {state.viewType === 'month' ? (
@@ -514,7 +557,7 @@ export default function CalendarPageClient({
               draggedAppointment={draggedAppointment}
               onDragStart={handleDragStart}
               onDragEnd={handleDragEnd}
-              onDrop={async (day, hour) => { await handleDrop(day, hour); }}
+              onDrop={async (day, hour, minute) => { await handleDrop(day, hour, minute); }}
               providers={providers}
             />
           )}
@@ -533,21 +576,15 @@ export default function CalendarPageClient({
               setSelectedDay(date);
               actions.navigateToDate(date);
             }}
-            rangeLabel={rangeLabel}
+            onTodayClick={() => {
+              const today = new Date();
+              setSelectedDay(today);
+              actions.goToToday();
+            }}
             viewType={state.viewType}
-            providers={providers}
-            resources={resources}
-            selectedProviderId={state.selectedProvider?.id || null}
-            selectedResourceId={state.selectedResource?.id || null}
-            searchQuery={searchQuery}
-            onPrevPeriod={actions.prevPeriod}
-            onNextPeriod={actions.nextPeriod}
-            onTodayClick={actions.goToToday}
             onViewTypeChange={actions.setViewType}
-            onProviderChange={(id) => actions.selectProvider(providers.find((p) => p.id === id) || null)}
-            onResourceChange={(id) => actions.selectResource(resources.find((r) => r.id === id) || null)}
+            searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
-            onJumpToDate={handleJumpToDate}
           />
         </div>
       </main>

@@ -4,6 +4,13 @@ import { checkAppointmentConflict } from '@/lib/calendar-conflicts';
 import type { RecurrenceRule } from '@/lib/types/calendar';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { invalidateReadCaches } from '@/lib/cache-keys';
+import { logger } from '@/lib/logger';
+
+interface RecurringConflict {
+  start: Date;
+  end: Date;
+  conflicts: unknown[];
+}
 
 // Cleanup classification: feature-flagged (advanced scheduling domain, no core UI dependency).
 // POST /api/appointments/recurring - Create recurring appointments
@@ -11,6 +18,14 @@ export async function POST(request: NextRequest) {
   try {
     const { userId, tenantId } = await getAuthUser();
     const body = await request.json();
+    const { createRecurringAppointmentSchema } = await import('@/lib/validation');
+    const validationResult = createRecurringAppointmentSchema.safeParse(body);
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: 'Invalid input', details: validationResult.error.errors },
+        { status: 400 }
+      );
+    }
     const {
       serviceId,
       clientName,
@@ -22,14 +37,7 @@ export async function POST(request: NextRequest) {
       resourceId,
       notes,
       recurrence,
-    } = body;
-
-    if (!serviceId || !clientName || !startTime || !endTime || !recurrence) {
-      return NextResponse.json(
-        { error: 'serviceId, clientName, startTime, endTime, and recurrence are required' },
-        { status: 400 }
-      );
-    }
+    } = validationResult.data;
 
     const db = await getMongoDbOrThrow();
     const normalizedUserId = Number(userId);
@@ -47,9 +55,10 @@ export async function POST(request: NextRequest) {
     }
 
     const recurrenceRule: RecurrenceRule = {
-      ...recurrence,
+      frequency: recurrence.frequency,
       interval: Math.max(1, Number(recurrence.interval) || 1),
       end_date: recurrence.end_date || recurrence.endDate,
+      count: recurrence.count,
     };
 
     const startDateObj = new Date(startTime);
@@ -74,8 +83,8 @@ export async function POST(request: NextRequest) {
       end: new Date(endTime),
     });
 
-    const createdAppointments: any[] = [];
-    const conflicts: any[] = [];
+    const createdAppointments: Record<string, unknown>[] = [];
+    const conflicts: RecurringConflict[] = [];
 
     // Get service details
     const service = await db.collection('services').findOne({ id: normalizedServiceId, tenant_id: tenantId });
@@ -104,7 +113,7 @@ export async function POST(request: NextRequest) {
 
       const nextId = await getNextNumericId('appointments');
 
-      const appointment: any = {
+      const appointment: Record<string, unknown> = {
         id: nextId,
         _id: nextId,
         tenant_id: tenantId,
@@ -145,7 +154,10 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error('Error creating recurring appointments:', error);
+    logger.error(
+      'Recurring appointments: failed to create appointments',
+      error instanceof Error ? error : new Error(String(error))
+    );
     return NextResponse.json(
       { error: 'Failed to create recurring appointments' },
       { status: 500 }

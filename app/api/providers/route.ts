@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { getCached } from '@/lib/redis';
 import { providersListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
@@ -55,14 +55,7 @@ export async function POST(request: NextRequest) {
 
     const db = await getMongoDbOrThrow();
 
-    // Get next ID
-    const lastProvider = await db
-      .collection('providers')
-      .find({ tenant_id: tenantId })
-      .sort({ id: -1 })
-      .limit(1)
-      .toArray();
-    const nextId = lastProvider.length > 0 ? lastProvider[0].id + 1 : 1;
+    const nextId = await getNextNumericId('providers');
 
     const provider = {
       id: nextId,

@@ -11,7 +11,7 @@ interface UseDragAndDropResult {
   isDragging: boolean;
   handleDragStart: (appointment: Appointment, sourceDate: Date) => void;
   handleDragEnd: () => void;
-  handleDrop: (targetDate: Date, targetHour?: number) => Promise<{ newStart: Date; newEnd: Date } | null>;
+  handleDrop: (targetDate: Date, targetHour?: number, targetMinute?: 0 | 30) => Promise<{ newStart: Date; newEnd: Date } | null>;
 }
 
 export function useDragAndDrop(
@@ -28,7 +28,7 @@ export function useDragAndDrop(
   }, []);
 
   const handleDrop = useCallback(
-    async (targetDate: Date, targetHour?: number): Promise<{ newStart: Date; newEnd: Date } | null> => {
+    async (targetDate: Date, targetHour?: number, targetMinute: 0 | 30 = 0): Promise<{ newStart: Date; newEnd: Date } | null> => {
       if (!dragData) return null;
 
       const { appointment } = dragData;
@@ -39,7 +39,7 @@ export function useDragAndDrop(
       // Calculate new start time
       const newStart = new Date(targetDate);
       if (targetHour !== undefined) {
-        newStart.setHours(targetHour, 0, 0, 0);
+        newStart.setHours(targetHour, targetMinute, 0, 0);
       } else {
         // Keep the same time, just change the date
         newStart.setHours(originalStart.getHours(), originalStart.getMinutes(), 0, 0);

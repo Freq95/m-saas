@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import {
   addDays,
   addMonths,
@@ -16,31 +16,21 @@ import {
 } from 'date-fns';
 import { ro } from 'date-fns/locale';
 import styles from './DayPanel.module.css';
-import type { Appointment, CalendarViewType, Provider, Resource } from '../../hooks/useCalendar';
+import type { Appointment, CalendarViewType } from '../../hooks/useCalendar';
 
 interface DayPanelProps {
   selectedDay: Date | null;
   appointments: Appointment[];
   currentDate: Date;
-  rangeLabel: string;
   viewType: CalendarViewType;
-  providers?: Provider[];
-  resources?: Resource[];
-  selectedProviderId?: number | null;
-  selectedResourceId?: number | null;
   searchQuery?: string;
   onAppointmentClick: (appointment: Appointment) => void;
   onQuickStatusChange: (id: number, status: string) => void;
   onCreateClick: () => void;
   onNavigate: (date: Date) => void;
-  onPrevPeriod: () => void;
-  onNextPeriod: () => void;
   onTodayClick: () => void;
   onViewTypeChange: (view: CalendarViewType) => void;
-  onProviderChange?: (providerId: number | null) => void;
-  onResourceChange?: (resourceId: number | null) => void;
   onSearchChange?: (query: string) => void;
-  onJumpToDate?: (date: Date) => void;
 }
 
 type PanelStatusKey = 'scheduled' | 'completed' | 'cancelled' | 'no-show';
@@ -59,7 +49,7 @@ function normalizeStatus(status: string): PanelStatusKey {
   return 'scheduled';
 }
 
-// ── Mini calendar ─────────────────────────────────────────────────────────────
+// Mini calendar
 function MiniCalendar({
   currentDate,
   selectedDay,
@@ -145,7 +135,7 @@ function MiniCalendar({
   );
 }
 
-// ── Appointment card ──────────────────────────────────────────────────────────
+// Appointment card
 function AppointmentCard({
   appointment: apt,
   onClick,
@@ -160,6 +150,7 @@ function AppointmentCard({
 }) {
   const start       = new Date(apt.start_time);
   const end         = new Date(apt.end_time);
+  const isPast      = end.getTime() < Date.now();
   const status      = normalizeStatus(apt.status);
   const cfg         = STATUS_CONFIG[status];
   const durationMin = Math.round((end.getTime() - start.getTime()) / 60_000);
@@ -169,7 +160,7 @@ function AppointmentCard({
       {dateLabel && (
         <div className={styles.cardDateLabel}>{dateLabel}</div>
       )}
-      <div className={styles.card} onClick={() => onClick(apt)}>
+      <div className={`${styles.card} ${isPast ? styles.cardPast : ''}`} onClick={() => onClick(apt)}>
         <div className={styles.colorBar} style={{ background: apt.color || 'var(--color-accent)' }} />
         <div className={styles.cardBody}>
           <div className={styles.timeRow}>
@@ -185,11 +176,6 @@ function AppointmentCard({
               {cfg.label}
             </span>
           </div>
-          {apt.category && (
-            <span className={styles.categoryTag} style={{ '--cat-color': apt.color || 'var(--color-accent)' } as React.CSSProperties}>
-              {apt.category}
-            </span>
-          )}
           {status === 'scheduled' && (
             <div className={styles.quickActions} onClick={(e) => e.stopPropagation()}>
               <button
@@ -212,35 +198,24 @@ function AppointmentCard({
   );
 }
 
-// ── Main panel ────────────────────────────────────────────────────────────────
+// Main panel
 export function DayPanel({
   selectedDay,
   appointments,
   currentDate,
-  rangeLabel,
   viewType,
-  providers = [],
-  resources = [],
-  selectedProviderId = null,
-  selectedResourceId = null,
   searchQuery = '',
   onAppointmentClick,
   onQuickStatusChange,
   onCreateClick,
   onNavigate,
-  onPrevPeriod,
-  onNextPeriod,
   onTodayClick,
   onViewTypeChange,
-  onProviderChange,
-  onResourceChange,
   onSearchChange,
-  onJumpToDate,
 }: DayPanelProps) {
-  const dateInputRef = useRef<HTMLInputElement>(null);
   const isSearching  = searchQuery.trim().length > 0;
 
-  // ── Search results: all appointments matching the query, sorted by date ──
+  // Search results: all appointments matching the query, sorted by date
   const searchResults = useMemo(() => {
     if (!isSearching) return [];
     const q = searchQuery.toLowerCase();
@@ -254,7 +229,7 @@ export function DayPanel({
       .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
   }, [appointments, searchQuery, isSearching]);
 
-  // ── Search result stats ───────────────────────────────────────────────────
+  // Search result stats
   const searchStats = useMemo(() => ({
     total:     searchResults.length,
     scheduled: searchResults.filter((a) => normalizeStatus(a.status) === 'scheduled').length,
@@ -265,7 +240,7 @@ export function DayPanel({
     }).length,
   }), [searchResults]);
 
-  // ── Day appointments (normal mode) ────────────────────────────────────────
+  // Day appointments (normal mode)
   const dayAppointments = useMemo(() => {
     if (!selectedDay) return [];
     return [...appointments]
@@ -305,114 +280,26 @@ export function DayPanel({
     return groups;
   }, [searchResults, isSearching]);
 
-  const handleRangeLabelClick = () => {
-    dateInputRef.current?.showPicker?.();
-    dateInputRef.current?.click();
-  };
-
   return (
     <aside className={styles.panel}>
-
-      {/* ── Controls ── */}
-      <div className={styles.controlSection}>
-        <div className={styles.controlRow}>
-          <button type="button" className={styles.ctrlButton} onClick={onPrevPeriod} aria-label="Perioada anterioara">
-            {'<'}
-          </button>
-          <button type="button" className={styles.rangeLabelButton} onClick={handleRangeLabelClick}>
-            {rangeLabel}
-          </button>
-          <input
-            ref={dateInputRef}
-            type="date"
-            className={styles.hiddenDateInput}
-            aria-hidden="true"
-            tabIndex={-1}
-            onChange={(e) => {
-              if (e.target.value && onJumpToDate) {
-                onJumpToDate(new Date(`${e.target.value}T00:00:00`));
-                e.target.value = '';
-              }
-            }}
-          />
-          <button type="button" className={styles.ctrlButton} onClick={onNextPeriod} aria-label="Perioada urmatoare">
-            {'>'}
-          </button>
-          <button type="button" className={styles.todayButton} onClick={onTodayClick}>
-            Astazi
-          </button>
-        </div>
-
-        <div className={styles.controlRow}>
-          {onSearchChange && (
-            <div className={styles.searchWrapper}>
-              <span className={styles.searchIcon}>⌕</span>
-              <input
-                type="search"
-                className={styles.searchInput}
-                placeholder="Cauta programari..."
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
-                aria-label="Cauta programari"
-              />
-              {isSearching && (
-                <button
-                  className={styles.searchClear}
-                  onClick={() => onSearchChange('')}
-                  aria-label="Sterge cautarea"
-                  title="Sterge cautarea"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          )}
-
-          <div className={styles.selectGroup}>
-            <select
-              className={styles.selectControl}
-              value={viewType}
-              onChange={(e) => onViewTypeChange(e.target.value as CalendarViewType)}
-              aria-label="Schimba vizualizarea"
-            >
-              <option value="day">Zi</option>
-              <option value="week">Saptamana</option>
-              <option value="workweek">Saptamana lucru</option>
-              <option value="month">Luna</option>
-            </select>
-
-            {providers.length > 0 && onProviderChange && (
-              <select
-                className={styles.selectControl}
-                value={selectedProviderId || ''}
-                onChange={(e) => onProviderChange(e.target.value ? parseInt(e.target.value, 10) : null)}
-                aria-label="Filtreaza dupa furnizor"
-              >
-                <option value="">Toti furnizorii</option>
-                {providers.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            )}
-
-            {resources.length > 0 && onResourceChange && (
-              <select
-                className={styles.selectControl}
-                value={selectedResourceId || ''}
-                onChange={(e) => onResourceChange(e.target.value ? parseInt(e.target.value, 10) : null)}
-                aria-label="Filtreaza dupa resursa"
-              >
-                <option value="">Toate resursele</option>
-                {resources.map((r) => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
-                ))}
-              </select>
-            )}
-          </div>
-        </div>
+      <div className={styles.panelTopControls}>
+        <button type="button" className={styles.panelTodayBtn} onClick={onTodayClick}>
+          Astazi
+        </button>
+        <select
+          className={styles.panelViewSelect}
+          value={viewType}
+          onChange={(e) => onViewTypeChange(e.target.value as CalendarViewType)}
+          aria-label="Schimba vizualizarea calendarului"
+        >
+          <option value="day">Zi</option>
+          <option value="week">Saptamana</option>
+          <option value="workweek">Sapt. lucru</option>
+          <option value="month">Luna</option>
+        </select>
       </div>
 
-      {/* ── Mini calendar ── */}
+      {/* Mini calendar */}
       <MiniCalendar
         currentDate={currentDate}
         selectedDay={selectedDay}
@@ -420,55 +307,71 @@ export function DayPanel({
         onSelectDay={onNavigate}
       />
 
-      {/* ── Search mode header ── */}
+      {onSearchChange && (
+        <div className={styles.searchWrapper}>
+          <svg className={styles.searchIcon} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input
+            type="search"
+            className={styles.searchInput}
+            placeholder="Cauta programari..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            aria-label="Cauta programari"
+          />
+          {isSearching && (
+            <button
+              className={styles.searchClear}
+              type="button"
+              onClick={() => onSearchChange('')}
+              aria-label="Sterge cautarea"
+              title="Sterge cautarea"
+            >
+              ×
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Search mode header */}
       {isSearching ? (
         <>
           <header className={styles.header}>
-            <div className={styles.headerLeft}>
-              <p className={styles.headerEyebrow}>Rezultate cautare</p>
-              <h3 className={styles.headerDate} style={{ fontSize: '1rem' }}>
-                &ldquo;{searchQuery}&rdquo;
-              </h3>
-            </div>
+            <h3 className={styles.headerDate}>Rezultate cautare: &ldquo;{searchQuery}&rdquo;</h3>
             <span className={styles.searchResultsBadge}>
               {searchStats.total}
             </span>
           </header>
 
           {/* Stats for search results */}
-          <div className={styles.statsStrip}>
-            <div className={styles.statItem}>
-              <span className={styles.statNum}>{stats.total}</span>
-              <span className={styles.statLabel}>Total</span>
+          {stats.total > 0 && (
+          <div className={styles.statsGrid}>
+            <div className={styles.statCard}>
+              <span className={styles.statCardValue}>{stats.total}</span>
+              <span className={styles.statCardLabel}>Total</span>
             </div>
-            <div className={styles.statDivider} />
-            <div className={styles.statItem}>
-              <span className={`${styles.statNum} ${styles.statNumScheduled}`}>{stats.scheduled}</span>
-              <span className={styles.statLabel}>Programate</span>
+            <div className={styles.statCard}>
+              <span className={`${styles.statCardValue} ${styles.statScheduled}`}>{stats.scheduled}</span>
+              <span className={styles.statCardLabel}>Programate</span>
             </div>
-            <div className={styles.statDivider} />
-            <div className={styles.statItem}>
-              <span className={`${styles.statNum} ${styles.statNumCompleted}`}>{stats.completed}</span>
-              <span className={styles.statLabel}>Complete</span>
+            <div className={styles.statCard}>
+              <span className={`${styles.statCardValue} ${styles.statCompleted}`}>{stats.completed}</span>
+              <span className={styles.statCardLabel}>Complete</span>
             </div>
-            <div className={styles.statDivider} />
-            <div className={styles.statItem}>
-              <span className={`${styles.statNum} ${styles.statNumOther}`}>{stats.other}</span>
-              <span className={styles.statLabel}>Anulate</span>
+            <div className={styles.statCard}>
+              <span className={`${styles.statCardValue} ${styles.statOther}`}>{stats.other}</span>
+              <span className={styles.statCardLabel}>Anulate</span>
             </div>
           </div>
+          )}
 
           {/* Search results list */}
           <div className={styles.list}>
             {groupedResults.length === 0 ? (
               <div className={styles.emptyDay}>
-                <span className={styles.emptyDayEmoji}>🔍</span>
+                <svg className={styles.emptyDayEmoji} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                 <p className={styles.emptyDayText}>
                   Nicio programare gasita pentru &ldquo;{searchQuery}&rdquo;
                 </p>
-                <button className={styles.emptyDayBtn} onClick={() => onSearchChange?.('')}>
-                  Sterge cautarea
-                </button>
               </div>
             ) : (
               groupedResults.map((group) => (
@@ -495,11 +398,11 @@ export function DayPanel({
           </div>
         </>
       ) : (
-        /* ── Normal mode ── */
+        /* Normal mode */
         <>
           {!selectedDay ? (
             <div className={styles.emptyPlaceholder}>
-              <span className={styles.emptyEmoji}>📅</span>
+              <svg className={styles.emptyEmoji} width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
               <p className={styles.emptyTitle}>Selecteaza o zi</p>
               <p className={styles.emptySubtitle}>
                 Apasa pe o zi din calendar pentru a vedea si gestiona programarile.
@@ -508,54 +411,47 @@ export function DayPanel({
           ) : (
             <>
               <header className={styles.header}>
-                <div className={styles.headerLeft}>
-                  <p className={styles.headerEyebrow}>
-                    {isToday(selectedDay) ? 'Astazi' : format(selectedDay, 'EEEE', { locale: ro })}
-                  </p>
-                  <h3 className={styles.headerDate}>
-                    {format(selectedDay, 'd MMMM', { locale: ro })}
-                  </h3>
-                </div>
+                <h3 className={styles.headerDate}>
+                  {isToday(selectedDay)
+                    ? `Astazi, ${format(selectedDay, 'd MMMM', { locale: ro })}`
+                    : format(selectedDay, 'EEEE, d MMMM', { locale: ro })}
+                </h3>
                 <button
                   className={styles.addBtn}
+                  type="button"
                   onClick={onCreateClick}
-                  aria-label="Adauga programare noua"
-                  title="Adauga programare"
+                  aria-label="Adauga programare"
                 >
-                  +
+                  + Adauga
                 </button>
               </header>
 
-              <div className={styles.statsStrip}>
-                <div className={styles.statItem}>
-                  <span className={styles.statNum}>{stats.total}</span>
-                  <span className={styles.statLabel}>Total</span>
+              {stats.total > 0 && (
+              <div className={styles.statsGrid}>
+                <div className={styles.statCard}>
+                  <span className={styles.statCardValue}>{stats.total}</span>
+                  <span className={styles.statCardLabel}>Total</span>
                 </div>
-                <div className={styles.statDivider} />
-                <div className={styles.statItem}>
-                  <span className={`${styles.statNum} ${styles.statNumScheduled}`}>{stats.scheduled}</span>
-                  <span className={styles.statLabel}>Programate</span>
+                <div className={styles.statCard}>
+                  <span className={`${styles.statCardValue} ${styles.statScheduled}`}>{stats.scheduled}</span>
+                  <span className={styles.statCardLabel}>Programate</span>
                 </div>
-                <div className={styles.statDivider} />
-                <div className={styles.statItem}>
-                  <span className={`${styles.statNum} ${styles.statNumCompleted}`}>{stats.completed}</span>
-                  <span className={styles.statLabel}>Complete</span>
+                <div className={styles.statCard}>
+                  <span className={`${styles.statCardValue} ${styles.statCompleted}`}>{stats.completed}</span>
+                  <span className={styles.statCardLabel}>Complete</span>
                 </div>
-                <div className={styles.statDivider} />
-                <div className={styles.statItem}>
-                  <span className={`${styles.statNum} ${styles.statNumOther}`}>{stats.other}</span>
-                  <span className={styles.statLabel}>Anulate</span>
+                <div className={styles.statCard}>
+                  <span className={`${styles.statCardValue} ${styles.statOther}`}>{stats.other}</span>
+                  <span className={styles.statCardLabel}>Anulate</span>
                 </div>
               </div>
+              )}
 
               <div className={styles.list}>
                 {dayAppointments.length === 0 ? (
                   <div className={styles.emptyDay}>
-                    <span className={styles.emptyDayEmoji}>🗓</span>
+                    <svg className={styles.emptyDayEmoji} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                     <p className={styles.emptyDayText}>Nicio programare in aceasta zi</p>
-                    <button className={styles.emptyDayBtn} onClick={onCreateClick}>
-                      + Adauga programare
-                    </button>
                   </div>
                 ) : (
                   dayAppointments.map((apt) => (

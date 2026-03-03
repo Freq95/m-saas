@@ -3,118 +3,61 @@
 ───────────────────────────────────────────────────────────────────────────── */
 
 .container {
-  min-height: 100vh;
+  flex: 1 1 auto;
+  min-height: 0;
   background: transparent;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .main {
   flex: 1;
-  padding: 1rem 1.25rem 1.25rem;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 1.25rem 0;
+  box-sizing: border-box;
   width: 100%;
-  overflow-x: auto;
+  overflow: hidden;
 }
 
 /* ─────────────────────────────────────────────────────────
    HEADER CONTROLS (navigation bar)
 ───────────────────────────────────────────────────────── */
-.calendarHeader {
-  margin-bottom: 0.85rem;
-}
-
-.headerControls {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.9rem;
-  padding: 0.65rem 0.9rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
-}
-
-.headerControls button {
-  padding: 0.45rem 0.85rem;
-  background: var(--color-surface-muted);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: 0.88rem;
-  color: var(--color-text);
-  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
-  font-weight: 600;
-}
-
-.headerControls button:hover {
-  background: var(--color-surface-strong);
-  border-color: var(--color-border-strong);
-  transform: translateY(-1px);
-}
-
-.headerControls h2 {
-  font-size: 1rem;
-  color: var(--color-text);
-  min-width: 240px;
-  font-weight: 560;
-  letter-spacing: -0.02em;
-  margin: 0;
-  text-align: center;
-}
-
-.todayButton {
-  margin-left: auto;
-  background: var(--color-surface);
-}
-
-.viewSwitcher {
-  display: flex;
-  gap: 0.35rem;
-  margin-left: 0.5rem;
-}
-
-.viewButton,
-.viewActive {
-  padding: 0.44rem 0.78rem;
-  background: color-mix(in srgb, var(--color-surface) 72%, white 28%);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: 0.84rem;
-  color: var(--color-text-soft);
-  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.viewButton:hover {
-  background: var(--color-surface-strong);
-  border-color: var(--color-border-strong);
-  color: var(--color-text);
-}
-
-.viewActive {
-  background: color-mix(in srgb, var(--color-accent) 18%, var(--color-surface));
-  border-color: color-mix(in srgb, var(--color-accent) 44%, var(--color-border));
-  color: var(--color-accent);
-}
-
 /* ─────────────────────────────────────────────────────────
    LAYOUT: Calendar + Day Panel side-by-side
 ───────────────────────────────────────────────────────── */
 .calendarWithPanel {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(240px, 28vw, 300px);
+  flex: 1;
   gap: 1rem;
-  align-items: flex-start;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .calendarWithPanel > :first-child {
   flex: 1;
   min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
 }
 
-@media (max-width: 1024px) {
+@media (max-width: 960px) {
   .calendarWithPanel {
-    flex-direction: column;
+    grid-template-columns: minmax(0, 1fr) clamp(210px, 34vw, 260px);
+    gap: 0.75rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .calendarWithPanel {
+    grid-template-columns: minmax(0, 1fr) clamp(180px, 42vw, 220px);
+    gap: 0.55rem;
   }
 }
 
@@ -124,6 +67,8 @@
 .weekGrid {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -171,9 +116,10 @@
 .weekBody {
   display: grid;
   grid-template-columns: 56px repeat(7, 1fr);
+  flex: 1;
   overflow-y: auto;
-  max-height: calc(100vh - 210px);
-  min-height: 400px;
+  min-height: 0;
+  max-height: none;
 }
 
 /* Time gutter */
@@ -252,6 +198,16 @@
   box-shadow:
     0 0 0 1px color-mix(in srgb, var(--color-accent-strong) 45%, transparent),
     0 0 10px color-mix(in srgb, var(--color-accent-strong) 40%, transparent);
+}
+
+.currentTimeLineDashed {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 2px dashed color-mix(in srgb, var(--color-accent-strong) 65%, transparent);
+  opacity: 0.75;
+  z-index: 24;
+  pointer-events: none;
 }
 
 .currentTimeDot {
@@ -398,8 +354,7 @@
 .editButton:focus-visible,
 .deleteButton:focus-visible,
 .saveButton:focus-visible,
-.cancelButton:focus-visible,
-.headerControls button:focus-visible {
+.cancelButton:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
@@ -426,6 +381,15 @@
   background: var(--color-border);
   color: var(--color-text-soft);
   border: 1px solid var(--color-border-strong);
+}
+
+.appointment.isPast {
+  opacity: 0.58;
+  filter: saturate(0.72) contrast(0.92);
+}
+
+.appointment.isPast:hover {
+  opacity: 0.78;
 }
 
 .appointment.dragging {
@@ -534,6 +498,10 @@
    MONTH VIEW
 ───────────────────────────────────────────────────────── */
 .monthCalendar {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -564,6 +532,9 @@
 .monthGrid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .monthDay {
@@ -647,6 +618,11 @@
   background: var(--color-border);
   color: var(--color-text-soft);
   opacity: 0.5;
+}
+
+.monthAppointment.isPast {
+  opacity: 0.52;
+  filter: saturate(0.72);
 }
 
 .monthAppointmentMore {
@@ -1541,90 +1517,12 @@
 /* ─────────────────────────────────────────────────────────
    HEADER — range label as button + hidden date input
 ───────────────────────────────────────────────────────── */
-.rangeLabelBtn {
-  font-size: 1rem;
-  color: var(--color-text);
-  min-width: 240px;
-  font-weight: 560;
-  letter-spacing: -0.02em;
-  margin: 0;
-  text-align: center;
-  cursor: pointer;
-  border-radius: var(--radius-xs);
-  padding: 0.2rem 0.5rem;
-  transition: background 120ms ease, color 120ms ease;
-  user-select: none;
-}
-.rangeLabelBtn:hover {
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
-  color: var(--color-accent);
-}
-
-.hiddenDateInput {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-  width: 0;
-  height: 0;
-  border: none;
-  padding: 0;
-  margin: 0;
-}
-
 /* ─────────────────────────────────────────────────────────
    HEADER — filter select
 ───────────────────────────────────────────────────────── */
-.filterSelect {
-  padding: 0.45rem 0.75rem;
-  background: var(--color-surface-muted);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: 0.84rem;
-  color: var(--color-text);
-  cursor: pointer;
-  transition: background var(--transition-fast), border-color var(--transition-fast);
-}
-.filterSelect:hover {
-  background: var(--color-surface-strong);
-  border-color: var(--color-border-strong);
-}
-
 /* ─────────────────────────────────────────────────────────
    HEADER — search bar
 ───────────────────────────────────────────────────────── */
-.searchWrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.searchIcon {
-  position: absolute;
-  left: 0.6rem;
-  font-size: 1.05rem;
-  color: var(--color-text-soft);
-  pointer-events: none;
-  line-height: 1;
-}
-
-.searchInput {
-  padding: 0.44rem 0.75rem 0.44rem 2rem;
-  background: var(--color-surface-muted);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: 0.84rem;
-  color: var(--color-text);
-  width: 200px;
-  transition: background var(--transition-fast), border-color var(--transition-fast), width 200ms ease;
-}
-.searchInput::placeholder { color: var(--color-text-soft); }
-.searchInput:focus {
-  outline: none;
-  border-color: color-mix(in srgb, var(--color-accent) 60%, var(--color-border));
-  background: var(--color-surface);
-  width: 260px;
-}
-
 /* ─────────────────────────────────────────────────────────
    MODAL — category picker
 ───────────────────────────────────────────────────────── */
@@ -1671,11 +1569,7 @@
    RESPONSIVE
 ───────────────────────────────────────────────────────── */
 @media (max-width: 1100px) {
-  .main { padding: 0.75rem 1rem 1rem; }
-  .headerControls { flex-wrap: wrap; gap: 0.6rem; }
-  .headerControls h2 { min-width: 200px; }
-  .todayButton { margin-left: 0; }
-  .viewSwitcher { margin-left: 0; }
+  .main { padding: 0.75rem 1rem 0; }
 }
 
 @media (max-width: 840px) {
@@ -1684,10 +1578,9 @@
 }
 
 @media (max-width: 640px) {
-  .main { padding: 0.5rem 0.75rem 0.75rem; }
+  .main { padding: 0.5rem 0.75rem 0; }
   .modal { width: 100%; max-width: none; border-radius: var(--radius-lg) var(--radius-lg) 0 0; margin-top: auto; max-height: 85vh; }
   .deleteSheet { width: 100%; border-radius: var(--radius-lg) var(--radius-lg) 0 0; margin-top: auto; }
   .modalActions { position: sticky; bottom: 0; background: var(--color-surface); padding-top: 0.8rem; }
   .modalFieldRow { grid-template-columns: 1fr; gap: 1rem; }
 }
-

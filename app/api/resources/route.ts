@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId } from '@/lib/db/mongo-utils';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { getCached } from '@/lib/redis';
 import { resourcesListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
@@ -55,14 +55,7 @@ export async function POST(request: NextRequest) {
 
     const db = await getMongoDbOrThrow();
 
-    // Get next ID
-    const lastResource = await db
-      .collection('resources')
-      .find({ tenant_id: tenantId })
-      .sort({ id: -1 })
-      .limit(1)
-      .toArray();
-    const nextId = lastResource.length > 0 ? lastResource[0].id + 1 : 1;
+    const nextId = await getNextNumericId('resources');
 
     const resource = {
       id: nextId,

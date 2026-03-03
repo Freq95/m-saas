@@ -38,7 +38,6 @@ interface Resource {
 interface CalendarState {
   viewType: CalendarViewType;
   currentDate: Date;
-  selectedDate: Date | null;
   selectedAppointment: Appointment | null;
   selectedProvider: Provider | null;
   selectedResource: Resource | null;
@@ -48,7 +47,6 @@ interface CalendarState {
 type CalendarAction =
   | { type: 'SET_VIEW_TYPE'; payload: CalendarViewType }
   | { type: 'SET_CURRENT_DATE'; payload: Date }
-  | { type: 'SET_SELECTED_DATE'; payload: Date | null }
   | { type: 'SET_SELECTED_APPOINTMENT'; payload: Appointment | null }
   | { type: 'SET_SELECTED_PROVIDER'; payload: Provider | null }
   | { type: 'SET_SELECTED_RESOURCE'; payload: Resource | null }
@@ -65,9 +63,6 @@ function calendarReducer(state: CalendarState, action: CalendarAction): Calendar
 
     case 'SET_CURRENT_DATE':
       return { ...state, currentDate: action.payload };
-
-    case 'SET_SELECTED_DATE':
-      return { ...state, selectedDate: action.payload };
 
     case 'SET_SELECTED_APPOINTMENT':
       return { ...state, selectedAppointment: action.payload };
@@ -107,7 +102,7 @@ function calendarReducer(state: CalendarState, action: CalendarAction): Calendar
       };
 
     case 'CLEAR_SELECTION':
-      return { ...state, selectedDate: null, selectedAppointment: null, selectedSlot: null };
+      return { ...state, selectedAppointment: null, selectedSlot: null };
 
     default:
       return state;
@@ -123,7 +118,6 @@ interface UseCalendarResult {
     nextPeriod: () => void;
     prevPeriod: () => void;
     selectAppointment: (appointment: Appointment | null) => void;
-    selectDate: (date: Date | null) => void;
     selectSlot: (slot: { start: Date; end: Date } | null) => void;
     selectProvider: (provider: Provider | null) => void;
     selectResource: (resource: Resource | null) => void;
@@ -138,7 +132,6 @@ export function useCalendar(
   const [state, dispatch] = useReducer(calendarReducer, {
     viewType: initialViewType,
     currentDate: new Date(initialDate),
-    selectedDate: null,
     selectedAppointment: null,
     selectedProvider: null,
     selectedResource: null,
@@ -156,7 +149,6 @@ export function useCalendar(
     nextPeriod:     useCallback(() => dispatch({ type: 'NEXT_PERIOD' }), []),
     prevPeriod:     useCallback(() => dispatch({ type: 'PREV_PERIOD' }), []),
     selectAppointment: useCallback((a: Appointment | null) => dispatch({ type: 'SET_SELECTED_APPOINTMENT', payload: a }), []),
-    selectDate:     useCallback((d: Date | null) => dispatch({ type: 'SET_SELECTED_DATE', payload: d }), []),
     selectSlot:     useCallback((s: { start: Date; end: Date } | null) => dispatch({ type: 'SET_SELECTED_SLOT', payload: s }), []),
     selectProvider: useCallback((p: Provider | null) => dispatch({ type: 'SET_SELECTED_PROVIDER', payload: p }), []),
     selectResource: useCallback((r: Resource | null) => dispatch({ type: 'SET_SELECTED_RESOURCE', payload: r }), []),

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { logger } from '@/lib/logger';
+import { parseSessionUserId } from './sessionUser';
 
 interface BlockedTime {
   id: number;
@@ -26,16 +27,15 @@ export function useBlockedTimes(
   endDate?: Date
 ): UseBlockedTimesResult {
   const { data: session, status } = useSession();
-  const sessionUserId =
-    session?.user?.id && /^[1-9]\d*$/.test(session.user.id)
-      ? Number.parseInt(session.user.id, 10)
-      : null;
+  const sessionUserId = parseSessionUserId(session);
   const effectiveUserId = userId ?? sessionUserId;
   const [blockedTimes, setBlockedTimes] = useState<BlockedTime[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const controller = new AbortController();
+
     const fetchBlockedTimes = async () => {
       if (status === 'loading') return;
       if (!effectiveUserId) {
@@ -55,15 +55,18 @@ export function useBlockedTimes(
           ...(endDate && { endDate: endDate.toISOString() }),
         });
 
-        const response = await fetch(`/api/blocked-times?${params}`);
+        const response = await fetch(`/api/blocked-times?${params}`, { signal: controller.signal });
 
         if (!response.ok) {
           throw new Error('Failed to fetch blocked times');
         }
 
         const result = await response.json();
-        setBlockedTimes(result.blockedTimes || []);
+        if (!controller.signal.aborted) {
+          setBlockedTimes(result.blockedTimes || []);
+        }
       } catch (err) {
+        if (controller.signal.aborted) return;
         setError(err instanceof Error ? err.message : 'Unknown error');
         logger.error('Calendar hook: failed to fetch blocked times', err instanceof Error ? err : new Error(String(err)), {
           userId: effectiveUserId,
@@ -73,11 +76,14 @@ export function useBlockedTimes(
           endDate: endDate?.toISOString(),
         });
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchBlockedTimes();
+    return () => controller.abort();
   }, [effectiveUserId, providerId, resourceId, startDate, endDate, status]);
 
   return { blockedTimes, loading, error };
