@@ -1032,3 +1032,23 @@ Scope: Auth + super-admin + invite flow + audit + tenant/user lifecycle controls
 ### Validation
 - `npx tsc --noEmit` passed (zero TypeScript errors).
 - Result: build-blocking dynamic route type errors cleared.
+
+## 40) Services Settings UI + Settings Tabs UX Consistency (2026-03-04)
+- Implemented Services Settings tab UI end-to-end (frontend only, existing APIs reused):
+  - `app/settings/services/page.tsx`
+  - `app/settings/services/ServicesSettingsPageClient.tsx`
+  - `app/settings/services/page.module.css`
+- Added shared Settings tabs component and unified tab behavior/styles:
+  - `app/settings/SettingsTabs.tsx`
+  - `app/settings/SettingsTabs.module.css`
+- Refactored Email + Services settings pages to consume shared tabs:
+  - `app/settings/email/EmailSettingsPageClient.tsx`
+  - `app/settings/email/page.module.css`
+- UX consistency fixes completed:
+  - tabs placement aligned (below title/description on both pages)
+  - container width aligned (`max-width: 960px`) to prevent layout shifts when switching tabs
+- Validation:
+  - `npm run build` passed after initial Services implementation
+  - `npx tsc --noEmit` passed after implementation and follow-up UX patches
+- Review handoff doc:
+  - `SERVICES-SETTINGS-CLAUDE-HANDOFF.md`

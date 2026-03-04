@@ -10,6 +10,7 @@ import { ToastContainer } from '@/components/Toast';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import styles from './page.module.css';
 import navStyles from '../../dashboard/page.module.css';
+import SettingsTabs from '../SettingsTabs';
 
 interface EmailIntegration {
   id: number;
@@ -358,6 +359,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
         <p className={styles.description}>
           Connect your email accounts to sync messages and manage conversations.
         </p>
+        <SettingsTabs activeTab="email" />
         
         {/* Yahoo Mail */}
         <div className={styles.integrationCard} role="region" aria-label="Yahoo Mail integration">
