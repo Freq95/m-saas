@@ -23,17 +23,314 @@
 }
 
 /* ─────────────────────────────────────────────────────────
-   HEADER CONTROLS (navigation bar)
-───────────────────────────────────────────────────────── */
-/* ─────────────────────────────────────────────────────────
    LAYOUT: Calendar + Day Panel side-by-side
 ───────────────────────────────────────────────────────── */
+.weekToolbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.34rem;
+  min-height: 42px;
+  margin: 0.7rem 0.85rem 0.5rem;
+  z-index: 60;
+}
+
+.todayButton {
+  height: 36px;
+  min-height: unset;
+  padding: 0 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface-muted) 62%, transparent);
+  color: var(--color-text);
+  font-size: 0.86rem;
+  font-weight: 620;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.todayButton:hover {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent) 38%, transparent);
+}
+
+.weekArrows {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.18rem;
+}
+
+.navArrowButton {
+  width: 32px;
+  height: 32px;
+  min-height: unset;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-soft);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  font-size: 1rem;
+}
+
+.navArrowButton:hover {
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+
+.rangeButton {
+  height: 36px;
+  min-height: unset;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: color-mix(in srgb, var(--color-surface-muted) 65%, transparent);
+  color: var(--color-text);
+  font-size: 0.92rem;
+  font-weight: 620;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.82rem;
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+  justify-content: space-between;
+  color: color-mix(in srgb, var(--color-text) 92%, white);
+  text-shadow: 0 1px 0 color-mix(in srgb, black 28%, transparent);
+}
+
+.rangeButton > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rangeButton:hover {
+  border-color: var(--color-border-strong);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+.rangeChevron {
+  font-size: 0.72rem;
+  color: color-mix(in srgb, var(--color-text-soft) 78%, white);
+}
+
+.dateDropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  left: auto;
+  z-index: 90;
+  display: grid;
+  grid-template-columns: minmax(360px, 1fr) 250px;
+  gap: 0.85rem;
+  width: min(94vw, 760px);
+  min-width: 660px;
+  background: var(--color-surface-strong);
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 84%, white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 0.9rem;
+}
+
+.dateDropdownCalendar {
+  padding-right: 0.6rem;
+  border-right: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+.dropdownMonthHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.45rem;
+  text-transform: capitalize;
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-weight: 610;
+}
+
+.dropdownArrow {
+  width: 22px;
+  height: 22px;
+  min-height: unset;
+  border-radius: var(--radius-xs);
+  border: 1px solid color-mix(in srgb, var(--color-border) 85%, transparent);
+  background: transparent;
+  color: var(--color-text-soft);
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+
+.dropdownArrow:hover {
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+}
+
+.dropdownWeekLabels {
+  display: grid;
+  grid-template-columns: 28px repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 0.25rem;
+}
+
+.dropdownWeekLabels span {
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--color-text-soft);
+}
+
+.dropdownWeeks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dropdownWeekRow {
+  display: grid;
+  grid-template-columns: 28px repeat(7, 1fr);
+  gap: 2px;
+}
+
+.dropdownWeekNumber {
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-soft);
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.dropdownDay {
+  height: 30px;
+  min-height: unset;
+  border-radius: var(--radius-xs);
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.dropdownDay:hover {
+  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  color: var(--color-accent);
+}
+
+.dropdownDayMuted {
+  opacity: 0.36;
+}
+
+.dropdownDaySelected {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-weight: 650;
+}
+
+.dropdownDayToday {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 70%, transparent);
+}
+
+.dateDropdownSide {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.yearSelector {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.95rem;
+  font-weight: 610;
+  color: var(--color-text);
+}
+
+.monthSelectorGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.28rem;
+}
+
+.monthSelectorButton {
+  height: 28px;
+  min-height: unset;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-soft);
+  font-size: 0.78rem;
+  cursor: pointer;
+  text-transform: capitalize;
+  padding: 0;
+}
+
+.monthSelectorButton:hover {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+.monthSelectorButtonActive {
+  color: var(--color-accent-contrast);
+  background: color-mix(in srgb, var(--color-accent) 82%, black 18%);
+  border-color: color-mix(in srgb, var(--color-accent) 68%, white 32%);
+}
+
+.yearList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.28rem;
+}
+
+.yearListButton {
+  height: 26px;
+  min-height: unset;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text-soft);
+  font-size: 0.74rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.yearListButton:hover {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+.yearListButtonActive {
+  color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 42%, transparent);
+}
+
+.dropdownTodayLink {
+  margin-top: auto;
+  align-self: flex-end;
+  border: none;
+  background: transparent;
+  color: var(--color-accent);
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 0;
+}
+
 .calendarWithPanel {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(240px, 28vw, 300px);
+  grid-template-columns: minmax(0, 1fr) clamp(280px, 32vw, 360px);
   flex: 1;
   gap: 1rem;
-  height: 100%;
   min-height: 0;
   overflow: hidden;
 }
@@ -48,15 +345,61 @@
 }
 
 @media (max-width: 960px) {
+  .weekToolbar {
+    margin-inline: 0.75rem;
+  }
+
+  .todayButton {
+    padding: 0 0.5rem;
+  }
+
+  .rangeButton {
+    font-size: 0.82rem;
+  }
+
+  .dateDropdown {
+    left: auto;
+    right: 0;
+    width: min(94vw, 700px);
+    min-width: 600px;
+    grid-template-columns: minmax(330px, 1fr) 220px;
+  }
+
   .calendarWithPanel {
-    grid-template-columns: minmax(0, 1fr) clamp(210px, 34vw, 260px);
+    grid-template-columns: minmax(0, 1fr) clamp(245px, 38vw, 320px);
     gap: 0.75rem;
   }
 }
 
 @media (max-width: 720px) {
+  .weekToolbar {
+    margin-inline: 0.65rem;
+    flex-wrap: wrap;
+    row-gap: 0.35rem;
+    margin-bottom: 0.55rem;
+  }
+
+  .rangeButton {
+    width: 100%;
+    max-width: none;
+    justify-content: space-between;
+  }
+
+  .dateDropdown {
+    grid-template-columns: 1fr;
+    width: min(96vw, 560px);
+    min-width: 0;
+  }
+
+  .dateDropdownCalendar {
+    border-right: none;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+    padding-right: 0;
+    padding-bottom: 0.65rem;
+  }
+
   .calendarWithPanel {
-    grid-template-columns: minmax(0, 1fr) clamp(180px, 42vw, 220px);
+    grid-template-columns: minmax(0, 1fr) clamp(210px, 46vw, 260px);
     gap: 0.55rem;
   }
 }

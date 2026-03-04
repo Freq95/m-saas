@@ -1,6 +1,27 @@
 'use client';
 
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
+import {
+  addMonths,
+  addWeeks,
+  eachDayOfInterval,
+  endOfMonth,
+  endOfWeek,
+  format,
+  getISOWeek,
+  getMonth,
+  getYear,
+  isSameDay,
+  isSameMonth,
+  isToday,
+  setMonth,
+  setYear,
+  startOfMonth,
+  startOfWeek,
+  subMonths,
+  subWeeks,
+} from 'date-fns';
+import { ro } from 'date-fns/locale';
 import { useSession } from 'next-auth/react';
 import styles from './page.module.css';
 import { useToast } from '@/lib/useToast';
@@ -17,7 +38,6 @@ import {
 import { useDragAndDrop } from './hooks/useDragAndDrop';
 import {
   WeekView,
-  MonthView,
   DayPanel,
   CreateAppointmentModal,
   AppointmentPreviewModal,
@@ -37,7 +57,7 @@ interface CalendarPageClientProps {
   initialAppointments: Appointment[];
   initialServices: Service[];
   initialDate: string;
-  initialViewType?: 'week' | 'workweek' | 'month' | 'day';
+  initialViewType?: 'week';
 }
 
 interface ConflictItem {
@@ -66,9 +86,9 @@ export default function CalendarPageClient({
   const { data: session } = useSession();
   const sessionUserId = parseSessionUserId(session) ?? undefined;
   const { state, actions } = useCalendar(initialDate, initialViewType);
-  const { weekDays, monthDays, hours } = useCalendarNavigation({
+  const { weekDays, hours } = useCalendarNavigation({
     currentDate: state.currentDate,
-    viewType: state.viewType,
+    viewType: 'week',
   });
 
   useLayoutEffect(() => {
@@ -98,7 +118,7 @@ export default function CalendarPageClient({
   const { appointments, loading, refetch, createAppointment, updateAppointment, deleteAppointment } =
     useAppointments({
       currentDate: state.currentDate,
-      viewType: state.viewType,
+      viewType: 'week',
       userId: sessionUserId,
       providerId: state.selectedProvider?.id,
       resourceId: state.selectedResource?.id,
@@ -115,12 +135,7 @@ export default function CalendarPageClient({
   const { providers } = useProviders(sessionUserId);
   const { resources } = useResources(sessionUserId);
 
-  // Day view: single-day array for WeekView reuse
-  const dayViewDays = useMemo(() => [state.currentDate], [state.currentDate]);
-  const visibleDays = useMemo(
-    () => (state.viewType === 'month' ? monthDays : state.viewType === 'day' ? dayViewDays : weekDays),
-    [state.viewType, monthDays, dayViewDays, weekDays]
-  );
+  const visibleDays = weekDays;
   const viewStart = visibleDays[0];
   const viewEnd = visibleDays[visibleDays.length - 1];
   const { blockedTimes } = useBlockedTimes(
@@ -156,6 +171,52 @@ export default function CalendarPageClient({
     conflicts: [],
     suggestions: [],
   });
+  const [showDateDropdown, setShowDateDropdown] = useState(false);
+  const [pickerDate, setPickerDate] = useState<Date>(state.currentDate);
+  const dateDropdownRef = useRef<HTMLDivElement>(null);
+
+  const weekStart = useMemo(() => startOfWeek(state.currentDate, { weekStartsOn: 1 }), [state.currentDate]);
+  const weekEnd = useMemo(() => endOfWeek(state.currentDate, { weekStartsOn: 1 }), [state.currentDate]);
+  const weekRangeLabel = useMemo(() => {
+    const monthLabel = (date: Date) => format(date, 'MMM', { locale: ro }).replace('.', '');
+    const sameMonth = getMonth(weekStart) === getMonth(weekEnd);
+    if (sameMonth) {
+      return `${format(weekStart, 'd', { locale: ro })}-${format(weekEnd, 'd', { locale: ro })} ${monthLabel(weekEnd)} ${format(weekEnd, 'yyyy', { locale: ro })}`;
+    }
+    return `${format(weekStart, 'd', { locale: ro })} ${monthLabel(weekStart)}-${format(weekEnd, 'd', { locale: ro })} ${monthLabel(weekEnd)} ${format(weekEnd, 'yyyy', { locale: ro })}`;
+  }, [weekStart, weekEnd]);
+  const pickerMonthStart = useMemo(() => startOfMonth(pickerDate), [pickerDate]);
+  const pickerDays = useMemo(() => {
+    const monthStartWeek = startOfWeek(pickerMonthStart, { weekStartsOn: 1 });
+    const monthEndWeek = endOfWeek(endOfMonth(pickerMonthStart), { weekStartsOn: 1 });
+    return eachDayOfInterval({ start: monthStartWeek, end: monthEndWeek });
+  }, [pickerMonthStart]);
+  const pickerWeeks = useMemo(() => {
+    const weeks: Date[][] = [];
+    for (let i = 0; i < pickerDays.length; i += 7) {
+      weeks.push(pickerDays.slice(i, i + 7));
+    }
+    return weeks;
+  }, [pickerDays]);
+  const months = useMemo(
+    () => Array.from({ length: 12 }, (_, idx) => format(new Date(2000, idx, 1), 'MMM', { locale: ro }).replace('.', '')),
+    []
+  );
+  const years = useMemo(() => {
+    const base = getYear(pickerDate);
+    return [base - 1, base, base + 1, base + 2];
+  }, [pickerDate]);
+
+  useEffect(() => {
+    if (state.viewType !== 'week') {
+      actions.setViewType('week');
+    }
+  }, [state.viewType, actions.setViewType]);
+
+  useEffect(() => {
+    if (!showDateDropdown) return;
+    setPickerDate(state.currentDate);
+  }, [showDateDropdown, state.currentDate]);
 
   // Drag-and-drop
   const { draggedAppointment, handleDragStart, handleDragEnd, handleDrop } = useDragAndDrop(
@@ -238,20 +299,36 @@ export default function CalendarPageClient({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      if (showDateDropdown) {
+        setShowDateDropdown(false);
+        return;
+      }
       setShowCreateModal(false);
       setShowPreviewModal(false);
       setShowDeleteConfirm(false);
+      setShowConflictModal(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [showDateDropdown]);
+
+  useEffect(() => {
+    if (!showDateDropdown) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!dateDropdownRef.current) return;
+      if (!dateDropdownRef.current.contains(event.target as Node)) {
+        setShowDateDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showDateDropdown]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   /** Select a day in the panel without opening the create modal */
   const handleDayHeaderClick = (day: Date) => {
-    setSelectedDay(day);
-    actions.navigateToDate(day);
+    navigateToDate(day);
   };
 
   /** Click on an empty slot — selects day AND opens create modal */
@@ -485,7 +562,7 @@ export default function CalendarPageClient({
       actions.clearSelection();
       toast.success('Programarea a fost stearsa.');
     } else {
-      throw new Error('Delete appointment failed');
+      toast.error('Nu s-a putut sterge programarea.');
     }
   };
 
@@ -499,6 +576,158 @@ export default function CalendarPageClient({
       toast.error(result.error || 'Nu s-a putut actualiza statusul.');
     }
   };
+
+  const navigateToDate = (date: Date) => {
+    setSelectedDay(date);
+    actions.navigateToDate(date);
+  };
+
+  const handleTodayClick = () => {
+    const today = new Date();
+    navigateToDate(today);
+    setShowDateDropdown(false);
+  };
+
+  const handlePrevWeek = () => {
+    const prevWeek = subWeeks(state.currentDate, 1);
+    navigateToDate(prevWeek);
+  };
+
+  const handleNextWeek = () => {
+    const nextWeek = addWeeks(state.currentDate, 1);
+    navigateToDate(nextWeek);
+  };
+
+  const handlePickerDaySelect = (date: Date) => {
+    navigateToDate(date);
+    setShowDateDropdown(false);
+  };
+
+  const weekToolbarControls = (
+    <div className={styles.weekToolbar} ref={dateDropdownRef}>
+      <button type="button" className={styles.todayButton} onClick={handleTodayClick}>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <rect x="3" y="4" width="18" height="18" rx="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
+        </svg>
+        <span>Astazi</span>
+      </button>
+
+      <div className={styles.weekArrows}>
+        <button type="button" className={styles.navArrowButton} onClick={handlePrevWeek} aria-label="Saptamana anterioara">
+          {'<'}
+        </button>
+        <button type="button" className={styles.navArrowButton} onClick={handleNextWeek} aria-label="Saptamana urmatoare">
+          {'>'}
+        </button>
+      </div>
+
+      <button
+        type="button"
+        className={styles.rangeButton}
+        aria-expanded={showDateDropdown}
+        onClick={() => setShowDateDropdown((prev) => !prev)}
+      >
+        <span>{weekRangeLabel}</span>
+        <span className={styles.rangeChevron}>{showDateDropdown ? '\u25b2' : '\u25bc'}</span>
+      </button>
+
+      {showDateDropdown && (
+        <div className={styles.dateDropdown} role="dialog" aria-label="Selecteaza data">
+          <div className={styles.dateDropdownCalendar}>
+            <div className={styles.dropdownMonthHeader}>
+              <button type="button" className={styles.dropdownArrow} onClick={() => setPickerDate(subMonths(pickerDate, 1))} aria-label="Luna anterioara">
+                {'<'}
+              </button>
+              <span>{format(pickerDate, 'MMMM yyyy', { locale: ro })}</span>
+              <button type="button" className={styles.dropdownArrow} onClick={() => setPickerDate(addMonths(pickerDate, 1))} aria-label="Luna urmatoare">
+                {'>'}
+              </button>
+            </div>
+
+            <div className={styles.dropdownWeekLabels}>
+              <span>S</span>
+              {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((label, index) => (
+                <span key={`${label}-${index}`}>{label}</span>
+              ))}
+            </div>
+
+            <div className={styles.dropdownWeeks}>
+              {pickerWeeks.map((week) => (
+                <div key={week[0].toISOString()} className={styles.dropdownWeekRow}>
+                  <span className={styles.dropdownWeekNumber}>{getISOWeek(week[0])}</span>
+                  {week.map((day) => {
+                    const outsideMonth = !isSameMonth(day, pickerMonthStart);
+                    const selected = isSameDay(day, state.currentDate);
+                    const todayFlag = isToday(day);
+                    return (
+                      <button
+                        key={day.toISOString()}
+                        type="button"
+                        className={[
+                          styles.dropdownDay,
+                          outsideMonth ? styles.dropdownDayMuted : '',
+                          selected ? styles.dropdownDaySelected : '',
+                          todayFlag ? styles.dropdownDayToday : '',
+                        ].filter(Boolean).join(' ')}
+                        onClick={() => handlePickerDaySelect(day)}
+                      >
+                        {format(day, 'd')}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className={styles.dateDropdownSide}>
+            <div className={styles.yearSelector}>
+              <button type="button" className={styles.dropdownArrow} onClick={() => setPickerDate(setYear(pickerDate, getYear(pickerDate) - 1))} aria-label="An precedent">
+                {'<'}
+              </button>
+              <span>{getYear(pickerDate)}</span>
+              <button type="button" className={styles.dropdownArrow} onClick={() => setPickerDate(setYear(pickerDate, getYear(pickerDate) + 1))} aria-label="An urmator">
+                {'>'}
+              </button>
+            </div>
+
+            <div className={styles.monthSelectorGrid}>
+              {months.map((monthLabel, index) => (
+                <button
+                  key={`${monthLabel}-${index}`}
+                  type="button"
+                  className={`${styles.monthSelectorButton}${getMonth(pickerDate) === index ? ` ${styles.monthSelectorButtonActive}` : ''}`}
+                  onClick={() => setPickerDate(setMonth(pickerDate, index))}
+                >
+                  {monthLabel}
+                </button>
+              ))}
+            </div>
+
+            <div className={styles.yearList}>
+              {years.map((year) => (
+                <button
+                  key={year}
+                  type="button"
+                  className={`${styles.yearListButton}${getYear(pickerDate) === year ? ` ${styles.yearListButtonActive}` : ''}`}
+                  onClick={() => setPickerDate(setYear(pickerDate, year))}
+                >
+                  {year}
+                </button>
+              ))}
+            </div>
+
+            <button type="button" className={styles.dropdownTodayLink} onClick={handleTodayClick}>
+              Astazi
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   // ── Render ─────────────────────────────────────────────────────────────────
   const showInitialSkeleton = !hasFinishedInitialLoad && loading;
@@ -531,41 +760,28 @@ export default function CalendarPageClient({
       style={availableHeight ? { height: `${availableHeight}px` } : undefined}
     >
       <main className={styles.main}>
-        {/* Calendar grid + day panel — always side-by-side for all views */}
         <div className={styles.calendarWithPanel}>
-          {state.viewType === 'month' ? (
-            <MonthView
-              monthDays={monthDays}
-              currentDate={state.currentDate}
-              appointments={appointments}
-              selectedDay={selectedDay}
-              onDayClick={handleDayHeaderClick}
-              onAppointmentClick={handleAppointmentClick}
-            />
-          ) : (
-            /* Day view reuses WeekView with a single-day array */
-            <WeekView
-              weekDays={state.viewType === 'day' ? dayViewDays : weekDays}
-              hours={hours}
-              appointments={appointments}
-              blockedTimes={blockedTimes}
-              selectedDay={selectedDay}
-              onSlotClick={handleSlotClick}
-              onDayHeaderClick={handleDayHeaderClick}
-              onAppointmentClick={handleAppointmentClick}
-              enableDragDrop={state.viewType === 'week' || state.viewType === 'workweek'}
-              draggedAppointment={draggedAppointment}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-              onDrop={async (day, hour, minute) => { await handleDrop(day, hour, minute); }}
-              providers={providers}
-            />
-          )}
+          <WeekView
+            weekDays={weekDays}
+            hours={hours}
+            appointments={appointments}
+            blockedTimes={blockedTimes}
+            selectedDay={selectedDay}
+            onSlotClick={handleSlotClick}
+            onDayHeaderClick={handleDayHeaderClick}
+            onAppointmentClick={handleAppointmentClick}
+            enableDragDrop
+            draggedAppointment={draggedAppointment}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDrop={async (day, hour, minute) => { await handleDrop(day, hour, minute); }}
+            providers={providers}
+          />
 
           <DayPanel
+            topControls={weekToolbarControls}
             selectedDay={selectedDay}
             appointments={appointments}
-            currentDate={state.currentDate}
             onAppointmentClick={(apt) => {
               actions.selectAppointment(apt);
               setShowPreviewModal(true);
@@ -573,16 +789,8 @@ export default function CalendarPageClient({
             onQuickStatusChange={handlePanelStatusChange}
             onCreateClick={() => handleSlotClick(selectedDay, 9)}
             onNavigate={(date) => {
-              setSelectedDay(date);
-              actions.navigateToDate(date);
+              navigateToDate(date);
             }}
-            onTodayClick={() => {
-              const today = new Date();
-              setSelectedDay(today);
-              actions.goToToday();
-            }}
-            viewType={state.viewType}
-            onViewTypeChange={actions.setViewType}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
           />

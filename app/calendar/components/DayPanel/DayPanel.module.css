@@ -2,116 +2,6 @@
    DayPanel — Apple-style right-hand appointment panel
 ───────────────────────────────────────────────────────────────────────────── */
 
-/* ── Mini calendar ── */
-.miniCal {
-  padding: 0.55rem 0.7rem 0.45rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
-}
-
-.miniCalHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.35rem;
-}
-
-.miniCalMonth {
-  font-size: 0.72rem;
-  font-weight: 620;
-  color: var(--color-text);
-  letter-spacing: -0.01em;
-  text-transform: capitalize;
-}
-
-.miniCalNav {
-  width: 20px;
-  height: 20px;
-  min-height: unset;
-  border-radius: var(--radius-xs);
-  background: transparent;
-  border: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
-  color: var(--color-text-soft);
-  font-size: 1rem;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 120ms ease, color 120ms ease;
-  padding: 0;
-}
-.miniCalNav:hover {
-  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
-  color: var(--color-accent);
-  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
-}
-
-.miniCalGrid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 1px;
-}
-
-.miniCalWeekLabel {
-  font-size: 0.54rem;
-  font-weight: 650;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--color-text-soft);
-  text-align: center;
-  padding: 0.1rem 0;
-}
-
-.miniCalDay {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  aspect-ratio: 1;
-  font-size: 0.66rem;
-  font-weight: 500;
-  color: var(--color-text);
-  border-radius: var(--radius-xs);
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  transition: background 120ms ease, color 120ms ease;
-  min-height: unset;
-  padding: 0;
-  gap: 0;
-}
-.miniCalDay:hover {
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
-  color: var(--color-accent);
-}
-
-.miniCalDayOther {
-  opacity: 0.35;
-}
-
-.miniCalDayToday {
-  background: color-mix(in srgb, var(--color-accent) 20%, transparent);
-  color: var(--color-accent);
-  font-weight: 700;
-}
-
-.miniCalDaySelected {
-  background: var(--color-accent) !important;
-  color: var(--color-accent-contrast) !important;
-  font-weight: 700;
-}
-
-.miniCalDot {
-  width: 2px;
-  height: 2px;
-  border-radius: 50%;
-  background: currentColor;
-  opacity: 0.65;
-  display: block;
-}
-
 .panel {
   width: 100%;
   height: 100%;
@@ -125,63 +15,9 @@
   box-shadow: var(--shadow-sm);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  overflow: hidden;
+  overflow: visible;
   animation: slideIn 220ms cubic-bezier(0.16, 1, 0.3, 1);
   align-self: stretch;
-}
-
-.panelTopControls {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.4rem;
-  padding: 0.6rem 0.75rem 0.55rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
-}
-
-.panelTodayBtn {
-  width: 100%;
-  height: 28px;
-  min-height: unset;
-  padding: 0 0.65rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-muted);
-  color: var(--color-text);
-  font-size: 0.72rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease;
-}
-
-.panelTodayBtn:hover {
-  background: var(--color-surface-strong);
-  border-color: var(--color-border-strong);
-}
-
-.panelViewSelect {
-  width: 100%;
-  height: 28px;
-  min-height: unset;
-  padding: 0 0.6rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-muted);
-  color: var(--color-text);
-  font-size: 0.72rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 120ms ease, border-color 120ms ease;
-}
-
-.panelViewSelect:hover {
-  background: var(--color-surface-strong);
-  border-color: var(--color-border-strong);
-}
-
-.panelViewSelect:focus-visible,
-.panelTodayBtn:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
 }
 
 .searchWrapper {
@@ -555,23 +391,6 @@
   font-size: 0.82rem;
   color: var(--color-text-soft);
   margin: 0;
-}
-
-.emptyDayBtn {
-  font-size: 0.8rem;
-  font-weight: 580;
-  padding: 0.45rem 1.1rem;
-  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
-  color: var(--color-accent);
-  border: 1px solid color-mix(in srgb, var(--color-accent) 32%, transparent);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: background 140ms ease, transform 140ms ease;
-  min-height: unset;
-}
-.emptyDayBtn:hover {
-  background: color-mix(in srgb, var(--color-accent) 26%, transparent);
-  transform: translateY(-1px);
 }
 
 /* ── Search clear button ── */

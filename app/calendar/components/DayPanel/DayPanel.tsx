@@ -1,35 +1,24 @@
 'use client';
 
-import { useMemo } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import {
-  addDays,
-  addMonths,
-  eachDayOfInterval,
-  endOfMonth,
   format,
   isSameDay,
-  isSameMonth,
   isToday,
-  startOfMonth,
-  startOfWeek,
-  subMonths,
 } from 'date-fns';
 import { ro } from 'date-fns/locale';
 import styles from './DayPanel.module.css';
-import type { Appointment, CalendarViewType } from '../../hooks/useCalendar';
+import type { Appointment } from '../../hooks/useCalendar';
 
 interface DayPanelProps {
+  topControls?: ReactNode;
   selectedDay: Date | null;
   appointments: Appointment[];
-  currentDate: Date;
-  viewType: CalendarViewType;
   searchQuery?: string;
   onAppointmentClick: (appointment: Appointment) => void;
   onQuickStatusChange: (id: number, status: string) => void;
   onCreateClick: () => void;
   onNavigate: (date: Date) => void;
-  onTodayClick: () => void;
-  onViewTypeChange: (view: CalendarViewType) => void;
   onSearchChange?: (query: string) => void;
 }
 
@@ -47,92 +36,6 @@ function normalizeStatus(status: string): PanelStatusKey {
   if (status === 'completed') return 'completed';
   if (status === 'cancelled') return 'cancelled';
   return 'scheduled';
-}
-
-// Mini calendar
-function MiniCalendar({
-  currentDate,
-  selectedDay,
-  appointments,
-  onSelectDay,
-}: {
-  currentDate: Date;
-  selectedDay: Date | null;
-  appointments: Appointment[];
-  onSelectDay: (date: Date) => void;
-}) {
-  const viewMonth = currentDate;
-
-  const days = useMemo(() => {
-    const monthStart = startOfMonth(viewMonth);
-    const monthEnd = endOfMonth(viewMonth);
-    const weekStart = startOfWeek(monthStart, { weekStartsOn: 1 });
-    const lastWeekStart = startOfWeek(monthEnd, { weekStartsOn: 1 });
-    return eachDayOfInterval({ start: weekStart, end: addDays(lastWeekStart, 6) });
-  }, [viewMonth]);
-
-  // Dot indicators use ALL appointments (not filtered)
-  const aptDays = useMemo(() => {
-    const set = new Set<string>();
-    appointments.forEach((a) => set.add(format(new Date(a.start_time), 'yyyy-MM-dd')));
-    return set;
-  }, [appointments]);
-
-  const weekLabels = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-
-  return (
-    <div className={styles.miniCal}>
-      <div className={styles.miniCalHeader}>
-        <button
-          className={styles.miniCalNav}
-          onClick={(e) => { e.stopPropagation(); onSelectDay(subMonths(viewMonth, 1)); }}
-          aria-label="Luna anterioara"
-        >
-          {'<'}
-        </button>
-        <span className={styles.miniCalMonth}>
-          {format(viewMonth, 'MMMM yyyy', { locale: ro })}
-        </span>
-        <button
-          className={styles.miniCalNav}
-          onClick={(e) => { e.stopPropagation(); onSelectDay(addMonths(viewMonth, 1)); }}
-          aria-label="Luna urmatoare"
-        >
-          {'>'}
-        </button>
-      </div>
-
-      <div className={styles.miniCalGrid}>
-        {weekLabels.map((d, i) => (
-          <span key={i} className={styles.miniCalWeekLabel}>{d}</span>
-        ))}
-        {days.map((day) => {
-          const isCurrentMonth = isSameMonth(day, viewMonth);
-          const isTodayFlag    = isToday(day);
-          const isSelected     = selectedDay ? isSameDay(day, selectedDay) : false;
-          const hasApt         = aptDays.has(format(day, 'yyyy-MM-dd'));
-
-          return (
-            <button
-              key={day.toISOString()}
-              className={[
-                styles.miniCalDay,
-                !isCurrentMonth ? styles.miniCalDayOther    : '',
-                isTodayFlag     ? styles.miniCalDayToday    : '',
-                isSelected      ? styles.miniCalDaySelected : '',
-              ].filter(Boolean).join(' ')}
-              onClick={() => onSelectDay(day)}
-              aria-label={format(day, 'd MMMM yyyy', { locale: ro })}
-              aria-pressed={isSelected}
-            >
-              {format(day, 'd')}
-              {hasApt && <span className={styles.miniCalDot} />}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
 }
 
 // Appointment card
@@ -200,17 +103,14 @@ function AppointmentCard({
 
 // Main panel
 export function DayPanel({
+  topControls,
   selectedDay,
   appointments,
-  currentDate,
-  viewType,
   searchQuery = '',
   onAppointmentClick,
   onQuickStatusChange,
   onCreateClick,
   onNavigate,
-  onTodayClick,
-  onViewTypeChange,
   onSearchChange,
 }: DayPanelProps) {
   const isSearching  = searchQuery.trim().length > 0;
@@ -279,58 +179,33 @@ export function DayPanel({
     }
     return groups;
   }, [searchResults, isSearching]);
-
+  const searchBar = onSearchChange ? (
+    <div className={styles.searchWrapper}>
+      <svg className={styles.searchIcon} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input
+        type="search"
+        className={styles.searchInput}
+        placeholder="Cauta programari..."
+        value={searchQuery}
+        onChange={(e) => onSearchChange(e.target.value)}
+        aria-label="Cauta programari"
+      />
+      {isSearching && (
+        <button
+          className={styles.searchClear}
+          type="button"
+          onClick={() => onSearchChange('')}
+          aria-label="Sterge cautarea"
+          title="Sterge cautarea"
+        >
+          {'\u00D7'}
+        </button>
+      )}
+    </div>
+  ) : null;
   return (
     <aside className={styles.panel}>
-      <div className={styles.panelTopControls}>
-        <button type="button" className={styles.panelTodayBtn} onClick={onTodayClick}>
-          Astazi
-        </button>
-        <select
-          className={styles.panelViewSelect}
-          value={viewType}
-          onChange={(e) => onViewTypeChange(e.target.value as CalendarViewType)}
-          aria-label="Schimba vizualizarea calendarului"
-        >
-          <option value="day">Zi</option>
-          <option value="week">Saptamana</option>
-          <option value="workweek">Sapt. lucru</option>
-          <option value="month">Luna</option>
-        </select>
-      </div>
-
-      {/* Mini calendar */}
-      <MiniCalendar
-        currentDate={currentDate}
-        selectedDay={selectedDay}
-        appointments={appointments}
-        onSelectDay={onNavigate}
-      />
-
-      {onSearchChange && (
-        <div className={styles.searchWrapper}>
-          <svg className={styles.searchIcon} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-          <input
-            type="search"
-            className={styles.searchInput}
-            placeholder="Cauta programari..."
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            aria-label="Cauta programari"
-          />
-          {isSearching && (
-            <button
-              className={styles.searchClear}
-              type="button"
-              onClick={() => onSearchChange('')}
-              aria-label="Sterge cautarea"
-              title="Sterge cautarea"
-            >
-              ×
-            </button>
-          )}
-        </div>
-      )}
+      {topControls}
 
       {/* Search mode header */}
       {isSearching ? (
@@ -363,6 +238,8 @@ export function DayPanel({
             </div>
           </div>
           )}
+
+          {searchBar}
 
           {/* Search results list */}
           <div className={styles.list}>
@@ -447,6 +324,8 @@ export function DayPanel({
               </div>
               )}
 
+              {searchBar}
+
               <div className={styles.list}>
                 {dayAppointments.length === 0 ? (
                   <div className={styles.emptyDay}>
@@ -471,3 +350,4 @@ export function DayPanel({
     </aside>
   );
 }
+
