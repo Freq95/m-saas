@@ -7,6 +7,7 @@ import { integrationIdParamSchema } from '@/lib/validation';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { getRedis } from '@/lib/redis';
 import { withRedisPrefix } from '@/lib/redis-prefix';
+import { decrypt } from '@/lib/encryption';
 
 const TEST_LIMIT = 5;
 const TEST_WINDOW_MS = 10 * 60 * 1000;
@@ -77,26 +78,25 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
     
     logger.info('Testing integration', { integrationId, provider: integration.provider, email: integration.email });
     
-    // Decrypt password directly from integration
-    let password: string | null = null;
-    if (integration.encrypted_password) {
-      try {
-        const { decrypt } = await import('@/lib/encryption');
-        password = decrypt(integration.encrypted_password);
-        logger.info('Password decrypted successfully');
-      } catch (error) {
-        logger.error('Failed to decrypt password', { error, integrationId });
-        return createErrorResponse('Failed to decrypt password. Please check ENCRYPTION_KEY is set correctly.', 500);
-      }
-    }
-    
-    if (!password) {
-      logger.warn('No password found for integration', { integrationId });
-      return createErrorResponse('Integration not configured - no password found', 404);
-    }
-    
     // Test connection based on provider
     if (integration.provider === 'yahoo') {
+      let password: string | null = null;
+      if (integration.encrypted_password) {
+        try {
+          const { decrypt } = await import('@/lib/encryption');
+          password = decrypt(integration.encrypted_password);
+          logger.info('Password decrypted successfully');
+        } catch (error) {
+          logger.error('Failed to decrypt password', { error, integrationId });
+          return createErrorResponse('Failed to decrypt password. Please check ENCRYPTION_KEY is set correctly.', 500);
+        }
+      }
+
+      if (!password) {
+        logger.warn('No password found for integration', { integrationId });
+        return createErrorResponse('Integration not configured - no password found', 404);
+      }
+
       const testConfig = {
         email: integration.email,
         password: password,
@@ -113,8 +113,24 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         return createErrorResponse(`Connection test failed: ${errorMessage}`, 400);
       }
+    } else if (integration.provider === 'gmail') {
+      const accessToken = integration.encrypted_access_token ? decrypt(integration.encrypted_access_token) : null;
+      const refreshToken = integration.encrypted_refresh_token ? decrypt(integration.encrypted_refresh_token) : null;
+      const tokenExpiresAt = typeof integration.token_expires_at === 'number' ? integration.token_expires_at : null;
+
+      if (!accessToken && !refreshToken) {
+        return createErrorResponse('Gmail not configured', 400);
+      }
+
+      const { getValidAccessToken, testGmailConnection } = await import('@/lib/gmail');
+      const validAccessToken = await getValidAccessToken(integrationId, accessToken, refreshToken, tokenExpiresAt);
+      const result = await testGmailConnection(validAccessToken);
+      if (!result.ok) {
+        return createErrorResponse(result.error || 'Connection test failed', 400);
+      }
+      return createSuccessResponse({ success: true, message: 'Connection successful' });
     } else {
-      // Gmail/Outlook OAuth testing would go here
+      // Outlook testing would go here
       return createErrorResponse('Connection testing not yet implemented for this provider', 501);
     }
   } catch (error) {

@@ -35,3 +35,31 @@ export async function enqueueYahooSyncJob(
 
   return { queued: true, messageId: result.messageId };
 }
+
+export async function enqueueGmailSyncJob(
+  integrationId: number,
+  tenantId?: string
+): Promise<{ queued: boolean; messageId?: string }> {
+  const token = process.env.QSTASH_TOKEN;
+  if (!token) {
+    return { queued: false };
+  }
+
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret) {
+    throw new Error('CRON_SECRET is required when QSTASH_TOKEN is configured.');
+  }
+
+  const client = new Client({ token });
+  const baseUrl = getAppBaseUrl();
+  const result = await client.publishJSON({
+    url: `${baseUrl}/api/jobs/email-sync/gmail`,
+    body: { integrationId, tenantId: tenantId || undefined },
+    headers: {
+      Authorization: `Bearer ${cronSecret}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  return { queued: true, messageId: result.messageId };
+}

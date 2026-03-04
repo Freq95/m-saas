@@ -37,7 +37,7 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
       const attachmentFilter = {
         user_id: userId,
         tenant_id: tenantId,
-        source: 'yahoo',
+        source: integration.provider,
       };
       const attachments = await db
         .collection('message_attachments')
@@ -77,7 +77,7 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
         cleanedAttachmentRecords = deleteResult.deletedCount ?? 0;
       }
     } catch (cleanupError) {
-      logger.warn('Failed to cleanup Yahoo message attachments after integration delete', {
+      logger.warn('Failed to cleanup message attachments after integration delete', {
         integrationId,
         userId,
         error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),

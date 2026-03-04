@@ -165,6 +165,7 @@ function EmailHtmlContent({ html }: { html: string }) {
 interface Conversation {
   id: number;
   channel: string;
+  email_provider?: 'yahoo' | 'gmail' | null;
   contact_name: string;
   contact_email: string;
   contact_phone?: string;
@@ -232,6 +233,36 @@ interface InboxPageClientProps {
   initialMessages: Message[] | null;
   initialHasMoreMessages?: boolean;
   initialOldestMessageId?: number | null;
+}
+
+function getChannelLabel(channel: string, emailProvider?: 'yahoo' | 'gmail' | null): string {
+  if (channel !== 'email') {
+    return channel;
+  }
+  if (emailProvider === 'yahoo') {
+    return 'Yahoo';
+  }
+  if (emailProvider === 'gmail') {
+    return 'Gmail';
+  }
+  return 'Email';
+}
+
+function getChannelClassName(
+  stylesMap: Record<string, string>,
+  channel: string,
+  emailProvider?: 'yahoo' | 'gmail' | null
+): string {
+  if (channel !== 'email') {
+    return `${stylesMap.channel} ${stylesMap.channelDefault}`;
+  }
+  if (emailProvider === 'yahoo') {
+    return `${stylesMap.channel} ${stylesMap.channelYahoo}`;
+  }
+  if (emailProvider === 'gmail') {
+    return `${stylesMap.channel} ${stylesMap.channelGmail}`;
+  }
+  return `${stylesMap.channel} ${stylesMap.channelEmail}`;
 }
 
 export default function InboxPageClient({
@@ -572,17 +603,35 @@ export default function InboxPageClient({
     setSyncing(true);
     setSyncError(null);
     try {
-      const response = await fetch('/api/yahoo/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ todayOnly: true }),
-      });
-      if (!response.ok) {
-        const err = await response.json();
-        const message = err?.error || err?.message || 'Failed to sync inbox';
-        showApiErrorToast('sync', response.status, message);
-        throw new Error(message);
+      const [yahooResult, gmailResult] = await Promise.allSettled([
+        fetch('/api/yahoo/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ todayOnly: true }),
+        }),
+        fetch('/api/gmail/sync', { method: 'POST' }),
+      ]);
+
+      // Collect errors only from providers that failed for a non-"not configured" reason
+      const errors: string[] = [];
+      for (const result of [yahooResult, gmailResult]) {
+        if (result.status === 'rejected') {
+          errors.push(result.reason?.message || 'Sync failed');
+        } else if (!result.value.ok) {
+          const err = await result.value.json().catch(() => ({}));
+          const message = err?.error || err?.message || '';
+          // Ignore "not configured" - provider simply not connected
+          if (message && !message.toLowerCase().includes('not configured') && !message.toLowerCase().includes('not found')) {
+            errors.push(message);
+          }
+        }
       }
+
+      if (errors.length > 0) {
+        showApiErrorToast('sync', 500, errors[0]);
+        setSyncError(errors[0]);
+      }
+
       await fetchConversations(searchQuery);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to sync inbox';
@@ -1338,7 +1387,7 @@ export default function InboxPageClient({
                   )}
                 </div>
                 <div className={styles.conversationMeta}>
-                  <span className={styles.channel}>{conv.channel}</span>
+                  <span className={getChannelClassName(styles, conv.channel, conv.email_provider)}>{getChannelLabel(conv.channel, conv.email_provider)}</span>
                   {conv.last_message_at && (
                     <span className={styles.lastMessageTime}>
                       {(() => {
@@ -1382,7 +1431,7 @@ export default function InboxPageClient({
                 <div>
                   <h3>{selectedConversation.contact_name || 'Fără nume'}</h3>
                   <div className={styles.threadMeta}>
-                    {selectedConversation.contact_email} • {selectedConversation.channel}
+                    {selectedConversation.contact_email} • {getChannelLabel(selectedConversation.channel, selectedConversation.email_provider)}
                   </div>
                 </div>
                 <div className={styles.threadHeaderActions}>

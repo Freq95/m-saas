@@ -246,6 +246,33 @@
   font-size: 0.8125rem;
   color: var(--color-text-soft);
   text-transform: capitalize;
+  padding: 0.125rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.channelDefault {
+  background: color-mix(in srgb, var(--color-surface-muted) 70%, transparent);
+  border-color: color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+.channelEmail {
+  background: color-mix(in srgb, var(--color-surface-muted) 70%, transparent);
+  border-color: color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+.channelYahoo {
+  color: #fecaca;
+  background: rgba(220, 38, 38, 0.22);
+  border-color: rgba(220, 38, 38, 0.5);
+}
+
+.channelGmail {
+  color: #bbf7d0;
+  background: rgba(22, 163, 74, 0.22);
+  border-color: rgba(22, 163, 74, 0.5);
 }
 
 .lastMessageTime {

@@ -75,6 +75,9 @@ export async function getConversationsData(query: ConversationsQuery) {
         conversation_id: 1,
         direction: 1,
         is_read: 1,
+        source_uid: 1,
+        external_id: 1,
+        id: 1,
         sent_at: 1,
         created_at: 1,
       },
@@ -82,6 +85,13 @@ export async function getConversationsData(query: ConversationsQuery) {
     {
       $addFields: {
         event_at: { $ifNull: ['$sent_at', '$created_at'] },
+      },
+    },
+    {
+      $sort: {
+        conversation_id: 1,
+        event_at: -1,
+        id: -1,
       },
     },
     {
@@ -97,7 +107,36 @@ export async function getConversationsData(query: ConversationsQuery) {
             ],
           },
         },
-        last_message_at: { $max: '$event_at' },
+        last_message_at: { $first: '$event_at' },
+        has_yahoo_messages: {
+          $max: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ['$direction', 'inbound'] },
+                  { $ne: [{ $ifNull: ['$source_uid', null] }, null] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+        has_gmail_messages: {
+          $max: {
+            $cond: [
+              {
+                $and: [
+                  { $eq: ['$direction', 'inbound'] },
+                  { $eq: [{ $ifNull: ['$source_uid', null] }, null] },
+                  { $ne: [{ $ifNull: ['$external_id', null] }, null] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
       },
     },
   ];
@@ -155,6 +194,16 @@ export async function getConversationsData(query: ConversationsQuery) {
 
   const enriched = conversations.map((conv: any) => {
     const stats = messageStatsByConversation.get(conv.id);
+    const hasYahooMessages = stats?.has_yahoo_messages === 1;
+    const hasGmailMessages = stats?.has_gmail_messages === 1;
+    const emailProvider =
+      conv.channel === 'email'
+        ? hasYahooMessages
+          ? 'yahoo'
+          : hasGmailMessages
+            ? 'gmail'
+            : null
+        : null;
 
     return {
       ...conv,
@@ -162,6 +211,7 @@ export async function getConversationsData(query: ConversationsQuery) {
       has_unread: (typeof stats?.unread_count === 'number' ? stats.unread_count : 0) > 0,
       last_message_at: stats?.last_message_at || conv.updated_at || conv.created_at,
       last_message_preview: '',
+      email_provider: emailProvider,
       tags: tagNamesByConversation.get(conv.id) || [],
     };
   });

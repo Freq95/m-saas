@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getEmailIntegrationById } from '@/lib/email-integrations';
 import { fetchYahooEmails } from '@/lib/yahoo-mail';
+import { fetchGmailMessages, getValidAccessToken } from '@/lib/gmail';
 import { logger } from '@/lib/logger';
 import { decrypt } from '@/lib/encryption';
 import { integrationIdParamSchema } from '@/lib/validation';
@@ -29,25 +30,24 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
     
     logger.info('Fetching last email', { integrationId, provider: integration.provider, email: integration.email });
     
-    // Decrypt password
-    let password: string | null = null;
-    if (integration.encrypted_password) {
-      try {
-        password = decrypt(integration.encrypted_password);
-        logger.info('Password decrypted successfully');
-      } catch (error) {
-        logger.error('Failed to decrypt password', { error, integrationId });
-        return createErrorResponse('Failed to decrypt password. Please check ENCRYPTION_KEY is set correctly.', 500);
-      }
-    }
-    
-    if (!password) {
-      logger.warn('No password found for integration', { integrationId });
-      return createErrorResponse('Integration not configured - no password found', 404);
-    }
-    
     // Fetch last email based on provider
     if (integration.provider === 'yahoo') {
+      let password: string | null = null;
+      if (integration.encrypted_password) {
+        try {
+          password = decrypt(integration.encrypted_password);
+          logger.info('Password decrypted successfully');
+        } catch (error) {
+          logger.error('Failed to decrypt password', { error, integrationId });
+          return createErrorResponse('Failed to decrypt password. Please check ENCRYPTION_KEY is set correctly.', 500);
+        }
+      }
+
+      if (!password) {
+        logger.warn('No password found for integration', { integrationId });
+        return createErrorResponse('Integration not configured - no password found', 404);
+      }
+
       const config = {
         email: integration.email,
         password: password,
@@ -94,6 +94,46 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
         });
       } catch (error) {
         logger.error('Failed to fetch email', { error, integrationId });
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        return createErrorResponse(`Failed to fetch email: ${errorMessage}`, 400);
+      }
+    } else if (integration.provider === 'gmail') {
+      try {
+        const accessToken = integration.encrypted_access_token ? decrypt(integration.encrypted_access_token) : null;
+        const refreshToken = integration.encrypted_refresh_token ? decrypt(integration.encrypted_refresh_token) : null;
+        const tokenExpiresAt = typeof integration.token_expires_at === 'number' ? integration.token_expires_at : null;
+
+        if (!accessToken && !refreshToken) {
+          return createErrorResponse('Gmail not configured', 400);
+        }
+
+        const validAccessToken = await getValidAccessToken(integrationId, accessToken, refreshToken, tokenExpiresAt);
+        const emails = await fetchGmailMessages(validAccessToken, integration.last_sync_at || null);
+
+        if (emails.length === 0) {
+          return createSuccessResponse({
+            success: true,
+            message: 'No emails found in Gmail',
+            email: null,
+          });
+        }
+
+        const lastEmail = emails[0];
+        return createSuccessResponse({
+          success: true,
+          email: {
+            from: lastEmail.from,
+            to: lastEmail.to,
+            subject: lastEmail.subject,
+            text: lastEmail.text,
+            html: lastEmail.html,
+            date: lastEmail.date || new Date().toISOString(),
+            messageId: lastEmail.messageId,
+            cleanText: lastEmail.text,
+          },
+        });
+      } catch (error) {
+        logger.error('Failed to fetch Gmail email', { error, integrationId });
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         return createErrorResponse(`Failed to fetch email: ${errorMessage}`, 400);
       }

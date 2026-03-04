@@ -20,6 +20,7 @@ export interface EmailIntegration {
   is_active: boolean;
   last_sync_at: string | null;
   last_synced_uid?: number | null;
+  token_expires_at?: number | null;
   created_at: string;
   updated_at: string;
 }

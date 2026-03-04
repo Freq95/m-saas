@@ -48,7 +48,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
   const [error, setError] = useState<string | null>(null);
   const [testing, setTesting] = useState<number | null>(null);
   const [fetchingEmail, setFetchingEmail] = useState<number | null>(null);
-  const [lastEmail, setLastEmail] = useState<EmailMessage | null>(null);
+  const [lastEmailByIntegration, setLastEmailByIntegration] = useState<Record<number, EmailMessage | null>>({});
   const [deleting, setDeleting] = useState<number | null>(null);
   const toast = useToast();
   
@@ -70,6 +70,24 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
       abortControllersRef.current.clear();
     };
   }, [initialIntegrations.length]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get('connected');
+    const errorCode = params.get('error');
+
+    if (connected === 'gmail') {
+      toast.success('Gmail conectat cu succes!');
+      loadIntegrations();
+      window.history.replaceState({}, '', '/settings/email');
+      return;
+    }
+
+    if (errorCode) {
+      toast.error('Conectarea Gmail a esuat. Incearca din nou.');
+      window.history.replaceState({}, '', '/settings/email');
+    }
+  }, []);
 
   async function loadIntegrations() {
     try {
@@ -271,7 +289,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
 
   async function fetchLastEmail(id: number) {
     setFetchingEmail(id);
-    setLastEmail(null);
+    setLastEmailByIntegration((prev) => ({ ...prev, [id]: null }));
     try {
       const response = await fetchWithRetry(
         `/api/settings/email-integrations/${id}/fetch-last-email`,
@@ -283,7 +301,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
       
       if (data.success) {
         if (data.email) {
-          setLastEmail(data.email);
+          setLastEmailByIntegration((prev) => ({ ...prev, [id]: data.email }));
           toast.success('Email fetched successfully');
         } else {
           toast.info(data.message || 'No emails found');
@@ -300,6 +318,9 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
   }
 
   const yahooIntegration = integrations.find(i => i.provider === 'yahoo');
+  const gmailIntegration = integrations.find(i => i.provider === 'gmail');
+  const yahooLastEmail = yahooIntegration ? lastEmailByIntegration[yahooIntegration.id] : null;
+  const gmailLastEmail = gmailIntegration ? lastEmailByIntegration[gmailIntegration.id] : null;
 
   if (loading) {
     return (
@@ -357,7 +378,8 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
           </button>
         </div>
         <p className={styles.description}>
-          Connect your email accounts to sync messages and manage conversations.
+          Conecteaza-ti contul Gmail pentru a sincroniza mesajele. Foloseste OAuth 2.0 - nu este nevoie de parole
+          de aplicatie.
         </p>
         <SettingsTabs activeTab="email" />
         
@@ -434,12 +456,15 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
                   {deleting === yahooIntegration.id ? 'Disconnecting...' : 'Disconnect'}
                 </button>
               </div>
-              {lastEmail && (
+              {yahooLastEmail && (
                 <div className={styles.emailPreview} role="article" aria-label="Last email preview">
                   <div className={styles.emailHeader}>
                     <h3>Last Email Received</h3>
                     <button 
-                      onClick={() => setLastEmail(null)} 
+                      onClick={() => {
+                        if (!yahooIntegration) return;
+                        setLastEmailByIntegration((prev) => ({ ...prev, [yahooIntegration.id]: null }));
+                      }}
                       className={styles.closeButton}
                       title="Close"
                       aria-label="Close email preview"
@@ -448,23 +473,23 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
                     </button>
                   </div>
                   <div className={styles.emailMeta}>
-                    <p><strong>From:</strong> {lastEmail.from}</p>
-                    <p><strong>To:</strong> {lastEmail.to}</p>
-                    <p><strong>Subject:</strong> {lastEmail.subject || '(No subject)'}</p>
-                    <p><strong>Date:</strong> {new Date(lastEmail.date).toLocaleString()}</p>
+                    <p><strong>From:</strong> {yahooLastEmail.from}</p>
+                    <p><strong>To:</strong> {yahooLastEmail.to}</p>
+                    <p><strong>Subject:</strong> {yahooLastEmail.subject || '(No subject)'}</p>
+                    <p><strong>Date:</strong> {new Date(yahooLastEmail.date).toLocaleString()}</p>
                   </div>
                   <div className={styles.emailContent}>
-                    {lastEmail.html ? (
+                    {yahooLastEmail.html ? (
                       <div 
                         className={styles.emailHtml}
                         dangerouslySetInnerHTML={{ 
-                          __html: sanitizeHtml(lastEmail.html)
+                          __html: sanitizeHtml(yahooLastEmail.html)
                         }}
                         aria-label="Email content"
                       />
                     ) : (
                       <div className={styles.emailText} aria-label="Email text content">
-                        <pre>{lastEmail.text || lastEmail.cleanText || '(No content)'}</pre>
+                        <pre>{yahooLastEmail.text || yahooLastEmail.cleanText || '(No content)'}</pre>
                       </div>
                     )}
                   </div>
@@ -578,20 +603,115 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
           )}
         </div>
 
-        {/* Gmail - Placeholder */}
+        {/* Gmail */}
         <div className={styles.integrationCard} role="region" aria-label="Gmail integration">
           <div className={styles.integrationHeader}>
             <div>
               <h2>Gmail</h2>
               <p className={styles.providerDescription}>
-                Connect your Gmail account using OAuth 2.0 (coming soon)
+                Conecteaza-ti contul Gmail cu OAuth 2.0 pentru sincronizare in siguranta.
               </p>
             </div>
-            <span className={styles.statusDisconnected} aria-label="Gmail not connected">Not Connected</span>
+            {gmailIntegration ? (
+              <span
+                className={gmailIntegration.is_active ? styles.statusConnected : styles.statusDisconnected}
+                role="status"
+                aria-live="polite"
+                aria-label={gmailIntegration.is_active ? 'Gmail connected' : 'Gmail disconnected'}
+              >
+                {gmailIntegration.is_active ? 'Connected' : 'Disconnected'}
+              </span>
+            ) : (
+              <span className={styles.statusDisconnected} aria-label="Gmail not connected">
+                Not Connected
+              </span>
+            )}
           </div>
-          <button disabled className={styles.connectButton} aria-label="Gmail connection coming soon">
-            Connect with Google (Coming Soon)
-          </button>
+          {gmailIntegration ? (
+            <div className={styles.integrationDetails}>
+              <p><strong>Email:</strong> {gmailIntegration.email}</p>
+              {gmailIntegration.last_sync_at && (
+                <p><strong>Last Sync:</strong> {new Date(gmailIntegration.last_sync_at).toLocaleString()}</p>
+              )}
+              <div className={styles.actions} role="group" aria-label="Gmail actions">
+                <button
+                  onClick={() => testConnection(gmailIntegration.id)}
+                  className={styles.testButton}
+                  disabled={testing === gmailIntegration.id || fetchingEmail === gmailIntegration.id || deleting === gmailIntegration.id}
+                  aria-label="Test Gmail connection"
+                >
+                  {testing === gmailIntegration.id ? 'Testing...' : 'Test Connection'}
+                </button>
+                <button
+                  onClick={() => fetchLastEmail(gmailIntegration.id)}
+                  className={styles.fetchButton}
+                  disabled={testing === gmailIntegration.id || fetchingEmail === gmailIntegration.id || deleting === gmailIntegration.id}
+                  aria-label="Fetch last email from Gmail"
+                  aria-busy={fetchingEmail === gmailIntegration.id}
+                >
+                  {fetchingEmail === gmailIntegration.id ? 'Fetching...' : 'Fetch Last Email'}
+                </button>
+                <button
+                  onClick={() => deleteIntegration(gmailIntegration.id)}
+                  className={styles.deleteButton}
+                  disabled={testing === gmailIntegration.id || fetchingEmail === gmailIntegration.id || deleting === gmailIntegration.id}
+                  aria-label="Disconnect Gmail integration"
+                >
+                  {deleting === gmailIntegration.id ? 'Disconnecting...' : 'Disconnect'}
+                </button>
+              </div>
+              {gmailLastEmail && (
+                <div className={styles.emailPreview} role="article" aria-label="Last email preview">
+                  <div className={styles.emailHeader}>
+                    <h3>Last Email Received</h3>
+                    <button
+                      onClick={() => {
+                        if (!gmailIntegration) return;
+                        setLastEmailByIntegration((prev) => ({ ...prev, [gmailIntegration.id]: null }));
+                      }} 
+                      className={styles.closeButton}
+                      title="Close"
+                      aria-label="Close email preview"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className={styles.emailMeta}>
+                    <p><strong>From:</strong> {gmailLastEmail.from}</p>
+                    <p><strong>To:</strong> {gmailLastEmail.to}</p>
+                    <p><strong>Subject:</strong> {gmailLastEmail.subject || '(No subject)'}</p>
+                    <p><strong>Date:</strong> {new Date(gmailLastEmail.date).toLocaleString()}</p>
+                  </div>
+                  <div className={styles.emailContent}>
+                    {gmailLastEmail.html ? (
+                      <div
+                        className={styles.emailHtml}
+                        dangerouslySetInnerHTML={{
+                          __html: sanitizeHtml(gmailLastEmail.html)
+                        }}
+                        aria-label="Email content"
+                      />
+                    ) : (
+                      <div className={styles.emailText} aria-label="Email text content">
+                        <pre>{gmailLastEmail.text || gmailLastEmail.cleanText || '(No content)'}</pre>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <button
+              type="button"
+              className={styles.connectButton}
+              onClick={() => {
+                window.location.href = '/api/auth/google/email';
+              }}
+              aria-label="Conecteaza cu Google"
+            >
+              Conecteaza cu Google
+            </button>
+          )}
         </div>
 
         {/* Outlook - Placeholder */}

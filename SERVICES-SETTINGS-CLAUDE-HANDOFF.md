@@ -1,8 +1,18 @@
 # Services Settings + Settings Tabs UX Handoff (Claude Review)
 
 Date: 2026-03-04  
-Scope in this batch: **Services Settings tab only** + **Settings tab UX consistency**  
-Out of scope: Gmail backend/UI implementation
+Scope in this batch: **Services Settings tab only** + **Settings tab UX consistency**
+
+Update (same day): Gmail OAuth implementation is now in progress/implemented in separate files:
+- `lib/gmail.ts`
+- `lib/gmail-sync-runner.ts`
+- `app/api/auth/google/email/route.ts`
+- `app/api/auth/google/email/callback/route.ts`
+- `app/api/jobs/email-sync/gmail/route.ts`
+- `app/settings/email/EmailSettingsPageClient.tsx`
+- `app/api/settings/email-integrations/[id]/test/route.ts`
+- `app/api/settings/email-integrations/[id]/fetch-last-email/route.ts`
+- `app/api/cron/email-sync/route.ts`
 
 ## What was implemented
 
@@ -65,5 +75,31 @@ Out of scope: Gmail backend/UI implementation
 5. Confirm CSS variable usage remains aligned with project theming constraints.
 
 ## Known intentional gaps
-- No Gmail implementation yet (still pending per plan order after Services).
 - No `/settings` hub route yet; top nav still points to `/settings/email` entry point.
+
+---
+
+## 2026-03-04 Update: Inbox Provider Labels (Yahoo/Gmail)
+
+Scope: Inbox UI consistency for provider identity badges.
+
+### Implemented
+- Backend enrichment in `lib/server/inbox.ts`:
+  - Added `email_provider` on conversation payload (`'yahoo' | 'gmail' | null`).
+  - Inference rules from inbound messages:
+    - Yahoo if `source_uid != null`
+    - Gmail if `source_uid == null` and `external_id != null`
+- Frontend rendering in `app/inbox/InboxPageClient.tsx`:
+  - Replaced generic `channel` label for email conversations with provider-aware label (`Yahoo`, `Gmail`, fallback `Email`).
+  - Applied same provider label in thread header meta for consistency.
+- Badge styling in `app/inbox/page.module.css`:
+  - Added `.channelYahoo` (red badge)
+  - Added `.channelGmail` (green badge)
+
+### Verification
+- `npx tsc --noEmit` passed after this patch.
+
+### Claude review focus
+1. Validate provider inference logic on mixed history threads (inbound + outbound).
+2. Confirm no regressions for non-email channels.
+3. Confirm badge contrast/accessibility in dark theme.

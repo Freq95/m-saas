@@ -28,6 +28,16 @@
 
 ## Claude Review Status
 
+### Inbox Provider Label Consistency â€” IMPLEMENTED (2026-03-04)
+- Email conversations now render provider-aware labels in Inbox:
+  - `Yahoo` with red badge
+  - `Gmail` with green badge
+  - fallback `Email` when provider cannot be inferred
+- Backend now enriches conversation payload with `email_provider` in `lib/server/inbox.ts`.
+- Label consistency applied in both conversation list and thread header meta (`app/inbox/InboxPageClient.tsx`).
+- Validation:
+  - `npx tsc --noEmit` passed
+
 ### Soft Delete + Error Pages Hardening — IMPLEMENTED (2026-03-04)
 - Appointment deletion is now soft delete:
   - `DELETE /api/appointments/[id]` sets `deleted_at`, `deleted_by`, `updated_at` and returns HTTP 204.
@@ -145,6 +155,7 @@ All 12 fixes from REVIEW-FIXES-REQUIRED.md verified:
 
 ### Inbox / Yahoo Mail Integration
 - Yahoo IMAP/SMTP integration (fetch + send)
+- Provider-aware inbox labels: `Yahoo` (red) and `Gmail` (green) badges for email conversations
 - HTML email rendering with DOMPurify + iframe isolation
 - Conversation threading, tags, search/filter
 - Attachment handling with R2 cloud storage

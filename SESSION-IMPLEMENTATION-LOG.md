@@ -1052,3 +1052,42 @@ Scope: Auth + super-admin + invite flow + audit + tenant/user lifecycle controls
   - `npx tsc --noEmit` passed after implementation and follow-up UX patches
 - Review handoff doc:
   - `SERVICES-SETTINGS-CLAUDE-HANDOFF.md`
+
+## 41) Gmail OAuth Integration + Gmail Fetch/Preview Fixes (2026-03-04)
+- Implemented Gmail OAuth flow (Google OAuth2, read-only scope) without touching existing calendar OAuth module:
+  - `lib/gmail.ts`
+  - `app/api/auth/google/email/route.ts`
+  - `app/api/auth/google/email/callback/route.ts`
+- Added Gmail sync pipeline compatible with current queue/job architecture:
+  - `lib/gmail-sync-runner.ts`
+  - `app/api/jobs/email-sync/gmail/route.ts`
+  - `lib/email-sync-queue.ts` (`enqueueGmailSyncJob`)
+  - `app/api/cron/email-sync/route.ts` (fan-out for `yahoo` + `gmail`)
+- Extended integration test route for Gmail provider:
+  - `app/api/settings/email-integrations/[id]/test/route.ts`
+  - fix included: test now uses selected integration row by ID (decrypt token fields directly), preventing false `Gmail not configured` for valid rows.
+- Replaced Gmail "Coming Soon" UI with OAuth connect card:
+  - `app/settings/email/EmailSettingsPageClient.tsx`
+  - includes redirect-param handling (`?connected=gmail` / `?error=*`) and connected-state actions (Test, Disconnect, Fetch Last Email).
+- Added Gmail support to fetch-last-email endpoint:
+  - `app/api/settings/email-integrations/[id]/fetch-last-email/route.ts`
+  - uses access/refresh tokens with auto-refresh before Gmail API call.
+- Fixed provider preview state leakage in settings UI:
+  - `app/settings/email/EmailSettingsPageClient.tsx`
+  - changed from shared `lastEmail` state to per-integration state map so Yahoo/Gmail preview panels no longer overwrite each other.
+- Minor cleanup:
+  - `app/api/settings/email-integrations/[id]/route.ts` attachment cleanup now uses `integration.provider` instead of hardcoded `'yahoo'`.
+  - `.env.example` updated with Gmail OAuth redirect env docs (`GMAIL_REDIRECT_URI`).
+
+### Validation
+- `npx tsc --noEmit` passed.
+- `npm run build` passed.
+
+## 2026-03-04 Inbox Provider Label Consistency (Yahoo/Gmail)
+- Added `email_provider` enrichment in `lib/server/inbox.ts` based on inbound message markers (`source_uid`/`external_id`).
+- Updated `app/inbox/InboxPageClient.tsx` to render provider-aware channel labels:
+  - Yahoo -> `Yahoo`
+  - Gmail -> `Gmail`
+  - fallback -> `Email`
+- Updated `app/inbox/page.module.css` with red Yahoo badge and green Gmail badge variants.
+- Validation: `npx tsc --noEmit` passed.

@@ -2,7 +2,8 @@ import { NextRequest } from 'next/server';
 import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { hasValidCronSecret } from '@/lib/cron-auth';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
-import { enqueueYahooSyncJob } from '@/lib/email-sync-queue';
+import { enqueueGmailSyncJob, enqueueYahooSyncJob } from '@/lib/email-sync-queue';
+import { syncGmailInboxForIntegration } from '@/lib/gmail-sync-runner';
 import { syncYahooInboxForIntegration } from '@/lib/yahoo-sync-runner';
 import { ObjectId } from 'mongodb';
 import { logger } from '@/lib/logger';
@@ -28,7 +29,7 @@ function isQuietHours(now: Date): boolean {
 }
 
 // POST /api/cron/email-sync
-// Fan-out endpoint: enqueue one Yahoo sync worker per active integration.
+// Fan-out endpoint: enqueue one email sync worker per active integration.
 export async function POST(request: NextRequest) {
   try {
     if (!hasValidCronSecret(request)) {
@@ -52,27 +53,29 @@ export async function POST(request: NextRequest) {
       : DEFAULT_BATCH_SIZE;
 
     const db = await getMongoDbOrThrow();
-    const activeYahooIntegrations = await db
+    const activeIntegrations = await db
       .collection('email_integrations')
-      .find({ provider: 'yahoo', is_active: true })
+      .find({ provider: { $in: ['yahoo', 'gmail'] }, is_active: true })
       .sort({ last_sync_at: 1 })
       .limit(batchSize)
-      .project({ id: 1, tenant_id: 1 })
+      .project({ id: 1, tenant_id: 1, provider: 1 })
       .toArray();
 
-    const integrationTargets = activeYahooIntegrations
+    const integrationTargets = activeIntegrations
       .map((doc: any) => ({
         integrationId: Number(doc.id),
         tenantId: doc.tenant_id ? String(doc.tenant_id) : null,
+        provider: doc.provider,
       }))
       .filter(
-        (target: { integrationId: number; tenantId: string | null }) =>
+        (target: { integrationId: number; tenantId: string | null; provider: string }) =>
           Number.isInteger(target.integrationId) &&
           target.integrationId > 0 &&
+          (target.provider === 'yahoo' || target.provider === 'gmail') &&
           target.tenantId !== null
       );
 
-    const skippedMissingTenant = activeYahooIntegrations.length - integrationTargets.length;
+    const skippedMissingTenant = activeIntegrations.length - integrationTargets.length;
     if (skippedMissingTenant > 0) {
       logger.warn('Cron: skipped integrations without tenant_id', { skippedMissingTenant });
     }
@@ -92,27 +95,34 @@ export async function POST(request: NextRequest) {
     let failed = 0;
 
     for (const target of integrationTargets) {
-      const { integrationId, tenantId } = target;
+      const { integrationId, tenantId, provider } = target;
       try {
-        const queuedResult = await enqueueYahooSyncJob(integrationId, tenantId || undefined);
+        const queuedResult =
+          provider === 'gmail'
+            ? await enqueueGmailSyncJob(integrationId, tenantId || undefined)
+            : await enqueueYahooSyncJob(integrationId, tenantId || undefined);
         if (queuedResult.queued) {
           queued++;
         } else {
-          await syncYahooInboxForIntegration(
-            integrationId,
-            {
-              enableAiTagging: false,
-              markAsRead: false,
-            },
-            tenantId ? new ObjectId(tenantId) : undefined
-          );
+          if (provider === 'gmail') {
+            await syncGmailInboxForIntegration(integrationId, {}, tenantId ? new ObjectId(tenantId) : undefined);
+          } else {
+            await syncYahooInboxForIntegration(
+              integrationId,
+              {
+                enableAiTagging: false,
+                markAsRead: false,
+              },
+              tenantId ? new ObjectId(tenantId) : undefined
+            );
+          }
           processedInline++;
         }
       } catch (error) {
         logger.error(
           'Cron: email-sync job failed',
           error instanceof Error ? error : new Error(String(error)),
-          { integrationId, tenantId }
+          { integrationId, tenantId, provider }
         );
         failed++;
       }
