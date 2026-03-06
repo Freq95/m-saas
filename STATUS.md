@@ -27,6 +27,35 @@
 ---
 
 ## Claude Review Status
+### Inbox Email Timeline + Attachment UX Hardening - IMPLEMENTED (2026-03-06)
+- Inbox now uses provider-received timestamps (not fetch time) for newly synced emails:
+  - Yahoo: IMAP message ttrs.date (with safe fallback)
+  - Gmail: internalDate (with header date fallback)
+  - files:
+    - lib/yahoo-mail.ts
+    - lib/yahoo-sync-runner.ts
+    - lib/gmail.ts
+    - lib/gmail-sync-runner.ts
+- Inbox sync no longer merges all emails from the same sender into one conversation:
+  - each inbound email creates its own conversation entry
+  - duplicate protection still enforced by provider message identifiers (external_id / source_uid)
+- Added Inbox Ultima sincronizare label in left panel:
+  - reads latest last_sync_at from /api/settings/email-integrations
+  - refreshes after manual sync
+  - file: pp/inbox/InboxPageClient.tsx
+- Added attachment UX in conversation list:
+  - paperclip badge on conversations that contain attachments
+  - filter toggle: Doar cu atasamente / Arata toate emailurile
+  - backend now enriches conversations with has_attachments
+  - files:
+    - lib/server/inbox.ts
+    - pp/inbox/InboxPageClient.tsx
+    - pp/inbox/page.module.css
+- Validation:
+  - 
+pm run typecheck passed
+  - 
+pm run test:run passed
 
 ### Automated Test Baseline â€” IMPLEMENTED (2026-03-06)
 - Added Vitest scripts:
@@ -377,3 +406,4 @@ These items require manual action in the Vercel dashboard at launch time. They c
   - `/api/appointments/[id]`, `/api/invite/[token]`, `/api/reminders/[id]`, `/api/services/[id]`, `/api/tasks/[id]`, `/api/team/[memberId]`
 - Validation:
   - `npx tsc --noEmit` passes with zero errors.
+

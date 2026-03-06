@@ -38,6 +38,16 @@ type IntegrationDoc = {
   last_synced_uid?: number | null;
 };
 
+function resolveEmailReceivedAtIso(email: { receivedAt?: Date; date?: Date }): string {
+  if (email.receivedAt instanceof Date && !Number.isNaN(email.receivedAt.getTime())) {
+    return email.receivedAt.toISOString();
+  }
+  if (email.date instanceof Date && !Number.isNaN(email.date.getTime())) {
+    return email.date.toISOString();
+  }
+  return new Date().toISOString();
+}
+
 function sanitizeFilename(filename: string): string {
   return filename.replace(/[^a-zA-Z0-9._-]/g, '_');
 }
@@ -206,42 +216,9 @@ async function runYahooSyncCore(
         });
       }
 
-      const existingConv = await db
-        .collection('conversations')
-        .find({ user_id: userId, tenant_id: tenantId, channel: 'email', contact_email: emailAddress })
-        .sort({ created_at: -1 })
-        .limit(1)
-        .next();
-
-      let conversationId: number;
-      let existingClientId: number | null = null;
-
-      if (existingConv) {
-        conversationId = existingConv.id;
-        existingClientId = existingConv.client_id || null;
-      } else {
-        const now = new Date().toISOString();
-        conversationId = await getNextNumericId('conversations');
-        await db.collection('conversations').insertOne({
-          _id: conversationId,
-          id: conversationId,
-          user_id: userId,
-          tenant_id: tenantId,
-          channel: 'email',
-          channel_id: email.messageId || email.uid?.toString() || '',
-          contact_name: name,
-          contact_email: emailAddress,
-          subject: email.subject || null,
-          client_id: client?.id || null,
-          created_at: now,
-          updated_at: now,
-        });
-      }
-
       let existingMsg: { id: number } | null = null;
       if (email.messageId || email.uid) {
         existingMsg = await db.collection('messages').findOne({
-          conversation_id: conversationId,
           tenant_id: tenantId,
           $or: [
             email.messageId ? { external_id: email.messageId } : undefined,
@@ -252,8 +229,22 @@ async function runYahooSyncCore(
 
       if (!existingMsg) {
         const { serializeMessage } = await import('@/lib/email-types');
-        const sentAt = email.date || new Date();
-        const sentAtIso = sentAt.toISOString();
+        const sentAtIso = resolveEmailReceivedAtIso(email);
+        const conversationId = await getNextNumericId('conversations');
+        await db.collection('conversations').insertOne({
+          _id: conversationId,
+          id: conversationId,
+          user_id: userId,
+          tenant_id: tenantId,
+          channel: 'email',
+          channel_id: email.messageId || email.uid?.toString() || '',
+          contact_name: name,
+          contact_email: normalizedEmailAddress,
+          subject: email.subject || null,
+          client_id: client?.id || null,
+          created_at: sentAtIso,
+          updated_at: sentAtIso,
+        });
         const messageId = await getNextNumericId('messages');
 
         const persistedAttachments = [];
@@ -347,12 +338,7 @@ async function runYahooSyncCore(
           source_uid: email.uid || null,
         });
 
-        await db.collection('conversations').updateOne(
-          { id: conversationId, tenant_id: tenantId },
-          { $set: { updated_at: sentAtIso } }
-        );
-
-        if (client && !existingClientId) {
+        if (client) {
           try {
             await linkConversationToClient(conversationId, client.id, tenantId);
           } catch (linkError) {

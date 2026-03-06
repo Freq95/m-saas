@@ -153,6 +153,27 @@ export async function getConversationsData(query: ConversationsQuery) {
     conversationTagsQuery.toArray().then((docs: any[]) => docs.map(stripMongoId)),
   ]);
 
+  const attachmentRows = await db.collection('message_attachments').aggregate([
+    {
+      $match: tenantId
+        ? { tenant_id: tenantId, conversation_id: { $in: conversationIds } }
+        : { conversation_id: { $in: conversationIds } },
+    },
+    {
+      $group: {
+        _id: '$conversation_id',
+        count: { $sum: 1 },
+      },
+    },
+  ]).toArray();
+
+  const attachmentsByConversation = new Map<number, number>();
+  for (const row of attachmentRows as any[]) {
+    if (typeof row?._id === 'number') {
+      attachmentsByConversation.set(row._id, typeof row.count === 'number' ? row.count : 0);
+    }
+  }
+
   const messageStatsByConversation = new Map<number, any>();
   for (const stat of messageStats as any[]) {
     messageStatsByConversation.set(stat._id, stat);
@@ -209,6 +230,7 @@ export async function getConversationsData(query: ConversationsQuery) {
       ...conv,
       message_count: typeof stats?.message_count === 'number' ? stats.message_count : 0,
       has_unread: (typeof stats?.unread_count === 'number' ? stats.unread_count : 0) > 0,
+      has_attachments: (attachmentsByConversation.get(conv.id) || 0) > 0,
       last_message_at: stats?.last_message_at || conv.updated_at || conv.created_at,
       last_message_preview: '',
       email_provider: emailProvider,
@@ -274,11 +296,19 @@ export async function getConversationsData(query: ConversationsQuery) {
         .trim()
         .slice(0, 160);
       previewByConversation.set(convId, preview);
+
+      if (Array.isArray(stored.attachments) && stored.attachments.length > 0) {
+        const existing = attachmentsByConversation.get(convId) || 0;
+        attachmentsByConversation.set(convId, Math.max(existing, stored.attachments.length));
+      }
     }
 
     for (const conv of enriched as any[]) {
       if (previewByConversation.has(conv.id)) {
         conv.last_message_preview = previewByConversation.get(conv.id) || '';
+      }
+      if ((attachmentsByConversation.get(conv.id) || 0) > 0) {
+        conv.has_attachments = true;
       }
     }
   }

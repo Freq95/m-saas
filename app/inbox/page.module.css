@@ -172,6 +172,37 @@
   font-size: 0.75rem;
 }
 
+.filtersRow {
+  margin-top: 0.45rem;
+}
+
+.filterButton {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  border-radius: var(--radius-sm);
+  padding: 0.38rem 0.55rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.filterButton:hover {
+  border-color: var(--color-border-strong);
+}
+
+.filterButtonActive {
+  border-color: rgba(77, 163, 255, 0.55);
+  background: rgba(77, 163, 255, 0.16);
+}
+
+.lastSyncLabel {
+  margin-top: 0.35rem;
+  color: var(--color-text-soft);
+  font-size: 0.74rem;
+}
+
 .emptyConversations {
   padding: 2rem;
   text-align: center;
@@ -224,6 +255,15 @@
   background: #fb923c;
   box-shadow: 0 0 0 2px rgba(251, 146, 60, 0.24);
   flex-shrink: 0;
+}
+
+.attachmentBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #93c5fd;
+  opacity: 0.95;
+  margin-right: 0.25rem;
 }
 
 .conversationMeta {

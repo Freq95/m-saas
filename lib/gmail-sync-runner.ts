@@ -37,6 +37,27 @@ function extractAddress(raw: string): { email: string; name: string } {
   return { email, name };
 }
 
+function resolveEmailReceivedAtIso(message: {
+  receivedAt?: string;
+  date?: string;
+}): string {
+  if (typeof message.receivedAt === 'string') {
+    const receivedDate = new Date(message.receivedAt);
+    if (!Number.isNaN(receivedDate.getTime())) {
+      return receivedDate.toISOString();
+    }
+  }
+
+  if (typeof message.date === 'string' && message.date.trim()) {
+    const headerDate = new Date(message.date);
+    if (!Number.isNaN(headerDate.getTime())) {
+      return headerDate.toISOString();
+    }
+  }
+
+  return new Date().toISOString();
+}
+
 export async function syncGmailInboxForUser(
   userId: number,
   tenantId: ObjectId
@@ -95,37 +116,7 @@ export async function syncGmailInboxForIntegration(
         skipped++;
         continue;
       }
-
-      let conversation = await db.collection('conversations').findOne({
-        user_id: integration.user_id,
-        tenant_id: integration.tenant_id,
-        channel: 'email',
-        contact_email: from.email,
-      });
-
-      if (!conversation) {
-        const conversationId = await getNextNumericId('conversations');
-        const now = new Date().toISOString();
-        const conversationDoc = {
-          _id: conversationId,
-          id: conversationId,
-          user_id: integration.user_id,
-          tenant_id: integration.tenant_id,
-          channel: 'email',
-          channel_id: message.messageId,
-          contact_name: from.name,
-          contact_email: from.email,
-          subject: message.subject || null,
-          client_id: null,
-          created_at: now,
-          updated_at: now,
-        };
-        await db.collection('conversations').insertOne(conversationDoc);
-        conversation = conversationDoc;
-      }
-
       const existingMessage = await db.collection('messages').findOne({
-        conversation_id: conversation.id,
         tenant_id: integration.tenant_id,
         external_id: message.messageId,
       });
@@ -135,14 +126,32 @@ export async function syncGmailInboxForIntegration(
         continue;
       }
 
+      const nowIso = resolveEmailReceivedAtIso(message);
+      const normalizedEmail = from.email.trim().toLowerCase();
+      const conversationId = await getNextNumericId('conversations');
+      const conversationDoc = {
+        _id: conversationId,
+        id: conversationId,
+        user_id: integration.user_id,
+        tenant_id: integration.tenant_id,
+        channel: 'email',
+        channel_id: message.messageId,
+        contact_name: from.name,
+        contact_email: normalizedEmail,
+        subject: message.subject || null,
+        client_id: null,
+        created_at: nowIso,
+        updated_at: nowIso,
+      };
+      await db.collection('conversations').insertOne(conversationDoc);
+
       const { serializeMessage } = await import('@/lib/email-types');
       const messageId = await getNextNumericId('messages');
-      const nowIso = new Date().toISOString();
       await db.collection('messages').insertOne({
         _id: messageId,
         id: messageId,
         tenant_id: integration.tenant_id,
-        conversation_id: conversation.id,
+        conversation_id: conversationId,
         direction: 'inbound',
         content: serializeMessage({
           text: message.text || '',
@@ -155,11 +164,6 @@ export async function syncGmailInboxForIntegration(
         external_id: message.messageId,
         source_uid: null,
       });
-
-      await db.collection('conversations').updateOne(
-        { id: conversation.id, tenant_id: integration.tenant_id },
-        { $set: { updated_at: nowIso } }
-      );
 
       synced++;
     } catch (error) {

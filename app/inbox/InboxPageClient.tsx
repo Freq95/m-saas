@@ -166,6 +166,7 @@ interface Conversation {
   id: number;
   channel: string;
   email_provider?: 'yahoo' | 'gmail' | null;
+  has_attachments?: boolean;
   contact_name: string;
   contact_email: string;
   contact_phone?: string;
@@ -304,6 +305,8 @@ export default function InboxPageClient({
   const [oldestMessageId, setOldestMessageId] = useState<number | null>(initialOldestMessageId);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [attachmentsOnly, setAttachmentsOnly] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
   const [clientOptions, setClientOptions] = useState<ClientOption[]>([]);
@@ -438,15 +441,16 @@ export default function InboxPageClient({
     fetchMessages(selectedConversation.id, true);
   }, [selectedConversation, initialHasMoreMessages, initialOldestMessageId]);
 
-  // Filter conversations based on search
+  // Filter conversations based on search + attachments toggle
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setConversations(allConversations);
-      return;
-    }
-
     const query = searchQuery.toLowerCase().trim();
     const filtered = allConversations.filter((conv) => {
+      if (attachmentsOnly && !conv.has_attachments) {
+        return false;
+      }
+      if (!query) {
+        return true;
+      }
       return (
         conv.contact_name?.toLowerCase().includes(query) ||
         conv.contact_email?.toLowerCase().includes(query) ||
@@ -456,7 +460,7 @@ export default function InboxPageClient({
     });
 
     setConversations(filtered);
-  }, [searchQuery, allConversations]);
+  }, [searchQuery, allConversations, attachmentsOnly]);
 
   const fetchConversations = async (serverSearch?: string) => {
     try {
@@ -517,6 +521,37 @@ export default function InboxPageClient({
       setLoading(false);
     }
   };
+
+  const fetchLatestSyncTimestamp = useCallback(async () => {
+    try {
+      const response = await fetch('/api/settings/email-integrations', { cache: 'no-store' });
+      if (!response.ok) {
+        return;
+      }
+      const payload = await response.json();
+      const integrations = Array.isArray(payload?.integrations) ? payload.integrations : [];
+      const syncDates = integrations
+        .map((integration: any) =>
+          typeof integration?.last_sync_at === 'string' ? new Date(integration.last_sync_at) : null
+        )
+        .filter((date: Date | null): date is Date => date instanceof Date && !Number.isNaN(date.getTime()));
+
+      if (syncDates.length === 0) {
+        setLastSyncAt(null);
+        return;
+      }
+
+      syncDates.sort((a: Date, b: Date) => b.getTime() - a.getTime());
+      setLastSyncAt(syncDates[0].toISOString());
+    } catch {
+      // Ignore sync meta fetch errors to avoid noisy UI.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (sessionStatus !== 'authenticated') return;
+    void fetchLatestSyncTimestamp();
+  }, [fetchLatestSyncTimestamp, sessionStatus]);
 
   const fetchMessages = async (conversationId: number, isInitial = false, beforeId?: number) => {
     try {
@@ -633,6 +668,7 @@ export default function InboxPageClient({
       }
 
       await fetchConversations(searchQuery);
+      await fetchLatestSyncTimestamp();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to sync inbox';
       setSyncError(message);
@@ -1365,6 +1401,20 @@ export default function InboxPageClient({
             {syncError && (
               <div className={styles.syncError}>{syncError}</div>
             )}
+            <div className={styles.filtersRow}>
+              <button
+                type="button"
+                className={`${styles.filterButton}${attachmentsOnly ? ` ${styles.filterButtonActive}` : ''}`}
+                onClick={() => setAttachmentsOnly((prev) => !prev)}
+              >
+                {attachmentsOnly ? 'Arata toate emailurile' : 'Doar cu atasamente'}
+              </button>
+            </div>
+            {lastSyncAt && (
+              <div className={styles.lastSyncLabel}>
+                Ultima sincronizare: {format(new Date(lastSyncAt), 'dd.MM.yyyy HH:mm')}
+              </div>
+            )}
           </div>
           <div className={styles.conversationListContent}>
             {conversations.length === 0 ? (
@@ -1382,6 +1432,16 @@ export default function InboxPageClient({
               >
                 <div className={styles.conversationHeader}>
                   <div className={styles.contactName}>{conv.contact_name || 'Fără nume'}</div>
+                  {conv.has_attachments && (
+                    <span className={styles.attachmentBadge} title="Contine atasamente" aria-label="Contine atasamente">
+                      <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                        <path
+                          fill="currentColor"
+                          d="M16.5 6.5a4 4 0 0 0-5.66 0L5.31 12a6 6 0 1 0 8.49 8.49l5.18-5.19a3.5 3.5 0 1 0-4.95-4.95L8.5 15.88a1.5 1.5 0 1 0 2.12 2.12l4.6-4.6 1.06 1.06-4.6 4.6a3 3 0 1 1-4.24-4.24l5.53-5.53a5 5 0 0 1 7.07 7.07l-5.18 5.19A7.5 7.5 0 1 1 4.25 10.94l5.53-5.53a5.5 5.5 0 0 1 7.78 7.78l-5.89 5.9-1.06-1.07 5.89-5.89a4 4 0 0 0 0-5.66Z"
+                        />
+                      </svg>
+                    </span>
+                  )}
                   {conv.has_unread && (
                     <div className={styles.unreadBadge} aria-label="Unread conversation" />
                   )}
@@ -1679,4 +1739,5 @@ export default function InboxPageClient({
     </div>
   );
 }
+
 

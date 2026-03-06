@@ -1130,3 +1130,36 @@ Scope: Auth + super-admin + invite flow + audit + tenant/user lifecycle controls
 ### Validation
 - `npm run typecheck` passed.
 - `npm run test:run` passed (`4` test files, `7` tests).
+
+## 43) Inbox Timeline + Conversation Split + Attachment Filter (2026-03-06)
+- Implemented true received-time handling in email sync (instead of fetch-time timestamps):
+  - Yahoo sync now uses IMAP receive timestamp (`attrs.date`) with safe fallback to parsed date.
+  - Gmail sync now uses Gmail `internalDate` with fallback to Date header.
+  - files:
+    - `lib/yahoo-mail.ts`
+    - `lib/yahoo-sync-runner.ts`
+    - `lib/gmail.ts`
+    - `lib/gmail-sync-runner.ts`
+- Implemented conversation split behavior for synced emails:
+  - no longer reuses one conversation per sender email;
+  - each new inbound email creates its own conversation row.
+  - duplicate protection remains by provider IDs (`external_id`, `source_uid`) at message level.
+- Added inbox sync timestamp label:
+  - `Ultima sincronizare` shown in inbox left panel.
+  - pulls latest `last_sync_at` from `/api/settings/email-integrations`.
+  - refreshes after manual sync.
+  - file: `app/inbox/InboxPageClient.tsx`
+- Added attachment indicator + filter in inbox conversation list:
+  - backend enriches conversations with `has_attachments`.
+  - list row shows paperclip badge when attachments exist.
+  - filter toggle:
+    - `Doar cu atasamente`
+    - `Arata toate emailurile`
+  - files:
+    - `lib/server/inbox.ts`
+    - `app/inbox/InboxPageClient.tsx`
+    - `app/inbox/page.module.css`
+
+### Validation
+- `npm run typecheck` passed.
+- `npm run test:run` passed.

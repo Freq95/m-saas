@@ -39,6 +39,7 @@ interface EmailMessage {
   text: string;
   html?: string;
   date: Date;
+  receivedAt?: Date;
   messageId?: string;
   attachments?: EmailAttachment[];
   images?: EmailImage[];
@@ -203,12 +204,16 @@ export async function fetchYahooEmails(
           fetch.on('message', (msg, seqno) => {
             let emailData: Partial<EmailMessage> = {};
             let uid: number | undefined;
+            let receivedAt: Date | undefined;
             let bodyBuffer = '';
             let parsingComplete = false;
 
             msg.once('attributes', (attrs) => {
               uid = attrs.uid;
               emailData.uid = attrs.uid;
+              if (attrs?.date instanceof Date && !Number.isNaN(attrs.date.getTime())) {
+                receivedAt = attrs.date;
+              }
             });
 
             msg.on('body', (stream, info) => {
@@ -285,6 +290,7 @@ export async function fetchYahooEmails(
                       cleanText: cleanTextContent,
                       html: processedHtml || undefined,
                       date: parsed.date || new Date(),
+                      receivedAt,
                       messageId: parsed.messageId,
                       images: images.length > 0 ? images : undefined,
                       attachments: attachments.length > 0 ? attachments : undefined,

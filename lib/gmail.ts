@@ -8,6 +8,7 @@ export interface ParsedGmailMessage {
   to: string;
   subject: string;
   date: string;
+  receivedAt?: string;
   text?: string;
   html?: string;
 }
@@ -66,12 +67,18 @@ export function parseGmailMessage(msg: gmail_v1.Schema$Message): ParsedGmailMess
 
   const body = msg.payload ? extractBody(msg.payload) : {};
 
+  const receivedAt =
+    typeof msg.internalDate === 'string' && /^\d+$/.test(msg.internalDate)
+      ? new Date(Number(msg.internalDate)).toISOString()
+      : undefined;
+
   return {
     messageId: msg.id || '',
     from: getHeader('From'),
     to: getHeader('To'),
     subject: getHeader('Subject'),
     date: getHeader('Date'),
+    receivedAt,
     text: body.text,
     html: body.html,
   };
