@@ -11,6 +11,8 @@ export interface Toast {
   message: string;
   type: ToastType;
   duration?: number;
+  actionLabel?: string;
+  onAction?: () => void | Promise<void>;
 }
 
 interface ToastProps {
@@ -35,7 +37,20 @@ export function ToastComponent({ toast, onClose }: ToastProps) {
       role="alert"
       aria-live="polite"
     >
-      <div className={styles.message}>{toast.message}</div>
+      <div className={styles.messageGroup}>
+        <div className={styles.message}>{toast.message}</div>
+        {toast.actionLabel && toast.onAction && (
+          <button
+            className={styles.actionButton}
+            onClick={() => {
+              void toast.onAction?.();
+              onClose(toast.id);
+            }}
+          >
+            {toast.actionLabel}
+          </button>
+        )}
+      </div>
       <button
         className={styles.closeButton}
         onClick={() => onClose(toast.id)}

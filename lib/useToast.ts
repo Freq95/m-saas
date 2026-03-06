@@ -2,9 +2,14 @@
 
 import { useState, useCallback } from 'react';
 import { Toast } from '@/components/Toast';
-import { ToastContainer } from '@/components/Toast';
 
 let toastIdCounter = 0;
+
+type ToastOptions = {
+  duration?: number;
+  actionLabel?: string;
+  onAction?: () => void | Promise<void>;
+};
 
 export function useToast() {
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -12,10 +17,18 @@ export function useToast() {
   const showToast = useCallback((
     message: string,
     type: Toast['type'] = 'info',
-    duration: number = 5000
+    options: number | ToastOptions = 5000
   ) => {
     const id = `toast-${++toastIdCounter}`;
-    const newToast: Toast = { id, message, type, duration };
+    const normalizedOptions = typeof options === 'number' ? { duration: options } : options;
+    const newToast: Toast = {
+      id,
+      message,
+      type,
+      duration: normalizedOptions.duration ?? 5000,
+      actionLabel: normalizedOptions.actionLabel,
+      onAction: normalizedOptions.onAction,
+    };
     
     setToasts((prev) => [...prev, newToast]);
     
@@ -26,20 +39,20 @@ export function useToast() {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
-  const success = useCallback((message: string, duration?: number) => {
-    return showToast(message, 'success', duration);
+  const success = useCallback((message: string, options?: number | ToastOptions) => {
+    return showToast(message, 'success', options);
   }, [showToast]);
 
-  const error = useCallback((message: string, duration?: number) => {
-    return showToast(message, 'error', duration);
+  const error = useCallback((message: string, options?: number | ToastOptions) => {
+    return showToast(message, 'error', options);
   }, [showToast]);
 
-  const info = useCallback((message: string, duration?: number) => {
-    return showToast(message, 'info', duration);
+  const info = useCallback((message: string, options?: number | ToastOptions) => {
+    return showToast(message, 'info', options);
   }, [showToast]);
 
-  const warning = useCallback((message: string, duration?: number) => {
-    return showToast(message, 'warning', duration);
+  const warning = useCallback((message: string, options?: number | ToastOptions) => {
+    return showToast(message, 'warning', options);
   }, [showToast]);
 
   return {

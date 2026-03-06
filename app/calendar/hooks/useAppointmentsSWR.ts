@@ -31,6 +31,7 @@ interface CreateAppointmentInput {
   clientName: string;
   clientEmail?: string;
   clientPhone?: string;
+  forceNewClient?: boolean;
   startTime: string;
   endTime: string;
   notes?: string;

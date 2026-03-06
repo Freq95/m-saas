@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { logger } from '@/lib/logger';
 import { parseSessionUserId } from './sessionUser';
 
 interface BlockedTime {
@@ -47,6 +46,7 @@ export function useBlockedTimes(
 
       try {
         setLoading(true);
+        setError(null);
         const params = new URLSearchParams({
           userId: effectiveUserId.toString(),
           ...(providerId && { providerId: providerId.toString() }),
@@ -58,23 +58,22 @@ export function useBlockedTimes(
         const response = await fetch(`/api/blocked-times?${params}`, { signal: controller.signal });
 
         if (!response.ok) {
-          throw new Error('Failed to fetch blocked times');
+          if (!controller.signal.aborted) {
+            setBlockedTimes([]);
+            setError(null);
+          }
+          return;
         }
 
         const result = await response.json();
         if (!controller.signal.aborted) {
           setBlockedTimes(result.blockedTimes || []);
+          setError(null);
         }
       } catch (err) {
         if (controller.signal.aborted) return;
+        setBlockedTimes([]);
         setError(err instanceof Error ? err.message : 'Unknown error');
-        logger.error('Calendar hook: failed to fetch blocked times', err instanceof Error ? err : new Error(String(err)), {
-          userId: effectiveUserId,
-          providerId: providerId || null,
-          resourceId: resourceId || null,
-          startDate: startDate?.toISOString(),
-          endDate: endDate?.toISOString(),
-        });
       } finally {
         if (!controller.signal.aborted) {
           setLoading(false);

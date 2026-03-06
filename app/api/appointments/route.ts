@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
       clientName,
       clientEmail,
       clientPhone,
+      forceNewClient,
       startTime,
       endTime,
       providerId,
@@ -131,7 +132,8 @@ export async function POST(request: NextRequest) {
       tenantId,
       clientName,
       clientEmail,
-      clientPhone
+      clientPhone,
+      forceNewClient ?? false
     );
 
     const now = new Date().toISOString();

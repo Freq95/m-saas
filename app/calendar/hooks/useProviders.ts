@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import type { Provider } from './useCalendar';
-import { logger } from '@/lib/logger';
 import { parseSessionUserId } from './sessionUser';
 
 interface UseProvidersResult {
@@ -31,22 +30,26 @@ export function useProviders(userId?: number): UseProvidersResult {
 
       try {
         setLoading(true);
+        setError(null);
         const response = await fetch(`/api/providers?userId=${effectiveUserId}`, { signal: controller.signal });
 
         if (!response.ok) {
-          throw new Error('Failed to fetch providers');
+          if (!controller.signal.aborted) {
+            setProviders([]);
+            setError(null);
+          }
+          return;
         }
 
         const result = await response.json();
         if (!controller.signal.aborted) {
           setProviders(result.providers || []);
+          setError(null);
         }
       } catch (err) {
         if (controller.signal.aborted) return;
+        setProviders([]);
         setError(err instanceof Error ? err.message : 'Unknown error');
-        logger.error('Calendar hook: failed to fetch providers', err instanceof Error ? err : new Error(String(err)), {
-          userId: effectiveUserId,
-        });
       } finally {
         if (!controller.signal.aborted) {
           setLoading(false);

@@ -26,9 +26,9 @@ type PanelStatusKey = 'scheduled' | 'completed' | 'cancelled' | 'no-show';
 
 const STATUS_CONFIG: Record<PanelStatusKey, { label: string; pillClass: string }> = {
   scheduled: { label: 'Programat',  pillClass: 'statusPillScheduled' },
-  completed: { label: 'Completat',  pillClass: 'statusPillCompleted' },
-  cancelled: { label: 'Anul.',      pillClass: 'statusPillCancelled' },
-  'no-show': { label: 'Absent',     pillClass: 'statusPillNoShow' },
+  completed: { label: 'Finalizat',  pillClass: 'statusPillFinalizat' },
+  cancelled: { label: 'Anulat',     pillClass: 'statusPillAnulat' },
+  'no-show': { label: 'Absent',     pillClass: 'statusPillAbsent' },
 };
 
 function normalizeStatus(status: string): PanelStatusKey {
@@ -79,22 +79,29 @@ function AppointmentCard({
               {cfg.label}
             </span>
           </div>
-          {status === 'scheduled' && (
-            <div className={styles.quickActions} onClick={(e) => e.stopPropagation()}>
-              <button
-                className={`${styles.qBtn} ${styles.qComplete}`}
-                onClick={() => onStatusChange(apt.id, 'completed')}
-              >
-                {'\u2713'} Completat
-              </button>
-              <button
-                className={`${styles.qBtn} ${styles.qAbsent}`}
-                onClick={() => onStatusChange(apt.id, 'no-show')}
-              >
-                {'\u26a0'} Absent
-              </button>
-            </div>
-          )}
+          <div className={styles.statusSelector} onClick={(e) => e.stopPropagation()}>
+            <button
+              className={`${styles.statusBtn} ${styles.statusBtnFinalizat} ${status === 'completed' ? styles.statusBtnActive : ''}`}
+              onClick={() => onStatusChange(apt.id, 'completed')}
+              title="Marcheaza ca Finalizat"
+            >
+              Finalizat
+            </button>
+            <button
+              className={`${styles.statusBtn} ${styles.statusBtnAnulat} ${status === 'cancelled' ? styles.statusBtnActive : ''}`}
+              onClick={() => onStatusChange(apt.id, 'cancelled')}
+              title="Marcheaza ca Anulat"
+            >
+              Anulat
+            </button>
+            <button
+              className={`${styles.statusBtn} ${styles.statusBtnAbsent} ${status === 'no-show' ? styles.statusBtnActive : ''}`}
+              onClick={() => onStatusChange(apt.id, 'no-show')}
+              title="Marcheaza ca Absent"
+            >
+              Absent
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -230,7 +237,7 @@ export function DayPanel({
             </div>
             <div className={styles.statCard}>
               <span className={`${styles.statCardValue} ${styles.statCompleted}`}>{stats.completed}</span>
-              <span className={styles.statCardLabel}>Complete</span>
+              <span className={styles.statCardLabel}>Finalizate</span>
             </div>
             <div className={styles.statCard}>
               <span className={`${styles.statCardValue} ${styles.statOther}`}>{stats.other}</span>
@@ -315,7 +322,7 @@ export function DayPanel({
                 </div>
                 <div className={styles.statCard}>
                   <span className={`${styles.statCardValue} ${styles.statCompleted}`}>{stats.completed}</span>
-                  <span className={styles.statCardLabel}>Complete</span>
+                  <span className={styles.statCardLabel}>Finalizate</span>
                 </div>
                 <div className={styles.statCard}>
                   <span className={`${styles.statCardValue} ${styles.statOther}`}>{stats.other}</span>

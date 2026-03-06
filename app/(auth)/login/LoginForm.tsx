@@ -15,6 +15,16 @@ export default function LoginForm({ successMessage }: LoginFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  function getLoginErrorMessage(result: Awaited<ReturnType<typeof signIn>>): string {
+    if (result?.code === 'database_connection_failed') {
+      return 'Database connection failed. Try again in a moment.';
+    }
+    if (result?.error === 'CallbackRouteError') {
+      return 'Authentication service failed. Try again in a moment.';
+    }
+    return 'Invalid credentials.';
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setSubmitting(true);
@@ -28,7 +38,7 @@ export default function LoginForm({ successMessage }: LoginFormProps) {
 
     if (!result || result.error) {
       setSubmitting(false);
-      setError('Invalid credentials.');
+      setError(getLoginErrorMessage(result));
       return;
     }
 

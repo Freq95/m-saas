@@ -39,6 +39,7 @@ type AppointmentFormPayload = {
   clientName: string;
   clientEmail: string;
   clientPhone: string;
+  forceNewClient?: boolean;
   serviceId: string;
   startTime: string;
   endTime: string;
@@ -46,6 +47,7 @@ type AppointmentFormPayload = {
   notes: string;
   category?: string;
   color?: string;
+  status?: string;
   isRecurring?: boolean;
   recurrence?: {
     frequency: 'daily' | 'weekly' | 'monthly';
@@ -72,11 +74,15 @@ interface CreateAppointmentModalProps {
   isSeedingDemoServices?: boolean;
   onClose: () => void;
   onSubmit: (data: AppointmentFormPayload) => Promise<void>;
-  mode?: 'create' | 'edit';
+  mode?: 'create' | 'edit' | 'view';
   title?: string;
   submitLabel?: string;
   allowRecurring?: boolean;
   initialData?: Partial<AppointmentFormPayload> | null;
+  onModeChange?: (mode: 'create' | 'edit' | 'view') => void;
+  appointmentStatus?: string;
+  onStatusChange?: (status: string) => Promise<void> | void;
+  onDelete?: () => void;
 }
 
 type ClientSuggestion = {
@@ -97,6 +103,16 @@ const DEFAULT_RECURRENCE: RecurrenceForm = {
 const MIN_DURATION_MINUTES = 15;
 const DEFAULT_DURATION_MINUTES = 30;
 const TIME_STEP_MINUTES = 15;
+const STATUS_OPTIONS = [
+  { value: 'completed', label: 'Finalizat' },
+  { value: 'cancelled', label: 'Anulat' },
+  { value: 'no-show', label: 'Absent' },
+] as const;
+
+const EDIT_STATUS_OPTIONS = [
+  { value: 'scheduled', label: 'Programat' },
+  ...STATUS_OPTIONS,
+] as const;
 
 function parseTimeToMinutes(value: string): number | null {
   const [hour, minute] = value.split(':').map(Number);
@@ -123,6 +139,10 @@ function parseDateInput(value: string): Date | null {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function getStatusLabel(status: string): string {
+  return EDIT_STATUS_OPTIONS.find((item) => item.value === status)?.label || status;
+}
+
 export function CreateAppointmentModal({
   isOpen,
   selectedSlot,
@@ -136,9 +156,14 @@ export function CreateAppointmentModal({
   submitLabel,
   allowRecurring = true,
   initialData,
+  onModeChange,
+  appointmentStatus,
+  onStatusChange,
+  onDelete,
 }: CreateAppointmentModalProps) {
   const toast = useToast();
   const backdropPressStartedRef = useRef(false);
+  const isViewMode = mode === 'view';
 
   const handleBackdropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     backdropPressStartedRef.current = event.target === event.currentTarget;
@@ -182,14 +207,18 @@ export function CreateAppointmentModal({
   const [loadingClientSuggestions, setLoadingClientSuggestions] = useState(false);
   const [clientSuggestionsError, setClientSuggestionsError] = useState('');
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+  const [forceNewClient, setForceNewClient] = useState(false);
   const [showNewClientConfirm, setShowNewClientConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingSubmitPayload, setPendingSubmitPayload] = useState<AppointmentFormPayload | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState(appointmentStatus || 'scheduled');
   const clientSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const datePickerRef = useRef<HTMLDivElement | null>(null);
   const startTimePickerRef = useRef<HTMLDivElement | null>(null);
   const endTimePickerRef = useRef<HTMLDivElement | null>(null);
   const servicePickerRef = useRef<HTMLDivElement | null>(null);
+  const startTimeListRef = useRef<HTMLDivElement | null>(null);
+  const endTimeListRef = useRef<HTMLDivElement | null>(null);
 
   const selectedStartDateTime = useMemo(() => {
     const [year, month, day] = selectedDate.split('-').map(Number);
@@ -263,6 +292,48 @@ export function CreateAppointmentModal({
     [services, formData.serviceId]
   );
 
+  const exactNameSuggestion = useMemo(() => {
+    const normalizedName = formData.clientName.trim().toLowerCase();
+    if (!normalizedName) {
+      return null;
+    }
+
+    return (
+      clientSuggestions.find((client) => (client.name || '').trim().toLowerCase() === normalizedName) ||
+      null
+    );
+  }, [clientSuggestions, formData.clientName]);
+
+  const shouldShowSameNameBanner = useMemo(() => {
+    if (!exactNameSuggestion || selectedClientId !== null || forceNewClient) {
+      return false;
+    }
+
+    const normalizedEmail = (formData.clientEmail || '').trim().toLowerCase();
+    const normalizedPhone = (formData.clientPhone || '').replace(/\s+/g, '');
+    const suggestionEmail = (exactNameSuggestion.email || '').trim().toLowerCase();
+    const suggestionPhone = (exactNameSuggestion.phone || '').replace(/\s+/g, '');
+
+    const emailConflict =
+      normalizedEmail.length > 0 &&
+      suggestionEmail.length > 0 &&
+      suggestionEmail !== normalizedEmail;
+    if (emailConflict) {
+      return false;
+    }
+
+    const emailConfirmed =
+      normalizedEmail.length > 0 &&
+      suggestionEmail.length > 0 &&
+      suggestionEmail === normalizedEmail;
+    const phoneConfirmed =
+      normalizedPhone.length > 0 &&
+      suggestionPhone.length > 0 &&
+      suggestionPhone === normalizedPhone;
+
+    return !emailConfirmed && !phoneConfirmed;
+  }, [exactNameSuggestion, forceNewClient, formData.clientEmail, formData.clientPhone, selectedClientId]);
+
   const datePickerDays = useMemo(() => {
     const monthStart = startOfMonth(datePickerMonth);
     const monthEnd = endOfMonth(datePickerMonth);
@@ -301,15 +372,23 @@ export function CreateAppointmentModal({
     setClientSuggestionsError('');
     setShowClientSuggestions(false);
     setSelectedClientId(null);
+    setForceNewClient(false);
     setShowNewClientConfirm(false);
     setPendingSubmitPayload(null);
     setSelectedCategory(initialData?.category || '');
+    setSelectedStatus(initialData?.status || appointmentStatus || 'scheduled');
     setIsRecurring(Boolean(initialData?.isRecurring) && allowRecurring);
     setRecurrence({
       ...DEFAULT_RECURRENCE,
       ...(initialData?.recurrence || {}),
     });
-  }, [isOpen, initialData, defaultServiceId, allowRecurring]);
+  }, [isOpen, initialData, defaultServiceId, allowRecurring, appointmentStatus]);
+
+  useEffect(() => {
+    if (mode === 'view' && appointmentStatus) {
+      setSelectedStatus(appointmentStatus);
+    }
+  }, [appointmentStatus, mode]);
 
   useEffect(() => {
     if (!isDatePickerOpen && !isStartTimePickerOpen && !isEndTimePickerOpen && !isServicePickerOpen) return;
@@ -429,6 +508,28 @@ export function CreateAppointmentModal({
     };
   }, [formData.clientName, isOpen]);
 
+  useEffect(() => {
+    if (!isStartTimePickerOpen) return;
+    const selectedButton = startTimeListRef.current?.querySelector<HTMLButtonElement>(
+      `[data-time-option="${selectedTime}"]`
+    );
+    selectedButton?.scrollIntoView({
+      block: 'center',
+      behavior: 'instant' as ScrollBehavior,
+    });
+  }, [isStartTimePickerOpen, selectedTime]);
+
+  useEffect(() => {
+    if (!isEndTimePickerOpen) return;
+    const selectedButton = endTimeListRef.current?.querySelector<HTMLButtonElement>(
+      `[data-time-option="${selectedEndTime}"]`
+    );
+    selectedButton?.scrollIntoView({
+      block: 'center',
+      behavior: 'instant' as ScrollBehavior,
+    });
+  }, [isEndTimePickerOpen, selectedEndTime]);
+
   const applyClientSuggestion = (client: ClientSuggestion) => {
     setFormData((prev) => ({
       ...prev,
@@ -437,12 +538,20 @@ export function CreateAppointmentModal({
       clientPhone: client.phone || prev.clientPhone,
     }));
     setSelectedClientId(client.id);
+    setForceNewClient(false);
     setShowClientSuggestions(false);
   };
 
+  const renderReadOnlyValue = (value: React.ReactNode, muted: boolean = false) => (
+    <div className={`${styles.readOnlyValue}${muted ? ` ${styles.readOnlyValueMuted}` : ''}`}>
+      {value}
+    </div>
+  );
+
   if (!isOpen || !selectedSlot) return null;
 
-  const modalTitle = title || (mode === 'edit' ? 'Editeaza programare' : 'Creeaza programare');
+  const modalTitle =
+    title || (mode === 'view' ? 'Detalii programare' : mode === 'edit' ? 'Editeaza programare' : 'Creeaza programare');
   const modalSubmitLabel = submitLabel || (mode === 'edit' ? 'Salveaza modificarile' : 'Salveaza');
   const activeCategoryColor = CATEGORIES.find((c) => c.label === selectedCategory)?.color;
 
@@ -467,7 +576,9 @@ export function CreateAppointmentModal({
     setClientSuggestionsError('');
     setShowClientSuggestions(false);
     setSelectedClientId(null);
+    setForceNewClient(false);
     setSelectedCategory('');
+    setSelectedStatus('scheduled');
     setIsRecurring(false);
     setRecurrence(DEFAULT_RECURRENCE);
   };
@@ -495,11 +606,13 @@ export function CreateAppointmentModal({
     const payload: AppointmentFormPayload = {
       ...formData,
       clientName: formData.clientName.trim(),
+      forceNewClient,
       startTime: selectedStartDateTime.toISOString(),
       endTime: selectedEndDateTime.toISOString(),
       durationMinutes,
       category: selectedCategory || undefined,
       color: activeCategoryColor,
+      ...(mode !== 'create' ? { status: selectedStatus } : {}),
       isRecurring: allowRecurring ? isRecurring : false,
       ...(allowRecurring && isRecurring ? { recurrence } : {}),
     };
@@ -519,7 +632,7 @@ export function CreateAppointmentModal({
       return matchByName || matchByEmail || matchByPhone;
     });
     const shouldConfirmNewClient =
-      mode === 'create' && !selectedClientId && !hasExactSuggestionMatch && normalizedName.length > 0;
+      mode === 'create' && !forceNewClient && !selectedClientId && !hasExactSuggestionMatch && normalizedName.length > 0;
 
     if (shouldConfirmNewClient) {
       setPendingSubmitPayload(payload);
@@ -552,18 +665,66 @@ export function CreateAppointmentModal({
         aria-modal="true"
         aria-label={modalTitle}
       >
-        <h3>{modalTitle}</h3>
+        <div className={styles.modalHeader}>
+          <h3>{modalTitle}</h3>
+          {mode === 'view' && (
+            <div className={styles.modalHeaderActions}>
+              <button
+                type="button"
+                onClick={() => onModeChange?.('edit')}
+                className={styles.modalIconButton}
+                aria-label="Editeaza programarea"
+                title="Editeaza"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4Z" />
+                </svg>
+              </button>
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  className={`${styles.modalIconButton} ${styles.modalIconButtonDanger}`}
+                  aria-label="Sterge programarea"
+                  title="Sterge"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4h8v2" />
+                    <path d="M19 6l-1 14H6L5 6" />
+                    <path d="M10 11v6" />
+                    <path d="M14 11v6" />
+                  </svg>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                className={styles.modalIconButton}
+                aria-label="Inchide"
+                title="Inchide"
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            </div>
+          )}
+        </div>
+        <fieldset className={styles.modalFieldset} disabled={isViewMode}>
         <div className={styles.modalContent}>
           <div className={styles.modalField}>
             <label>Data si ora</label>
-            <div>
-              {format(selectedStartDateTime, "EEEE, d MMMM yyyy", { locale: ro })}
-              {` (${format(selectedStartDateTime, 'HH:mm', { locale: ro })} - ${format(selectedEndDateTime, 'HH:mm', { locale: ro })})`}
-            </div>
+            {renderReadOnlyValue(
+              `${format(selectedStartDateTime, "EEEE, d MMMM yyyy", { locale: ro })} (${format(selectedStartDateTime, 'HH:mm', { locale: ro })} - ${format(selectedEndDateTime, 'HH:mm', { locale: ro })})`
+            )}
           </div>
 
           <div className={styles.modalField}>
             <label>Data</label>
+            {isViewMode ? renderReadOnlyValue(format(selectedCalendarDate, 'dd-MMM-yyyy', { locale: ro })) : (
             <div className={styles.modalDatePicker} ref={datePickerRef}>
               <button
                 type="button"
@@ -637,11 +798,13 @@ export function CreateAppointmentModal({
                 </div>
               )}
             </div>
+            )}
           </div>
 
           <div className={styles.modalFieldRow}>
             <div className={styles.modalField}>
               <label>Ora inceput</label>
+              {isViewMode ? renderReadOnlyValue(selectedTime) : (
               <div className={styles.modalTimePicker} ref={startTimePickerRef}>
                 <button
                   type="button"
@@ -659,11 +822,12 @@ export function CreateAppointmentModal({
 
                 {isStartTimePickerOpen && (
                   <div className={`${styles.clientSuggestions} ${styles.modalTimePopover}`} role="dialog" aria-label="Selecteaza ora de inceput">
-                    <div className={styles.modalTimeList}>
+                    <div className={styles.modalTimeList} ref={startTimeListRef}>
                       {startTimeOptions.map((time) => (
                         <button
                           key={time}
                           type="button"
+                          data-time-option={time}
                           className={`${styles.clientSuggestionItem} ${styles.modalTimeOption} ${time === selectedTime ? styles.modalTimeOptionSelected : ''}`}
                           onClick={() => {
                             setSelectedTime(time);
@@ -678,10 +842,12 @@ export function CreateAppointmentModal({
                   </div>
                 )}
               </div>
+              )}
             </div>
 
             <div className={styles.modalField}>
               <label>Ora final</label>
+              {isViewMode ? renderReadOnlyValue(selectedEndTime || 'Ora prea tarzie', !selectedEndTime) : (
               <div className={styles.modalTimePicker} ref={endTimePickerRef}>
                 <button
                   type="button"
@@ -701,11 +867,12 @@ export function CreateAppointmentModal({
 
                 {isEndTimePickerOpen && endTimeOptions.length > 0 && (
                   <div className={`${styles.clientSuggestions} ${styles.modalTimePopover}`} role="dialog" aria-label="Selecteaza ora de final">
-                    <div className={styles.modalTimeList}>
+                    <div className={styles.modalTimeList} ref={endTimeListRef}>
                       {endTimeOptions.map((time) => (
                         <button
                           key={time}
                           type="button"
+                          data-time-option={time}
                           className={`${styles.clientSuggestionItem} ${styles.modalTimeOption} ${time === selectedEndTime ? styles.modalTimeOptionSelected : ''}`}
                           onClick={() => {
                             setSelectedEndTime(time);
@@ -720,6 +887,7 @@ export function CreateAppointmentModal({
                   </div>
                 )}
               </div>
+              )}
               {timeValidationError && (
                 <div className={styles.clientSuggestionError}>{timeValidationError}</div>
               )}
@@ -728,17 +896,20 @@ export function CreateAppointmentModal({
 
           <div className={styles.modalField}>
             <label>Nume client *</label>
-            <input
-              type="text"
-              value={formData.clientName}
-              onFocus={() => setShowClientSuggestions(true)}
-              onChange={(e) => {
-                setFormData({ ...formData, clientName: e.target.value });
-                setSelectedClientId(null);
-                setShowClientSuggestions(true);
-              }}
-              required
-            />
+            {isViewMode ? renderReadOnlyValue(formData.clientName || 'Fara nume', !formData.clientName) : (
+              <input
+                type="text"
+                value={formData.clientName}
+                onFocus={() => setShowClientSuggestions(true)}
+                onChange={(e) => {
+                  setFormData({ ...formData, clientName: e.target.value });
+                  setSelectedClientId(null);
+                  setForceNewClient(false);
+                  setShowClientSuggestions(true);
+                }}
+                required
+              />
+            )}
             {showClientSuggestions && (loadingClientSuggestions || clientSuggestions.length > 0) && (
               <div className={styles.clientSuggestions}>
                 {loadingClientSuggestions && (
@@ -767,29 +938,88 @@ export function CreateAppointmentModal({
             <div className={styles.clientSuggestionHint}>
               Daca nu selectezi un client existent, unul nou va fi creat automat.
             </div>
+            {shouldShowSameNameBanner && exactNameSuggestion && (
+              <div className={styles.sameNameBanner}>
+                <span className={styles.sameNameBannerText}>
+                  Exista deja un client cu acest nume: {exactNameSuggestion.name} ({exactNameSuggestion.email || 'fara email'}). Folosesti acelasi client?
+                </span>
+                <div className={styles.sameNameBannerActions}>
+                  <button
+                    type="button"
+                    className={styles.sameNameBannerPrimary}
+                    onClick={() => applyClientSuggestion(exactNameSuggestion)}
+                  >
+                    Da, acelasi
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.sameNameBannerSecondary}
+                    onClick={() => {
+                      setForceNewClient(true);
+                      setShowClientSuggestions(false);
+                    }}
+                  >
+                    Nu, client nou
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className={styles.modalField}>
             <label>Email</label>
-            <input
-              type="email"
-              value={formData.clientEmail}
-              onChange={(e) => setFormData({ ...formData, clientEmail: e.target.value })}
-            />
+            {isViewMode
+              ? renderReadOnlyValue(formData.clientEmail || 'Fara email', !formData.clientEmail)
+              : (
+                <input
+                  type="email"
+                  value={formData.clientEmail}
+                  onChange={(e) => setFormData({ ...formData, clientEmail: e.target.value })}
+                />
+              )}
           </div>
 
           <div className={styles.modalField}>
             <label>Telefon</label>
-            <input
-              type="tel"
-              value={formData.clientPhone}
-              onChange={(e) => setFormData({ ...formData, clientPhone: e.target.value })}
-            />
+            {isViewMode
+              ? renderReadOnlyValue(formData.clientPhone || 'Fara telefon', !formData.clientPhone)
+              : (
+                <input
+                  type="tel"
+                  value={formData.clientPhone}
+                  onChange={(e) => setFormData({ ...formData, clientPhone: e.target.value })}
+                />
+              )}
           </div>
+
+          {(mode === 'edit' || mode === 'view') && (
+            <div className={styles.modalField}>
+              <label>Status</label>
+              {isViewMode
+                ? renderReadOnlyValue(getStatusLabel(selectedStatus))
+                : (
+                  <select
+                    value={selectedStatus}
+                    onChange={(e) => setSelectedStatus(e.target.value)}
+                  >
+                    {EDIT_STATUS_OPTIONS.map((statusOption) => (
+                      <option key={statusOption.value} value={statusOption.value}>
+                        {statusOption.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+            </div>
+          )}
 
           <div className={styles.modalField}>
             <label>Serviciu *</label>
-            {services.length === 0 ? (
+            {isViewMode ? renderReadOnlyValue(
+              selectedService
+                ? `${selectedService.name} (${selectedService.duration_minutes} min) - ${selectedService.price} lei`
+                : 'Fara serviciu',
+              !selectedService
+            ) : services.length === 0 ? (
               <div className={styles.serviceSeedBox}>
                 <p className={styles.clientSuggestionMuted}>
                   Nu exista servicii definite pentru cabinetul curent.
@@ -855,30 +1085,38 @@ export function CreateAppointmentModal({
 
           <div className={styles.modalField}>
             <label>Categorie</label>
-            <div className={styles.categoryPicker}>
-              {CATEGORIES.map((cat) => (
-                <button
-                  key={cat.label}
-                  type="button"
-                  className={`${styles.categoryChip} ${selectedCategory === cat.label ? styles.categoryChipActive : ''}`}
-                  style={{ '--chip-color': cat.color } as React.CSSProperties}
-                  onClick={() => setSelectedCategory(selectedCategory === cat.label ? '' : cat.label)}
-                  title={cat.label}
-                >
-                  <span className={styles.categoryDot} style={{ background: cat.color }} />
-                  {cat.label}
-                </button>
-              ))}
-            </div>
+            {isViewMode
+              ? renderReadOnlyValue(selectedCategory || 'Fara categorie', !selectedCategory)
+              : (
+                <div className={styles.categoryPicker}>
+                  {CATEGORIES.map((cat) => (
+                    <button
+                      key={cat.label}
+                      type="button"
+                      className={`${styles.categoryChip} ${selectedCategory === cat.label ? styles.categoryChipActive : ''}`}
+                      style={{ '--chip-color': cat.color } as React.CSSProperties}
+                      onClick={() => setSelectedCategory(selectedCategory === cat.label ? '' : cat.label)}
+                      title={cat.label}
+                    >
+                      <span className={styles.categoryDot} style={{ background: cat.color }} />
+                      {cat.label}
+                    </button>
+                  ))}
+                </div>
+              )}
           </div>
 
           <div className={styles.modalField}>
             <label>Note</label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              rows={3}
-            />
+            {isViewMode
+              ? renderReadOnlyValue(formData.notes || 'Fara note', !formData.notes)
+              : (
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  rows={3}
+                />
+              )}
           </div>
 
           {allowRecurring && (
@@ -967,19 +1205,46 @@ export function CreateAppointmentModal({
             </>
           )}
         </div>
+        </fieldset>
 
-        <div className={styles.modalActions}>
-          <button onClick={onClose} className={styles.cancelButton}>
-            Anuleaza
-          </button>
-          <button
-            onClick={handleSubmit}
-            className={styles.saveButton}
-            disabled={services.length === 0 || isSubmitting || showNewClientConfirm}
-          >
-            {modalSubmitLabel}
-          </button>
-        </div>
+        {mode === 'view' && onStatusChange && (
+          <div className={styles.modalFooterStack}>
+            <div className={styles.quickActionsSection}>
+              <p className={styles.quickActionsLabel}>Status</p>
+              <div className={styles.statusSegmentedControl}>
+                {STATUS_OPTIONS.map((statusOption) => (
+                  <button
+                    key={statusOption.value}
+                    type="button"
+                    data-status={statusOption.value}
+                    className={`${styles.statusSegmentButton} ${selectedStatus !== 'scheduled' && selectedStatus === statusOption.value ? styles.statusSegmentButtonActive : ''}`}
+                    onClick={async () => {
+                      if (selectedStatus === statusOption.value) return;
+                      await onStatusChange(statusOption.value);
+                    }}
+                  >
+                    {statusOption.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {mode !== 'view' && (
+          <div className={styles.modalActions}>
+            <button onClick={onClose} className={styles.cancelButton}>
+              Anuleaza
+            </button>
+            <button
+              onClick={handleSubmit}
+              className={styles.saveButton}
+              disabled={services.length === 0 || isSubmitting || showNewClientConfirm}
+            >
+              {modalSubmitLabel}
+            </button>
+          </div>
+        )}
 
         {showNewClientConfirm && (
           <div className={styles.inlineConfirmBox}>

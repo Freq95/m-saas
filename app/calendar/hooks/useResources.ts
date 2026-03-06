@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import type { Resource } from './useCalendar';
-import { logger } from '@/lib/logger';
 import { parseSessionUserId } from './sessionUser';
 
 interface UseResourcesResult {
@@ -31,22 +30,26 @@ export function useResources(userId?: number): UseResourcesResult {
 
       try {
         setLoading(true);
+        setError(null);
         const response = await fetch(`/api/resources?userId=${effectiveUserId}`, { signal: controller.signal });
 
         if (!response.ok) {
-          throw new Error('Failed to fetch resources');
+          if (!controller.signal.aborted) {
+            setResources([]);
+            setError(null);
+          }
+          return;
         }
 
         const result = await response.json();
         if (!controller.signal.aborted) {
           setResources(result.resources || []);
+          setError(null);
         }
       } catch (err) {
         if (controller.signal.aborted) return;
+        setResources([]);
         setError(err instanceof Error ? err.message : 'Unknown error');
-        logger.error('Calendar hook: failed to fetch resources', err instanceof Error ? err : new Error(String(err)), {
-          userId: effectiveUserId,
-        });
       } finally {
         if (!controller.signal.aborted) {
           setLoading(false);

@@ -9,6 +9,7 @@ import { invalidateReadCaches } from '@/lib/cache-keys';
 const CONFLICT_MESSAGE_BY_TYPE: Record<string, string> = {
   provider_appointment: 'Providerul are deja o programare in acest interval.',
   resource_appointment: 'Resursa este deja ocupata in acest interval.',
+  appointment_overlap: 'Exista deja o alta programare in acest interval.',
   blocked_time: 'Intervalul este blocat.',
   outside_working_hours: 'Intervalul este in afara programului de lucru.',
 };
@@ -163,6 +164,32 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         resourceId === null
           ? null
           : (resourceId !== undefined ? resourceId : (existingAppointment.resource_id ?? null));
+
+      const overlappingAppointment = await db.collection('appointments').findOne({
+        id: { $ne: appointmentId },
+        user_id: existingAppointment.user_id,
+        tenant_id: tenantId,
+        deleted_at: { $exists: false },
+        status: { $ne: 'cancelled' },
+        start_time: { $lt: newEndTime.toISOString() },
+        end_time: { $gt: newStartTime.toISOString() },
+      });
+
+      if (overlappingAppointment) {
+        return NextResponse.json(
+          {
+            error: 'Time slot conflicts with existing appointment or blocked time',
+            conflicts: [
+              formatConflictPayload({
+                type: 'appointment_overlap',
+                appointment: overlappingAppointment,
+              }),
+            ],
+            suggestions: [],
+          },
+          { status: 409 }
+        );
+      }
 
       // Check for conflicts (excluding this appointment)
       const conflictCheck = await checkAppointmentConflict(

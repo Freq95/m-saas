@@ -43,6 +43,7 @@ export const createAppointmentSchema = z.object({
   clientName: z.string().min(1, 'Client name is required').max(255),
   clientEmail: emailSchema.optional(),
   clientPhone: phoneSchema,
+  forceNewClient: z.boolean().optional(),
   startTime: dateTimeSchema,
   endTime: dateTimeSchema.optional(), // Will be calculated if not provided
   providerId: z.number().int().positive().optional(),

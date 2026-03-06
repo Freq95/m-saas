@@ -40,7 +40,6 @@ import {
   WeekView,
   DayPanel,
   CreateAppointmentModal,
-  AppointmentPreviewModal,
   DeleteConfirmModal,
   ConflictWarningModal,
 } from './components';
@@ -70,6 +69,8 @@ interface ConflictSuggestion {
   endTime: string;
   reason: string;
 }
+
+type AppointmentModalMode = 'create' | 'edit' | 'view';
 
 export default function CalendarPageClient({
   initialAppointments,
@@ -151,8 +152,7 @@ export default function CalendarPageClient({
   const [seedingDemoServices, setSeedingDemoServices] = useState(false);
   const hasRequestedServicesRef = useRef(false);
   const [showCreateModal, setShowCreateModal]       = useState(false);
-  const [showPreviewModal, setShowPreviewModal]     = useState(false);
-  const [appointmentModalMode, setAppointmentModalMode] = useState<'create' | 'edit'>('create');
+  const [appointmentModalMode, setAppointmentModalMode] = useState<AppointmentModalMode>('create');
   const [editInitialData, setEditInitialData] = useState<{
     clientName: string;
     clientEmail: string;
@@ -164,6 +164,7 @@ export default function CalendarPageClient({
     notes: string;
     category?: string;
     color?: string;
+    status?: string;
   } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm]   = useState(false);
   const [showConflictModal, setShowConflictModal]   = useState(false);
@@ -174,6 +175,8 @@ export default function CalendarPageClient({
   const [showDateDropdown, setShowDateDropdown] = useState(false);
   const [pickerDate, setPickerDate] = useState<Date>(state.currentDate);
   const dateDropdownRef = useRef<HTMLDivElement>(null);
+  const justDroppedRef = useRef(false);
+  const justDroppedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const weekStart = useMemo(() => startOfWeek(state.currentDate, { weekStartsOn: 1 }), [state.currentDate]);
   const weekEnd = useMemo(() => endOfWeek(state.currentDate, { weekStartsOn: 1 }), [state.currentDate]);
@@ -226,6 +229,14 @@ export default function CalendarPageClient({
         endTime: newEndTime.toISOString(),
       });
       if (result.ok) {
+        justDroppedRef.current = true;
+        if (justDroppedTimeoutRef.current) {
+          clearTimeout(justDroppedTimeoutRef.current);
+        }
+        justDroppedTimeoutRef.current = setTimeout(() => {
+          justDroppedRef.current = false;
+          justDroppedTimeoutRef.current = null;
+        }, 100);
         toast.success('Programarea a fost mutata.');
         return true;
       }
@@ -304,13 +315,20 @@ export default function CalendarPageClient({
         return;
       }
       setShowCreateModal(false);
-      setShowPreviewModal(false);
       setShowDeleteConfirm(false);
       setShowConflictModal(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [showDateDropdown]);
+
+  useEffect(() => {
+    return () => {
+      if (justDroppedTimeoutRef.current) {
+        clearTimeout(justDroppedTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!showDateDropdown) return;
@@ -333,6 +351,9 @@ export default function CalendarPageClient({
 
   /** Click on an empty slot — selects day AND opens create modal */
   const handleSlotClick = (day: Date, hour?: number, minute: 0 | 30 = 0) => {
+    if (justDroppedRef.current) {
+      return;
+    }
     setSelectedDay(day);
     const start = new Date(day);
     start.setHours(hour ?? 9, minute, 0, 0);
@@ -344,27 +365,92 @@ export default function CalendarPageClient({
     setShowCreateModal(true);
   };
 
+  const buildAppointmentInitialData = (appointment: Appointment) => {
+    const start = new Date(appointment.start_time);
+    const end = new Date(appointment.end_time);
+
+    return {
+      clientName: appointment.client_name || '',
+      clientEmail: appointment.client_email || '',
+      clientPhone: appointment.client_phone || '',
+      serviceId: appointment.service_id ? String(appointment.service_id) : '',
+      startTime: start.toISOString(),
+      endTime: end.toISOString(),
+      durationMinutes: Math.max(15, Math.round((end.getTime() - start.getTime()) / 60_000)),
+      notes: appointment.notes || '',
+      category: appointment.category || undefined,
+      color: appointment.color || undefined,
+      status: appointment.status,
+    };
+  };
+
+  const openAppointmentDetails = async (appointment: Appointment) => {
+    let nextAppointment = appointment;
+    try {
+      const res = await fetch(`/api/appointments/${appointment.id}`);
+      const result = await res.json();
+      if (res.ok && result?.appointment) {
+        nextAppointment = result.appointment;
+      }
+    } catch {
+      // Keep current appointment snapshot if details fetch fails.
+    }
+
+    actions.selectAppointment(nextAppointment);
+    actions.selectSlot({
+      start: new Date(nextAppointment.start_time),
+      end: new Date(nextAppointment.end_time),
+    });
+    setEditInitialData(buildAppointmentInitialData(nextAppointment));
+    setAppointmentModalMode('view');
+    setShowCreateModal(true);
+  };
+
   const handleAppointmentClick = (appointment: Appointment) => {
-    actions.selectAppointment(appointment);
-    setShowPreviewModal(true);
+    void openAppointmentDetails(appointment);
+  };
+
+  const updateStatusWithUndo = async (appointment: Appointment, nextStatus: string) => {
+    const previousStatus = appointment.status;
+    if (previousStatus === nextStatus) {
+      return;
+    }
+
+    const result = await updateAppointment(appointment.id, { status: nextStatus });
+    if (!result.ok) {
+      toast.error(result.error || 'Nu s-a putut actualiza statusul.');
+      return;
+    }
+
+    actions.selectAppointment({ ...appointment, status: nextStatus });
+    setEditInitialData((prev) => (prev ? { ...prev, status: nextStatus } : prev));
+    refetch();
+    toast.success('Status schimbat.', {
+      duration: 5000,
+      actionLabel: 'Anuleaza',
+      onAction: async () => {
+        const undoResult = await updateAppointment(appointment.id, { status: previousStatus });
+        if (!undoResult.ok) {
+          toast.error(undoResult.error || 'Nu s-a putut reveni la statusul anterior.');
+          return;
+        }
+        actions.selectAppointment({ ...appointment, status: previousStatus });
+        setEditInitialData((prev) => (prev ? { ...prev, status: previousStatus } : prev));
+        refetch();
+        toast.info('Status restaurat.');
+      },
+    });
   };
 
   const handlePanelStatusChange = async (appointmentId: number, status: string) => {
+    const appointment = appointments.find((item) => item.id === appointmentId);
+    if (!appointment) {
+      toast.error('Programarea nu a fost gasita.');
+      return;
+    }
+
     try {
-      const res = await fetch(`/api/appointments/${appointmentId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      });
-      const result = await res.json();
-      if (res.ok) {
-        refetch();
-        const label =
-          status === 'completed' ? 'completata' : status === 'cancelled' ? 'anulata' : 'absenta';
-        toast.success(`Programarea a fost marcata ca ${label}.`);
-      } else {
-        toast.error(result.error || 'Nu s-a putut actualiza statusul.');
-      }
+      await updateStatusWithUndo(appointment, status);
     } catch {
       toast.error('Eroare la actualizarea statusului.');
     }
@@ -374,6 +460,7 @@ export default function CalendarPageClient({
     clientName: string;
     clientEmail: string;
     clientPhone: string;
+    forceNewClient?: boolean;
     serviceId: string;
     startTime: string;
     endTime: string;
@@ -441,6 +528,7 @@ export default function CalendarPageClient({
         clientName: formData.clientName.trim(),
         clientEmail: formData.clientEmail || undefined,
         clientPhone: formData.clientPhone || undefined,
+        forceNewClient: formData.forceNewClient,
         startTime: formData.startTime,
         endTime: formData.endTime,
         notes: formData.notes,
@@ -474,19 +562,7 @@ export default function CalendarPageClient({
     const end = new Date(appointment.end_time);
     actions.selectSlot({ start, end });
     setAppointmentModalMode('edit');
-    setEditInitialData({
-      clientName: appointment.client_name || '',
-      clientEmail: appointment.client_email || '',
-      clientPhone: appointment.client_phone || '',
-      serviceId: appointment.service_id ? String(appointment.service_id) : '',
-      startTime: start.toISOString(),
-      endTime: end.toISOString(),
-      durationMinutes: Math.max(15, Math.round((end.getTime() - start.getTime()) / 60_000)),
-      notes: appointment.notes || '',
-      category: appointment.category || undefined,
-      color: appointment.color || undefined,
-    });
-    setShowPreviewModal(false);
+    setEditInitialData(buildAppointmentInitialData(appointment));
     setShowCreateModal(true);
   };
 
@@ -501,6 +577,7 @@ export default function CalendarPageClient({
     notes: string;
     category?: string;
     color?: string;
+    status?: string;
   }) => {
     if (!state.selectedAppointment || !formData.startTime || !formData.endTime) return;
 
@@ -521,6 +598,7 @@ export default function CalendarPageClient({
           notes: formData.notes,
           category: formData.category,
           color: formData.color,
+          status: formData.status,
           providerId: state.selectedProvider?.id,
           resourceId: state.selectedResource?.id,
         }),
@@ -557,7 +635,7 @@ export default function CalendarPageClient({
     if (!state.selectedAppointment) return;
     const ok = await deleteAppointment(state.selectedAppointment.id);
     if (ok) {
-      setShowPreviewModal(false);
+      setShowCreateModal(false);
       setShowDeleteConfirm(false);
       actions.clearSelection();
       toast.success('Programarea a fost stearsa.');
@@ -568,13 +646,7 @@ export default function CalendarPageClient({
 
   const handleQuickStatusChange = async (status: string) => {
     if (!state.selectedAppointment) return;
-    const result = await updateAppointment(state.selectedAppointment.id, { status });
-    if (result.ok) {
-      refetch();
-      toast.success('Statusul a fost actualizat.');
-    } else {
-      toast.error(result.error || 'Nu s-a putut actualiza statusul.');
-    }
+    await updateStatusWithUndo(state.selectedAppointment, status);
   };
 
   const navigateToDate = (date: Date) => {
@@ -783,8 +855,7 @@ export default function CalendarPageClient({
             selectedDay={selectedDay}
             appointments={appointments}
             onAppointmentClick={(apt) => {
-              actions.selectAppointment(apt);
-              setShowPreviewModal(true);
+              void openAppointmentDetails(apt);
             }}
             onQuickStatusChange={handlePanelStatusChange}
             onCreateClick={() => handleSlotClick(selectedDay, 9)}
@@ -804,10 +875,20 @@ export default function CalendarPageClient({
         onSeedDemoServices={seedDemoDentalServices}
         isSeedingDemoServices={seedingDemoServices}
         mode={appointmentModalMode}
-        title={appointmentModalMode === 'edit' ? 'Editeaza programare' : 'Creeaza programare'}
+        title={
+          appointmentModalMode === 'view'
+            ? 'Detalii programare'
+            : appointmentModalMode === 'edit'
+              ? 'Editeaza programare'
+              : 'Creeaza programare'
+        }
         submitLabel={appointmentModalMode === 'edit' ? 'Salveaza modificarile' : 'Salveaza'}
         allowRecurring={appointmentModalMode === 'create'}
-        initialData={appointmentModalMode === 'edit' ? editInitialData : null}
+        initialData={editInitialData}
+        onModeChange={setAppointmentModalMode}
+        appointmentStatus={editInitialData?.status || state.selectedAppointment?.status}
+        onStatusChange={appointmentModalMode === 'create' ? undefined : handleQuickStatusChange}
+        onDelete={appointmentModalMode === 'view' ? () => setShowDeleteConfirm(true) : undefined}
         onClose={() => {
           setShowCreateModal(false);
           setAppointmentModalMode('create');
@@ -815,15 +896,6 @@ export default function CalendarPageClient({
           actions.clearSelection();
         }}
         onSubmit={appointmentModalMode === 'edit' ? handleEditAppointment : handleCreateAppointment}
-      />
-
-      <AppointmentPreviewModal
-        isOpen={showPreviewModal}
-        appointment={state.selectedAppointment}
-        onClose={() => { setShowPreviewModal(false); actions.clearSelection(); }}
-        onEdit={handleEditClick}
-        onDelete={() => setShowDeleteConfirm(true)}
-        onQuickStatusChange={handleQuickStatusChange}
       />
 
       <DeleteConfirmModal

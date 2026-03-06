@@ -62,7 +62,8 @@ export async function findOrCreateClient(
   tenantId: ObjectId,
   name: string,
   email?: string,
-  phone?: string
+  phone?: string,
+  forceNew: boolean = false
 ): Promise<Client> {
   const db = await getMongoDbOrThrow();
 
@@ -73,7 +74,7 @@ export async function findOrCreateClient(
 
   let existingClient: Client | null = null;
 
-  if (normalizedNameKey) {
+  if (!forceNew && normalizedNameKey) {
     const nameMatches = await db.collection('clients').find(
       {
         tenant_id: tenantId,
@@ -92,7 +93,8 @@ export async function findOrCreateClient(
     if (nameMatches.length === 1) {
       const match = nameMatches[0];
       const matchEmail = typeof match.email === 'string' ? match.email.trim().toLowerCase() : null;
-      if (!(normalizedEmail && matchEmail && matchEmail !== normalizedEmail)) {
+      const emailConflict = Boolean(normalizedEmail && matchEmail && matchEmail !== normalizedEmail);
+      if (!emailConflict) {
         existingClient = normalizeClientDoc(match);
       }
     } else if (nameMatches.length > 1) {
@@ -132,7 +134,8 @@ export async function findOrCreateClient(
       if (regexMatches.length === 1) {
         const match = regexMatches[0];
         const matchEmail = typeof match.email === 'string' ? match.email.trim().toLowerCase() : null;
-        if (!(normalizedEmail && matchEmail && matchEmail !== normalizedEmail)) {
+        const emailConflict = Boolean(normalizedEmail && matchEmail && matchEmail !== normalizedEmail);
+        if (!emailConflict) {
           existingClient = normalizeClientDoc(match);
         }
       } else if (regexMatches.length > 1) {
@@ -168,10 +171,6 @@ export async function findOrCreateClient(
 
     if (!existingClient.phone && normalizedPhone) {
       updates.phone = normalizedPhone;
-    }
-
-    if (existingClient.name !== normalizedName) {
-      updates.name = normalizedName;
     }
 
     if (Object.keys(updates).length > 0) {
@@ -225,7 +224,11 @@ export async function updateClientStats(clientId: number, tenantId: ObjectId): P
   if (!client) return;
 
   const [appointments, services, conversations] = await Promise.all([
-    db.collection('appointments').find({ client_id: clientId, tenant_id: tenantId }).toArray(),
+    db.collection('appointments').find({
+      client_id: clientId,
+      tenant_id: tenantId,
+      deleted_at: { $exists: false },
+    }).toArray(),
     db.collection('services').find({ tenant_id: tenantId }).toArray(),
     db.collection('conversations').find({ client_id: clientId, tenant_id: tenantId }).toArray(),
   ]);

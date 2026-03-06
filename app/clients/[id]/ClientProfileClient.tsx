@@ -257,13 +257,13 @@ export default function ClientProfileClient({
   const getAppointmentStatusClass = (status: string) => {
     switch (status) {
       case 'completed':
-        return styles.statusCompleted;
+        return styles.statusFinalizat;
       case 'scheduled':
         return styles.statusScheduled;
       case 'cancelled':
-        return styles.statusCancelled;
+        return styles.statusAnulat;
       case 'no-show':
-        return styles.statusNoShow;
+        return styles.statusAbsent;
       default:
         return styles.statusDefault;
     }

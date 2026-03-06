@@ -106,24 +106,34 @@
 .badgeActive,
 .statusScheduled,
 .badgeDefault {
-  background: rgba(77, 163, 255, 0.11);
-  color: #bddfff;
-  border-color: rgba(77, 163, 255, 0.3);
+  background: #f3f4f6;
+  color: #6b7280;
+  border-color: #e5e7eb;
 }
 
-.statusCompleted {
-  background: rgba(52, 211, 153, 0.12);
-  color: #a7f3d0;
-  border-color: rgba(52, 211, 153, 0.3);
+.statusFinalizat {
+  background: #dcfce7;
+  color: #15803d;
+  border-color: #bbf7d0;
 }
 
 .badgeInactive,
-.statusCancelled,
-.statusNoShow,
 .statusDefault {
   background: rgba(148, 163, 184, 0.12);
   color: var(--color-text-soft);
   border-color: var(--color-border);
+}
+
+.statusAnulat {
+  background: #fef3c7;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+.statusAbsent {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fecaca;
 }
 
 .emailLink {

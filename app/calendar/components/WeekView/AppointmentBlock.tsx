@@ -17,7 +17,14 @@ interface AppointmentBlockProps {
 
 export const AppointmentBlock = React.memo<AppointmentBlockProps>(
   ({ appointment, style, onClick, onDragStart, onDragEnd, isDragging = false, enableDragDrop = false, providers = [] }) => {
-    const appointmentStatusClass = appointment.status === 'no-show' ? 'no_show' : appointment.status;
+    const appointmentStatusClass =
+      appointment.status === 'completed'
+        ? 'statusFinalizat'
+        : appointment.status === 'cancelled'
+          ? 'statusAnulat'
+          : appointment.status === 'no-show' || appointment.status === 'no_show'
+            ? 'statusAbsent'
+            : 'statusScheduled';
     const badgeStatusClass = appointment.status === 'no_show' ? 'no-show' : appointment.status;
     const isPast = new Date(appointment.end_time).getTime() < Date.now();
 
@@ -80,7 +87,7 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
           <div className={styles.appointmentTitle}>{appointment.client_name}</div>
           <span className={`${styles.statusBadge} ${styles[`statusBadge--${badgeStatusClass}`]}`}>
             {badgeStatusClass === 'scheduled' && 'Programat'}
-            {badgeStatusClass === 'completed' && 'Completat'}
+            {badgeStatusClass === 'completed' && 'Finalizat'}
             {badgeStatusClass === 'cancelled' && 'Anulat'}
             {badgeStatusClass === 'no-show' && 'Absent'}
           </span>

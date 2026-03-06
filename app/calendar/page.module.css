@@ -702,28 +702,29 @@
   box-shadow: var(--focus-ring);
 }
 
-.appointment.scheduled {
-  background: var(--gradient-accent);
-  color: var(--color-accent-contrast);
+.appointment.statusScheduled {
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
 }
 
-.appointment.completed {
-  background: var(--color-border);
-  color: var(--color-text-soft);
-  border: 1px solid var(--color-border-strong);
+.appointment.statusFinalizat {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
 }
 
-.appointment.cancelled {
-  background: var(--color-border);
-  color: var(--color-text-soft);
-  border: 1px solid var(--color-border-strong);
-  opacity: 0.5;
+.appointment.statusAnulat {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  opacity: 0.72;
 }
 
-.appointment.no_show {
-  background: var(--color-border);
-  color: var(--color-text-soft);
-  border: 1px solid var(--color-border-strong);
+.appointment.statusAbsent {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
 }
 
 .appointment.isPast {
@@ -781,27 +782,27 @@
 }
 
 .statusBadge--scheduled {
-  background: color-mix(in srgb, var(--color-accent) 24%, transparent);
-  color: color-mix(in srgb, var(--color-accent) 72%, white);
-  border: 1px solid color-mix(in srgb, var(--color-accent) 40%, transparent);
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
 }
 
 .statusBadge--completed {
-  background: color-mix(in srgb, var(--color-success) 24%, transparent);
-  color: color-mix(in srgb, var(--color-success) 74%, white);
-  border: 1px solid color-mix(in srgb, var(--color-success) 40%, transparent);
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
 }
 
 .statusBadge--cancelled {
-  background: color-mix(in srgb, var(--color-danger) 24%, transparent);
-  color: color-mix(in srgb, var(--color-danger) 76%, white);
-  border: 1px solid color-mix(in srgb, var(--color-danger) 40%, transparent);
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
 }
 
 .statusBadge--no-show {
-  background: color-mix(in srgb, var(--color-text-soft) 24%, transparent);
-  color: color-mix(in srgb, var(--color-text-soft) 80%, white);
-  border: 1px solid color-mix(in srgb, var(--color-text-soft) 40%, transparent);
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -947,20 +948,26 @@
 }
 
 .monthAppointment.scheduled {
-  background: var(--gradient-accent);
-  color: var(--color-accent-contrast);
+  background: #f3f4f6;
+  color: #6b7280;
 }
 
 .monthAppointment.completed {
-  background: var(--color-border);
-  color: var(--color-text-soft);
-  opacity: 0.7;
+  background: #dcfce7;
+  color: #15803d;
+  opacity: 0.82;
 }
 
 .monthAppointment.cancelled {
-  background: var(--color-border);
-  color: var(--color-text-soft);
-  opacity: 0.5;
+  background: #fef3c7;
+  color: #b45309;
+  opacity: 0.7;
+}
+
+.monthAppointment.no_show {
+  background: #fee2e2;
+  color: #b91c1c;
+  opacity: 0.82;
 }
 
 .monthAppointment.isPast {
@@ -1011,10 +1018,57 @@
 
 .modal h3 {
   font-size: 1.18rem;
-  margin-bottom: 1.2rem;
+  margin: 0;
   color: var(--color-text);
   font-weight: 500;
   letter-spacing: -0.01em;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+
+.modalHeaderActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.modalIconButton {
+  width: 32px;
+  height: 32px;
+  min-height: unset;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+
+.modalIconButton:hover {
+  background: var(--color-surface-strong);
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+  transform: translateY(-1px);
+}
+
+.modalIconButtonDanger {
+  color: color-mix(in srgb, var(--color-danger) 76%, white);
+  border-color: color-mix(in srgb, var(--color-danger) 36%, transparent);
+}
+
+.modalIconButtonDanger:hover {
+  background: color-mix(in srgb, var(--color-danger) 14%, transparent);
+  border-color: color-mix(in srgb, var(--color-danger) 55%, transparent);
+  color: color-mix(in srgb, var(--color-danger) 86%, white);
 }
 
 .modalContent {
@@ -1039,6 +1093,23 @@
 .modalField label {
   font-size: 0.78rem;
   font-weight: 400;
+  color: var(--color-text-soft);
+}
+
+.readOnlyValue {
+  min-height: 44px;
+  padding: 0.78rem 0.86rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 88%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-muted) 72%, var(--color-surface));
+  color: var(--color-text);
+  font-size: 0.92rem;
+  line-height: 1.5;
+  display: flex;
+  align-items: center;
+}
+
+.readOnlyValueMuted {
   color: var(--color-text-soft);
 }
 
@@ -1502,6 +1573,51 @@
   padding: 0.25rem 0;
 }
 
+.sameNameBanner {
+  margin-top: 0.55rem;
+  border: 1px solid color-mix(in srgb, #eab308 45%, var(--color-border));
+  background: color-mix(in srgb, #fef3c7 72%, var(--color-surface));
+  border-radius: var(--radius-md);
+  padding: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.sameNameBannerText {
+  font-size: 0.78rem;
+  color: color-mix(in srgb, #854d0e 82%, var(--color-text));
+  line-height: 1.45;
+}
+
+.sameNameBannerActions {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.sameNameBannerPrimary,
+.sameNameBannerSecondary {
+  min-height: unset;
+  border-radius: var(--radius-md);
+  padding: 0.58rem 0.8rem;
+  font-size: 0.78rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.sameNameBannerPrimary {
+  border: 1px solid color-mix(in srgb, #ca8a04 50%, transparent);
+  background: color-mix(in srgb, #facc15 28%, transparent);
+  color: color-mix(in srgb, #854d0e 88%, var(--color-text));
+}
+
+.sameNameBannerSecondary {
+  border: 1px solid color-mix(in srgb, #d1d5db 65%, var(--color-border));
+  background: transparent;
+  color: var(--color-text-soft);
+}
+
 .serviceSeedBox {
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-md);
@@ -1674,6 +1790,66 @@
   margin-top: 1.2rem;
 }
 
+.modalFooterStack {
+  margin-top: 1.2rem;
+}
+
+.modalFieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+}
+
+.modalFieldset:disabled {
+  opacity: 1;
+}
+
+.statusSegmentedControl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.statusSegmentButton {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text-soft);
+  border-radius: var(--radius-md);
+  padding: 0.65rem 0.75rem;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+
+.statusSegmentButton:hover {
+  background: var(--color-surface-strong);
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+  transform: translateY(-1px);
+}
+
+.statusSegmentButtonActive {
+  color: white;
+  box-shadow: var(--shadow-sm);
+}
+
+.statusSegmentButton[data-status="completed"].statusSegmentButtonActive {
+  background: #16a34a;
+  border-color: #16a34a;
+}
+
+.statusSegmentButton[data-status="cancelled"].statusSegmentButtonActive {
+  background: #d97706;
+  border-color: #d97706;
+}
+
+.statusSegmentButton[data-status="no-show"].statusSegmentButtonActive {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
 .cancelButton {
   padding: 0.72rem 1.35rem;
   background: transparent;
@@ -1778,28 +1954,28 @@
   letter-spacing: 0.3px;
 }
 
-.previewStatusBadge.scheduled {
-  background: color-mix(in srgb, var(--color-success) 20%, transparent);
-  color: color-mix(in srgb, var(--color-success) 72%, white);
-  border: 1px solid color-mix(in srgb, var(--color-success) 36%, transparent);
+.statusFinalizat {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
 }
 
-.previewStatusBadge.completed {
-  background: color-mix(in srgb, var(--color-text-soft) 16%, transparent);
-  color: var(--color-text-muted);
-  border: 1px solid var(--color-border);
+.statusAnulat {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
 }
 
-.previewStatusBadge.cancelled {
-  background: color-mix(in srgb, var(--color-danger) 20%, transparent);
-  color: color-mix(in srgb, var(--color-danger) 78%, white);
-  border: 1px solid color-mix(in srgb, var(--color-danger) 36%, transparent);
+.statusAbsent {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
 }
 
-.previewStatusBadge.no_show {
-  background: color-mix(in srgb, var(--color-danger) 14%, var(--color-accent) 8%);
-  color: color-mix(in srgb, var(--color-danger) 42%, white);
-  border: 1px solid color-mix(in srgb, var(--color-danger) 34%, var(--color-accent) 16%);
+.statusScheduled {
+  background: #f3f4f6;
+  color: #6b7280;
+  border: 1px solid #e5e7eb;
 }
 
 .previewActions {
@@ -1926,4 +2102,5 @@
   .deleteSheet { width: 100%; border-radius: var(--radius-lg) var(--radius-lg) 0 0; margin-top: auto; }
   .modalActions { position: sticky; bottom: 0; background: var(--color-surface); padding-top: 0.8rem; }
   .modalFieldRow { grid-template-columns: 1fr; gap: 1rem; }
+  .statusSegmentedControl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

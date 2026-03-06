@@ -6,13 +6,19 @@ import { useRef } from 'react';
 import styles from '../../page.module.css';
 import type { Appointment } from '../../hooks/useCalendar';
 
+const STATUS_OPTIONS = [
+  { value: 'completed', label: 'Finalizat' },
+  { value: 'cancelled', label: 'Anulat' },
+  { value: 'no-show', label: 'Absent' },
+] as const;
+
 interface AppointmentPreviewModalProps {
   isOpen: boolean;
   appointment: Appointment | null;
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onQuickStatusChange?: (status: string) => void;
+  onQuickStatusChange?: (status: string) => Promise<void> | void;
 }
 
 export function AppointmentPreviewModal({
@@ -24,17 +30,22 @@ export function AppointmentPreviewModal({
   onQuickStatusChange,
 }: AppointmentPreviewModalProps) {
   const backdropPressStartedRef = useRef(false);
-  const normalizedStatus = appointment?.status === 'no-show' ? 'no_show' : appointment?.status;
+  const normalizedStatus =
+    appointment?.status === 'completed'
+      ? 'statusFinalizat'
+      : appointment?.status === 'cancelled'
+        ? 'statusAnulat'
+        : appointment?.status === 'no-show' || appointment?.status === 'no_show'
+          ? 'statusAbsent'
+          : 'statusScheduled';
   const statusLabel =
-    appointment?.status === 'scheduled'
-      ? 'Programat'
-      : appointment?.status === 'completed'
-        ? 'Completat'
-        : appointment?.status === 'cancelled'
-          ? 'Anulat'
-          : appointment?.status === 'no-show' || appointment?.status === 'no_show'
-            ? 'Absent'
-            : appointment?.status;
+    appointment?.status === 'completed'
+      ? 'Finalizat'
+      : appointment?.status === 'cancelled'
+        ? 'Anulat'
+        : appointment?.status === 'no-show' || appointment?.status === 'no_show'
+          ? 'Absent'
+          : 'Programat';
 
   const handleBackdropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     backdropPressStartedRef.current = event.target === event.currentTarget;
@@ -69,7 +80,7 @@ export function AppointmentPreviewModal({
             <p className={styles.previewSubtitle}>{appointment.service_name}</p>
           </div>
           <button className={styles.closeButton} onClick={onClose}>
-            ×
+            x
           </button>
         </div>
 
@@ -104,43 +115,21 @@ export function AppointmentPreviewModal({
             )}
           </div>
 
-          {onQuickStatusChange && appointment.status !== 'completed' && (
+          {onQuickStatusChange && (
             <div className={styles.quickActionsSection}>
-              <p className={styles.quickActionsLabel}>Actiuni rapide:</p>
-              <div className={styles.quickActionButtons}>
-                {appointment.status !== 'completed' && (
+              <p className={styles.quickActionsLabel}>Status</p>
+              <div className={styles.statusSegmentedControl}>
+                {STATUS_OPTIONS.map((statusOption) => (
                   <button
-                    className={`${styles.quickActionButton} ${styles.quickActionCompleted}`}
-                    onClick={() => {
-                      onQuickStatusChange('completed');
-                      onClose();
-                    }}
+                    key={statusOption.value}
+                    type="button"
+                    data-status={statusOption.value}
+                    className={`${styles.statusSegmentButton} ${appointment.status !== 'scheduled' && appointment.status === statusOption.value ? styles.statusSegmentButtonActive : ''}`}
+                    onClick={() => onQuickStatusChange(statusOption.value)}
                   >
-                    ✓ Completeaza
+                    {statusOption.label}
                   </button>
-                )}
-                {appointment.status !== 'cancelled' && (
-                  <button
-                    className={`${styles.quickActionButton} ${styles.quickActionCancelled}`}
-                    onClick={() => {
-                      onQuickStatusChange('cancelled');
-                      onClose();
-                    }}
-                  >
-                    ✕ Anuleaza
-                  </button>
-                )}
-                {appointment.status !== 'no-show' && (
-                  <button
-                    className={`${styles.quickActionButton} ${styles.quickActionNoShow}`}
-                    onClick={() => {
-                      onQuickStatusChange('no-show');
-                      onClose();
-                    }}
-                  >
-                    ⚠ Absent
-                  </button>
-                )}
+                ))}
               </div>
             </div>
           )}
