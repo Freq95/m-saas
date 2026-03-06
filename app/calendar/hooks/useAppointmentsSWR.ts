@@ -124,6 +124,8 @@ export function useAppointmentsSWR({
   // Calculate date range
   let startDate: Date;
   let endDate: Date;
+  const trimmedSearch = search?.trim();
+  const isGlobalSearch = Boolean(trimmedSearch);
 
   if (viewType === 'day') {
     startDate = startOfDay(currentDate);
@@ -140,9 +142,12 @@ export function useAppointmentsSWR({
   // Build query string
   const queryParams = new URLSearchParams({
     userId: String(effectiveUserId || ''),
-    startDate: startDate.toISOString(),
-    endDate: endDate.toISOString(),
   });
+
+  if (!isGlobalSearch) {
+    queryParams.set('startDate', startDate.toISOString());
+    queryParams.set('endDate', endDate.toISOString());
+  }
 
   if (providerId) {
     queryParams.append('providerId', providerId.toString());
@@ -152,7 +157,6 @@ export function useAppointmentsSWR({
     queryParams.append('resourceId', resourceId.toString());
   }
 
-  const trimmedSearch = search?.trim();
   if (trimmedSearch) {
     queryParams.append('search', trimmedSearch);
   }
@@ -166,7 +170,7 @@ export function useAppointmentsSWR({
     isLoading,
     mutate,
   } = useSWR<Appointment[]>(url, fetcher, {
-    fallbackData: initialAppointments,
+    fallbackData: isGlobalSearch ? [] : initialAppointments,
     keepPreviousData: true,
     revalidateOnFocus: false, // Don't refetch when window regains focus
     dedupingInterval: 10000, // 10 seconds deduplication

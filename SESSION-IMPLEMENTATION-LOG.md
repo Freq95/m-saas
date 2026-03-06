@@ -1091,3 +1091,42 @@ Scope: Auth + super-admin + invite flow + audit + tenant/user lifecycle controls
   - fallback -> `Email`
 - Updated `app/inbox/page.module.css` with red Yahoo badge and green Gmail badge variants.
 - Validation: `npx tsc --noEmit` passed.
+
+## 42) Automated Test Baseline + Pricing Consistency Fix (2026-03-06)
+- Added Vitest test framework setup:
+  - `vitest.config.ts`
+  - `tests/setup.ts`
+  - `package.json` scripts:
+    - `test`
+    - `test:run`
+    - `test:coverage`
+- Added integration tests for password reset lifecycle:
+  - `tests/integration/password-reset.lifecycle.test.ts`
+  - coverage:
+    - token issue via forgot-password flow
+    - valid token check
+    - single-use token consume on reset
+    - replay denial after consume
+    - expired token denial
+- Added UI test for stacked modal keyboard behavior:
+  - `tests/ui/create-appointment-modal.esc-priority.test.tsx`
+  - verifies `Escape` priority:
+    - first `Escape` closes inner picker/popover
+    - second `Escape` closes modal
+- Added API behavior test for appointment patch pricing:
+  - `tests/api/appointments.patch-price-at-time.test.ts`
+  - verifies:
+    - `price_at_time` updates when `serviceId` changes
+    - `price_at_time` is preserved on unrelated PATCH fields
+- Added cross-module pricing consistency test:
+  - `tests/consistency/dashboard-client-stats.pricing-source.test.ts`
+  - verifies both dashboard and client stats compute using:
+    - `appointment.price_at_time` first
+    - fallback to current `service.price` when snapshot is missing
+- Shipped supporting correctness fix:
+  - `lib/server/dashboard.ts`
+  - added `price_at_time` to appointment projection used by dashboard revenue calculation.
+
+### Validation
+- `npm run typecheck` passed.
+- `npm run test:run` passed (`4` test files, `7` tests).

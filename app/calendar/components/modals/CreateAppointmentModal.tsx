@@ -554,6 +554,20 @@ export function CreateAppointmentModal({
   const isDirty = useMemo(() => {
     if (mode === 'view') return false;
 
+    const initialRecurrence = {
+      ...DEFAULT_RECURRENCE,
+      ...(initialData?.recurrence || {}),
+    };
+    const recurrenceChanged =
+      isRecurring && (
+        recurrence.frequency !== initialRecurrence.frequency ||
+        recurrence.interval !== initialRecurrence.interval ||
+        recurrence.endType !== initialRecurrence.endType ||
+        (recurrence.endType === 'date'
+          ? recurrence.endDate !== initialRecurrence.endDate
+          : recurrence.count !== initialRecurrence.count)
+      );
+
     return (
       formData.clientName !== (initialData?.clientName ?? '') ||
       formData.clientEmail !== (initialData?.clientEmail ?? '') ||
@@ -565,7 +579,8 @@ export function CreateAppointmentModal({
       selectedEndTime !== initialEndTimeValue ||
       selectedCategory !== (initialData?.category ?? '') ||
       selectedStatus !== (initialData?.status ?? appointmentStatus ?? 'scheduled') ||
-      isRecurring !== Boolean(initialData?.isRecurring)
+      isRecurring !== Boolean(initialData?.isRecurring) ||
+      recurrenceChanged
     );
   }, [
     appointmentStatus,
@@ -577,6 +592,7 @@ export function CreateAppointmentModal({
     initialStartTimeValue,
     isRecurring,
     mode,
+    recurrence,
     selectedCategory,
     selectedDate,
     selectedEndTime,
@@ -591,14 +607,10 @@ export function CreateAppointmentModal({
     onClose();
   };
 
-  if (!isOpen || !selectedSlot) return null;
-
-  const modalTitle =
-    title || (mode === 'view' ? 'Detalii programare' : mode === 'edit' ? 'Editeaza programare' : 'Creeaza programare');
-  const modalSubmitLabel = submitLabel || (mode === 'edit' ? 'Salveaza modificarile' : 'Salveaza');
-  const activeCategoryColor = CATEGORIES.find((c) => c.label === selectedCategory)?.color;
-
   const resetCreateFormState = () => {
+    if (!selectedSlot) {
+      return;
+    }
     setFormData({
       clientName: '',
       clientEmail: '',
@@ -646,6 +658,13 @@ export function CreateAppointmentModal({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isDatePickerOpen, isDirty, isEndTimePickerOpen, isOpen, isServicePickerOpen, isStartTimePickerOpen, onClose]);
+
+  if (!isOpen || !selectedSlot) return null;
+
+  const modalTitle =
+    title || (mode === 'view' ? 'Detalii programare' : mode === 'edit' ? 'Editeaza programare' : 'Creeaza programare');
+  const modalSubmitLabel = submitLabel || (mode === 'edit' ? 'Salveaza modificarile' : 'Salveaza');
+  const activeCategoryColor = CATEGORIES.find((c) => c.label === selectedCategory)?.color;
 
   const handleSubmit = async () => {
     if (isSubmitting) return;

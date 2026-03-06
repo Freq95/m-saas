@@ -314,6 +314,14 @@ export default function CalendarPageClient({
         setShowDateDropdown(false);
         return;
       }
+      if (showDeleteConfirm) {
+        setShowDeleteConfirm(false);
+        return;
+      }
+      if (showConflictModal) {
+        setShowConflictModal(false);
+        return;
+      }
       if (showCreateModal) return;
       setShowCreateModal(false);
       setShowDeleteConfirm(false);
@@ -321,7 +329,7 @@ export default function CalendarPageClient({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [showCreateModal, showDateDropdown]);
+  }, [showConflictModal, showCreateModal, showDateDropdown, showDeleteConfirm]);
 
   useEffect(() => {
     return () => {
@@ -630,6 +638,7 @@ export default function CalendarPageClient({
           }
         }
         setConflictData({ conflicts, suggestions });
+        setShowCreateModal(false);
         setShowConflictModal(true);
       } else {
         toast.error(result.error || 'Nu s-a putut actualiza programarea.');
@@ -862,9 +871,7 @@ export default function CalendarPageClient({
             topControls={weekToolbarControls}
             selectedDay={selectedDay}
             appointments={appointments}
-            onAppointmentClick={(apt) => {
-              void openAppointmentDetails(apt);
-            }}
+            onAppointmentClick={handleAppointmentClick}
             onQuickStatusChange={handlePanelStatusChange}
             onCreateClick={() => handleSlotClick(selectedDay, 9)}
             onNavigate={(date) => {
@@ -896,7 +903,10 @@ export default function CalendarPageClient({
         onModeChange={setAppointmentModalMode}
         appointmentStatus={editInitialData?.status || state.selectedAppointment?.status}
         onStatusChange={appointmentModalMode === 'create' ? undefined : handleQuickStatusChange}
-        onDelete={appointmentModalMode === 'view' ? () => setShowDeleteConfirm(true) : undefined}
+        onDelete={appointmentModalMode === 'view' ? () => {
+          setShowCreateModal(false);
+          setShowDeleteConfirm(true);
+        } : undefined}
         onClose={() => {
           setShowCreateModal(false);
           setAppointmentModalMode('create');

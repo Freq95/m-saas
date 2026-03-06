@@ -11,6 +11,7 @@ const FORGOT_PASSWORD_LIMIT = 7;
 const FORGOT_PASSWORD_WINDOW_MS = 60 * 60 * 1000;
 const forgotPasswordFallbackStore = new Map<string, { count: number; resetAt: number }>();
 let forgotPasswordLimiter: Ratelimit | null = null;
+let passwordResetIndexesEnsured = false;
 
 function hashToken(token: string) {
   return crypto.createHash('sha256').update(token).digest('hex');
@@ -50,6 +51,17 @@ async function isForgotPasswordRateLimited(identifier: string): Promise<boolean>
   return false;
 }
 
+async function ensurePasswordResetTokenIndexes(db: Awaited<ReturnType<typeof getMongoDbOrThrow>>) {
+  if (passwordResetIndexesEnsured) return;
+  await db.collection('password_reset_tokens').createIndexes([
+    { key: { token_hash: 1 }, unique: true },
+    { key: { expires_at: 1 }, expireAfterSeconds: 0 },
+    { key: { email: 1, used_at: 1 } },
+    { key: { user_id: 1, created_at: -1 } },
+  ]);
+  passwordResetIndexesEnsured = true;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const ip =
@@ -68,13 +80,14 @@ export async function POST(request: NextRequest) {
     }
 
     const db = await getMongoDbOrThrow();
+    await ensurePasswordResetTokenIndexes(db);
     const user = await db.collection('users').findOne({ email, status: 'active' });
 
     if (user) {
       const token = crypto.randomBytes(32).toString('hex');
       const tokenHash = hashToken(token);
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-      const now = new Date().toISOString();
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+      const now = new Date();
       const resetLinkBase = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
       const resetLink = `${resetLinkBase}/reset-password?token=${encodeURIComponent(token)}`;
 
@@ -83,6 +96,7 @@ export async function POST(request: NextRequest) {
         email,
         token_hash: tokenHash,
         expires_at: expiresAt,
+        used_at: null,
         created_at: now,
         updated_at: now,
       });

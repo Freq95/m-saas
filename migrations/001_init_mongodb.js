@@ -19,6 +19,7 @@ const collections = [
   'tenants',
   'team_members',
   'invite_tokens',
+  'password_reset_tokens',
   'users',
   'clients',
   'conversations',
@@ -58,6 +59,12 @@ const indexPlan = {
     { key: { token: 1 }, unique: true },
     { key: { expires_at: 1 }, expireAfterSeconds: 0 },
     { key: { email: 1, used_at: 1 } },
+  ],
+  password_reset_tokens: [
+    { key: { token_hash: 1 }, unique: true },
+    { key: { expires_at: 1 }, expireAfterSeconds: 0 },
+    { key: { email: 1, used_at: 1 } },
+    { key: { user_id: 1, created_at: -1 } },
   ],
   users: [{ key: { email: 1 } }, { key: { tenant_id: 1, role: 1 } }],
   clients: [

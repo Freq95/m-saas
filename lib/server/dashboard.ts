@@ -84,6 +84,7 @@ export async function getDashboardData(
       start_time: 1,
       end_time: 1,
       status: 1,
+      price_at_time: 1,
     };
 
     const appointmentsRangeQuery = db
@@ -307,7 +308,10 @@ export async function getDashboardData(
       .filter((appointment: any) => ['scheduled', 'completed'].includes(appointment.status))
       .reduce((sum: number, appointment: any) => {
         const service = servicesMap.get(appointment.service_id);
-        return sum + (typeof service?.price === 'number' ? service.price : 0);
+        const price = typeof appointment.price_at_time === 'number'
+          ? appointment.price_at_time
+          : (typeof service?.price === 'number' ? service.price : 0);
+        return sum + price;
       }, 0);
 
     const todayAppointments = (todayAppointmentsRaw as any[]).map((appointment: any) => {

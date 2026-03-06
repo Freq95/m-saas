@@ -324,8 +324,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
   const yahooLastEmail = yahooIntegration ? lastEmailByIntegration[yahooIntegration.id] : null;
   const gmailLastEmail = gmailIntegration ? lastEmailByIntegration[gmailIntegration.id] : null;
   const activeIntegrations = integrations.filter((integration) => integration.is_active);
-  const bannerIntegrations = activeIntegrations.length > 0 ? activeIntegrations : integrations;
-  const latestSyncAt = bannerIntegrations
+  const latestSyncAt = activeIntegrations
     .map((integration) => integration.last_sync_at)
     .filter((value): value is string => Boolean(value))
     .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || null;
@@ -390,10 +389,10 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
           de aplicatie.
         </p>
         <SettingsTabs activeTab="email" />
-        {bannerIntegrations.length > 0 ? (
+        {activeIntegrations.length > 0 ? (
           <div className={styles.connectedBanner}>
             <span>
-              Conectat: {bannerIntegrations.map((integration) => `${integration.provider} (${integration.email})`).join(', ')}
+              Conectat: {activeIntegrations.map((integration) => `${integration.provider} (${integration.email})`).join(', ')}
             </span>
             {latestSyncAt && (
               <span>

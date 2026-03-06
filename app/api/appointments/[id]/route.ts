@@ -142,7 +142,9 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       cancelled: 'Anulat',
       'no-show': 'Absent',
     };
-    const currentStatus = String(existingAppointment.status || 'scheduled');
+    const currentStatus = existingAppointment.status === 'no_show'
+      ? 'no-show'
+      : String(existingAppointment.status || 'scheduled');
     const warning = status && WARN_TRANSITIONS[currentStatus]?.includes(status)
       ? `Schimbi statusul de la ${STATUS_LABELS[currentStatus] || currentStatus} la ${STATUS_LABELS[status] || status}. Esti sigur?`
       : null;
@@ -251,7 +253,16 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     }
 
     if (serviceId !== undefined) {
+      const serviceDoc = await db.collection('services').findOne({
+        id: serviceId,
+        user_id: existingAppointment.user_id,
+        tenant_id: tenantId,
+      });
+      if (!serviceDoc) {
+        return createErrorResponse('Service not found', 400);
+      }
       updates.service_id = serviceId;
+      updates.price_at_time = typeof serviceDoc.price === 'number' ? serviceDoc.price : null;
     }
 
     const shouldUpdateClient =

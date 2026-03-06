@@ -1,6 +1,6 @@
 # m-saas Project Status
 
-**Last Updated:** 2026-03-04
+**Last Updated:** 2026-03-06
 **MVP Version:** V1 (~90% complete)
 **Database:** MongoDB
 **Framework:** Next.js App Router (updated to latest in security remediation pass)
@@ -27,6 +27,26 @@
 ---
 
 ## Claude Review Status
+
+### Automated Test Baseline â€” IMPLEMENTED (2026-03-06)
+- Added Vitest scripts:
+  - `npm test`
+  - `npm run test:run`
+  - `npm run test:coverage`
+- Added focused automated suites:
+  - `tests/integration/password-reset.lifecycle.test.ts`
+    - token issue, single-use consumption, expiry check, replay denial
+  - `tests/ui/create-appointment-modal.esc-priority.test.tsx`
+    - stacked modal keyboard priority: `Escape` closes inner picker before modal close
+  - `tests/api/appointments.patch-price-at-time.test.ts`
+    - `PATCH /api/appointments/[id]` preserves `price_at_time` on non-service updates and updates it on service change
+  - `tests/consistency/dashboard-client-stats.pricing-source.test.ts`
+    - dashboard/client-stats pricing consistency (`price_at_time` first, service price fallback)
+- Supporting fix shipped with these tests:
+  - `lib/server/dashboard.ts` appointment projection now includes `price_at_time` so estimated revenue uses appointment snapshot price correctly.
+- Validation:
+  - `npm run typecheck` passed
+  - `npm run test:run` passed (`4` files, `7` tests)
 
 ### Inbox Provider Label Consistency â€” IMPLEMENTED (2026-03-04)
 - Email conversations now render provider-aware labels in Inbox:
@@ -265,7 +285,7 @@ npm run bench:gui
 
 ## Technical Debt
 
-1. **No automated tests** - Zero test coverage
+1. **Automated tests are baseline-only** - 4 focused suites exist; broader coverage is still needed
 2. **Mock AI responses** - Returns static data without OpenAI key
 3. **Reminders not automated** - Function exists but no cron trigger
 4. **Settings page size** - Large component (~500 lines), needs splitting
