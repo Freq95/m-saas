@@ -92,6 +92,7 @@ export async function POST(request: NextRequest) {
       exportToGoogle,
       googleAccessToken,
     } = validationResult.data;
+    const serviceDoc = await db.collection('services').findOne({ id: serviceId, user_id: userId, tenant_id: tenantId });
 
     const start = typeof startTime === 'string' ? new Date(startTime) : startTime;
 
@@ -100,7 +101,6 @@ export async function POST(request: NextRequest) {
     if (endTime) {
       end = typeof endTime === 'string' ? new Date(endTime) : endTime;
     } else {
-      const serviceDoc = await db.collection('services').findOne({ id: serviceId, user_id: userId, tenant_id: tenantId });
       const durationMinutes = serviceDoc?.duration_minutes || 60;
       end = new Date(start);
       end.setMinutes(end.getMinutes() + durationMinutes);
@@ -157,6 +157,7 @@ export async function POST(request: NextRequest) {
       category: category || null,
       color: color || null,
       notes: notes || null,
+      price_at_time: typeof serviceDoc?.price === 'number' ? serviceDoc.price : null,
       reminder_sent: false,
       created_at: now,
       updated_at: now,

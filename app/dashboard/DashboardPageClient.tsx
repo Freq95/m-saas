@@ -213,10 +213,19 @@ export default function DashboardPageClient() {
                 dashboard.today.appointmentsList.map((apt) => {
                   const startTime = new Date(apt.start_time);
                   const endTime = new Date(apt.end_time);
-                  const statusValue = apt.status || 'scheduled';
-                  const statusClass = styles[
-                    `status${statusValue.charAt(0).toUpperCase() + statusValue.slice(1).replace('_', '')}`
-                  ] || '';
+                  const statusValue = apt.status === 'no_show' ? 'no-show' : (apt.status || 'scheduled');
+                  const statusLabel = {
+                    scheduled: 'Programat',
+                    completed: 'Finalizat',
+                    cancelled: 'Anulat',
+                    'no-show': 'Absent',
+                  }[statusValue] || statusValue;
+                  const statusClass = {
+                    scheduled: styles.statusScheduled,
+                    completed: styles.statusCompleted,
+                    cancelled: styles.statusCancelled,
+                    'no-show': styles.statusNoShow,
+                  }[statusValue] || '';
 
                   return (
                     <div key={apt.id} className={styles.appointmentItem}>
@@ -233,7 +242,7 @@ export default function DashboardPageClient() {
                         <div className={styles.appointmentClient}>{apt.client_name || 'Unknown'}</div>
                         <div className={styles.appointmentService}>{apt.service_name || 'Unknown'}</div>
                       </div>
-                      <div className={`${styles.appointmentStatus} ${statusClass}`}>{statusValue}</div>
+                      <div className={`${styles.appointmentStatus} ${statusClass}`}>{statusLabel}</div>
                     </div>
                   );
                 })
@@ -272,20 +281,27 @@ export default function DashboardPageClient() {
             <div className={styles.clientCard}>
               <h4>Clienti Inactivi (30+ zile)</h4>
               {dashboard.clients.inactiveClients.length > 0 ? (
-                <div className={styles.clientList}>
-                  {dashboard.clients.inactiveClients.slice(0, 5).map((client) => (
-                    <Link key={client.id} href={`/clients/${client.id}`} className={styles.clientItem}>
-                      <div className={styles.clientName}>{client.name}</div>
-                      <div className={styles.clientMeta}>
-                        {client.last_appointment_date
-                          ? `Ultima vizita: ${format(new Date(client.last_appointment_date), 'dd MMM yyyy', { locale: ro })}`
-                          : 'Fara programari'}
-                      </div>
+                <>
+                  <div className={styles.clientList}>
+                    {dashboard.clients.inactiveClients.slice(0, 5).map((client) => (
+                      <Link key={client.id} href={`/clients/${client.id}`} className={styles.clientItem}>
+                        <div className={styles.clientName}>{client.name}</div>
+                        <div className={styles.clientMeta}>
+                          {client.last_appointment_date
+                            ? `Ultima vizita: ${format(new Date(client.last_appointment_date), 'dd MMM yyyy', { locale: ro })}`
+                            : 'Fara programari'}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                  {dashboard.clients.inactiveClients.length > 5 && (
+                    <Link href="/clients?filter=inactive" className={styles.viewAllLink}>
+                      Vezi toti ({dashboard.clients.inactiveClients.length})
                     </Link>
-                  ))}
-                </div>
+                  )}
+                </>
               ) : (
-                <div className={styles.empty}>Nu exista clienti inactivi</div>
+                <div className={styles.empty}>Toti clientii sunt activi. Felicitari!</div>
               )}
             </div>
 

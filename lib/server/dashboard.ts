@@ -291,11 +291,15 @@ export async function getDashboardData(
     const services = serviceIds.length > 0 ? await servicesQuery.toArray() : [];
     const servicesMap = new Map<number, any>(services.map((service: any) => [service.id, service]));
 
-    const noShows = (appointmentsInRange as any[]).filter(
-      (appointment: any) => appointment.status === 'no_show' || appointment.status === 'no-show'
+    const normalizedAppointmentStatuses = (appointmentsInRange as any[]).map((appointment: any) => ({
+      ...appointment,
+      status: appointment.status === 'no_show' ? 'no-show' : appointment.status,
+    }));
+    const noShows = normalizedAppointmentStatuses.filter(
+      (appointment: any) => appointment.status === 'no-show'
     ).length;
-    const totalAppointments = (appointmentsInRange as any[]).filter((appointment: any) =>
-      ['scheduled', 'completed', 'no_show', 'no-show', 'cancelled'].includes(appointment.status)
+    const totalAppointments = normalizedAppointmentStatuses.filter((appointment: any) =>
+      ['scheduled', 'completed', 'no-show', 'cancelled'].includes(appointment.status)
     ).length;
     const noShowRate = totalAppointments > 0 ? (noShows / totalAppointments) * 100 : 0;
 
@@ -314,7 +318,7 @@ export async function getDashboardData(
         service_name: service?.name || 'Unknown',
         start_time: appointment.start_time,
         end_time: appointment.end_time,
-        status: appointment.status,
+        status: appointment.status === 'no_show' ? 'no-show' : appointment.status,
       };
     });
 

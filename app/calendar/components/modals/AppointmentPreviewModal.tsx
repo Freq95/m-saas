@@ -30,20 +30,21 @@ export function AppointmentPreviewModal({
   onQuickStatusChange,
 }: AppointmentPreviewModalProps) {
   const backdropPressStartedRef = useRef(false);
+  const status = appointment?.status === 'no_show' ? 'no-show' : appointment?.status;
   const normalizedStatus =
-    appointment?.status === 'completed'
+    status === 'completed'
       ? 'statusFinalizat'
-      : appointment?.status === 'cancelled'
+      : status === 'cancelled'
         ? 'statusAnulat'
-        : appointment?.status === 'no-show' || appointment?.status === 'no_show'
+        : status === 'no-show'
           ? 'statusAbsent'
           : 'statusScheduled';
   const statusLabel =
-    appointment?.status === 'completed'
+    status === 'completed'
       ? 'Finalizat'
-      : appointment?.status === 'cancelled'
+      : status === 'cancelled'
         ? 'Anulat'
-        : appointment?.status === 'no-show' || appointment?.status === 'no_show'
+        : status === 'no-show'
           ? 'Absent'
           : 'Programat';
 
@@ -124,7 +125,7 @@ export function AppointmentPreviewModal({
                     key={statusOption.value}
                     type="button"
                     data-status={statusOption.value}
-                    className={`${styles.statusSegmentButton} ${appointment.status !== 'scheduled' && appointment.status === statusOption.value ? styles.statusSegmentButtonActive : ''}`}
+                    className={`${styles.statusSegmentButton} ${status !== 'scheduled' && status === statusOption.value ? styles.statusSegmentButtonActive : ''}`}
                     onClick={() => onQuickStatusChange(statusOption.value)}
                   >
                     {statusOption.label}

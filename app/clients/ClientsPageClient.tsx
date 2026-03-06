@@ -186,7 +186,7 @@ export default function ClientsPageClient({
           </div>
         ) : clients.length === 0 ? (
           <div className={styles.empty}>
-            <p>Nu exista clienti.</p>
+            <p>Nu exista clienti inregistrati. Apasa 'Client nou' pentru a adauga primul client.</p>
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}

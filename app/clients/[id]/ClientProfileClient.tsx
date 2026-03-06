@@ -245,17 +245,18 @@ export default function ClientProfileClient({
   };
 
   const formatAppointmentStatus = (status: string): string => {
+    const normalizedStatus = status === 'no_show' ? 'no-show' : status;
     const labels: Record<string, string> = {
       completed: 'Finalizat',
       scheduled: 'Programat',
       cancelled: 'Anulat',
       'no-show': 'Absent',
     };
-    return labels[status] ?? status;
+    return labels[normalizedStatus] ?? normalizedStatus;
   };
 
   const getAppointmentStatusClass = (status: string) => {
-    switch (status) {
+    switch (status === 'no_show' ? 'no-show' : status) {
       case 'completed':
         return styles.statusFinalizat;
       case 'scheduled':

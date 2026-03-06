@@ -212,29 +212,27 @@
 }
 
 .statusScheduled {
-  background: rgba(52, 211, 153, 0.16);
-  color: #6ee7b7;
-  border: 1px solid rgba(52, 211, 153, 0.25);
-}
-
-.statusCompleted {
   background: rgba(148, 163, 184, 0.14);
   color: #cbd5e1;
   border: 1px solid rgba(148, 163, 184, 0.2);
 }
 
-.statusCancelled {
-  background: rgba(248, 113, 113, 0.15);
-  color: #fca5a5;
-  border: 1px solid rgba(248, 113, 113, 0.28);
+.statusCompleted {
+  background: rgba(34, 197, 94, 0.16);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.28);
 }
 
-.statusNo_show,
-.statusNoshow,
-.statusNoShow {
-  background: rgba(251, 191, 36, 0.16);
+.statusCancelled {
+  background: rgba(245, 158, 11, 0.16);
   color: #fcd34d;
-  border: 1px solid rgba(251, 191, 36, 0.26);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+}
+
+.statusNoShow {
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.28);
 }
 
 .emptyAppointments,
@@ -313,6 +311,14 @@
   gap: var(--space-3);
   color: var(--color-text-soft);
   font-size: 0.78rem;
+}
+
+.viewAllLink {
+  font-size: 0.8rem;
+  color: var(--color-accent);
+  text-decoration: underline;
+  display: block;
+  margin-top: 8px;
 }
 
 .growthChart {

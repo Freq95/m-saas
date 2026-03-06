@@ -62,8 +62,8 @@ export async function getClientProfileData(clientId: number, tenantId?: ObjectId
     db
       .collection('appointments')
       .find(typeof userId === 'number'
-        ? (tenantId ? { client_id: clientId, user_id: userId, tenant_id: tenantId } : { client_id: clientId, user_id: userId })
-        : (tenantId ? { client_id: clientId, tenant_id: tenantId } : { client_id: clientId }))
+        ? (tenantId ? { client_id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } } : { client_id: clientId, user_id: userId, deleted_at: { $exists: false } })
+        : (tenantId ? { client_id: clientId, tenant_id: tenantId, deleted_at: { $exists: false } } : { client_id: clientId, deleted_at: { $exists: false } }))
       .sort({ start_time: -1 })
       .toArray(),
     db.collection('services').find(
@@ -89,7 +89,9 @@ export async function getClientProfileData(clientId: number, tenantId?: ObjectId
     return {
       ...stripMongoId(appointment),
       service_name: service?.name || '',
-      service_price: service?.price || 0,
+      service_price: typeof appointment.price_at_time === 'number'
+        ? appointment.price_at_time
+        : (service?.price || 0),
     } as ProfileAppointment;
   }) as ProfileAppointment[];
 
@@ -132,8 +134,8 @@ export async function getClientStatsData(clientId: number, tenantId?: ObjectId, 
     db
       .collection('appointments')
       .find(typeof userId === 'number'
-        ? (tenantId ? { client_id: clientId, user_id: userId, tenant_id: tenantId } : { client_id: clientId, user_id: userId })
-        : (tenantId ? { client_id: clientId, tenant_id: tenantId } : { client_id: clientId }))
+        ? (tenantId ? { client_id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } } : { client_id: clientId, user_id: userId, deleted_at: { $exists: false } })
+        : (tenantId ? { client_id: clientId, tenant_id: tenantId, deleted_at: { $exists: false } } : { client_id: clientId, deleted_at: { $exists: false } }))
       .toArray(),
     db.collection('services').find(
       typeof userId === 'number'
@@ -151,7 +153,7 @@ export async function getClientStatsData(clientId: number, tenantId?: ObjectId, 
 
   const totalSpent = completedAppointments.reduce((sum: number, apt: any) => {
     const service = serviceById.get(apt.service_id);
-    const price = typeof service?.price === 'number' ? service.price : 0;
+    const price = typeof apt.price_at_time === 'number' ? apt.price_at_time : (typeof service?.price === 'number' ? service.price : 0);
     return sum + price;
   }, 0);
 
@@ -183,7 +185,9 @@ export async function getClientStatsData(clientId: number, tenantId?: ObjectId, 
     if (!service) continue;
     const stats = serviceStats.get(service.id) || { name: service.name, count: 0, total_spent: 0 };
     stats.count += 1;
-    const price = typeof service.price === 'number' ? service.price : 0;
+    const price = typeof appointment.price_at_time === 'number'
+      ? appointment.price_at_time
+      : (typeof service.price === 'number' ? service.price : 0);
     stats.total_spent += price;
     serviceStats.set(service.id, stats);
   }

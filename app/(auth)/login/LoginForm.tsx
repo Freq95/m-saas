@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
@@ -64,6 +65,9 @@ export default function LoginForm({ successMessage }: LoginFormProps) {
         <span>Password</span>
         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
       </label>
+      <Link href="/forgot-password" style={{ color: '#93c5fd', fontSize: 14 }}>
+        Ai uitat parola?
+      </Link>
       <button type="submit" disabled={submitting}>
         {submitting ? 'Signing in...' : 'Sign in'}
       </button>

@@ -26,7 +26,7 @@ const NAV_ITEMS = [
   { key: 'inbox', href: '/inbox', label: 'Inbox' },
   { key: 'calendar', href: '/calendar', label: 'Calendar' },
   { key: 'clients', href: '/clients', label: 'Clienti' },
-  { key: 'settings', href: '/settings/email', label: 'Setari' },
+  { key: 'settings', href: '/settings', label: 'Setari' },
 ] as const;
 
 function detectSection(pathname: string | null): NavSection {

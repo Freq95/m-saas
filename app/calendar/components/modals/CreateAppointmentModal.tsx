@@ -109,11 +109,6 @@ const STATUS_OPTIONS = [
   { value: 'no-show', label: 'Absent' },
 ] as const;
 
-const EDIT_STATUS_OPTIONS = [
-  { value: 'scheduled', label: 'Programat' },
-  ...STATUS_OPTIONS,
-] as const;
-
 function parseTimeToMinutes(value: string): number | null {
   const [hour, minute] = value.split(':').map(Number);
   if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
@@ -140,7 +135,8 @@ function parseDateInput(value: string): Date | null {
 }
 
 function getStatusLabel(status: string): string {
-  return EDIT_STATUS_OPTIONS.find((item) => item.value === status)?.label || status;
+  if (status === 'scheduled') return 'Programat';
+  return STATUS_OPTIONS.find((item) => item.value === status)?.label || status;
 }
 
 export function CreateAppointmentModal({
@@ -164,6 +160,11 @@ export function CreateAppointmentModal({
   const toast = useToast();
   const backdropPressStartedRef = useRef(false);
   const isViewMode = mode === 'view';
+  const initialStartIso = initialData?.startTime || selectedSlot?.start?.toISOString() || '';
+  const initialEndIso = initialData?.endTime || selectedSlot?.end?.toISOString() || '';
+  const initialDateValue = initialStartIso ? format(new Date(initialStartIso), 'yyyy-MM-dd') : '';
+  const initialStartTimeValue = initialStartIso ? format(new Date(initialStartIso), 'HH:mm') : '';
+  const initialEndTimeValue = initialEndIso ? format(new Date(initialEndIso), 'HH:mm') : '';
 
   const handleBackdropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     backdropPressStartedRef.current = event.target === event.currentTarget;
@@ -172,7 +173,7 @@ export function CreateAppointmentModal({
   const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const endedOnBackdrop = event.target === event.currentTarget;
     if (backdropPressStartedRef.current && endedOnBackdrop) {
-      onClose();
+      requestClose();
     }
     backdropPressStartedRef.current = false;
   };
@@ -517,6 +518,7 @@ export function CreateAppointmentModal({
       block: 'center',
       behavior: 'instant' as ScrollBehavior,
     });
+    selectedButton?.focus();
   }, [isStartTimePickerOpen, selectedTime]);
 
   useEffect(() => {
@@ -528,6 +530,7 @@ export function CreateAppointmentModal({
       block: 'center',
       behavior: 'instant' as ScrollBehavior,
     });
+    selectedButton?.focus();
   }, [isEndTimePickerOpen, selectedEndTime]);
 
   const applyClientSuggestion = (client: ClientSuggestion) => {
@@ -547,6 +550,46 @@ export function CreateAppointmentModal({
       {value}
     </div>
   );
+
+  const isDirty = useMemo(() => {
+    if (mode === 'view') return false;
+
+    return (
+      formData.clientName !== (initialData?.clientName ?? '') ||
+      formData.clientEmail !== (initialData?.clientEmail ?? '') ||
+      formData.clientPhone !== (initialData?.clientPhone ?? '') ||
+      formData.notes !== (initialData?.notes ?? '') ||
+      formData.serviceId !== (initialData?.serviceId ?? defaultServiceId) ||
+      selectedDate !== initialDateValue ||
+      selectedTime !== initialStartTimeValue ||
+      selectedEndTime !== initialEndTimeValue ||
+      selectedCategory !== (initialData?.category ?? '') ||
+      selectedStatus !== (initialData?.status ?? appointmentStatus ?? 'scheduled') ||
+      isRecurring !== Boolean(initialData?.isRecurring)
+    );
+  }, [
+    appointmentStatus,
+    defaultServiceId,
+    formData,
+    initialData,
+    initialDateValue,
+    initialEndTimeValue,
+    initialStartTimeValue,
+    isRecurring,
+    mode,
+    selectedCategory,
+    selectedDate,
+    selectedEndTime,
+    selectedStatus,
+    selectedTime,
+  ]);
+
+  const requestClose = () => {
+    if (isDirty && !window.confirm('Ai modificari nesalvate. Inchizi fara sa salvezi?')) {
+      return;
+    }
+    onClose();
+  };
 
   if (!isOpen || !selectedSlot) return null;
 
@@ -582,6 +625,27 @@ export function CreateAppointmentModal({
     setIsRecurring(false);
     setRecurrence(DEFAULT_RECURRENCE);
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+
+      if (isDatePickerOpen || isStartTimePickerOpen || isEndTimePickerOpen || isServicePickerOpen) {
+        setIsDatePickerOpen(false);
+        setIsStartTimePickerOpen(false);
+        setIsEndTimePickerOpen(false);
+        setIsServicePickerOpen(false);
+        return;
+      }
+
+      requestClose();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isDatePickerOpen, isDirty, isEndTimePickerOpen, isOpen, isServicePickerOpen, isStartTimePickerOpen, onClose]);
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
@@ -700,7 +764,7 @@ export function CreateAppointmentModal({
               )}
               <button
                 type="button"
-                onClick={onClose}
+                onClick={requestClose}
                 className={styles.modalIconButton}
                 aria-label="Inchide"
                 title="Inchide"
@@ -822,7 +886,30 @@ export function CreateAppointmentModal({
 
                 {isStartTimePickerOpen && (
                   <div className={`${styles.clientSuggestions} ${styles.modalTimePopover}`} role="dialog" aria-label="Selecteaza ora de inceput">
-                    <div className={styles.modalTimeList} ref={startTimeListRef}>
+                    <div
+                      className={styles.modalTimeList}
+                      ref={startTimeListRef}
+                      onKeyDown={(e) => {
+                        const items = startTimeListRef.current?.querySelectorAll<HTMLButtonElement>('[data-time-option]');
+                        if (!items || items.length === 0) return;
+                        const currentIndex = Array.from(items).findIndex((btn) => btn.dataset.timeOption === selectedTime);
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          const next = items[Math.min(currentIndex + 1, items.length - 1)];
+                          next?.focus();
+                          setSelectedTime(next?.dataset.timeOption ?? selectedTime);
+                        } else if (e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          const prev = items[Math.max(currentIndex - 1, 0)];
+                          prev?.focus();
+                          setSelectedTime(prev?.dataset.timeOption ?? selectedTime);
+                        } else if (e.key === 'Enter') {
+                          setIsStartTimePickerOpen(false);
+                        } else if (e.key === 'Escape') {
+                          setIsStartTimePickerOpen(false);
+                        }
+                      }}
+                    >
                       {startTimeOptions.map((time) => (
                         <button
                           key={time}
@@ -867,7 +954,30 @@ export function CreateAppointmentModal({
 
                 {isEndTimePickerOpen && endTimeOptions.length > 0 && (
                   <div className={`${styles.clientSuggestions} ${styles.modalTimePopover}`} role="dialog" aria-label="Selecteaza ora de final">
-                    <div className={styles.modalTimeList} ref={endTimeListRef}>
+                    <div
+                      className={styles.modalTimeList}
+                      ref={endTimeListRef}
+                      onKeyDown={(e) => {
+                        const items = endTimeListRef.current?.querySelectorAll<HTMLButtonElement>('[data-time-option]');
+                        if (!items || items.length === 0) return;
+                        const currentIndex = Array.from(items).findIndex((btn) => btn.dataset.timeOption === selectedEndTime);
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault();
+                          const next = items[Math.min(currentIndex + 1, items.length - 1)];
+                          next?.focus();
+                          setSelectedEndTime(next?.dataset.timeOption ?? selectedEndTime);
+                        } else if (e.key === 'ArrowUp') {
+                          e.preventDefault();
+                          const prev = items[Math.max(currentIndex - 1, 0)];
+                          prev?.focus();
+                          setSelectedEndTime(prev?.dataset.timeOption ?? selectedEndTime);
+                        } else if (e.key === 'Enter') {
+                          setIsEndTimePickerOpen(false);
+                        } else if (e.key === 'Escape') {
+                          setIsEndTimePickerOpen(false);
+                        }
+                      }}
+                    >
                       {endTimeOptions.map((time) => (
                         <button
                           key={time}
@@ -890,6 +1000,11 @@ export function CreateAppointmentModal({
               )}
               {timeValidationError && (
                 <div className={styles.clientSuggestionError}>{timeValidationError}</div>
+              )}
+              {!isViewMode && selectedDate && selectedStartDateTime < new Date() && (
+                <div className={styles.pastDateWarning}>
+                  Aceasta programare este in trecut.
+                </div>
               )}
             </div>
           </div>
@@ -1002,7 +1117,7 @@ export function CreateAppointmentModal({
                     value={selectedStatus}
                     onChange={(e) => setSelectedStatus(e.target.value)}
                   >
-                    {EDIT_STATUS_OPTIONS.map((statusOption) => (
+                    {STATUS_OPTIONS.map((statusOption) => (
                       <option key={statusOption.value} value={statusOption.value}>
                         {statusOption.label}
                       </option>
@@ -1233,7 +1348,7 @@ export function CreateAppointmentModal({
 
         {mode !== 'view' && (
           <div className={styles.modalActions}>
-            <button onClick={onClose} className={styles.cancelButton}>
+            <button onClick={requestClose} className={styles.cancelButton}>
               Anuleaza
             </button>
             <button
@@ -1241,7 +1356,7 @@ export function CreateAppointmentModal({
               className={styles.saveButton}
               disabled={services.length === 0 || isSubmitting || showNewClientConfirm}
             >
-              {modalSubmitLabel}
+              {isSubmitting ? 'Se salveaza...' : modalSubmitLabel}
             </button>
           </div>
         )}

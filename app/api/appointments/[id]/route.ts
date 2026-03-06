@@ -132,6 +132,21 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       updates.status = status;
     }
 
+    const WARN_TRANSITIONS: Record<string, string[]> = {
+      cancelled: ['completed'],
+      'no-show': ['completed'],
+    };
+    const STATUS_LABELS: Record<string, string> = {
+      scheduled: 'Programat',
+      completed: 'Finalizat',
+      cancelled: 'Anulat',
+      'no-show': 'Absent',
+    };
+    const currentStatus = String(existingAppointment.status || 'scheduled');
+    const warning = status && WARN_TRANSITIONS[currentStatus]?.includes(status)
+      ? `Schimbi statusul de la ${STATUS_LABELS[currentStatus] || currentStatus} la ${STATUS_LABELS[status] || status}. Esti sigur?`
+      : null;
+
     const hasTimeOrAllocationChange =
       startTime !== undefined ||
       endTime !== undefined ||
@@ -284,6 +299,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
     updates.updated_at = new Date().toISOString();
 
+    const previousClientId = typeof existingAppointment.client_id === 'number' ? existingAppointment.client_id : null;
     const updateResult = await db.collection('appointments').updateOne(
       { id: appointmentId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } },
       { $set: updates }
@@ -302,12 +318,27 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       return createErrorResponse('Appointment not found', 404);
     }
 
-    // If status changed to 'completed', update client stats
-    if (status === 'completed' && appointmentDoc.client_id) {
-      await updateClientStats(appointmentDoc.client_id, tenantId);
+    const impactedClientIds = new Set<number>();
+    if (previousClientId !== null) {
+      impactedClientIds.add(previousClientId);
+    }
+    if (typeof appointmentDoc.client_id === 'number') {
+      impactedClientIds.add(appointmentDoc.client_id);
+    }
+    if (
+      impactedClientIds.size > 0 &&
+      (
+        previousClientId !== appointmentDoc.client_id ||
+        status !== undefined ||
+        serviceId !== undefined ||
+        startTime !== undefined ||
+        endTime !== undefined
+      )
+    ) {
+      await Promise.all(Array.from(impactedClientIds).map((clientId) => updateClientStats(clientId, tenantId)));
     }
     await invalidateReadCaches({ tenantId, userId });
-    return createSuccessResponse({ appointment: stripMongoId(appointmentDoc) });
+    return createSuccessResponse({ appointment: stripMongoId(appointmentDoc), warning });
   } catch (error) {
     return handleApiError(error, 'Failed to update appointment');
   }
@@ -323,6 +354,18 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
 
     if (Number.isNaN(appointmentId)) {
       return createErrorResponse('Invalid appointment ID', 400);
+    }
+
+    const existingAppointment = await db.collection('appointments').findOne(
+      {
+        id: appointmentId,
+        user_id: userId,
+        tenant_id: tenantId,
+        deleted_at: { $exists: false },
+      }
+    );
+    if (!existingAppointment) {
+      return createErrorResponse('Not found or not authorized', 404);
     }
 
     const result = await db.collection('appointments').updateOne(
@@ -342,6 +385,9 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
     );
     if (result.matchedCount === 0) {
       return createErrorResponse('Not found or not authorized', 404);
+    }
+    if (typeof existingAppointment.client_id === 'number') {
+      await updateClientStats(existingAppointment.client_id, tenantId);
     }
     await invalidateReadCaches({ tenantId, userId });
     return new NextResponse(null, { status: 204 });

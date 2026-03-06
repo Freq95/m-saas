@@ -970,6 +970,12 @@
   opacity: 0.82;
 }
 
+.monthAppointment.no-show {
+  background: #fee2e2;
+  color: #b91c1c;
+  opacity: 0.82;
+}
+
 .monthAppointment.isPast {
   opacity: 0.52;
   filter: saturate(0.72);
@@ -1571,6 +1577,12 @@
   font-size: 0.78rem;
   color: var(--color-error, #dc2626);
   padding: 0.25rem 0;
+}
+
+.pastDateWarning {
+  color: #b45309;
+  font-size: 0.75rem;
+  margin-top: 4px;
 }
 
 .sameNameBanner {

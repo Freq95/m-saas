@@ -17,6 +17,27 @@
   font-size: 0.95rem;
 }
 
+.connectedBanner,
+.notConnectedBanner {
+  margin: 0 0 var(--space-5);
+  padding: 0.9rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  font-size: 0.9rem;
+}
+
+.connectedBanner {
+  background: rgba(52, 211, 153, 0.12);
+  color: #bbf7d0;
+  border-color: rgba(52, 211, 153, 0.28);
+}
+
+.notConnectedBanner {
+  background: rgba(248, 113, 113, 0.12);
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.24);
+}
+
 .integrationCard {
   background: var(--color-surface);
   border-radius: var(--radius-lg);

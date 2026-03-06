@@ -314,13 +314,14 @@ export default function CalendarPageClient({
         setShowDateDropdown(false);
         return;
       }
+      if (showCreateModal) return;
       setShowCreateModal(false);
       setShowDeleteConfirm(false);
       setShowConflictModal(false);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [showDateDropdown]);
+  }, [showCreateModal, showDateDropdown]);
 
   useEffect(() => {
     return () => {
@@ -407,6 +408,7 @@ export default function CalendarPageClient({
   };
 
   const handleAppointmentClick = (appointment: Appointment) => {
+    if (justDroppedRef.current) return;
     void openAppointmentDetails(appointment);
   };
 
@@ -425,6 +427,9 @@ export default function CalendarPageClient({
     actions.selectAppointment({ ...appointment, status: nextStatus });
     setEditInitialData((prev) => (prev ? { ...prev, status: nextStatus } : prev));
     refetch();
+    if (result.warning) {
+      toast.warning(result.warning);
+    }
     toast.success('Status schimbat.', {
       duration: 5000,
       actionLabel: 'Anuleaza',
@@ -608,6 +613,9 @@ export default function CalendarPageClient({
         setShowCreateModal(false);
         actions.clearSelection();
         refetch();
+        if (result.warning) {
+          toast.warning(result.warning);
+        }
         toast.success('Programarea a fost actualizata.');
       } else if (res.status === 409) {
         let conflicts = result.conflicts || [];

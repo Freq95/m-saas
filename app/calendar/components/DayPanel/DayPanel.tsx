@@ -287,10 +287,7 @@ export function DayPanel({
           {!selectedDay ? (
             <div className={styles.emptyPlaceholder}>
               <svg className={styles.emptyEmoji} width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              <p className={styles.emptyTitle}>Selecteaza o zi</p>
-              <p className={styles.emptySubtitle}>
-                Apasa pe o zi din calendar pentru a vedea si gestiona programarile.
-              </p>
+              <p className={styles.emptyTitle}>Selecteaza o zi din calendar pentru a vedea programarile.</p>
             </div>
           ) : (
             <>
@@ -337,7 +334,7 @@ export function DayPanel({
                 {dayAppointments.length === 0 ? (
                   <div className={styles.emptyDay}>
                     <svg className={styles.emptyDayEmoji} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    <p className={styles.emptyDayText}>Nicio programare in aceasta zi</p>
+                    <p className={styles.emptyDayText}>Nicio programare pentru aceasta zi. Apasa + Adauga pentru a crea una.</p>
                   </div>
                 ) : (
                   dayAppointments.map((apt) => (

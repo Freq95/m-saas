@@ -65,6 +65,7 @@ interface UpdateAppointmentResult {
   error?: string;
   conflicts?: ConflictItem[];
   suggestions?: ConflictSuggestion[];
+  warning?: string | null;
 }
 
 // SWR fetcher function
@@ -265,9 +266,16 @@ export function useAppointmentsSWR({
           };
         }
 
+        let resultData: any = null;
+        try {
+          resultData = await response.json();
+        } catch {
+          resultData = null;
+        }
+
         // Optimistically update cache
         await mutate();
-        return { ok: true, status: response.status };
+        return { ok: true, status: response.status, warning: typeof resultData?.warning === 'string' ? resultData.warning : null };
       } catch (err) {
         logger.error('Calendar hook: failed to update appointment', err instanceof Error ? err : new Error(String(err)), {
           appointmentId: id,

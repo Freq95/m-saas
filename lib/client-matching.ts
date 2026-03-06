@@ -239,8 +239,9 @@ export async function updateClientStats(clientId: number, tenantId: ObjectId): P
 
   const completedAppointments = appointments.filter((apt: any) => apt.status === 'completed');
   const totalSpent = completedAppointments.reduce((sum: number, apt: any) => {
-    const service = serviceById.get(apt.service_id);
-    const price = typeof service?.price === 'number' ? service.price : 0;
+    const price = typeof apt.price_at_time === 'number'
+      ? apt.price_at_time
+      : (serviceById.get(apt.service_id)?.price ?? 0);
     return sum + price;
   }, 0);
 

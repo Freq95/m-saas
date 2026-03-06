@@ -22,6 +22,7 @@ export function MonthView({
   onDayClick,
   onAppointmentClick,
 }: MonthViewProps) {
+  const normalizeStatus = (status: string) => (status === 'no_show' ? 'no-show' : status);
   const getAppointmentsForDay = (day: Date) =>
     appointments.filter((apt) => isSameDay(new Date(apt.start_time), day));
 
@@ -64,10 +65,12 @@ export function MonthView({
             >
               <div className={styles.monthDayNumber}>{format(day, 'd')}</div>
               <div className={styles.monthDayAppointments}>
-                {dayAppointments.slice(0, 3).map((apt) => (
+                {dayAppointments.slice(0, 3).map((apt) => {
+                  const normalizedStatus = normalizeStatus(apt.status);
+                  return (
                   <div
                     key={apt.id}
-                    className={`${styles.monthAppointment} ${styles[apt.status] ?? ''} ${new Date(apt.end_time).getTime() < Date.now() ? styles.isPast : ''}`}
+                    className={`${styles.monthAppointment} ${styles[normalizedStatus] ?? ''} ${new Date(apt.end_time).getTime() < Date.now() ? styles.isPast : ''}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       onAppointmentClick(apt);
@@ -84,7 +87,8 @@ export function MonthView({
                   >
                     {format(new Date(apt.start_time), 'HH:mm', { locale: ro })} {apt.client_name}
                   </div>
-                ))}
+                  );
+                })}
                 {dayAppointments.length > 3 && (
                   <div className={styles.monthAppointmentMore}>
                     +{dayAppointments.length - 3} mai multe

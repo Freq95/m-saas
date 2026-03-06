@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { format } from 'date-fns';
+import { ro } from 'date-fns/locale';
 import DOMPurify from 'dompurify';
 import { signOut } from 'next-auth/react';
 import { emailSchema } from '@/lib/validation';
@@ -321,6 +323,12 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
   const gmailIntegration = integrations.find(i => i.provider === 'gmail');
   const yahooLastEmail = yahooIntegration ? lastEmailByIntegration[yahooIntegration.id] : null;
   const gmailLastEmail = gmailIntegration ? lastEmailByIntegration[gmailIntegration.id] : null;
+  const activeIntegrations = integrations.filter((integration) => integration.is_active);
+  const bannerIntegrations = activeIntegrations.length > 0 ? activeIntegrations : integrations;
+  const latestSyncAt = bannerIntegrations
+    .map((integration) => integration.last_sync_at)
+    .filter((value): value is string => Boolean(value))
+    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || null;
 
   if (loading) {
     return (
@@ -382,6 +390,22 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
           de aplicatie.
         </p>
         <SettingsTabs activeTab="email" />
+        {bannerIntegrations.length > 0 ? (
+          <div className={styles.connectedBanner}>
+            <span>
+              Conectat: {bannerIntegrations.map((integration) => `${integration.provider} (${integration.email})`).join(', ')}
+            </span>
+            {latestSyncAt && (
+              <span>
+                {' '}Ultima sincronizare: {format(new Date(latestSyncAt), 'dd MMM HH:mm', { locale: ro })}
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className={styles.notConnectedBanner}>
+            Niciun cont de email conectat
+          </div>
+        )}
         
         {/* Yahoo Mail */}
         <div className={styles.integrationCard} role="region" aria-label="Yahoo Mail integration">
@@ -469,7 +493,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
                       title="Close"
                       aria-label="Close email preview"
                     >
-                      ×
+                      ÃƒÆ’Ã¢â‚¬â€
                     </button>
                   </div>
                   <div className={styles.emailMeta}>
@@ -673,7 +697,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
                       title="Close"
                       aria-label="Close email preview"
                     >
-                      ×
+                      ÃƒÆ’Ã¢â‚¬â€
                     </button>
                   </div>
                   <div className={styles.emailMeta}>
