@@ -3,20 +3,24 @@ import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { createInviteToken, sendInviteEmail } from '@/lib/invite';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { checkWriteRateLimit } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
   try {
-    const { dbUserId, tenantId, role } = await getAuthUser();
+    const { dbUserId, tenantId, role, userId } = await getAuthUser();
     if (role !== 'owner') {
       return createErrorResponse('Only the clinic owner can invite team members', 403);
     }
+    const limited = await checkWriteRateLimit(userId);
+    if (limited) return limited;
 
     const body = await request.json();
-    const email = String(body?.email || '').toLowerCase().trim();
-    const name = String(body?.name || '').trim();
-    if (!email || !name) {
-      return createErrorResponse('Name and email are required', 400);
+    const { inviteTeamMemberSchema } = await import('@/lib/validation');
+    const validationResult = inviteTeamMemberSchema.safeParse(body);
+    if (!validationResult.success) {
+      return createErrorResponse(validationResult.error.errors[0]?.message || 'Invalid input', 400);
     }
+    const { email, name } = validationResult.data;
 
     const db = await getMongoDbOrThrow();
     const tenant = await db.collection('tenants').findOne({ _id: tenantId });

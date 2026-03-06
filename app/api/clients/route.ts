@@ -6,6 +6,7 @@ import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { getCached } from '@/lib/redis';
 import { clientsListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
+import { checkWriteRateLimit } from '@/lib/rate-limit';
 
 // GET /api/clients - Get all clients with filtering and sorting
 export async function GET(request: NextRequest) {
@@ -61,6 +62,8 @@ export async function POST(request: NextRequest) {
     }
 
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkWriteRateLimit(userId);
+    if (limited) return limited;
     const { name, email, phone, notes } = validationResult.data;
 
     // Use findOrCreateClient to avoid duplicates

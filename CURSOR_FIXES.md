@@ -104,7 +104,9 @@ export default function ForgotPasswordPage() {
 </Link>
 ```
 
-> **Check first:** Look for any existing email sending utility in the project (e.g., `lib/email.ts`, Resend/Nodemailer setup) and reuse it. If none exists, use the Resend package (already installed in m-vecinu) or add a simple nodemailer setup.
+> **Check first:** Look for any existing email sending utility in the project (e.g., `lib/email.ts`, `lib/resend.ts`, Resend/Nodemailer setup) and reuse it. If none exists, check `package.json` for `resend` or `nodemailer` and use whichever is present.
+>
+> **Rate limiting:** Add rate limiting to the POST `/api/auth/forgot-password` endpoint — 5 requests per hour per IP. Create a new limiter in `lib/rate-limit.ts` following the existing pattern (e.g. `forgotPasswordRateLimit`) and apply it at the top of the route handler before any DB query.
 
 ---
 
@@ -129,14 +131,22 @@ const isDirty = useMemo(() => {
     );
   }
   // edit mode: compare against initialData
+  // initialData.startTime / endTime are ISO strings — parse to HH:mm for comparison
+  const initStart = initialData?.startTime
+    ? format(new Date(initialData.startTime), 'HH:mm')
+    : '';
+  const initEnd = initialData?.endTime
+    ? format(new Date(initialData.endTime), 'HH:mm')
+    : '';
   return (
     formData.clientName !== (initialData?.clientName ?? '') ||
     formData.clientEmail !== (initialData?.clientEmail ?? '') ||
     formData.notes !== (initialData?.notes ?? '') ||
-    selectedTime !== /* initial start time */ '' ||
-    selectedEndTime !== /* initial end time */ ''
+    selectedTime !== initStart ||
+    selectedEndTime !== initEnd
   );
 }, [mode, formData, initialData, selectedTime, selectedEndTime]);
+// NOTE: `format` is already imported from 'date-fns' in this file.
 ```
 
 Modify `handleBackdropClick` and the ESC key handler in the parent (`CalendarPageClient.tsx`):
@@ -216,42 +226,6 @@ Add `breadcrumb` style: `font-size: 0.85rem; color: #666; margin-bottom: 16px; d
 
 ---
 
-### FIX 11 — Drag-and-drop opens preview modal after successful drop
-
-**File:** `app/calendar/CalendarPageClient.tsx`, line 409
-
-**Problem:** After dragging an appointment to a new slot, the `click` event fires on the appointment block and triggers `handleAppointmentClick`, opening the preview modal. `handleSlotClick` already guards against this with `if (justDroppedRef.current) return` (line 354), but `handleAppointmentClick` does not.
-
-**Change:**
-```ts
-// BEFORE (line 409):
-const handleAppointmentClick = (appointment: Appointment) => {
-  void openAppointmentDetails(appointment);
-};
-
-// AFTER:
-const handleAppointmentClick = (appointment: Appointment) => {
-  if (justDroppedRef.current) return;   // ADD THIS LINE
-  void openAppointmentDetails(appointment);
-};
-```
-
-One line change. `justDroppedRef` is already declared at line 178 and set at line 232.
-
----
-
-### FIX 12 — Status labels inconsistent across components (Completat vs Finalizat, etc.)
-
-**Separate plan file:** `CURSOR_STATUS_CONSISTENCY.md` in project root.
-
-**Problem:** Status labels, colors, and CSS class names differ between `AppointmentPreviewModal`, `DayPanel`, `WeekView/AppointmentBlock`, `CreateAppointmentModal`, and `ClientProfileClient`. Some show "Completat" (wrong), some use old CSS class names that don't exist in the stylesheet.
-
-**Action:** Follow the full implementation plan in `CURSOR_STATUS_CONSISTENCY.md`. That file has exact current code and exact replacements for each of the 7 files needing changes.
-
-Do NOT modify `lib/types.ts`, `lib/validation.ts`, or `lib/server/dashboard.ts` — those are already correct (confirmed by validation agent).
-
----
-
 ### FIX 8 — Email integration: show which account is connected
 
 **File:** `app/settings/email/EmailSettingsPageClient.tsx`
@@ -320,6 +294,42 @@ const totalSpent = completedAppointments.reduce((sum, apt) => {
 
 ---
 
+### FIX 11 — Drag-and-drop opens preview modal after successful drop
+
+**File:** `app/calendar/CalendarPageClient.tsx`, line 409
+
+**Problem:** After dragging an appointment to a new slot, the `click` event fires on the appointment block and triggers `handleAppointmentClick`, opening the preview modal. `handleSlotClick` already guards against this with `if (justDroppedRef.current) return` (line 354), but `handleAppointmentClick` does not.
+
+**Change:**
+```ts
+// BEFORE (line 409):
+const handleAppointmentClick = (appointment: Appointment) => {
+  void openAppointmentDetails(appointment);
+};
+
+// AFTER:
+const handleAppointmentClick = (appointment: Appointment) => {
+  if (justDroppedRef.current) return;   // ADD THIS LINE
+  void openAppointmentDetails(appointment);
+};
+```
+
+One line change. `justDroppedRef` is already declared at line 178 and set at line 232.
+
+---
+
+### FIX 12 — Status labels inconsistent across components (Completat vs Finalizat, etc.)
+
+**Separate plan file:** `CURSOR_STATUS_CONSISTENCY.md` in project root.
+
+**Problem:** Status labels, colors, and CSS class names differ between `AppointmentPreviewModal`, `DayPanel`, `WeekView/AppointmentBlock`, `CreateAppointmentModal`, and `ClientProfileClient`. Some show "Completat" (wrong), some use old CSS class names that don't exist in the stylesheet.
+
+**Action:** Follow the full implementation plan in `CURSOR_STATUS_CONSISTENCY.md`. That file has exact current code and exact replacements for each of the 7 files needing changes.
+
+Do NOT modify `lib/types.ts`, `lib/validation.ts`, or `lib/server/dashboard.ts` — those are already correct (confirmed by validation agent).
+
+---
+
 ## LOW PRIORITY — Nice to have before launch
 
 ---
@@ -367,13 +377,20 @@ Apply same pattern for end time list with `selectedEndTime`/`setSelectedEndTime`
 
 ```ts
 // After validating the new status, before saving:
+const STATUS_LABELS: Record<string, string> = {
+  'scheduled':  'Programat',
+  'completed':  'Finalizat',
+  'cancelled':  'Anulat',
+  'no-show':    'Absent',
+};
+
 const WARN_TRANSITIONS: Record<string, string[]> = {
   'cancelled': ['completed'],
   'no-show':   ['completed'],
 };
 const currentStatus = existingAppointment.status;
 const warning = WARN_TRANSITIONS[currentStatus]?.includes(status)
-  ? `Schimbi statusul de la ${currentStatus} la ${status}. Ești sigur?`
+  ? `Statusul a fost schimbat din "${STATUS_LABELS[currentStatus] ?? currentStatus}" în "${STATUS_LABELS[status] ?? status}".`
   : null;
 
 // Include in response:

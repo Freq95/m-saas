@@ -42,22 +42,22 @@
 - Added Inbox Ultima sincronizare label in left panel:
   - reads latest last_sync_at from /api/settings/email-integrations
   - refreshes after manual sync
-  - file: pp/inbox/InboxPageClient.tsx
+  - file: app/inbox/InboxPageClient.tsx
 - Added attachment UX in conversation list:
   - paperclip badge on conversations that contain attachments
   - filter toggle: Doar cu atasamente / Arata toate emailurile
   - backend now enriches conversations with has_attachments
   - files:
     - lib/server/inbox.ts
-    - pp/inbox/InboxPageClient.tsx
-    - pp/inbox/page.module.css
+    - app/inbox/InboxPageClient.tsx
+    - app/inbox/page.module.css
 - Validation:
   - 
 pm run typecheck passed
   - 
 pm run test:run passed
 
-### Automated Test Baseline â€” IMPLEMENTED (2026-03-06)
+### Automated Test Baseline — IMPLEMENTED (2026-03-06)
 - Added Vitest scripts:
   - `npm test`
   - `npm run test:run`
@@ -77,7 +77,7 @@ pm run test:run passed
   - `npm run typecheck` passed
   - `npm run test:run` passed (`4` files, `7` tests)
 
-### Inbox Provider Label Consistency â€” IMPLEMENTED (2026-03-04)
+### Inbox Provider Label Consistency — IMPLEMENTED (2026-03-04)
 - Email conversations now render provider-aware labels in Inbox:
   - `Yahoo` with red badge
   - `Gmail` with green badge

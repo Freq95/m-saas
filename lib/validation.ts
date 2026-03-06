@@ -183,6 +183,16 @@ export const createNoteSchema = z.object({
   content: z.string().min(1, 'Note content is required').max(5000),
 });
 
+// Task create schema
+export const createTaskSchema = z.object({
+  contactId: z.number().int().positive().optional(),
+  title: z.string().min(1, 'Title is required').max(255),
+  description: z.string().max(2000).optional(),
+  dueDate: z.string().datetime().optional().nullable(),
+  status: z.enum(['open', 'completed', 'cancelled']).optional().default('open'),
+  priority: z.enum(['low', 'medium', 'high']).optional().default('medium'),
+});
+
 // Task update schema
 export const updateTaskSchema = z.object({
   title: z.string().min(1).max(255).optional(),
@@ -190,6 +200,41 @@ export const updateTaskSchema = z.object({
   dueDate: z.string().datetime().optional().nullable(),
   status: z.enum(['open', 'completed', 'cancelled']).optional(),
   priority: z.enum(['low', 'medium', 'high']).optional(),
+});
+
+// Waitlist schemas
+export const createWaitlistEntrySchema = z.object({
+  clientId: z.number().int().positive(),
+  serviceId: z.number().int().positive(),
+  providerId: z.number().int().positive().optional(),
+  preferredDays: z.array(z.string().max(20)).optional().default([]),
+  preferredTimes: z.array(z.string().max(20)).optional().default([]),
+  notes: z.string().max(2000).optional().default(''),
+});
+
+// Provider schemas
+export const createProviderSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(255),
+  email: emailSchema,
+  role: z.string().min(1, 'Role is required').max(100),
+  color: z.string().max(20).optional(),
+  workingHours: z.record(z.string(), z.object({
+    start: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format'),
+    end: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format'),
+    breaks: z.array(z.unknown()).optional().default([]),
+  })).optional(),
+});
+
+// Resource schemas
+export const createResourceSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(255),
+  type: z.enum(['chair', 'room', 'equipment']),
+});
+
+// Team invite schema
+export const inviteTeamMemberSchema = z.object({
+  email: emailSchema,
+  name: z.string().min(1, 'Name is required').max(255),
 });
 
 // Email integration schemas

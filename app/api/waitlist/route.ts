@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { checkWriteRateLimit } from '@/lib/rate-limit';
 
 // Cleanup classification: feature-flagged (advanced scheduling domain, no core UI dependency).
 // GET /api/waitlist - Get waitlist entries for a user
@@ -26,22 +27,19 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkWriteRateLimit(userId);
+    if (limited) return limited;
     const body = await request.json();
-    const {
-      clientId,
-      serviceId,
-      providerId,
-      preferredDays,
-      preferredTimes,
-      notes,
-    } = body;
 
-    if (!clientId || !serviceId) {
+    const { createWaitlistEntrySchema } = await import('@/lib/validation');
+    const validationResult = createWaitlistEntrySchema.safeParse(body);
+    if (!validationResult.success) {
       return NextResponse.json(
-        { error: 'clientId and serviceId are required' },
+        { error: validationResult.error.errors[0]?.message || 'Invalid input' },
         { status: 400 }
       );
     }
+    const { clientId, serviceId, providerId, preferredDays, preferredTimes, notes } = validationResult.data;
 
     const db = await getMongoDbOrThrow();
 
@@ -58,15 +56,15 @@ export async function POST(request: NextRequest) {
       id: nextId,
       user_id: Number(userId),
       tenant_id: tenantId,
-      client_id: parseInt(clientId),
-      service_id: parseInt(serviceId),
-      preferred_days: preferredDays || [],
-      preferred_times: preferredTimes || [],
-      notes: notes || '',
+      client_id: clientId,
+      service_id: serviceId,
+      preferred_days: preferredDays,
+      preferred_times: preferredTimes,
+      notes,
       created_at: new Date(),
     };
 
-    if (providerId) entry.provider_id = parseInt(providerId);
+    if (providerId) entry.provider_id = providerId;
 
     await db.collection('waitlist').insertOne(entry);
 
@@ -81,6 +79,8 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkWriteRateLimit(userId);
+    if (limited) return limited;
     const { searchParams } = new URL(request.url);
     const entryId = searchParams.get('entryId');
 

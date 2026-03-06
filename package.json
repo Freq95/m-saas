@@ -87,6 +87,7 @@
   },
   "overrides": {
     "utf7": "^1.0.2",
+    "semver": "^7.5.4",
     "minimatch": "^3.1.2",
     "glob": "^9.0.0"
   }

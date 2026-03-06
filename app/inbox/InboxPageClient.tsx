@@ -305,6 +305,7 @@ export default function InboxPageClient({
   const [oldestMessageId, setOldestMessageId] = useState<number | null>(initialOldestMessageId);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [syncPartiallyFailed, setSyncPartiallyFailed] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
   const [attachmentsOnly, setAttachmentsOnly] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
@@ -637,6 +638,7 @@ export default function InboxPageClient({
   const syncInbox = async () => {
     setSyncing(true);
     setSyncError(null);
+    setSyncPartiallyFailed(false);
     try {
       const [yahooResult, gmailResult] = await Promise.allSettled([
         fetch('/api/yahoo/sync', {
@@ -665,6 +667,7 @@ export default function InboxPageClient({
       if (errors.length > 0) {
         showApiErrorToast('sync', 500, errors[0]);
         setSyncError(errors[0]);
+        setSyncPartiallyFailed(true);
       }
 
       await fetchConversations(searchQuery);
@@ -672,6 +675,7 @@ export default function InboxPageClient({
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to sync inbox';
       setSyncError(message);
+      setSyncPartiallyFailed(false);
       console.error('Inbox sync error:', error);
     } finally {
       setSyncing(false);
@@ -1398,7 +1402,12 @@ export default function InboxPageClient({
                 <span>{syncing ? 'Sincronizare inbox' : 'Sincronizeaza Inbox'}</span>
               </span>
             </button>
-            {syncError && (
+            {syncPartiallyFailed && syncError && (
+              <div className={styles.syncError}>
+                Sincronizare partiala: {syncError}
+              </div>
+            )}
+            {!syncPartiallyFailed && syncError && (
               <div className={styles.syncError}>{syncError}</div>
             )}
             <div className={styles.filtersRow}>

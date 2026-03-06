@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { checkWriteRateLimit } from '@/lib/rate-limit';
 
 // GET /api/tasks - Get tasks for a client or user
 export async function GET(request: NextRequest) {
@@ -48,14 +49,17 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkWriteRateLimit(userId);
+    if (limited) return limited;
     const db = await getMongoDbOrThrow();
     const body = await request.json();
 
-    const { contactId, title, description, dueDate, status, priority } = body;
-
-    if (!title) {
-      return createErrorResponse('title is required', 400);
+    const { createTaskSchema } = await import('@/lib/validation');
+    const validationResult = createTaskSchema.safeParse(body);
+    if (!validationResult.success) {
+      return createErrorResponse(validationResult.error.errors[0]?.message || 'Invalid input', 400);
     }
+    const { contactId, title, description, dueDate, status, priority } = validationResult.data;
 
     const now = new Date().toISOString();
     const taskId = await getNextNumericId('tasks');
@@ -69,8 +73,8 @@ export async function POST(request: NextRequest) {
       title,
       description: description || null,
       due_date: dueDate || null,
-      status: status || 'open',
-      priority: priority || 'medium',
+      status,
+      priority,
       created_at: now,
       updated_at: now,
     };

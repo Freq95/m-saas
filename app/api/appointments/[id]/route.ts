@@ -146,7 +146,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       ? 'no-show'
       : String(existingAppointment.status || 'scheduled');
     const warning = status && WARN_TRANSITIONS[currentStatus]?.includes(status)
-      ? `Schimbi statusul de la ${STATUS_LABELS[currentStatus] || currentStatus} la ${STATUS_LABELS[status] || status}. Esti sigur?`
+      ? `Statusul a fost schimbat din "${STATUS_LABELS[currentStatus] ?? currentStatus}" în "${STATUS_LABELS[status] ?? status}".`
       : null;
 
     const hasTimeOrAllocationChange =

@@ -4,6 +4,7 @@ import { getAuthUser } from '@/lib/auth-helpers';
 import { getCached } from '@/lib/redis';
 import { providersListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
 import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
+import { checkWriteRateLimit } from '@/lib/rate-limit';
 
 // Cleanup classification: feature-flagged (advanced scheduling domain, no core UI dependency).
 // GET /api/providers - List all providers for a user
@@ -46,12 +47,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkWriteRateLimit(userId);
+    if (limited) return limited;
     const body = await request.json();
-    const { name, email, role, color, workingHours } = body;
 
-    if (!name || !email || !role) {
-      return createErrorResponse('name, email, and role are required', 400);
+    const { createProviderSchema } = await import('@/lib/validation');
+    const validationResult = createProviderSchema.safeParse(body);
+    if (!validationResult.success) {
+      return createErrorResponse(validationResult.error.errors[0]?.message || 'Invalid input', 400);
     }
+    const { name, email, role, color, workingHours } = validationResult.data;
 
     const db = await getMongoDbOrThrow();
 

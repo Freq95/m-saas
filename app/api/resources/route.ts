@@ -4,6 +4,7 @@ import { getAuthUser } from '@/lib/auth-helpers';
 import { getCached } from '@/lib/redis';
 import { resourcesListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
 import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
+import { checkWriteRateLimit } from '@/lib/rate-limit';
 
 // Cleanup classification: feature-flagged (advanced scheduling domain, no core UI dependency).
 // GET /api/resources - List all resources for a user
@@ -42,16 +43,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkWriteRateLimit(userId);
+    if (limited) return limited;
     const body = await request.json();
-    const { name, type } = body;
 
-    if (!name || !type) {
-      return createErrorResponse('name and type are required', 400);
+    const { createResourceSchema } = await import('@/lib/validation');
+    const validationResult = createResourceSchema.safeParse(body);
+    if (!validationResult.success) {
+      return createErrorResponse(validationResult.error.errors[0]?.message || 'Invalid input', 400);
     }
-
-    if (!['chair', 'room', 'equipment'].includes(type)) {
-      return createErrorResponse('type must be chair, room, or equipment', 400);
-    }
+    const { name, type } = validationResult.data;
 
     const db = await getMongoDbOrThrow();
 

@@ -383,6 +383,7 @@ export async function getClientSegments(
     user_id: userId,
     status: { $in: ['scheduled', 'completed'] },
     client_id: { $ne: null },
+    deleted_at: { $exists: false },
   }).toArray();
 
   const statsByClient = new Map<number, { count: number; first: string; last: string }>();

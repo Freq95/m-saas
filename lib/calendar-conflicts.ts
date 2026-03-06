@@ -84,6 +84,7 @@ export async function checkAppointmentConflict(
       .find({
         user_id: userId,
         tenant_id: tenantId,
+        deleted_at: { $exists: false },
         $and: [
           { $or: [{ provider_id: { $exists: false } }, { provider_id: null }] },
           { $or: [{ resource_id: { $exists: false } }, { resource_id: null }] },
@@ -139,6 +140,8 @@ export async function checkAppointmentConflict(
       .collection('blocked_times')
       .find({
         user_id: userId,
+        tenant_id: tenantId,
+        deleted_at: { $exists: false },
         $or: [
           { provider_id: providerId },
           { provider_id: { $exists: false } }, // All-provider blocks
@@ -221,6 +224,7 @@ export async function checkAppointmentConflict(
       .find({
         user_id: userId,
         tenant_id: tenantId,
+        deleted_at: { $exists: false },
         $or: [
           { resource_id: resourceId },
           { resource_id: { $exists: false } }, // All-resource blocks

@@ -4,6 +4,7 @@ import { getAuthUser } from '@/lib/auth-helpers';
 import { getCached } from '@/lib/redis';
 import { blockedTimesCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
 import { logger } from '@/lib/logger';
+import { checkWriteRateLimit } from '@/lib/rate-limit';
 
 function toDate(value: unknown): Date | null {
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
@@ -104,6 +105,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkWriteRateLimit(userId);
+    if (limited) return limited;
     const body = await request.json();
     const { providerId, resourceId, startTime, endTime, reason, recurrence } = body;
 

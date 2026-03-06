@@ -7,6 +7,7 @@ import { getAppointmentsData } from '@/lib/server/calendar';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { getCached } from '@/lib/redis';
 import { appointmentsListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
+import { checkWriteRateLimit } from '@/lib/rate-limit';
 
 // GET /api/appointments - Get appointments
 export async function GET(request: NextRequest) {
@@ -59,6 +60,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkWriteRateLimit(userId);
+    if (limited) return limited;
     const db = await getMongoDbOrThrow();
     const body = await request.json();
 

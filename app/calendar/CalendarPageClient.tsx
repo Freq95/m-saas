@@ -322,10 +322,7 @@ export default function CalendarPageClient({
         setShowConflictModal(false);
         return;
       }
-      if (showCreateModal) return;
-      setShowCreateModal(false);
-      setShowDeleteConfirm(false);
-      setShowConflictModal(false);
+      // Let CreateAppointmentModal handle its own ESC (isDirty guard lives there)
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

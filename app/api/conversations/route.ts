@@ -5,6 +5,7 @@ import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mong
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { getConversationsData } from '@/lib/server/inbox';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { checkWriteRateLimit } from '@/lib/rate-limit';
 
 // GET /api/conversations - Get all conversations from storage
 export async function GET(request: NextRequest) {
@@ -33,6 +34,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkWriteRateLimit(userId);
+    if (limited) return limited;
     const db = await getMongoDbOrThrow();
     const body = await request.json();
 
