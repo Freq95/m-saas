@@ -19,6 +19,14 @@ interface Appointment {
   resource_id?: number;
   category?: string;
   color?: string;
+  recurrence?: {
+    frequency: 'daily' | 'weekly' | 'monthly';
+    interval?: number;
+    end_date?: string;
+    endDate?: string;
+    count?: number;
+  } | null;
+  recurrence_group_id?: number;
 }
 
 interface Provider {

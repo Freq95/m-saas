@@ -31,6 +31,21 @@ type ClientCreateModalProps = {
   submitLabel?: string;
 };
 
+const PHONE_REGEX = /^[\d\s\+\-\(\)]+$/;
+
+function validatePhone(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (!PHONE_REGEX.test(trimmed)) {
+    return 'Telefon invalid. Folositi doar cifre, spatii si +, -, (, )';
+  }
+  const digitCount = trimmed.replace(/\D/g, '').length;
+  if (digitCount < 7 || digitCount > 15) {
+    return 'Telefon invalid. Numarul trebuie sa aiba intre 7 si 15 cifre.';
+  }
+  return '';
+}
+
 export default function ClientCreateModal({
   isOpen,
   onClose,
@@ -45,6 +60,7 @@ export default function ClientCreateModal({
   const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [phoneError, setPhoneError] = useState('');
   const [backdropPressStarted, setBackdropPressStarted] = useState(false);
   const [formData, setFormData] = useState<ClientFormData>({
     name: initialData?.name || '',
@@ -63,6 +79,7 @@ export default function ClientCreateModal({
   useEffect(() => {
     if (!isOpen) return;
     setErrorMessage('');
+    setPhoneError('');
     if (isEditMode) {
       setFormData({
         name: initialData?.name || '',
@@ -127,6 +144,7 @@ export default function ClientCreateModal({
       setFormData({ name: '', email: '', phone: '', notes: '' });
     }
     setErrorMessage('');
+    setPhoneError('');
     onClose();
   };
 
@@ -134,6 +152,11 @@ export default function ClientCreateModal({
     event.preventDefault();
     if (!formData.name.trim()) {
       setErrorMessage('Numele este obligatoriu.');
+      return;
+    }
+    const nextPhoneError = validatePhone(formData.phone);
+    if (nextPhoneError) {
+      setPhoneError(nextPhoneError);
       return;
     }
 
@@ -171,6 +194,7 @@ export default function ClientCreateModal({
       }
 
       setFormData({ name: '', email: '', phone: '', notes: '' });
+      setPhoneError('');
       if (savedClient && onCreated) {
         onCreated(savedClient);
         return;
@@ -220,9 +244,17 @@ export default function ClientCreateModal({
                 id="client-phone"
                 type="tel"
                 value={formData.phone}
-                onChange={(event) => setFormData((prev) => ({ ...prev, phone: event.target.value }))}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setFormData((prev) => ({ ...prev, phone: value }));
+                  if (phoneError && !validatePhone(value)) {
+                    setPhoneError('');
+                  }
+                }}
+                onBlur={() => setPhoneError(validatePhone(formData.phone))}
                 placeholder="+40 123 456 789"
               />
+              {phoneError && <div className={styles.fieldError}>{phoneError}</div>}
             </div>
 
             <div className={`${styles.field} ${styles.fieldFull}`}>

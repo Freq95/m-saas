@@ -7,7 +7,13 @@ import { z } from 'zod';
 
 // Common validation patterns
 export const emailSchema = z.string().email('Invalid email format').toLowerCase().trim();
-const phoneSchema = z.string().regex(/^[\d\s\+\-\(\)]+$/, 'Invalid phone format').optional();
+const phoneSchema = z.string()
+  .regex(/^[\d\s\+\-\(\)]+$/, 'Invalid phone format')
+  .refine((value) => {
+    const digitCount = value.replace(/\D/g, '').length;
+    return digitCount >= 7 && digitCount <= 15;
+  }, 'Invalid phone length')
+  .optional();
 const dateTimeSchema = z.string().datetime().or(z.date());
 
 // Conversation schemas
@@ -66,6 +72,15 @@ export const updateAppointmentSchema = z.object({
   resourceId: z.number().int().positive().optional().nullable(),
   category: z.string().max(120).optional().nullable(),
   color: z.string().max(120).optional().nullable(),
+  isRecurring: z.boolean().optional(),
+  recurrence: z.object({
+    frequency: z.enum(['daily', 'weekly', 'monthly']),
+    interval: z.number().int().positive().default(1),
+    endType: z.enum(['date', 'count']).optional(),
+    endDate: z.string().date().optional(),
+    end_date: z.string().date().optional(),
+    count: z.number().int().positive().optional(),
+  }).strict().optional().nullable(),
   status: z.enum(['scheduled', 'completed', 'cancelled', 'no-show']).optional(),
   notes: z.string().max(2000).optional(),
 });
@@ -92,6 +107,8 @@ export const createRecurringAppointmentSchema = z
     providerId: z.number().int().positive().optional(),
     resourceId: z.number().int().positive().optional(),
     notes: z.string().max(2000).optional(),
+    category: z.string().max(120).optional(),
+    color: z.string().max(120).optional(),
     recurrence: recurrenceSchema,
   })
   .strict();
@@ -247,4 +264,3 @@ export const createYahooIntegrationSchema = z.object({
 export const integrationIdParamSchema = z.object({
   id: z.string().regex(/^\d+$/, 'Integration ID must be a number').transform((val) => parseInt(val, 10)),
 });
-

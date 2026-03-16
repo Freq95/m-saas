@@ -8,9 +8,16 @@ type TenantDetailClientProps = {
   owner: any;
   members: any[];
   seatUsage: number;
+  initialInviteToken?: string | null;
 };
 
-export default function TenantDetailClient({ tenant, owner, members, seatUsage }: TenantDetailClientProps) {
+export default function TenantDetailClient({
+  tenant,
+  owner,
+  members,
+  seatUsage,
+  initialInviteToken,
+}: TenantDetailClientProps) {
   const router = useRouter();
   const [plan, setPlan] = useState(tenant.plan || 'free');
   const [status, setStatus] = useState(tenant.status || 'active');
@@ -18,6 +25,9 @@ export default function TenantDetailClient({ tenant, owner, members, seatUsage }
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
+  const [manualInviteUrl, setManualInviteUrl] = useState<string | null>(
+    initialInviteToken ? `/invite/${initialInviteToken}` : null
+  );
   const isDeleted = tenant.status === 'deleted' || Boolean(tenant.deleted_at);
 
   const atLimit = seatUsage >= maxSeats;
@@ -30,6 +40,17 @@ export default function TenantDetailClient({ tenant, owner, members, seatUsage }
     }
     return null;
   }, [atLimit, maxSeats, seatUsage]);
+
+  function getInviteFailureMessage(reason: string | undefined, fallback: string): string {
+    if (reason === 'not_configured') return `${fallback} Email service is not configured.`;
+    if (reason === 'provider_error') return `${fallback} Email provider rejected the send. Check RESEND_API_KEY and EMAIL_FROM domain verification.`;
+    return `${fallback} Reason: ${reason || 'unknown'}.`;
+  }
+
+  function buildInviteUrl(token: string): string {
+    if (typeof window === 'undefined') return `/invite/${token}`;
+    return `${window.location.origin}/invite/${token}`;
+  }
 
   async function saveTenantChanges(event: FormEvent) {
     event.preventDefault();
@@ -125,8 +146,11 @@ export default function TenantDetailClient({ tenant, owner, members, seatUsage }
       setWorking(false);
       return;
     }
+    if (typeof data?.inviteToken === 'string' && data.inviteToken) {
+      setManualInviteUrl(buildInviteUrl(data.inviteToken));
+    }
     if (data?.inviteEmail?.requested && !data?.inviteEmail?.sent) {
-      setNotice('Invite token regenerated, but email was not sent because email service is not configured.');
+      setNotice(getInviteFailureMessage(data?.inviteEmail?.reason, 'Invite token regenerated, but email was not sent.'));
     } else {
       setNotice('Invite resent successfully.');
     }
@@ -156,8 +180,11 @@ export default function TenantDetailClient({ tenant, owner, members, seatUsage }
       setWorking(false);
       return;
     }
+    if (typeof data?.inviteToken === 'string' && data.inviteToken) {
+      setManualInviteUrl(buildInviteUrl(data.inviteToken));
+    }
     if (data?.inviteEmail?.requested && !data?.inviteEmail?.sent) {
-      setNotice('User created, but invite email was not sent because email service is not configured.');
+      setNotice(getInviteFailureMessage(data?.inviteEmail?.reason, 'User created, but invite email was not sent.'));
     } else {
       setNotice('User created and invite email sent.');
     }
@@ -169,6 +196,27 @@ export default function TenantDetailClient({ tenant, owner, members, seatUsage }
   return (
     <div style={{ display: 'grid', gap: 16 }}>
       <h1>{tenant.name}</h1>
+      {manualInviteUrl && (
+        <div style={{ border: '1px solid #334155', padding: 12, display: 'grid', gap: 8 }}>
+          <strong>Manual invite link</strong>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <input value={manualInviteUrl} readOnly style={{ minWidth: 320, flex: 1 }} />
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(manualInviteUrl);
+                  setNotice('Invite link copied.');
+                } catch {
+                  setNotice('Copy failed. Please copy manually.');
+                }
+              }}
+            >
+              Copy link
+            </button>
+          </div>
+        </div>
+      )}
       <div style={{ border: '1px solid #334155', padding: 12 }}>
         <p>Status: {tenant.status}</p>
         {tenant.deleted_at && <p>Deleted at: {new Date(tenant.deleted_at).toLocaleString()}</p>}

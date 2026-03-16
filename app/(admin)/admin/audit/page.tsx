@@ -1,14 +1,15 @@
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 
 type AuditPageProps = {
-  searchParams?: {
+  searchParams?: Promise<{
     action?: string;
-  };
+  }>;
 };
 
 export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
   const db = await getMongoDbOrThrow();
-  const action = searchParams?.action?.trim();
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const action = resolvedSearchParams?.action?.trim();
   const filter: Record<string, unknown> = {};
   if (action) {
     filter.action = action;

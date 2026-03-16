@@ -1,14 +1,17 @@
 import { notFound } from 'next/navigation';
 import { ObjectId } from 'mongodb';
-import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import TenantDetailClient from './TenantDetailClient';
 
 type TenantDetailPageProps = {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ inviteToken?: string }>;
 };
 
-export default async function TenantDetailPage({ params }: TenantDetailPageProps) {
+export default async function TenantDetailPage({ params, searchParams }: TenantDetailPageProps) {
   const { id } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const initialInviteToken = typeof resolvedSearchParams?.inviteToken === 'string' ? resolvedSearchParams.inviteToken : null;
   if (!ObjectId.isValid(id)) notFound();
   const tenantId = new ObjectId(id);
   const db = await getMongoDbOrThrow();
@@ -28,7 +31,8 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
   const enrichedMembers = members.map((member: any) => {
     const user = userMap.get(String(member.user_id));
     return {
-      ...member,
+      _id: String(member._id),
+      ...stripMongoId(member),
       name: user?.name || null,
       email: user?.email || null,
     };
@@ -36,5 +40,13 @@ export default async function TenantDetailPage({ params }: TenantDetailPageProps
 
   const seatUsage = enrichedMembers.filter((member: any) => ['active', 'pending_invite'].includes(member.status)).length;
 
-  return <TenantDetailClient tenant={tenant} owner={owner} members={enrichedMembers} seatUsage={seatUsage} />;
+  return (
+    <TenantDetailClient
+      tenant={{ _id: String(tenant._id), ...stripMongoId(tenant) }}
+      owner={owner ? { _id: String(owner._id), ...stripMongoId(owner) } : null}
+      members={enrichedMembers}
+      seatUsage={seatUsage}
+      initialInviteToken={initialInviteToken}
+    />
+  );
 }

@@ -36,6 +36,8 @@ export async function POST(request: NextRequest) {
       providerId,
       resourceId,
       notes,
+      category,
+      color,
       recurrence,
     } = validationResult.data;
 
@@ -53,6 +55,15 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json({ error: 'Invalid numeric fields' }, { status: 400 });
     }
+
+    const { findOrCreateClient, updateClientStats } = await import('@/lib/client-matching');
+    const client = await findOrCreateClient(
+      normalizedUserId,
+      tenantId,
+      clientName,
+      clientEmail || undefined,
+      clientPhone || undefined
+    );
 
     const recurrenceRule: RecurrenceRule = {
       frequency: recurrence.frequency,
@@ -120,6 +131,7 @@ export async function POST(request: NextRequest) {
         user_id: normalizedUserId,
         service_id: normalizedServiceId,
         service_name: serviceName,
+        client_id: client.id,
         client_name: clientName,
         start_time: instance.start.toISOString(),
         end_time: instance.end.toISOString(),
@@ -135,10 +147,14 @@ export async function POST(request: NextRequest) {
       if (normalizedProviderId) appointment.provider_id = normalizedProviderId;
       if (normalizedResourceId) appointment.resource_id = normalizedResourceId;
       if (notes) appointment.notes = notes;
+      if (category !== undefined) appointment.category = category || null;
+      if (color !== undefined) appointment.color = color || null;
 
       await db.collection('appointments').insertOne(appointment);
       createdAppointments.push(appointment);
     }
+
+    await updateClientStats(client.id, tenantId);
 
     await invalidateReadCaches({ tenantId, userId: normalizedUserId });
 

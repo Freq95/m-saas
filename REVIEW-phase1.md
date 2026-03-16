@@ -78,7 +78,7 @@ This is a Next.js 14 application ("OpsGenie pentru Micro-Servicii") intended as 
 #### Data Storage
 
 **Primary: MongoDB Atlas**
-- **URI**: `mongodb+srv://95novac_db_user:...@m-saas-cluster.u7nuxoy.mongodb.net/?appName=m-saas-cluster`
+- **URI**: `mongodb+srv://[REDACTED_USER]:[REDACTED_PASSWORD]@[REDACTED_HOST]/?appName=[REDACTED]`
 - **Database**: `m-saas`
 - **17 Collections**:
   1. `users` -- Basic user profile (id, email, name, created_at, updated_at)
@@ -957,11 +957,11 @@ rejectUnauthorized: process.env.NODE_ENV !== 'development'
 ##### 5. Credentials in .env File
 
 **Finding**: `.env` contains real secrets:
-- `YAHOO_APP_PASSWORD=vcntabqqlnpleekv`
-- `OPENAI_API_KEY=` (blank, but structure exists)
-- `SUPABASE_SERVICE_ROLE_KEY=sb_secret_Z0xt9unIWm3NUBeaBLzuWw_...`
-- `MONGODB_URI=mongodb+srv://95novac_db_user:kBlqWoEilCRduPZI@...`
-- `ENCRYPTION_KEY=8522077cc0eca8bdd5221f18ad2652fa33803c04e6654d...`
+- `YAHOO_APP_PASSWORD=[REDACTED]`
+- `OPENAI_API_KEY=[REDACTED_OR_EMPTY]`
+- `SUPABASE_SERVICE_ROLE_KEY=[REDACTED]`
+- `MONGODB_URI=[REDACTED]`
+- `ENCRYPTION_KEY=[REDACTED]`
 
 **Status**: 
 - ✅ `.env` is in `.gitignore`

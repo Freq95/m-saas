@@ -2,18 +2,19 @@ import Link from 'next/link';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 
 type AdminUsersPageProps = {
-  searchParams?: {
+  searchParams?: Promise<{
     search?: string;
     role?: string;
     status?: string;
-  };
+  }>;
 };
 
 export default async function AdminUsersPage({ searchParams }: AdminUsersPageProps) {
   const db = await getMongoDbOrThrow();
-  const search = searchParams?.search?.trim() || '';
-  const role = searchParams?.role?.trim() || '';
-  const status = searchParams?.status?.trim() || '';
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const search = resolvedSearchParams?.search?.trim() || '';
+  const role = resolvedSearchParams?.role?.trim() || '';
+  const status = resolvedSearchParams?.status?.trim() || '';
 
   const filter: Record<string, unknown> = {};
   if (role) filter.role = role;

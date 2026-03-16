@@ -1,9 +1,11 @@
 import OpenAI from 'openai';
 import { getMongoDbOrThrow } from './db/mongo-utils';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+function getOpenAIClient(): OpenAI | null {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return null;
+  return new OpenAI({ apiKey });
+}
 
 interface ConversationContext {
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>;
@@ -78,6 +80,11 @@ Nu face actiuni autonome - doar sugerezi raspunsuri pe care utilizatorul le poat
   systemPrompt += `\n\nIMPORTANT: Sugereaza un raspuns scurt, clar si profesional. Daca clientul intreaba despre programare, propune orele disponibile.`;
 
   try {
+    const openai = getOpenAIClient();
+    if (!openai) {
+      throw new Error('OPENAI_API_KEY is not configured');
+    }
+
     const completion = await openai.chat.completions.create({
       model: 'gpt-4-turbo-preview',
       messages: [
@@ -111,7 +118,8 @@ Nu face actiuni autonome - doar sugerezi raspunsuri pe care utilizatorul le poat
  * Analyzes a message and suggests tags
  */
 export async function suggestTags(messageContent: string): Promise<string[]> {
-  if (!process.env.OPENAI_API_KEY) {
+  const openai = getOpenAIClient();
+  if (!openai) {
     return [];
   }
 

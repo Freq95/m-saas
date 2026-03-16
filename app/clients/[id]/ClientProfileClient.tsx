@@ -183,23 +183,31 @@ export default function ClientProfileClient({
   };
 
   const handleUploadFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const response = await fetch(`/api/clients/${clientId}/files`, {
-        method: 'POST',
-        body: formData,
-      });
-      if (!response.ok) throw new Error('Failed to upload file');
-      fetchFiles();
-    } catch (error) {
-      logger.error('Client profile: failed to upload file', error instanceof Error ? error : new Error(String(error)), {
-        clientId,
-      });
-      toastError('Eroare la incarcarea fisierului');
+    const filesToUpload = Array.from(e.target.files || []);
+    if (filesToUpload.length === 0) return;
+
+    for (const file of filesToUpload) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await fetch(`/api/clients/${clientId}/files`, {
+          method: 'POST',
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to upload ${file.name}`);
+        }
+      } catch (error) {
+        logger.error('Client profile: failed to upload file', error instanceof Error ? error : new Error(String(error)), {
+          clientId,
+          fileName: file.name,
+        });
+        toastError(`Eroare la incarcarea fisierului: ${file.name}`);
+      }
     }
+
+    e.target.value = '';
+    fetchFiles();
   };
 
   const handleDeleteFile = (fileId: number) => {
@@ -369,7 +377,7 @@ export default function ClientProfileClient({
               </button>
               <label className={styles.actionButton}>
                 + Fisier
-                <input type="file" style={{ display: 'none' }} onChange={handleUploadFile} />
+                <input type="file" multiple style={{ display: 'none' }} onChange={handleUploadFile} />
               </label>
               <Link href={`/calendar?contactId=${clientId}`} className={styles.actionButton} prefetch>
                 + Programare
@@ -438,7 +446,7 @@ export default function ClientProfileClient({
                     <p className={styles.statPrimaryValue}>{client.total_appointments}</p>
                   </div>
                   <div className={styles.statPrimaryCard}>
-                    <label className={styles.statPrimaryLabel}>Ultima vizita</label>
+                    <label className={styles.statPrimaryLabel}>Ultima vizita finalizata</label>
                     <p className={styles.statPrimaryValue}>{formatDate(client.last_appointment_date)}</p>
                   </div>
                 </div>

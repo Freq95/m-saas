@@ -108,6 +108,7 @@ const STATUS_OPTIONS = [
   { value: 'cancelled', label: 'Anulat' },
   { value: 'no-show', label: 'Absent' },
 ] as const;
+const PHONE_REGEX = /^[\d\s\+\-\(\)]+$/;
 
 function parseTimeToMinutes(value: string): number | null {
   const [hour, minute] = value.split(':').map(Number);
@@ -137,6 +138,19 @@ function parseDateInput(value: string): Date | null {
 function getStatusLabel(status: string): string {
   if (status === 'scheduled') return 'Programat';
   return STATUS_OPTIONS.find((item) => item.value === status)?.label || status;
+}
+
+function validatePhone(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  if (!PHONE_REGEX.test(trimmed)) {
+    return 'Telefon invalid. Folositi doar cifre, spatii si +, -, (, )';
+  }
+  const digitCount = trimmed.replace(/\D/g, '').length;
+  if (digitCount < 7 || digitCount > 15) {
+    return 'Telefon invalid. Numarul trebuie sa aiba intre 7 si 15 cifre.';
+  }
+  return '';
 }
 
 export function CreateAppointmentModal({
@@ -213,6 +227,7 @@ export function CreateAppointmentModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingSubmitPayload, setPendingSubmitPayload] = useState<AppointmentFormPayload | null>(null);
   const [selectedStatus, setSelectedStatus] = useState(appointmentStatus || 'scheduled');
+  const [phoneError, setPhoneError] = useState('');
   const clientSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const datePickerRef = useRef<HTMLDivElement | null>(null);
   const startTimePickerRef = useRef<HTMLDivElement | null>(null);
@@ -376,6 +391,7 @@ export function CreateAppointmentModal({
     setForceNewClient(false);
     setShowNewClientConfirm(false);
     setPendingSubmitPayload(null);
+    setPhoneError('');
     setSelectedCategory(initialData?.category || '');
     setSelectedStatus(initialData?.status || appointmentStatus || 'scheduled');
     setIsRecurring(Boolean(initialData?.isRecurring) && allowRecurring);
@@ -632,6 +648,9 @@ export function CreateAppointmentModal({
     setShowClientSuggestions(false);
     setSelectedClientId(null);
     setForceNewClient(false);
+    setShowNewClientConfirm(false);
+    setPendingSubmitPayload(null);
+    setPhoneError('');
     setSelectedCategory('');
     setSelectedStatus('scheduled');
     setIsRecurring(false);
@@ -674,6 +693,11 @@ export function CreateAppointmentModal({
     }
     if (!formData.serviceId) {
       toast.error('Selectati un serviciu.');
+      return;
+    }
+    const nextPhoneError = validatePhone(formData.clientPhone);
+    if (nextPhoneError) {
+      setPhoneError(nextPhoneError);
       return;
     }
     if (selectedEndDateTime <= selectedStartDateTime) {
@@ -1121,9 +1145,19 @@ export function CreateAppointmentModal({
                 <input
                   type="tel"
                   value={formData.clientPhone}
-                  onChange={(e) => setFormData({ ...formData, clientPhone: e.target.value })}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setFormData({ ...formData, clientPhone: value });
+                    if (phoneError && !validatePhone(value)) {
+                      setPhoneError('');
+                    }
+                  }}
+                  onBlur={() => setPhoneError(validatePhone(formData.clientPhone))}
                 />
               )}
+            {phoneError && (
+              <div className={styles.clientSuggestionError}>{phoneError}</div>
+            )}
           </div>
 
           {(mode === 'edit' || mode === 'view') && (

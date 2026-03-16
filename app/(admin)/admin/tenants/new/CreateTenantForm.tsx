@@ -14,6 +14,16 @@ export default function CreateTenantForm() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  function getInviteFailureMessage(reason: string | undefined): string {
+    if (reason === 'not_configured') {
+      return 'Tenant created, but invite email was not sent because email service is not configured.';
+    }
+    if (reason === 'provider_error') {
+      return 'Tenant created, but invite email was rejected by the email provider. Check RESEND_API_KEY and EMAIL_FROM domain verification.';
+    }
+    return `Tenant created, but invite email was not sent. Reason: ${reason || 'unknown'}.`;
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setError(null);
@@ -33,10 +43,14 @@ export default function CreateTenantForm() {
     }
 
     if (data?.inviteEmail?.requested && !data?.inviteEmail?.sent) {
-      window.alert('Tenant created, but invite email was not sent. Configure RESEND_API_KEY and retry from tenant details.');
+      window.alert(getInviteFailureMessage(data?.inviteEmail?.reason));
     }
 
-    router.replace(`/admin/tenants/${data.tenantId}`);
+    const token = typeof data?.inviteToken === 'string' ? data.inviteToken : '';
+    const nextUrl = token
+      ? `/admin/tenants/${data.tenantId}?inviteToken=${encodeURIComponent(token)}`
+      : `/admin/tenants/${data.tenantId}`;
+    router.replace(nextUrl);
   }
 
   return (

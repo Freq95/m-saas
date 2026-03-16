@@ -200,13 +200,24 @@ export function useAppointmentsSWR({
 
         if (!response.ok) {
           const errorData = await response.json();
-          logger.error('Calendar hook: create appointment API error', {
+          const isAvailabilityError =
+            response.status === 400 &&
+            typeof errorData?.error === 'string' &&
+            errorData.error.toLowerCase().includes('time slot is not available');
+          const logPayload = {
             status: response.status,
             errorData,
-          });
+          };
+          if (isAvailabilityError) {
+            logger.warn('Calendar hook: create appointment slot unavailable', logPayload);
+          } else {
+            logger.error('Calendar hook: create appointment API error', logPayload);
+          }
           return {
             ok: false,
-            error: extractApiError(errorData, 'Nu s-a putut crea programarea.'),
+            error: isAvailabilityError
+              ? 'Intervalul selectat nu este disponibil. Alege un alt interval.'
+              : extractApiError(errorData, 'Nu s-a putut crea programarea.'),
           };
         }
 

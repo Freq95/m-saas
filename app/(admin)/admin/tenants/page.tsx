@@ -2,18 +2,19 @@ import Link from 'next/link';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 
 type TenantsPageProps = {
-  searchParams?: {
+  searchParams?: Promise<{
     search?: string;
     plan?: string;
     status?: string;
-  };
+  }>;
 };
 
 export default async function AdminTenantsPage({ searchParams }: TenantsPageProps) {
   const db = await getMongoDbOrThrow();
-  const search = searchParams?.search?.trim();
-  const plan = searchParams?.plan?.trim();
-  const status = searchParams?.status?.trim();
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const search = resolvedSearchParams?.search?.trim();
+  const plan = resolvedSearchParams?.plan?.trim();
+  const status = resolvedSearchParams?.status?.trim();
 
   const filter: Record<string, unknown> = {};
   if (plan) filter.plan = plan;

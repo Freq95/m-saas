@@ -94,6 +94,11 @@
   resize: vertical;
 }
 
+.fieldError {
+  font-size: 0.8rem;
+  color: var(--color-error, #dc2626);
+}
+
 .error {
   border-radius: var(--radius-md);
   border: 1px solid rgba(248, 113, 113, 0.4);

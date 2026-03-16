@@ -63,7 +63,8 @@ export async function findOrCreateClient(
   name: string,
   email?: string,
   phone?: string,
-  forceNew: boolean = false
+  forceNew: boolean = false,
+  overwriteContactFields: boolean = false
 ): Promise<Client> {
   const db = await getMongoDbOrThrow();
 
@@ -165,12 +166,26 @@ export async function findOrCreateClient(
   if (existingClient) {
     const updates: Record<string, unknown> = {};
 
-    if (!existingClient.email && normalizedEmail) {
+    const existingEmail = existingClient.email?.trim().toLowerCase() || null;
+    if (
+      normalizedEmail &&
+      (overwriteContactFields || !existingClient.email) &&
+      existingEmail !== normalizedEmail
+    ) {
       updates.email = normalizedEmail;
     }
 
-    if (!existingClient.phone && normalizedPhone) {
+    const existingPhone = normalizePhone(existingClient.phone || undefined);
+    if (
+      normalizedPhone &&
+      (overwriteContactFields || !existingClient.phone) &&
+      existingPhone !== normalizedPhone
+    ) {
       updates.phone = normalizedPhone;
+    }
+
+    if (overwriteContactFields && normalizedName && existingClient.name !== normalizedName) {
+      updates.name = normalizedName;
     }
 
     if (Object.keys(updates).length > 0) {
@@ -248,7 +263,7 @@ export async function updateClientStats(clientId: number, tenantId: ObjectId): P
   const totalAppointments = appointments.filter((apt: any) => ['scheduled', 'completed'].includes(apt.status)).length;
 
   const lastAppointmentDate = appointments
-    .filter((apt: any) => ['scheduled', 'completed'].includes(apt.status))
+    .filter((apt: any) => apt.status === 'completed')
     .map((apt: any) => apt.start_time)
     .filter(Boolean)
     .sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime())[0] || null;

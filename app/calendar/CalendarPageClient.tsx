@@ -23,6 +23,7 @@ import {
 } from 'date-fns';
 import { ro } from 'date-fns/locale';
 import { useSession } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
 import styles from './page.module.css';
 import { useToast } from '@/lib/useToast';
 import { ToastContainer } from '@/components/Toast';
@@ -79,6 +80,7 @@ export default function CalendarPageClient({
   initialViewType = 'week',
 }: CalendarPageClientProps) {
   const toast = useToast();
+  const searchParams = useSearchParams();
   const containerRef = useRef<HTMLDivElement>(null);
   const [availableHeight, setAvailableHeight] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -165,6 +167,14 @@ export default function CalendarPageClient({
     category?: string;
     color?: string;
     status?: string;
+    isRecurring?: boolean;
+    recurrence?: {
+      frequency: 'daily' | 'weekly' | 'monthly';
+      interval: number;
+      endType: 'date' | 'count';
+      endDate?: string;
+      count?: number;
+    };
   } | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm]   = useState(false);
   const [showConflictModal, setShowConflictModal]   = useState(false);
@@ -177,6 +187,7 @@ export default function CalendarPageClient({
   const dateDropdownRef = useRef<HTMLDivElement>(null);
   const justDroppedRef = useRef(false);
   const justDroppedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handledContactPrefillRef = useRef<number | null>(null);
 
   const weekStart = useMemo(() => startOfWeek(state.currentDate, { weekStartsOn: 1 }), [state.currentDate]);
   const weekEnd = useMemo(() => endOfWeek(state.currentDate, { weekStartsOn: 1 }), [state.currentDate]);
@@ -220,6 +231,59 @@ export default function CalendarPageClient({
     if (!showDateDropdown) return;
     setPickerDate(state.currentDate);
   }, [showDateDropdown, state.currentDate]);
+
+  useEffect(() => {
+    const contactIdParam = searchParams.get('contactId');
+    if (!contactIdParam) return;
+
+    const contactId = Number(contactIdParam);
+    if (!Number.isInteger(contactId) || contactId <= 0) return;
+    if (handledContactPrefillRef.current === contactId) return;
+    handledContactPrefillRef.current = contactId;
+
+    const defaultStart = state.selectedSlot?.start
+      ? new Date(state.selectedSlot.start)
+      : (() => {
+        const now = new Date();
+        now.setHours(9, 0, 0, 0);
+        return now;
+      })();
+    const defaultEnd = state.selectedSlot?.end
+      ? new Date(state.selectedSlot.end)
+      : new Date(defaultStart.getTime() + 30 * 60_000);
+
+    void (async () => {
+      try {
+        const response = await fetch(`/api/clients/${contactId}`, { cache: 'no-store' });
+        if (!response.ok) {
+          throw new Error('Failed to fetch client');
+        }
+        const result = await response.json();
+        const client = result?.client;
+        if (!client) {
+          throw new Error('Client not found');
+        }
+
+        const slot = { start: defaultStart, end: defaultEnd };
+        actions.selectSlot(slot);
+        setSelectedDay(slot.start);
+        setAppointmentModalMode('create');
+        setEditInitialData({
+          clientName: client.name || '',
+          clientEmail: client.email || '',
+          clientPhone: client.phone || '',
+          serviceId: '',
+          startTime: slot.start.toISOString(),
+          endTime: slot.end.toISOString(),
+          durationMinutes: Math.max(15, Math.round((slot.end.getTime() - slot.start.getTime()) / 60_000)),
+          notes: '',
+        });
+        setShowCreateModal(true);
+      } catch {
+        toast.error('Nu am putut preincarca datele clientului pentru programare.');
+      }
+    })();
+  }, [actions.selectSlot, searchParams, state.selectedSlot, toast]);
 
   // Drag-and-drop
   const { draggedAppointment, handleDragStart, handleDragEnd, handleDrop } = useDragAndDrop(
@@ -374,6 +438,9 @@ export default function CalendarPageClient({
   const buildAppointmentInitialData = (appointment: Appointment) => {
     const start = new Date(appointment.start_time);
     const end = new Date(appointment.end_time);
+    const recurrence = appointment.recurrence;
+    const recurrenceCount = recurrence?.count;
+    const recurrenceEndType: 'date' | 'count' = recurrenceCount ? 'count' : 'date';
 
     return {
       clientName: appointment.client_name || '',
@@ -387,6 +454,16 @@ export default function CalendarPageClient({
       category: appointment.category || undefined,
       color: appointment.color || undefined,
       status: appointment.status,
+      isRecurring: Boolean(recurrence),
+      recurrence: recurrence
+        ? {
+          frequency: recurrence.frequency,
+          interval: Math.max(1, Number(recurrence.interval) || 1),
+          endType: recurrenceEndType,
+          endDate: recurrence.end_date || recurrence.endDate || '',
+          count: recurrenceCount || 4,
+        }
+        : undefined,
     };
   };
 
@@ -588,6 +665,14 @@ export default function CalendarPageClient({
     category?: string;
     color?: string;
     status?: string;
+    isRecurring?: boolean;
+    recurrence?: {
+      frequency: 'daily' | 'weekly' | 'monthly';
+      interval: number;
+      endType: 'date' | 'count';
+      endDate?: string;
+      count?: number;
+    };
   }) => {
     if (!state.selectedAppointment || !formData.startTime || !formData.endTime) return;
 
@@ -609,6 +694,16 @@ export default function CalendarPageClient({
           category: formData.category,
           color: formData.color,
           status: formData.status,
+          isRecurring: formData.isRecurring,
+          recurrence: formData.isRecurring && formData.recurrence
+            ? {
+              frequency: formData.recurrence.frequency,
+              interval: formData.recurrence.interval,
+              ...(formData.recurrence.endType === 'count'
+                ? { count: formData.recurrence.count }
+                : { end_date: formData.recurrence.endDate }),
+            }
+            : null,
           providerId: state.selectedProvider?.id,
           resourceId: state.selectedResource?.id,
         }),
@@ -895,7 +990,7 @@ export default function CalendarPageClient({
               : 'Creeaza programare'
         }
         submitLabel={appointmentModalMode === 'edit' ? 'Salveaza modificarile' : 'Salveaza'}
-        allowRecurring={appointmentModalMode === 'create'}
+        allowRecurring={appointmentModalMode !== 'view'}
         initialData={editInitialData}
         onModeChange={setAppointmentModalMode}
         appointmentStatus={editInitialData?.status || state.selectedAppointment?.status}

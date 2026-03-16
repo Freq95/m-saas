@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
 import { updateClientStats } from '@/lib/client-matching';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { checkAppointmentConflict } from '@/lib/calendar-conflicts';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { invalidateReadCaches } from '@/lib/cache-keys';
+import { logger } from '@/lib/logger';
 
 const CONFLICT_MESSAGE_BY_TYPE: Record<string, string> = {
   provider_appointment: 'Providerul are deja o programare in acest interval.',
@@ -113,6 +114,8 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       resourceId,
       category,
       color,
+      isRecurring,
+      recurrence,
     } = validationResult.data;
 
     // Get existing appointment
@@ -127,6 +130,10 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     }
 
     const updates: Record<string, unknown> = {};
+    const shouldCreateRecurringInstances =
+      isRecurring === true &&
+      recurrence !== undefined &&
+      !existingAppointment.recurrence_group_id;
 
     if (status !== undefined) {
       updates.status = status;
@@ -287,7 +294,9 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         tenantId,
         normalizedName,
         normalizedEmail || undefined,
-        normalizedPhone || undefined
+        normalizedPhone || undefined,
+        false,
+        true
       );
 
       updates.client_id = linkedClient.id;
@@ -302,6 +311,19 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
     if (color !== undefined) {
       updates.color = color || null;
+    }
+
+    if (isRecurring === false) {
+      updates.recurrence = null;
+      updates.recurrence_group_id = null;
+    } else if ((isRecurring === true || recurrence) && recurrence) {
+      updates.recurrence = {
+        frequency: recurrence.frequency,
+        interval: Math.max(1, Number(recurrence.interval) || 1),
+        end_date: recurrence.end_date || recurrence.endDate,
+        count: recurrence.count,
+      };
+      updates.recurrence_group_id = existingAppointment.recurrence_group_id || Date.now();
     }
 
     if (Object.keys(updates).length === 0) {
@@ -329,6 +351,76 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       return createErrorResponse('Appointment not found', 404);
     }
 
+    if (
+      shouldCreateRecurringInstances &&
+      appointmentDoc.recurrence &&
+      appointmentDoc.recurrence_group_id
+    ) {
+      const recurrenceRule = appointmentDoc.recurrence;
+      const recurringInstances = generateRecurringInstances(
+        new Date(appointmentDoc.start_time),
+        new Date(appointmentDoc.end_time),
+        recurrenceRule
+      );
+
+      for (const instance of recurringInstances) {
+        const conflictCheck = await checkAppointmentConflict(
+          appointmentDoc.user_id,
+          tenantId,
+          appointmentDoc.provider_id || undefined,
+          appointmentDoc.resource_id || undefined,
+          instance.start,
+          instance.end
+        );
+        if (conflictCheck.hasConflict) {
+          continue;
+        }
+
+        const nextRecurringId = await getNextNumericId('appointments');
+        const nowIso = new Date().toISOString();
+        await db.collection('appointments').insertOne({
+          id: nextRecurringId,
+          _id: nextRecurringId,
+          tenant_id: tenantId,
+          user_id: appointmentDoc.user_id,
+          conversation_id: appointmentDoc.conversation_id || null,
+          service_id: appointmentDoc.service_id,
+          service_name: appointmentDoc.service_name || null,
+          client_id: appointmentDoc.client_id || null,
+          client_name: appointmentDoc.client_name || null,
+          client_email: appointmentDoc.client_email || null,
+          client_phone: appointmentDoc.client_phone || null,
+          start_time: instance.start.toISOString(),
+          end_time: instance.end.toISOString(),
+          status: 'scheduled',
+          provider_id: appointmentDoc.provider_id || null,
+          resource_id: appointmentDoc.resource_id || null,
+          category: appointmentDoc.category || null,
+          color: appointmentDoc.color || null,
+          notes: appointmentDoc.notes || null,
+          price_at_time: appointmentDoc.price_at_time ?? null,
+          recurrence: recurrenceRule,
+          recurrence_group_id: appointmentDoc.recurrence_group_id,
+          reminder_sent: false,
+          created_at: nowIso,
+          updated_at: nowIso,
+        });
+      }
+    }
+
+    if (
+      !shouldCreateRecurringInstances &&
+      appointmentDoc.recurrence &&
+      appointmentDoc.recurrence_group_id &&
+      (isRecurring !== undefined || recurrence !== undefined || startTime !== undefined || endTime !== undefined)
+    ) {
+      await syncRecurringSeriesFromAnchor({
+        db,
+        tenantId,
+        anchorAppointment: appointmentDoc,
+      });
+    }
+
     const impactedClientIds = new Set<number>();
     if (previousClientId !== null) {
       impactedClientIds.add(previousClientId);
@@ -343,7 +435,12 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         status !== undefined ||
         serviceId !== undefined ||
         startTime !== undefined ||
-        endTime !== undefined
+        endTime !== undefined ||
+        clientName !== undefined ||
+        clientEmail !== undefined ||
+        clientPhone !== undefined ||
+        isRecurring !== undefined ||
+        recurrence !== undefined
       )
     ) {
       await Promise.all(Array.from(impactedClientIds).map((clientId) => updateClientStats(clientId, tenantId)));
@@ -353,6 +450,188 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
   } catch (error) {
     return handleApiError(error, 'Failed to update appointment');
   }
+}
+
+function generateRecurringInstances(
+  startTime: Date,
+  endTime: Date,
+  recurrence: {
+    frequency: 'daily' | 'weekly' | 'monthly';
+    interval?: number;
+    end_date?: string;
+    endDate?: string;
+    count?: number;
+  }
+): Array<{ start: Date; end: Date }> {
+  const instances: Array<{ start: Date; end: Date }> = [];
+  const duration = endTime.getTime() - startTime.getTime();
+  const safeInterval = Math.max(1, Number(recurrence.interval) || 1);
+
+  let currentStart = new Date(startTime);
+  let count = 0;
+  const maxCount = recurrence.count || 52;
+  const recurrenceEndDate = recurrence.end_date || recurrence.endDate;
+
+  while (count < maxCount - 1) {
+    if (recurrence.frequency === 'daily') {
+      currentStart.setDate(currentStart.getDate() + safeInterval);
+    } else if (recurrence.frequency === 'weekly') {
+      currentStart.setDate(currentStart.getDate() + 7 * safeInterval);
+    } else if (recurrence.frequency === 'monthly') {
+      currentStart.setMonth(currentStart.getMonth() + safeInterval);
+    }
+
+    if (recurrenceEndDate && currentStart > new Date(recurrenceEndDate)) {
+      break;
+    }
+
+    const currentEnd = new Date(currentStart.getTime() + duration);
+    instances.push({ start: new Date(currentStart), end: currentEnd });
+    count++;
+  }
+
+  return instances;
+}
+
+async function syncRecurringSeriesFromAnchor({
+  db,
+  tenantId,
+  anchorAppointment,
+}: {
+  db: any;
+  tenantId: any;
+  anchorAppointment: any;
+}): Promise<void> {
+  if (!anchorAppointment.recurrence || !anchorAppointment.recurrence_group_id) {
+    return;
+  }
+
+  const anchorStart = new Date(anchorAppointment.start_time);
+  const anchorEnd = new Date(anchorAppointment.end_time);
+  if (Number.isNaN(anchorStart.getTime()) || Number.isNaN(anchorEnd.getTime()) || anchorStart >= anchorEnd) {
+    logger.error('syncRecurringSeriesFromAnchor: invalid anchor time range, skipping series sync', {
+      appointmentId: anchorAppointment.id,
+      start_time: anchorAppointment.start_time,
+      end_time: anchorAppointment.end_time,
+    });
+    return;
+  }
+
+  const futureInstances = generateRecurringInstances(anchorStart, anchorEnd, anchorAppointment.recurrence);
+  const desiredInstances = futureInstances.map((instance) => ({
+    start: instance.start,
+    end: instance.end,
+    key: `${instance.start.toISOString()}|${instance.end.toISOString()}`,
+  }));
+  const desiredKeys = new Set(desiredInstances.map((item) => item.key));
+
+  const existingSeriesAppointments = await db.collection('appointments').find({
+    tenant_id: tenantId,
+    user_id: anchorAppointment.user_id,
+    recurrence_group_id: anchorAppointment.recurrence_group_id,
+    deleted_at: { $exists: false },
+    id: { $ne: anchorAppointment.id },
+    start_time: { $gte: anchorAppointment.start_time },
+  }).toArray();
+
+  const existingByKey = new Map<string, any>();
+  const toDeleteIds: number[] = [];
+  const toUpdateIds: number[] = [];
+
+  for (const appointment of existingSeriesAppointments) {
+    if (appointment.status !== 'scheduled') {
+      continue;
+    }
+    const key = `${appointment.start_time}|${appointment.end_time}`;
+    if (desiredKeys.has(key)) {
+      existingByKey.set(key, appointment);
+      toUpdateIds.push(appointment.id);
+    } else {
+      toDeleteIds.push(appointment.id);
+    }
+  }
+
+  if (toDeleteIds.length > 0) {
+    const nowIso = new Date().toISOString();
+    await db.collection('appointments').updateMany(
+      { id: { $in: toDeleteIds }, tenant_id: tenantId, deleted_at: { $exists: false } },
+      { $set: { deleted_at: nowIso, updated_at: nowIso } }
+    );
+  }
+
+  if (toUpdateIds.length > 0) {
+    await db.collection('appointments').updateMany(
+      { id: { $in: toUpdateIds }, tenant_id: tenantId, deleted_at: { $exists: false } },
+      {
+        $set: {
+          service_id: anchorAppointment.service_id,
+          service_name: anchorAppointment.service_name || null,
+          client_id: anchorAppointment.client_id || null,
+          client_name: anchorAppointment.client_name || null,
+          client_email: anchorAppointment.client_email || null,
+          client_phone: anchorAppointment.client_phone || null,
+          provider_id: anchorAppointment.provider_id || null,
+          resource_id: anchorAppointment.resource_id || null,
+          category: anchorAppointment.category || null,
+          color: anchorAppointment.color || null,
+          notes: anchorAppointment.notes || null,
+          recurrence: anchorAppointment.recurrence,
+          recurrence_group_id: anchorAppointment.recurrence_group_id,
+          updated_at: new Date().toISOString(),
+        },
+      }
+    );
+  }
+
+  for (const desired of desiredInstances) {
+    if (existingByKey.has(desired.key)) {
+      continue;
+    }
+
+    const conflictCheck = await checkAppointmentConflict(
+      anchorAppointment.user_id,
+      tenantId,
+      anchorAppointment.provider_id || undefined,
+      anchorAppointment.resource_id || undefined,
+      desired.start,
+      desired.end
+    );
+    if (conflictCheck.hasConflict) {
+      continue;
+    }
+
+    const nextRecurringId = await getNextNumericId('appointments');
+    const nowIso = new Date().toISOString();
+    await db.collection('appointments').insertOne({
+      id: nextRecurringId,
+      _id: nextRecurringId,
+      tenant_id: tenantId,
+      user_id: anchorAppointment.user_id,
+      conversation_id: anchorAppointment.conversation_id || null,
+      service_id: anchorAppointment.service_id,
+      service_name: anchorAppointment.service_name || null,
+      client_id: anchorAppointment.client_id || null,
+      client_name: anchorAppointment.client_name || null,
+      client_email: anchorAppointment.client_email || null,
+      client_phone: anchorAppointment.client_phone || null,
+      start_time: desired.start.toISOString(),
+      end_time: desired.end.toISOString(),
+      status: 'scheduled',
+      provider_id: anchorAppointment.provider_id || null,
+      resource_id: anchorAppointment.resource_id || null,
+      category: anchorAppointment.category || null,
+      color: anchorAppointment.color || null,
+      notes: anchorAppointment.notes || null,
+      price_at_time: anchorAppointment.price_at_time ?? null,
+      recurrence: anchorAppointment.recurrence,
+      recurrence_group_id: anchorAppointment.recurrence_group_id,
+      reminder_sent: false,
+      created_at: nowIso,
+      updated_at: nowIso,
+    });
+  }
+
+  return;
 }
 
 // DELETE /api/appointments/[id] - Delete appointment
