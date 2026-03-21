@@ -361,7 +361,7 @@
     left: auto;
     right: 0;
     width: min(94vw, 700px);
-    min-width: 600px;
+    min-width: min(90vw, 400px);
     grid-template-columns: minmax(330px, 1fr) 220px;
   }
 
@@ -1129,11 +1129,11 @@
   width: 100%;
   min-width: 260px;
   max-width: 320px;
-  background: var(--color-surface);
+  background: #111827;
   opacity: 1;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
   padding: 0.65rem;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -1281,7 +1281,7 @@
   width: 100%;
   min-width: 200px;
   max-width: 260px;
-  background: var(--color-surface);
+  background: #111827;
   opacity: 1;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -1312,7 +1312,7 @@
   text-align: left;
   min-height: unset;
   padding: 0.55rem 0.7rem;
-  background: transparent;
+  background: var(--color-surface);
   color: var(--color-text);
   border: none;
   border-bottom: 1px solid var(--color-border);
@@ -1468,7 +1468,7 @@
 .clientSuggestions {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: var(--color-surface);
+  background: #111827;
   box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
@@ -1929,10 +1929,20 @@
 
 @media (max-width: 640px) {
   .main { padding: 0.5rem 0.75rem 0; }
-  .modal { width: 100%; max-width: none; border-radius: var(--radius-lg) var(--radius-lg) 0 0; margin-top: auto; max-height: 85vh; }
-  .deleteSheet { width: 100%; border-radius: var(--radius-lg) var(--radius-lg) 0 0; margin-top: auto; }
-  .modalActions { position: sticky; bottom: 0; background: var(--color-surface); padding-top: 0.8rem; }
+  .modal { width: 100%; max-width: none; border-radius: var(--radius-lg) var(--radius-lg) 0 0; margin-top: auto; max-height: 75vh; padding-bottom: max(1.25rem, env(safe-area-inset-bottom)); overflow-y: auto; }
+  .previewModal { width: 100%; max-width: none; max-height: 75vh; overflow-y: auto; border-radius: var(--radius-lg) var(--radius-lg) 0 0; margin-top: auto; }
+  .deleteSheet { width: 100%; border-radius: var(--radius-lg) var(--radius-lg) 0 0; margin-top: auto; padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+  .modalActions { position: sticky; bottom: 0; background: var(--color-surface); padding-top: 0.8rem; flex-direction: column; gap: 0.5rem; padding-bottom: max(0.8rem, env(safe-area-inset-bottom)); }
+  .cancelButton, .saveButton { width: 100%; justify-content: center; }
+  .previewActions { flex-direction: column; gap: 0.5rem; padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+  .editButton, .deleteButton { width: 100%; justify-content: center; }
+  .previewTitle { font-size: 1.1rem; }
+  .statusSegmentButton { padding: 0.55rem 0.5rem; font-size: 0.8rem; }
   .modalFieldRow { grid-template-columns: 1fr; gap: 1rem; }
+}
+
+@media (max-width: 600px) {
+  .dateDropdown { width: 100vw; left: 0; right: 0; grid-template-columns: 1fr; }
 }
 
 @media (max-width: 767px) {
@@ -2121,4 +2131,3 @@
 .mobileFab {
   display: none;
 }
-

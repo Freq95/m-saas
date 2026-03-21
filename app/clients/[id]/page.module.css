@@ -570,3 +570,15 @@
     width: 100%;
   }
 }
+
+@media (max-width: 600px) {
+  .tabs {
+    scroll-snap-type: x mandatory;
+  }
+
+  .tab {
+    scroll-snap-align: start;
+    flex-shrink: 0;
+    font-size: 0.75rem;
+  }
+}

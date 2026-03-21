@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import createDOMPurify from 'dompurify';
@@ -78,26 +78,38 @@ function EmailHtmlContent({ html }: { html: string }) {
     * {
       box-sizing: border-box;
     }
+    html,
     body {
       margin: 0;
       padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       background: #ffffff;
       color: #000000;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       line-height: 1.6;
     }
     img {
-      max-width: 100%;
+      max-width: 100% !important;
       height: auto;
       display: block;
     }
     table {
-      max-width: 100%;
       border-collapse: collapse;
+    }
+    pre, code {
+      white-space: pre-wrap !important;
+      word-break: break-word;
+    }
+    iframe, video {
+      max-width: 100% !important;
+      height: auto;
     }
     a {
       color: #0066cc;
       text-decoration: underline;
+      word-break: break-word;
+      overflow-wrap: anywhere;
     }
   </style>
 </head>
@@ -110,33 +122,80 @@ function EmailHtmlContent({ html }: { html: string }) {
   useEffect(() => {
     const iframe = iframeRef.current;
     if (!iframe) return;
+    let animationFrameId = 0;
+    let pendingTimeouts: ReturnType<typeof setTimeout>[] = [];
 
-    const handleLoad = () => {
+    const fitIframeToViewport = () => {
       try {
         const doc = iframe.contentDocument || iframe.contentWindow?.document;
-        if (doc && doc.body) {
-          const height = Math.max(
-            doc.body.scrollHeight,
-            doc.body.offsetHeight,
-            doc.documentElement?.clientHeight || 0,
-            doc.documentElement?.scrollHeight || 0
-          );
-          setIframeHeight(height);
+        if (!doc || !doc.body || !doc.documentElement) return;
+
+        const body = doc.body;
+        const root = doc.documentElement;
+
+        // Reset previously applied scaling before measuring natural size.
+        body.style.transform = '';
+        body.style.transformOrigin = '';
+        body.style.width = '';
+        body.style.margin = '0';
+
+        const viewportWidth = iframe.clientWidth || iframe.getBoundingClientRect().width || 1;
+        const naturalWidth = Math.max(
+          body.scrollWidth,
+          body.offsetWidth,
+          root.scrollWidth,
+          root.offsetWidth
+        );
+
+        let scale = 1;
+        if (naturalWidth > viewportWidth + 1) {
+          scale = viewportWidth / naturalWidth;
+          body.style.width = `${naturalWidth}px`;
+          body.style.transformOrigin = 'top left';
+          body.style.transform = `scale(${scale})`;
+        } else {
+          body.style.width = '100%';
         }
+
+        const naturalHeight = Math.max(
+          body.scrollHeight,
+          body.offsetHeight,
+          root.scrollHeight,
+          root.offsetHeight
+        );
+        setIframeHeight(Math.ceil(naturalHeight * scale));
       } catch (e) {
         // Cross-origin or other error, use default height
-        console.warn('Could not access iframe content for auto-resize:', e);
+        console.warn('Could not access iframe content for mobile-fit resize:', e);
         setIframeHeight(600); // Default height
       }
     };
 
+    const scheduleFit = () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+      animationFrameId = requestAnimationFrame(fitIframeToViewport);
+    };
+
+    const handleLoad = () => {
+      scheduleFit();
+      // Re-run after assets (images/fonts) settle.
+      pendingTimeouts = [120, 360, 900, 1500].map((delay) => setTimeout(scheduleFit, delay));
+    };
+
     iframe.addEventListener('load', handleLoad);
-    // Also try after a short delay in case content loads asynchronously
-    const timeout = setTimeout(handleLoad, 500);
+    const onWindowResize = () => scheduleFit();
+    window.addEventListener('resize', onWindowResize);
+    scheduleFit();
 
     return () => {
       iframe.removeEventListener('load', handleLoad);
-      clearTimeout(timeout);
+      window.removeEventListener('resize', onWindowResize);
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+      pendingTimeouts.forEach((timeoutId) => clearTimeout(timeoutId));
     };
   }, [html]);
 
@@ -341,6 +400,7 @@ export default function InboxPageClient({
   const [selectedSaveItemKeys, setSelectedSaveItemKeys] = useState<string[]>([]);
   const [savingItemKey, setSavingItemKey] = useState<string | null>(null);
   const [isSavingSelection, setIsSavingSelection] = useState(false);
+  const [saveModalLoading, setSaveModalLoading] = useState(false);
   const [updatingReadState, setUpdatingReadState] = useState(false);
   const clientSearchRequestSeqRef = useRef(0);
   const inboxSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -604,7 +664,7 @@ export default function InboxPageClient({
     void fetchLatestSyncTimestamp();
   }, [fetchLatestSyncTimestamp, sessionStatus]);
 
-  const fetchMessages = async (conversationId: number, isInitial = false, beforeId?: number) => {
+  const fetchMessages = async (conversationId: number, isInitial = false, beforeId?: number): Promise<Message[]> => {
     try {
       if (isInitial) {
         setLoadingOlderMessages(false);
@@ -622,23 +682,25 @@ export default function InboxPageClient({
       if (!response.ok) {
         const errorMessage = await readErrorMessage(response);
         showApiErrorToast('messages', response.status, errorMessage);
-        return;
+        return [];
       }
       const result = await response.json();
-      const fetchedMessages = result.messages || [];
-      
+      const fetchedMessages: Message[] = result.messages || [];
+
       if (isInitial) {
         setMessages(fetchedMessages);
       } else {
         // Prepend older messages
         setMessages((prev) => [...fetchedMessages, ...prev]);
       }
-      
+
       setHasMoreMessages(result.hasMore || false);
       setOldestMessageId(result.oldestMessageId || null);
-      
+
+      return fetchedMessages;
     } catch (error) {
       console.error('Error fetching messages:', error);
+      return [];
     } finally {
       setLoadingOlderMessages(false);
     }
@@ -1095,11 +1157,35 @@ export default function InboxPageClient({
     []
   );
 
+  // Fix 3: helper that returns true if item has been saved to ANY client
+  const isAnySavedClient = useCallback((item: SaveableItem): boolean => {
+    if (Array.isArray(item.savedClientIds) && item.savedClientIds.length > 0) {
+      return true;
+    }
+    return typeof item.savedClientId === 'number' && item.savedClientId > 0;
+  }, []);
+
+  // Fix 1: centralised close that fully resets all modal state
+  const closeSaveModal = useCallback(() => {
+    setSaveModalOpen(false);
+    setClientSearch('');
+    setHasActivatedClientSearch(false);
+    setSelectedTargetClientId(null);
+    setSelectedSaveItemKeys([]);
+    setClientOptions([]);
+    setSaveModalLoading(false);
+  }, []);
+
   const openSaveModal = async () => {
     if (!selectedConversation) return;
+
+    // Fix 6: show loading state while we fetch fresh messages
+    setSaveModalLoading(true);
     setSaveModalOpen(true);
     setClientSearch('');
     setHasActivatedClientSearch(false);
+    setSelectedSaveItemKeys([]);
+    setClientOptions([]);
 
     const defaultClientId =
       typeof selectedConversation.client_id === 'number' && selectedConversation.client_id > 0
@@ -1107,12 +1193,66 @@ export default function InboxPageClient({
         : null;
     setSelectedTargetClientId(defaultClientId);
 
-    const defaultKeys = saveableItems
-      .filter((item) => item.savable && !isItemAlreadySavedForClient(item, defaultClientId))
+    // Fix 2: fetch fresh messages BEFORE computing defaults so stale saved-state
+    // from a previous save session does not incorrectly re-select already-saved items.
+    const freshMessages = await fetchMessages(selectedConversation.id, true);
+
+    // Fix 2 + 3: compute default keys inline from the fresh messages rather than
+    // the potentially stale saveableItems memo.  Exclude anything already saved to
+    // ANY client (Fix 3), not just the default one.
+    const computeFreshItems = (msgs: Message[]): SaveableItem[] => {
+      const items: SaveableItem[] = [];
+      for (const message of msgs) {
+        for (const [index, attachment] of (message.attachments || []).entries()) {
+          const filename = attachment.filename || `Attachment #${index + 1}`;
+          items.push({
+            key: `attachment:${message.id}:${attachment.id ?? index}`,
+            type: 'attachment',
+            messageId: message.id,
+            attachmentId: attachment.id,
+            label: `${filename} (${Math.round((attachment.size || 0) / 1024)}KB)`,
+            savable: Boolean(attachment.id && attachment.persisted),
+            savedClientId: attachment.last_saved_client_id,
+            savedAt: attachment.last_saved_at,
+            savedClientIds: Array.isArray(attachment.saved_client_ids)
+              ? attachment.saved_client_ids
+              : undefined,
+          });
+        }
+        for (const [index, image] of (message.images || []).entries()) {
+          const canSave = Boolean(image.data || (image.url && image.url.startsWith('data:')));
+          items.push({
+            key: `image:${message.id}:${index}`,
+            type: 'image',
+            messageId: message.id,
+            imageIndex: index,
+            label: `Inline image #${index + 1}`,
+            savable: canSave,
+            savedClientId: image.last_saved_client_id,
+            savedAt: image.last_saved_at,
+            savedClientIds: Array.isArray(image.saved_client_ids)
+              ? image.saved_client_ids
+              : undefined,
+          });
+        }
+      }
+      return items;
+    };
+
+    const freshItems = computeFreshItems(freshMessages);
+
+    // Fix 3: exclude items already saved to ANY client, not just the default client
+    const defaultKeys = freshItems
+      .filter((item) => {
+        if (!item.savable) return false;
+        if (isAnySavedClient(item)) return false;
+        return true;
+      })
       .map((item) => item.key);
     setSelectedSaveItemKeys(defaultKeys);
 
-    setClientOptions([]);
+    setSaveModalLoading(false);
+
     if (defaultClientId) {
       try {
         const response = await fetch(`/api/clients/${defaultClientId}`, { cache: 'no-store' });
@@ -1225,6 +1365,9 @@ export default function InboxPageClient({
       }
       await fetchMessages(selectedConversation.id, true);
       await fetchConversations(searchQuery);
+      // Fix 4: clear selected keys after a successful save so stale selection
+      // does not persist if the user reopens or stays in the modal
+      setSelectedSaveItemKeys([]);
       toast.success('Elementele selectate au fost salvate in fisa pacientului.');
     } catch (error) {
       console.error('Save selection failed:', error);
@@ -1366,7 +1509,7 @@ export default function InboxPageClient({
   const handleSaveModalBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const endedOnBackdrop = event.target === event.currentTarget;
     if (saveModalBackdropPressStartedRef.current && endedOnBackdrop) {
-      setSaveModalOpen(false);
+      closeSaveModal();
     }
     saveModalBackdropPressStartedRef.current = false;
   };
@@ -1759,130 +1902,377 @@ export default function InboxPageClient({
         </div>
       </div>
 
-      {saveModalOpen && (
-        <div
-          className={styles.saveModalBackdrop}
-          onPointerDown={handleSaveModalBackdropPointerDown}
-          onClick={handleSaveModalBackdropClick}
-        >
-          <div className={styles.saveModal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.saveModalHeader}>
-              <h4>Salveaza atasamente si poze</h4>
-              <button
-                type="button"
-                className={styles.modalCloseButton}
-                onClick={() => setSaveModalOpen(false)}
-              >
-                Inchide
-              </button>
-            </div>
+      {saveModalOpen && (() => {
+        // Derive the currently selected client object for chip display
+        const selectedClient = selectedTargetClientId
+          ? clientOptions.find((c) => c.id === selectedTargetClientId) ?? null
+          : null;
 
-            <div className={styles.saveModalSection}>
-              <div className={styles.saveModalLabel}>Client propus / destinatie</div>
+        // Split items into two groups
+        const attachmentItems = saveableItems.filter((i) => i.type === 'attachment');
+        const imageItems = saveableItems.filter((i) => i.type === 'image');
+
+        // Count of items actually pending selection (not already saved for target)
+        const pendingCount = selectedSaveItemKeys.filter((k) => {
+          const item = saveableItems.find((i) => i.key === k);
+          return item && !isItemAlreadySavedForClient(item, selectedTargetClientId);
+        }).length;
+
+        // Helper: derive file-type label + icon class from item label / type
+        const getFileTypeInfo = (item: SaveableItem): { ext: string; iconClass: string } => {
+          if (item.type === 'image') {
+            return { ext: 'IMG', iconClass: styles.fileTypeIconImage };
+          }
+          const match = item.label.match(/\.([a-zA-Z0-9]+)\s*\(/);
+          const ext = match ? match[1].toUpperCase() : 'FILE';
+          if (ext === 'PDF') return { ext, iconClass: styles.fileTypeIconPdf };
+          if (['DOC', 'DOCX'].includes(ext)) return { ext, iconClass: styles.fileTypeIconDoc };
+          if (['XLS', 'XLSX', 'CSV'].includes(ext)) return { ext, iconClass: styles.fileTypeIconSheet };
+          if (['JPG', 'JPEG', 'PNG', 'GIF', 'WEBP', 'SVG'].includes(ext)) return { ext, iconClass: styles.fileTypeIconImage };
+          return { ext: ext.slice(0, 4), iconClass: styles.fileTypeIconDefault };
+        };
+
+        // Helper: extract just the filename from the label (strips the "(XKB)" size suffix)
+        const getItemDisplayName = (item: SaveableItem): { name: string; size: string } => {
+          const match = item.label.match(/^(.+?)\s*\((\d+KB)\)$/);
+          if (match) return { name: match[1], size: match[2] };
+          return { name: item.label, size: '' };
+        };
+
+        // Helper: get initials from client name
+        const getInitials = (name: string) => {
+          const parts = name.trim().split(/\s+/);
+          if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+          return name.slice(0, 2).toUpperCase();
+        };
+
+        const renderStatusPill = (item: SaveableItem) => {
+          if (savingItemKey === item.key) {
+            return (
+              <span className={`${styles.saveItemStatusPill} ${styles.saveItemStatusPillSaving}`}>
+                <span className={styles.clientSearchSpinner} aria-hidden="true" />
+                Se salveaza...
+              </span>
+            );
+          }
+          if (!item.savable) {
+            return (
+              <span className={`${styles.saveItemStatusPill} ${styles.saveItemStatusPillDisabled}`}>
+                Indisponibil
+              </span>
+            );
+          }
+          if (isItemAlreadySavedForClient(item, selectedTargetClientId)) {
+            return (
+              <span className={`${styles.saveItemStatusPill} ${styles.saveItemStatusPillSaved}`}>
+                {/* checkmark */}
+                <svg width="9" height="9" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 5.5l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="1.7" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                Salvat
+              </span>
+            );
+          }
+          // Fix 5: show indicator when item was saved to a different client
+          if (isAnySavedClient(item)) {
+            const savedIds = Array.isArray(item.savedClientIds) && item.savedClientIds.length > 0
+              ? item.savedClientIds
+              : item.savedClientId
+                ? [item.savedClientId]
+                : [];
+            const savedNames = savedIds
+              .map((id) => getPatientNameById(id))
+              .join(', ');
+            return (
+              <span
+                className={`${styles.saveItemStatusPill} ${styles.saveItemStatusPillSaved}`}
+                title={savedNames ? `Salvat la: ${savedNames}` : 'Salvat la alt client'}
+                style={{ opacity: 0.75 }}
+              >
+                <svg width="9" height="9" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 5.5l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="1.7" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                {savedIds.length > 1 ? `Salvat (${savedIds.length})` : 'Salvat alt client'}
+              </span>
+            );
+          }
+          return (
+            <span className={`${styles.saveItemStatusPill} ${styles.saveItemStatusPillUnsaved}`}>
+              Nesalvat
+            </span>
+          );
+        };
+
+        const renderToggle = (item: SaveableItem) => {
+          const isSaved = isItemAlreadySavedForClient(item, selectedTargetClientId);
+          const isDisabled = !item.savable || isSavingSelection || isSaved;
+          const isChecked = selectedSaveItemKeys.includes(item.key);
+
+          let toggleClass = styles.saveItemToggle;
+          if (isSaved) toggleClass += ` ${styles.saveItemToggleSaved}`;
+          else if (isDisabled) toggleClass += ` ${styles.saveItemToggleDisabled}`;
+          else if (isChecked) toggleClass += ` ${styles.saveItemToggleChecked}`;
+
+          return (
+            <div className={toggleClass} aria-hidden="true">
+              {isSaved ? (
+                <svg width="11" height="11" viewBox="0 0 11 11" aria-hidden="true"><path d="M1.5 5.5l2.8 2.8 5-5.5" stroke="#34d399" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              ) : isChecked && !isDisabled ? (
+                <svg width="11" height="11" viewBox="0 0 11 11" aria-hidden="true"><path d="M1.5 5.5l2.8 2.8 5-5.5" stroke="currentColor" strokeWidth="1.8" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              ) : null}
+            </div>
+          );
+        };
+
+        const renderItemCard = (item: SaveableItem) => {
+          const isSaved = isItemAlreadySavedForClient(item, selectedTargetClientId);
+          const isDisabled = !item.savable || isSavingSelection || isSaved;
+          const isChecked = selectedSaveItemKeys.includes(item.key);
+          const { ext, iconClass } = getFileTypeInfo(item);
+          const { name, size } = getItemDisplayName(item);
+
+          let rowClass = styles.saveItemRow;
+          if (isSaved) rowClass += ` ${styles.saveItemRowSaved}`;
+          else if (isDisabled) rowClass += ` ${styles.saveItemRowDisabled}`;
+          else if (isChecked) rowClass += ` ${styles.saveItemRowSelected}`;
+
+          return (
+            <label
+              key={item.key}
+              className={rowClass}
+              title={formatSaveStatus(item)}
+              style={{ cursor: isDisabled ? undefined : 'pointer' }}
+            >
               <input
-                type="text"
-                value={clientSearch}
-                onChange={(e) => setClientSearch(e.target.value)}
-                onFocus={() => setHasActivatedClientSearch(true)}
-                className={styles.searchInput}
-                placeholder="Cauta client dupa nume, email sau telefon..."
+                type="checkbox"
+                className={styles.saveItemNativeCheckbox}
+                checked={isChecked}
+                disabled={isDisabled}
+                onChange={() => handleToggleSaveItem(item.key)}
+                aria-label={`${name} — ${formatSaveStatus(item)}`}
               />
-              <div className={styles.clientList}>
-                {clientOptions.map((client) => (
-                  <label key={client.id} className={styles.clientOption}>
-                    <input
-                      type="radio"
-                      name="save-target-client"
-                      checked={selectedTargetClientId === client.id}
-                      onChange={() => setSelectedTargetClientId(client.id)}
-                    />
-                    <span>
-                      {client.name} {client.email ? `(${client.email})` : ''}
-                    </span>
-                  </label>
-                ))}
-                {!loadingClientOptions && hasActivatedClientSearch && clientSearch.trim().length > 0 && clientOptions.length === 0 && (
-                  <div className={styles.modalHint}>Nu am gasit clienti pentru cautarea curenta.</div>
+              {renderToggle(item)}
+              <div className={`${styles.fileTypeIcon} ${iconClass}`}>
+                {item.type === 'image' ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M21 15l-5-5L11 15l-3-3-5 5v2a2 2 0 002 2h16a2 2 0 002-2v-2zM4 4h16a2 2 0 012 2v8l-5-5-5 5-3-3-5 5V6a2 2 0 012-2z" opacity=".9"/>
+                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                  </svg>
+                ) : (
+                  <span>{ext}</span>
                 )}
-                {!selectedTargetClientId && (
-                  <div className={styles.modalHint}>
-                    Daca nu alegi client, sistemul va crea automat unul nou la prima salvare.
+              </div>
+              <div className={styles.saveItemMeta}>
+                <div className={styles.saveItemName}>{name}</div>
+                {size && <div className={styles.saveItemSize}>{size}</div>}
+              </div>
+              {renderStatusPill(item)}
+            </label>
+          );
+        };
+
+        const renderGroup = (items: SaveableItem[], groupLabel: string, groupIcon: React.ReactNode) => {
+          if (items.length === 0) return null;
+          return (
+            <div className={styles.saveModalSection}>
+              <div className={styles.attachmentGroupLabel}>
+                <span className={styles.attachmentGroupLabelIcon}>{groupIcon}</span>
+                {groupLabel}
+              </div>
+              <div className={styles.saveItemList}>
+                {items.map(renderItemCard)}
+              </div>
+            </div>
+          );
+        };
+
+        return (
+          <div
+            className={styles.saveModalBackdrop}
+            onPointerDown={handleSaveModalBackdropPointerDown}
+            onClick={handleSaveModalBackdropClick}
+          >
+            <div className={styles.saveModal} onClick={(e) => e.stopPropagation()}>
+
+              {/* ---- Header ---- */}
+              <div className={styles.saveModalHeader}>
+                <div className={styles.saveModalTitleGroup}>
+                  <h4 className={styles.saveModalTitle}>Salveaza atasamente si poze</h4>
+                  <div className={styles.saveModalSubtitle}>
+                    {saveableItems.length === 0
+                      ? 'Niciun element detectat in conversatie'
+                      : `${saveableItems.length} element${saveableItems.length !== 1 ? 'e' : ''} detectat${saveableItems.length !== 1 ? 'e' : ''} in conversatie`}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={styles.modalCloseButton}
+                  onClick={closeSaveModal}
+                  aria-label="Inchide"
+                  title="Inchide (Esc)"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* ---- Scrollable body ---- */}
+              <div className={styles.saveModalBody}>
+
+                {/* Fix 6: loading state while refreshing messages before showing content */}
+                {saveModalLoading && (
+                  <div className={styles.modalHint} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '1.5rem 0' }}>
+                    <span className={styles.clientSearchSpinner} aria-hidden="true" />
+                    Se incarca datele actualizate...
                   </div>
                 )}
-              </div>
-            </div>
 
-            <div className={styles.saveModalSection}>
-              <div className={styles.saveModalLabel}>Elemente detectate in conversatie</div>
-              <div className={styles.saveItemList}>
-                {saveableItems.length === 0 && (
-                  <div className={styles.modalHint}>Nu exista atasamente sau poze inline de salvat.</div>
-                )}
-                {saveableItems.map((item) => (
-                  <label key={item.key} className={styles.saveItemRow}>
-                    <input
-                      type="checkbox"
-                      checked={selectedSaveItemKeys.includes(item.key)}
-                      disabled={
-                        !item.savable ||
-                        isSavingSelection ||
-                        isItemAlreadySavedForClient(item, selectedTargetClientId)
-                      }
-                      onChange={() => handleToggleSaveItem(item.key)}
-                    />
-                    <div className={styles.saveItemMeta}>
-                      <div>{item.type === 'attachment' ? 'Attachment' : 'Poza'}: {item.label}</div>
-                      <div className={styles.saveItemStatus}>
-                        {savingItemKey === item.key ? (
-                          'Se salveaza...'
-                        ) : (
-                          <span
-                            className={styles.saveStateIcon}
-                            title={formatSaveStatus(item)}
-                            aria-label={formatSaveStatus(item)}
-                          >
-                            <svg
-                              className={getSaveIconClassName(item)}
-                              viewBox="0 0 24 24"
-                              width="15"
-                              height="15"
-                              aria-hidden="true"
-                            >
-                              <path
-                                fill="currentColor"
-                                d="M5 3h11l3 3v15H5V3zm2 2v4h8V5H7zm0 8v6h10v-6H7zm2 1h6v4H9v-4z"
-                              />
-                            </svg>
-                          </span>
+                {/* Fix 6: hide content while fresh messages are being loaded */}
+                {!saveModalLoading && (
+                  <>
+                {/* Client section */}
+                <div className={styles.saveModalSection}>
+                  <div className={styles.saveModalSectionHeader}>
+                    <div className={styles.saveModalLabel}>Client destinatie</div>
+                  </div>
+
+                  {/* If a client is already selected, show chip; otherwise show search */}
+                  {selectedClient ? (
+                    <div className={styles.selectedClientChip}>
+                      <div className={styles.clientAvatar}>{getInitials(selectedClient.name)}</div>
+                      <div className={styles.selectedClientInfo}>
+                        <div className={styles.selectedClientName}>{selectedClient.name}</div>
+                        {selectedClient.email && (
+                          <div className={styles.selectedClientEmail}>{selectedClient.email}</div>
                         )}
                       </div>
+                      <button
+                        type="button"
+                        className={styles.clientChipDismiss}
+                        onClick={() => {
+                          setSelectedTargetClientId(null);
+                          setClientSearch('');
+                        }}
+                        aria-label="Sterge selectia clientului"
+                        title="Sterge selectia"
+                      >
+                        ✕
+                      </button>
                     </div>
-                  </label>
-                ))}
-              </div>
-            </div>
+                  ) : (
+                    <div className={styles.clientSearchWrapper}>
+                      <span className={styles.clientSearchIcon} aria-hidden="true">
+                        {loadingClientOptions ? (
+                          <span className={styles.clientSearchSpinner} />
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                          </svg>
+                        )}
+                      </span>
+                      <input
+                        type="text"
+                        value={clientSearch}
+                        onChange={(e) => setClientSearch(e.target.value)}
+                        onFocus={() => setHasActivatedClientSearch(true)}
+                        className={styles.clientSearchInput}
+                        placeholder="Cauta client dupa nume, email sau telefon..."
+                        autoComplete="off"
+                      />
+                    </div>
+                  )}
 
-            <div className={styles.saveModalActions}>
-              <button
-                type="button"
-                className={styles.readToggleButton}
-                onClick={() => setSaveModalOpen(false)}
-                disabled={isSavingSelection}
-              >
-                Anuleaza
-              </button>
-              <button
-                type="button"
-                className={styles.attachmentSaveButton}
-                onClick={saveSelectedItems}
-                disabled={isSavingSelection || selectedSaveItemKeys.length === 0}
-              >
-                {isSavingSelection ? 'Se salveaza...' : 'Salveaza selectate'}
-              </button>
+                  {/* Dropdown results (only when no client selected and search active) */}
+                  {!selectedClient && hasActivatedClientSearch && clientSearch.trim().length > 0 && (
+                    <div className={styles.clientDropdown}>
+                      {clientOptions
+                        .filter((c) => c.id !== selectedTargetClientId)
+                        .map((client) => (
+                          <button
+                            key={client.id}
+                            type="button"
+                            className={styles.clientDropdownItem}
+                            onClick={() => {
+                              setSelectedTargetClientId(client.id);
+                              setClientSearch('');
+                            }}
+                          >
+                            <div className={styles.clientDropdownAvatar}>{getInitials(client.name)}</div>
+                            <span className={styles.clientDropdownName}>{client.name}</span>
+                            {client.email && (
+                              <span className={styles.clientDropdownEmail}>{client.email}</span>
+                            )}
+                          </button>
+                        ))}
+                      {!loadingClientOptions && clientOptions.filter((c) => c.id !== selectedTargetClientId).length === 0 && (
+                        <div className={styles.modalHint}>Nu am gasit clienti pentru cautarea curenta.</div>
+                      )}
+                    </div>
+                  )}
+
+                  {!selectedTargetClientId && (
+                    <div className={styles.modalHintAutoCreate}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '1px', opacity: 0.7 }}><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
+                      Daca nu alegi un client, sistemul va crea automat unul nou la prima salvare.
+                    </div>
+                  )}
+                </div>
+
+                {/* Attachments section */}
+                {saveableItems.length === 0 ? (
+                  <div className={styles.modalHint}>
+                    Nu exista atasamente sau poze inline de salvat in aceasta conversatie.
+                  </div>
+                ) : (
+                  <>
+                    {renderGroup(
+                      attachmentItems,
+                      'Documente si fisiere',
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    )}
+                    {renderGroup(
+                      imageItems,
+                      'Poze inline',
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    )}
+                  </>
+                )}
+                  </>
+                )}
+
+              </div>
+
+              {/* ---- Footer actions ---- */}
+              <div className={styles.saveModalActions}>
+                <button
+                  type="button"
+                  className={styles.saveModalCancelButton}
+                  onClick={closeSaveModal}
+                  disabled={isSavingSelection}
+                >
+                  Anuleaza
+                </button>
+                <button
+                  type="button"
+                  className={styles.saveModalSaveButton}
+                  onClick={saveSelectedItems}
+                  disabled={isSavingSelection || saveModalLoading || pendingCount === 0}
+                >
+                  {isSavingSelection ? (
+                    <>
+                      <span className={styles.clientSearchSpinner} aria-hidden="true" style={{ borderTopColor: 'currentColor' }} />
+                      Se salveaza...
+                    </>
+                  ) : (
+                    <>
+                      Salveaza
+                      {pendingCount > 0 && (
+                        <span className={styles.saveModalSaveBadge}>{pendingCount}</span>
+                      )}
+                    </>
+                  )}
+                </button>
+              </div>
+
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
       <ToastContainer toasts={toast.toasts} onClose={toast.removeToast} />
     </div>
   );

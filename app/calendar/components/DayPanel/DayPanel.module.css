@@ -572,6 +572,8 @@
     gap: 0.35rem;
     padding: 0.5rem 0.75rem;
   }
+  .service { font-size: 0.7rem; }
+  .statusPill { font-size: 0.55rem; padding: 0.1rem 0.35rem; }
   .statCard { padding: 0.35rem 0.45rem; }
   .statCardLabel { font-size: 0.54rem; }
   .statusValue { font-size: 0.7rem; }

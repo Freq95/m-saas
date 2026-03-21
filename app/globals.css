@@ -67,6 +67,11 @@ input, textarea, select {
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
 }
 
+option {
+  background: #111827;
+  color: #e6edf8;
+}
+
 button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
@@ -184,6 +189,17 @@ main {
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.5);
+}
+
+@media (max-width: 767px) {
+  button {
+    min-height: 44px;
+  }
+
+  input,
+  select {
+    min-height: 44px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

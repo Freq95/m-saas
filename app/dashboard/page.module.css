@@ -256,7 +256,7 @@
 
 .clientGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
   gap: var(--space-4);
 }
 
@@ -437,5 +437,11 @@
   .appointmentItem {
     gap: var(--space-3);
     padding: var(--space-3);
+  }
+}
+
+@media (max-width: 480px) {
+  .statsGrid {
+    grid-template-columns: 1fr;
   }
 }

@@ -213,6 +213,7 @@ export function CreateAppointmentModal({
   const servicePickerRef = useRef<HTMLDivElement | null>(null);
   const startTimeListRef = useRef<HTMLDivElement | null>(null);
   const endTimeListRef = useRef<HTMLDivElement | null>(null);
+  const newClientConfirmRef = useRef<HTMLDivElement | null>(null);
 
   const selectedStartDateTime = useMemo(() => {
     const [year, month, day] = selectedDate.split('-').map(Number);
@@ -526,6 +527,22 @@ export function CreateAppointmentModal({
     });
     selectedButton?.focus();
   }, [isEndTimePickerOpen, selectedEndTime]);
+
+  useEffect(() => {
+    if (!showNewClientConfirm) return;
+    const panel = newClientConfirmRef.current;
+    if (!panel) return;
+
+    const rafId = window.requestAnimationFrame(() => {
+      panel.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'nearest',
+      });
+    });
+
+    return () => window.cancelAnimationFrame(rafId);
+  }, [showNewClientConfirm]);
 
   const applyClientSuggestion = (client: ClientSuggestion) => {
     setFormData((prev) => ({
@@ -1370,7 +1387,7 @@ export function CreateAppointmentModal({
         )}
 
         {showNewClientConfirm && (
-          <div className={styles.inlineConfirmBox}>
+          <div ref={newClientConfirmRef} className={styles.inlineConfirmBox}>
             <p className={styles.inlineConfirmTitle}>Client nou detectat</p>
             <p className={styles.inlineConfirmText}>
               Nu am gasit un client existent pentru <strong>{formData.clientName.trim()}</strong>. Confirmi crearea automata in baza de date?
