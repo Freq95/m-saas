@@ -4,7 +4,7 @@ import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { ObjectId } from 'mongodb';
 
-export const revalidate = 30;
+export const dynamic = 'force-dynamic';
 
 export default async function ClientsPage() {
   const session = await auth();

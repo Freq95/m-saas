@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { getUserEmailIntegrations } from '@/lib/email-integrations';
 import { auth } from '@/lib/auth';
 
-export const revalidate = 30;
+export const dynamic = 'force-dynamic';
 
 export default async function EmailSettingsPage() {
   const session = await auth();

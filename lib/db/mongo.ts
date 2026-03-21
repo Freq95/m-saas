@@ -19,7 +19,10 @@ function getDbName(uri: string): string {
 async function getMongoClient(uri: string): Promise<MongoClient> {
   if (!clientPromise) {
     const client = new MongoClient(uri);
-    clientPromise = client.connect();
+    clientPromise = client.connect().catch((err) => {
+      clientPromise = null;
+      throw err;
+    });
   }
   return clientPromise;
 }

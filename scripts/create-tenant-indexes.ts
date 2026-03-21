@@ -16,6 +16,7 @@ async function createTenantIndexes() {
 
   await db.collection('conversations').createIndex({ tenant_id: 1, updated_at: -1 });
   await db.collection('conversations').createIndex({ tenant_id: 1, channel: 1 });
+  await db.collection('conversations').createIndex({ tenant_id: 1, user_id: 1, created_at: -1 });
 
   await db.collection('messages').createIndex({ tenant_id: 1, conversation_id: 1, created_at: -1 });
 

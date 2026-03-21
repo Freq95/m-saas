@@ -13,7 +13,7 @@ export interface EmailAttachment {
   last_saved_client_id?: number;
   last_saved_client_file_id?: number;
   last_saved_at?: string;
-  saved_client_ids?: number[];
+  saved_client_ids?: Array<{ clientId: number; fileId: number }>;
 }
 
 export interface EmailImage {
@@ -25,7 +25,7 @@ export interface EmailImage {
   last_saved_client_id?: number;
   last_saved_client_file_id?: number;
   last_saved_at?: string;
-  saved_client_ids?: number[];
+  saved_client_ids?: Array<{ clientId: number; fileId: number }>;
 }
 
 /**

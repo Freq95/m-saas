@@ -1120,6 +1120,88 @@
   color: var(--color-text-soft);
 }
 
+.savedClientsRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+}
+
+.savedClientsLabel {
+  font-size: 0.7rem;
+  color: var(--color-text-soft);
+  flex-shrink: 0;
+}
+
+.savedClientChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.14rem 0.22rem 0.14rem 0.14rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 84%, transparent);
+  background: color-mix(in srgb, var(--color-surface-muted) 78%, transparent);
+  max-width: 100%;
+}
+
+.savedClientChipRemoving {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.savedClientChipAvatar {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: var(--color-accent-contrast);
+  background: var(--gradient-accent);
+  flex-shrink: 0;
+}
+
+.savedClientChipName {
+  font-size: 0.68rem;
+  color: var(--color-text);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.savedClientChipRemove {
+  min-height: 16px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  background: transparent;
+  color: var(--color-text-soft);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.savedClientChipRemove:hover:not(:disabled) {
+  color: color-mix(in srgb, var(--color-danger) 78%, white);
+  border-color: color-mix(in srgb, var(--color-danger) 45%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 15%, transparent);
+}
+
+.savedClientChipRemove:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Status pill */
 .saveItemStatusPill {
   display: inline-flex;

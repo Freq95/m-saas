@@ -64,12 +64,15 @@ export async function getConversationsData(query: ConversationsQuery) {
   }
 
   const conversationIds = conversations.map((conv: any) => conv.id);
+  const messagesMatch = tenantId
+    ? { tenant_id: tenantId, conversation_id: { $in: conversationIds } }
+    : { conversation_id: { $in: conversationIds } };
+
+  // Stats pipeline: project only small scalar fields before $sort to stay under MongoDB's
+  // 32 MB in-memory sort limit. Content (potentially large email bodies) is excluded here
+  // and fetched separately below for a bounded set of top conversations.
   const messageStatsPipeline: Record<string, unknown>[] = [
-    {
-      $match: tenantId
-        ? { tenant_id: tenantId, conversation_id: { $in: conversationIds } }
-        : { conversation_id: { $in: conversationIds } },
-    },
+    { $match: messagesMatch },
     {
       $project: {
         conversation_id: 1,
@@ -82,18 +85,8 @@ export async function getConversationsData(query: ConversationsQuery) {
         created_at: 1,
       },
     },
-    {
-      $addFields: {
-        event_at: { $ifNull: ['$sent_at', '$created_at'] },
-      },
-    },
-    {
-      $sort: {
-        conversation_id: 1,
-        event_at: -1,
-        id: -1,
-      },
-    },
+    { $addFields: { event_at: { $ifNull: ['$sent_at', '$created_at'] } } },
+    { $sort: { conversation_id: 1, event_at: -1, id: -1 } },
     {
       $group: {
         _id: '$conversation_id',
@@ -141,31 +134,19 @@ export async function getConversationsData(query: ConversationsQuery) {
     },
   ];
 
-  const messageStatsCursor = db.collection('messages').aggregate(messageStatsPipeline);
-
-  const conversationTagsQuery = db
-    .collection('conversation_tags')
-    .find(tenantId ? { conversation_id: { $in: conversationIds }, tenant_id: tenantId } : { conversation_id: { $in: conversationIds } })
-    .project({ conversation_id: 1, tag_id: 1 });
-
-  const [messageStats, allConvTags] = await Promise.all([
-    messageStatsCursor.toArray(),
-    conversationTagsQuery.toArray().then((docs: any[]) => docs.map(stripMongoId)),
+  const [messageStats, allConvTags, attachmentRows] = await Promise.all([
+    db.collection('messages').aggregate(messageStatsPipeline).toArray(),
+    db
+      .collection('conversation_tags')
+      .find(tenantId ? { conversation_id: { $in: conversationIds }, tenant_id: tenantId } : { conversation_id: { $in: conversationIds } })
+      .project({ conversation_id: 1, tag_id: 1 })
+      .toArray()
+      .then((docs: any[]) => docs.map(stripMongoId)),
+    db.collection('message_attachments').aggregate([
+      { $match: messagesMatch },
+      { $group: { _id: '$conversation_id', count: { $sum: 1 } } },
+    ]).toArray(),
   ]);
-
-  const attachmentRows = await db.collection('message_attachments').aggregate([
-    {
-      $match: tenantId
-        ? { tenant_id: tenantId, conversation_id: { $in: conversationIds } }
-        : { conversation_id: { $in: conversationIds } },
-    },
-    {
-      $group: {
-        _id: '$conversation_id',
-        count: { $sum: 1 },
-      },
-    },
-  ]).toArray();
 
   const attachmentsByConversation = new Map<number, number>();
   for (const row of attachmentRows as any[]) {
@@ -247,56 +228,31 @@ export async function getConversationsData(query: ConversationsQuery) {
     return new Date(fallbackB).getTime() - new Date(fallbackA).getTime();
   });
 
-  // Keep preview UX for most relevant rows while bounding DB/CPU cost at high concurrency.
+  // Fetch last-message preview for the top 50 visible conversations only.
+  // Content is excluded from the stats sort above to stay under MongoDB's 32 MB limit.
   const previewConversationIds = enriched
     .slice(0, 50)
     .map((conv: any) => conv.id)
     .filter((id: unknown): id is number => typeof id === 'number');
   if (previewConversationIds.length > 0) {
+    const previewMatch = tenantId
+      ? { tenant_id: tenantId, conversation_id: { $in: previewConversationIds } }
+      : { conversation_id: { $in: previewConversationIds } };
     const previewRows = await db.collection('messages').aggregate([
-      {
-        $match: tenantId
-          ? { tenant_id: tenantId, conversation_id: { $in: previewConversationIds } }
-          : { conversation_id: { $in: previewConversationIds } },
-      },
-      {
-        $project: {
-          conversation_id: 1,
-          content: 1,
-          created_at: 1,
-          id: 1,
-        },
-      },
-      {
-        $sort: {
-          conversation_id: 1,
-          created_at: -1,
-          id: -1,
-        },
-      },
-      {
-        $group: {
-          _id: '$conversation_id',
-          last_content: { $first: '$content' },
-        },
-      },
+      { $match: previewMatch },
+      { $project: { conversation_id: 1, content: 1, created_at: 1, id: 1 } },
+      { $sort: { conversation_id: 1, created_at: -1, id: -1 } },
+      { $group: { _id: '$conversation_id', last_content: { $first: '$content' } } },
     ]).toArray();
 
     const previewByConversation = new Map<number, string>();
     for (const row of previewRows as any[]) {
       const convId = row?._id;
-      if (typeof convId !== 'number' || typeof row?.last_content !== 'string') {
-        continue;
-      }
+      if (typeof convId !== 'number' || typeof row?.last_content !== 'string') continue;
       const stored = parseStoredMessage(row.last_content);
       const raw = stored.text || stored.html || '';
-      const preview = raw
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .slice(0, 160);
+      const preview = raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
       previewByConversation.set(convId, preview);
-
       if (Array.isArray(stored.attachments) && stored.attachments.length > 0) {
         const existing = attachmentsByConversation.get(convId) || 0;
         attachmentsByConversation.set(convId, Math.max(existing, stored.attachments.length));
@@ -426,13 +382,17 @@ export async function getConversationMessagesData(
         .map((doc: any) => [doc.id, doc])
     );
 
-    const savedClientsByAttachmentId = new Map<number, Set<number>>();
+    const savedClientsByAttachmentId = new Map<number, Map<number, number>>();
     for (const fileDoc of attachmentClientFiles as any[]) {
-      if (typeof fileDoc?.source_attachment_id !== 'number' || typeof fileDoc?.client_id !== 'number') {
+      if (
+        typeof fileDoc?.source_attachment_id !== 'number' ||
+        typeof fileDoc?.client_id !== 'number' ||
+        typeof fileDoc?.id !== 'number'
+      ) {
         continue;
       }
-      const savedClients = savedClientsByAttachmentId.get(fileDoc.source_attachment_id) || new Set<number>();
-      savedClients.add(fileDoc.client_id);
+      const savedClients = savedClientsByAttachmentId.get(fileDoc.source_attachment_id) || new Map<number, number>();
+      savedClients.set(fileDoc.client_id, fileDoc.id);
       savedClientsByAttachmentId.set(fileDoc.source_attachment_id, savedClients);
     }
 
@@ -448,16 +408,16 @@ export async function getConversationMessagesData(
         if (!persistedAttachment) {
           return attachment;
         }
-        const savedClientsSet = savedClientsByAttachmentId.get(attachment.id) || new Set<number>();
-        if (typeof persistedAttachment.last_saved_client_id === 'number') {
-          savedClientsSet.add(persistedAttachment.last_saved_client_id);
-        }
+        const savedClientsMap = savedClientsByAttachmentId.get(attachment.id) || new Map<number, number>();
         return {
           ...attachment,
           last_saved_client_id: persistedAttachment.last_saved_client_id,
           last_saved_client_file_id: persistedAttachment.last_saved_client_file_id,
           last_saved_at: persistedAttachment.last_saved_at,
-          saved_client_ids: Array.from(savedClientsSet),
+          saved_client_ids: Array.from(savedClientsMap.entries()).map(([clientId, fileId]) => ({
+            clientId,
+            fileId,
+          })),
         };
       });
     }
@@ -488,18 +448,19 @@ export async function getConversationMessagesData(
       })
       .toArray();
 
-    const savedClientsByImageRef = new Map<string, Set<number>>();
+    const savedClientsByImageRef = new Map<string, Map<number, number>>();
     for (const fileDoc of inlineImageClientFiles as any[]) {
       if (
         typeof fileDoc?.source_message_id !== 'number' ||
         typeof fileDoc?.source_image_index !== 'number' ||
-        typeof fileDoc?.client_id !== 'number'
+        typeof fileDoc?.client_id !== 'number' ||
+        typeof fileDoc?.id !== 'number'
       ) {
         continue;
       }
       const imageKey = `${fileDoc.source_message_id}:${fileDoc.source_image_index}`;
-      const savedClients = savedClientsByImageRef.get(imageKey) || new Set<number>();
-      savedClients.add(fileDoc.client_id);
+      const savedClients = savedClientsByImageRef.get(imageKey) || new Map<number, number>();
+      savedClients.set(fileDoc.client_id, fileDoc.id);
       savedClientsByImageRef.set(imageKey, savedClients);
     }
 
@@ -509,13 +470,13 @@ export async function getConversationMessagesData(
       }
       msg.images = msg.images.map((image: any, idx: number) => {
         const imageKey = `${msg.id}:${idx}`;
-        const savedClientsSet = savedClientsByImageRef.get(imageKey) || new Set<number>();
-        if (typeof image?.last_saved_client_id === 'number') {
-          savedClientsSet.add(image.last_saved_client_id);
-        }
+        const savedClientsMap = savedClientsByImageRef.get(imageKey) || new Map<number, number>();
         return {
           ...image,
-          saved_client_ids: Array.from(savedClientsSet),
+          saved_client_ids: Array.from(savedClientsMap.entries()).map(([clientId, fileId]) => ({
+            clientId,
+            fileId,
+          })),
         };
       });
     }

@@ -254,7 +254,7 @@ interface Message {
     last_saved_client_id?: number;
     last_saved_client_file_id?: number;
     last_saved_at?: string;
-    saved_client_ids?: number[];
+    saved_client_ids?: Array<{ clientId: number; fileId: number }>;
   }>;
   attachments?: Array<{
     id?: number;
@@ -265,7 +265,7 @@ interface Message {
     last_saved_client_id?: number;
     last_saved_client_file_id?: number;
     last_saved_at?: string;
-    saved_client_ids?: number[];
+    saved_client_ids?: Array<{ clientId: number; fileId: number }>;
   }>;
 }
 
@@ -283,9 +283,8 @@ interface SaveableItem {
   attachmentId?: number;
   label: string;
   savable: boolean;
-  savedClientId?: number;
+  savedClients: Array<{ clientId: number; fileId: number }>;
   savedAt?: string;
-  savedClientIds?: number[];
 }
 
 type SyncLogLevel = 'info' | 'success' | 'warning' | 'error';
@@ -400,6 +399,7 @@ export default function InboxPageClient({
   const [selectedSaveItemKeys, setSelectedSaveItemKeys] = useState<string[]>([]);
   const [savingItemKey, setSavingItemKey] = useState<string | null>(null);
   const [isSavingSelection, setIsSavingSelection] = useState(false);
+  const [removingClientChipKeys, setRemovingClientChipKeys] = useState<string[]>([]);
   const [saveModalLoading, setSaveModalLoading] = useState(false);
   const [updatingReadState, setUpdatingReadState] = useState(false);
   const clientSearchRequestSeqRef = useRef(0);
@@ -507,6 +507,7 @@ export default function InboxPageClient({
   useEffect(() => {
     if (sessionStatus !== 'authenticated') return;
     if (loading) return;
+    if (!searchQuery.trim() && allConversations.length > 0) return;
 
     if (inboxSearchDebounceRef.current) {
       clearTimeout(inboxSearchDebounceRef.current);
@@ -661,7 +662,7 @@ export default function InboxPageClient({
 
   useEffect(() => {
     if (sessionStatus !== 'authenticated') return;
-    void fetchLatestSyncTimestamp();
+    setTimeout(() => void fetchLatestSyncTimestamp(), 1000);
   }, [fetchLatestSyncTimestamp, sessionStatus]);
 
   const fetchMessages = async (conversationId: number, isInitial = false, beforeId?: number): Promise<Message[]> => {
@@ -1043,9 +1044,9 @@ export default function InboxPageClient({
     return () => clearTimeout(timeout);
   }, [saveModalOpen, hasActivatedClientSearch, clientSearch, loadClientOptions]);
 
-  const saveableItems = useMemo<SaveableItem[]>(() => {
+  const mapMessagesToSaveableItems = useCallback((msgs: Message[]): SaveableItem[] => {
     const items: SaveableItem[] = [];
-    for (const message of messages) {
+    for (const message of msgs) {
       for (const [index, attachment] of (message.attachments || []).entries()) {
         const filename = attachment.filename || `Attachment #${index + 1}`;
         items.push({
@@ -1055,11 +1056,8 @@ export default function InboxPageClient({
           attachmentId: attachment.id,
           label: `${filename} (${Math.round((attachment.size || 0) / 1024)}KB)`,
           savable: Boolean(attachment.id && attachment.persisted),
-          savedClientId: attachment.last_saved_client_id,
           savedAt: attachment.last_saved_at,
-          savedClientIds: Array.isArray(attachment.saved_client_ids)
-            ? attachment.saved_client_ids
-            : undefined,
+          savedClients: Array.isArray(attachment.saved_client_ids) ? attachment.saved_client_ids : [],
         });
       }
 
@@ -1072,30 +1070,27 @@ export default function InboxPageClient({
           imageIndex: index,
           label: `Inline image #${index + 1}`,
           savable: canSave,
-          savedClientId: image.last_saved_client_id,
           savedAt: image.last_saved_at,
-          savedClientIds: Array.isArray(image.saved_client_ids)
-            ? image.saved_client_ids
-            : undefined,
+          savedClients: Array.isArray(image.saved_client_ids) ? image.saved_client_ids : [],
         });
       }
     }
     return items;
-  }, [messages]);
+  }, []);
+
+  const saveableItems = useMemo<SaveableItem[]>(
+    () => mapMessagesToSaveableItems(messages),
+    [messages, mapMessagesToSaveableItems]
+  );
 
   useEffect(() => {
     if (!saveModalOpen) return;
     const savedClientIds = Array.from(new Set(
-      saveableItems.flatMap((item) => {
-        const ids: number[] = [];
-        if (typeof item.savedClientId === 'number' && item.savedClientId > 0) {
-          ids.push(item.savedClientId);
-        }
-        if (Array.isArray(item.savedClientIds)) {
-          ids.push(...item.savedClientIds.filter((id): id is number => typeof id === 'number' && id > 0));
-        }
-        return ids;
-      })
+      saveableItems.flatMap((item) =>
+        item.savedClients
+          .map((entry) => entry.clientId)
+          .filter((clientId): clientId is number => typeof clientId === 'number' && clientId > 0)
+      )
     ));
 
     const unresolved = savedClientIds.filter(
@@ -1149,21 +1144,12 @@ export default function InboxPageClient({
       if (!clientId) {
         return false;
       }
-      if (Array.isArray(item.savedClientIds) && item.savedClientIds.includes(clientId)) {
-        return true;
-      }
-      return Boolean(item.savedClientId && item.savedClientId === clientId);
+      return item.savedClients.some((entry) => entry.clientId === clientId);
     },
     []
   );
 
-  // Fix 3: helper that returns true if item has been saved to ANY client
-  const isAnySavedClient = useCallback((item: SaveableItem): boolean => {
-    if (Array.isArray(item.savedClientIds) && item.savedClientIds.length > 0) {
-      return true;
-    }
-    return typeof item.savedClientId === 'number' && item.savedClientId > 0;
-  }, []);
+  const isAnySavedClient = useCallback((item: SaveableItem): boolean => item.savedClients.length > 0, []);
 
   // Fix 1: centralised close that fully resets all modal state
   const closeSaveModal = useCallback(() => {
@@ -1172,6 +1158,7 @@ export default function InboxPageClient({
     setHasActivatedClientSearch(false);
     setSelectedTargetClientId(null);
     setSelectedSaveItemKeys([]);
+    setRemovingClientChipKeys([]);
     setClientOptions([]);
     setSaveModalLoading(false);
   }, []);
@@ -1185,6 +1172,7 @@ export default function InboxPageClient({
     setClientSearch('');
     setHasActivatedClientSearch(false);
     setSelectedSaveItemKeys([]);
+    setRemovingClientChipKeys([]);
     setClientOptions([]);
 
     const defaultClientId =
@@ -1200,46 +1188,7 @@ export default function InboxPageClient({
     // Fix 2 + 3: compute default keys inline from the fresh messages rather than
     // the potentially stale saveableItems memo.  Exclude anything already saved to
     // ANY client (Fix 3), not just the default one.
-    const computeFreshItems = (msgs: Message[]): SaveableItem[] => {
-      const items: SaveableItem[] = [];
-      for (const message of msgs) {
-        for (const [index, attachment] of (message.attachments || []).entries()) {
-          const filename = attachment.filename || `Attachment #${index + 1}`;
-          items.push({
-            key: `attachment:${message.id}:${attachment.id ?? index}`,
-            type: 'attachment',
-            messageId: message.id,
-            attachmentId: attachment.id,
-            label: `${filename} (${Math.round((attachment.size || 0) / 1024)}KB)`,
-            savable: Boolean(attachment.id && attachment.persisted),
-            savedClientId: attachment.last_saved_client_id,
-            savedAt: attachment.last_saved_at,
-            savedClientIds: Array.isArray(attachment.saved_client_ids)
-              ? attachment.saved_client_ids
-              : undefined,
-          });
-        }
-        for (const [index, image] of (message.images || []).entries()) {
-          const canSave = Boolean(image.data || (image.url && image.url.startsWith('data:')));
-          items.push({
-            key: `image:${message.id}:${index}`,
-            type: 'image',
-            messageId: message.id,
-            imageIndex: index,
-            label: `Inline image #${index + 1}`,
-            savable: canSave,
-            savedClientId: image.last_saved_client_id,
-            savedAt: image.last_saved_at,
-            savedClientIds: Array.isArray(image.saved_client_ids)
-              ? image.saved_client_ids
-              : undefined,
-          });
-        }
-      }
-      return items;
-    };
-
-    const freshItems = computeFreshItems(freshMessages);
+    const freshItems = mapMessagesToSaveableItems(freshMessages);
 
     // Fix 3: exclude items already saved to ANY client, not just the default client
     const defaultKeys = freshItems
@@ -1346,6 +1295,57 @@ export default function InboxPageClient({
     }
   };
 
+  const buildClientChipKey = useCallback(
+    (itemKey: string, clientId: number, fileId: number) => `${itemKey}:${clientId}:${fileId}`,
+    []
+  );
+
+  const removeFileFromClient = useCallback(
+    async (itemKey: string, clientId: number, fileId: number) => {
+      if (!selectedConversation) return;
+
+      const chipKey = buildClientChipKey(itemKey, clientId, fileId);
+      setRemovingClientChipKeys((prev) => (prev.includes(chipKey) ? prev : [...prev, chipKey]));
+
+      try {
+        const response = await fetch(`/api/clients/${clientId}/files/${fileId}`, { method: 'DELETE' });
+        if (!response.ok) {
+          const errorMessage = await readErrorMessage(response);
+          throw new Error(errorMessage || 'Nu am putut elimina fisierul de la client.');
+        }
+
+        const freshMessages = await fetchMessages(selectedConversation.id, true);
+        const refreshedItems = mapMessagesToSaveableItems(freshMessages);
+        const refreshedItem = refreshedItems.find((entry) => entry.key === itemKey);
+
+        if (selectedTargetClientId === clientId) {
+          if (
+            refreshedItem &&
+            refreshedItem.savable &&
+            !isItemAlreadySavedForClient(refreshedItem, selectedTargetClientId)
+          ) {
+            setSelectedSaveItemKeys((prev) => (prev.includes(itemKey) ? prev : [...prev, itemKey]));
+          }
+        }
+      } catch (error) {
+        console.error('Failed to remove file from client:', error);
+        toast.error(error instanceof Error ? error.message : 'Eroare la eliminarea fisierului.');
+      } finally {
+        setRemovingClientChipKeys((prev) => prev.filter((entry) => entry !== chipKey));
+      }
+    },
+    [
+      buildClientChipKey,
+      fetchMessages,
+      isItemAlreadySavedForClient,
+      mapMessagesToSaveableItems,
+      readErrorMessage,
+      selectedConversation,
+      selectedTargetClientId,
+      toast,
+    ]
+  );
+
   const saveSelectedItems = async () => {
     const selectedItems = saveableItems.filter(
       (item) =>
@@ -1388,11 +1388,11 @@ export default function InboxPageClient({
         : 'pacientul selectat';
       return `Deja salvat pentru pacientul selectat (${selectedPatientName})`;
     }
-    if (Array.isArray(item.savedClientIds) && item.savedClientIds.length > 1) {
-      return `Salvat la ${item.savedClientIds.length} pacienti`;
+    if (item.savedClients.length > 1) {
+      return `Salvat la ${item.savedClients.length} pacienti`;
     }
-    if (item.savedClientId) {
-      const patientName = getPatientNameById(item.savedClientId);
+    if (item.savedClients.length === 1) {
+      const patientName = getPatientNameById(item.savedClients[0].clientId);
       if (item.savedAt) {
         const date = new Date(item.savedAt);
         if (!Number.isNaN(date.getTime())) {
@@ -1423,7 +1423,7 @@ export default function InboxPageClient({
       persisted?: boolean;
       last_saved_client_id?: number;
       last_saved_at?: string;
-      saved_client_ids?: number[];
+      saved_client_ids?: Array<{ clientId: number; fileId: number }>;
     }>
   ) => {
     if (!attachments || attachments.length === 0) {
@@ -1440,11 +1440,11 @@ export default function InboxPageClient({
             <div className={styles.attachmentStatus}>
               {Array.isArray(att.saved_client_ids) && att.saved_client_ids.length > 1
                 ? `Salvat la ${att.saved_client_ids.length} pacienti`
-                : att.last_saved_client_id
-                ? `Salvat la pacient ${getPatientNameById(att.last_saved_client_id)}`
+                : Array.isArray(att.saved_client_ids) && att.saved_client_ids.length === 1
+                ? `Salvat la pacient ${getPatientNameById(att.saved_client_ids[0].clientId)}`
                 : att.persisted
-                  ? 'Nesalvat'
-                  : 'Nedisponibil'}
+                ? 'Nesalvat'
+                : 'Nedisponibil'}
             </div>
           </div>
         ))}
@@ -1459,7 +1459,7 @@ export default function InboxPageClient({
       data?: string;
       contentType: string;
       last_saved_client_id?: number;
-      saved_client_ids?: number[];
+      saved_client_ids?: Array<{ clientId: number; fileId: number }>;
     }>
   ) => {
     if (!images || images.length === 0) {
@@ -1476,11 +1476,11 @@ export default function InboxPageClient({
               <div className={styles.attachmentStatus}>
                 {Array.isArray(image.saved_client_ids) && image.saved_client_ids.length > 1
                   ? `Salvata la ${image.saved_client_ids.length} pacienti`
-                  : image.last_saved_client_id
-                  ? `Salvata la pacient ${getPatientNameById(image.last_saved_client_id)}`
+                  : Array.isArray(image.saved_client_ids) && image.saved_client_ids.length === 1
+                  ? `Salvata la pacient ${getPatientNameById(image.saved_client_ids[0].clientId)}`
                   : canSave
-                    ? 'Nesalvata'
-                    : 'Nedisponibila'}
+                  ? 'Nesalvata'
+                  : 'Nedisponibila'}
               </div>
             </div>
           );
@@ -1971,15 +1971,9 @@ export default function InboxPageClient({
               </span>
             );
           }
-          // Fix 5: show indicator when item was saved to a different client
           if (isAnySavedClient(item)) {
-            const savedIds = Array.isArray(item.savedClientIds) && item.savedClientIds.length > 0
-              ? item.savedClientIds
-              : item.savedClientId
-                ? [item.savedClientId]
-                : [];
-            const savedNames = savedIds
-              .map((id) => getPatientNameById(id))
+            const savedNames = item.savedClients
+              .map((entry) => getPatientNameById(entry.clientId))
               .join(', ');
             return (
               <span
@@ -1988,7 +1982,7 @@ export default function InboxPageClient({
                 style={{ opacity: 0.75 }}
               >
                 <svg width="9" height="9" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 5.5l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="1.7" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                {savedIds.length > 1 ? `Salvat (${savedIds.length})` : 'Salvat alt client'}
+                {item.savedClients.length > 1 ? `Salvat (${item.savedClients.length})` : 'Salvat alt client'}
               </span>
             );
           }
@@ -2024,6 +2018,7 @@ export default function InboxPageClient({
           const isSaved = isItemAlreadySavedForClient(item, selectedTargetClientId);
           const isDisabled = !item.savable || isSavingSelection || isSaved;
           const isChecked = selectedSaveItemKeys.includes(item.key);
+          const hasSavedClients = item.savedClients.length > 0;
           const { ext, iconClass } = getFileTypeInfo(item);
           const { name, size } = getItemDisplayName(item);
 
@@ -2061,6 +2056,48 @@ export default function InboxPageClient({
               <div className={styles.saveItemMeta}>
                 <div className={styles.saveItemName}>{name}</div>
                 {size && <div className={styles.saveItemSize}>{size}</div>}
+                {hasSavedClients && (
+                  <div
+                    className={styles.savedClientsRow}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                  >
+                    <span className={styles.savedClientsLabel}>Salvat la:</span>
+                    {item.savedClients.map((entry) => {
+                      const chipKey = buildClientChipKey(item.key, entry.clientId, entry.fileId);
+                      const isRemoving = removingClientChipKeys.includes(chipKey);
+                      const clientName = getPatientNameById(entry.clientId);
+                      const chipClass = isRemoving
+                        ? `${styles.savedClientChip} ${styles.savedClientChipRemoving}`
+                        : styles.savedClientChip;
+
+                      return (
+                        <span key={chipKey} className={chipClass} title={clientName}>
+                          <span className={styles.savedClientChipAvatar}>{getInitials(clientName)}</span>
+                          <span className={styles.savedClientChipName}>{clientName}</span>
+                          <button
+                            type="button"
+                            className={styles.savedClientChipRemove}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              void removeFileFromClient(item.key, entry.clientId, entry.fileId);
+                            }}
+                            disabled={isRemoving || isSavingSelection}
+                            aria-label={`Elimina fisierul pentru ${clientName}`}
+                            title={`Elimina pentru ${clientName}`}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               {renderStatusPill(item)}
             </label>

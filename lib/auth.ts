@@ -3,6 +3,7 @@ import Credentials from 'next-auth/providers/credentials';
 import { CredentialsSignin } from 'next-auth';
 import bcrypt from 'bcryptjs';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
+import { authConfig } from '@/lib/auth.config';
 
 class DatabaseConnectionSigninError extends CredentialsSignin {
   code = 'database_connection_failed';
@@ -22,11 +23,7 @@ function isMongoInfrastructureError(error: unknown): boolean {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  session: { strategy: 'jwt' },
-  pages: {
-    signIn: '/login',
-    error: '/login?error=true',
-  },
+  ...authConfig,
   providers: [
     Credentials({
       name: 'Email & Password',
@@ -77,24 +74,4 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
     }),
   ],
-  callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.userId = String(user.id || '');
-        token.dbUserId = String(user.dbUserId || '');
-        token.role = String(user.role || 'staff');
-        token.tenantId = user.tenantId ? String(user.tenantId) : null;
-      }
-      return token;
-    },
-    async session({ session, token }) {
-      if (session.user) {
-        session.user.id = String(token.userId || '');
-        session.user.dbUserId = String(token.dbUserId || '');
-        session.user.role = String(token.role || 'staff');
-        session.user.tenantId = token.tenantId ? String(token.tenantId) : null;
-      }
-      return session;
-    },
-  },
 });

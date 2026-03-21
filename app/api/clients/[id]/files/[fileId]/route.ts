@@ -11,18 +11,34 @@ export async function PATCH(
 ) {
   const params = await props.params;
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const { tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
+    const clientId = parseInt(params.id);
     const fileId = parseInt(params.fileId);
     const body = await request.json();
 
     const { description } = body;
 
-    let file = await db.collection('client_files').findOne({ id: fileId, user_id: userId, tenant_id: tenantId });
+    if (isNaN(clientId) || clientId <= 0) {
+      return createErrorResponse('Invalid client ID', 400);
+    }
+    if (isNaN(fileId) || fileId <= 0) {
+      return createErrorResponse('Invalid file ID', 400);
+    }
+
+    let file = await db.collection('client_files').findOne({
+      id: fileId,
+      client_id: clientId,
+      tenant_id: tenantId,
+    });
     let collectionName = 'client_files';
 
     if (!file) {
-      file = await db.collection('contact_files').findOne({ id: fileId, user_id: userId, tenant_id: tenantId });
+      file = await db.collection('contact_files').findOne({
+        id: fileId,
+        contact_id: clientId,
+        tenant_id: tenantId,
+      });
       collectionName = 'contact_files';
     }
 
@@ -35,14 +51,20 @@ export async function PATCH(
 
     const now = new Date().toISOString();
     const result = await db.collection(collectionName).updateOne(
-      { id: fileId, user_id: userId, tenant_id: tenantId },
+      collectionName === 'client_files'
+        ? { id: fileId, client_id: clientId, tenant_id: tenantId }
+        : { id: fileId, contact_id: clientId, tenant_id: tenantId },
       { $set: { description: description || null, updated_at: now } }
     );
     if (result.matchedCount === 0) {
       return createErrorResponse('Not found or not authorized', 404);
     }
 
-    const updated = await db.collection(collectionName).findOne({ id: fileId, user_id: userId, tenant_id: tenantId });
+    const updated = await db.collection(collectionName).findOne(
+      collectionName === 'client_files'
+        ? { id: fileId, client_id: clientId, tenant_id: tenantId }
+        : { id: fileId, contact_id: clientId, tenant_id: tenantId }
+    );
     return createSuccessResponse({ file: updated ? stripMongoId(updated) : stripMongoId(file) });
   } catch (error) {
     return handleApiError(error, 'Failed to update file');
@@ -56,15 +78,31 @@ export async function DELETE(
 ) {
   const params = await props.params;
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const { tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
+    const clientId = parseInt(params.id);
     const fileId = parseInt(params.fileId);
 
-    let file = await db.collection('client_files').findOne({ id: fileId, user_id: userId, tenant_id: tenantId });
+    if (isNaN(clientId) || clientId <= 0) {
+      return createErrorResponse('Invalid client ID', 400);
+    }
+    if (isNaN(fileId) || fileId <= 0) {
+      return createErrorResponse('Invalid file ID', 400);
+    }
+
+    let file = await db.collection('client_files').findOne({
+      id: fileId,
+      client_id: clientId,
+      tenant_id: tenantId,
+    });
     let collectionName = 'client_files';
 
     if (!file) {
-      file = await db.collection('contact_files').findOne({ id: fileId, user_id: userId, tenant_id: tenantId });
+      file = await db.collection('contact_files').findOne({
+        id: fileId,
+        contact_id: clientId,
+        tenant_id: tenantId,
+      });
       collectionName = 'contact_files';
     }
 
@@ -77,7 +115,11 @@ export async function DELETE(
       await storage.delete(String(file.storage_key));
     }
 
-    const result = await db.collection(collectionName).deleteOne({ id: fileId, user_id: userId, tenant_id: tenantId });
+    const result = await db.collection(collectionName).deleteOne(
+      collectionName === 'client_files'
+        ? { id: fileId, client_id: clientId, tenant_id: tenantId }
+        : { id: fileId, contact_id: clientId, tenant_id: tenantId }
+    );
     if (result.deletedCount === 0) {
       return createErrorResponse('Not found or not authorized', 404);
     }

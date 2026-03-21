@@ -70,7 +70,8 @@ export function handleApiError(error: unknown, defaultMessage: string = 'An erro
       );
     }
 
-    // Default error
+    // Default error — log unexpected server errors
+    console.error(`[API Error] ${defaultMessage}:`, error);
     return createErrorResponse(
       defaultMessage,
       500,
@@ -79,6 +80,7 @@ export function handleApiError(error: unknown, defaultMessage: string = 'An erro
   }
 
   // Unknown error type
+  console.error(`[API Error] ${defaultMessage}:`, error);
   return createErrorResponse(
     defaultMessage,
     500,

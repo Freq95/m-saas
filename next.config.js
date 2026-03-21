@@ -2,6 +2,15 @@
 const nextConfig = {
   reactStrictMode: true,
   distDir: '.next-build',
+  async redirects() {
+    return [
+      {
+        source: '/settings',
+        destination: '/settings/services',
+        permanent: false,
+      },
+    ];
+  },
   // CORS policy: authenticated API routes are same-origin only.
   // Do not add Access-Control-Allow-Origin: * for authenticated endpoints.
   async headers() {
