@@ -60,45 +60,56 @@ export function ConflictWarningModal({
         aria-modal="true"
         aria-label="Avertizare conflict"
       >
-        <h3>⚠️ Conflict detectat</h3>
+        <h3>Interval ocupat</h3>
 
         <div className={styles.modalContent}>
           <div className={styles.conflictSection}>
             <h4 className={styles.sectionTitle}>Conflicte:</h4>
-            <ul className={styles.conflictList}>
-              {conflicts.map((conflict, index) => (
-                <li key={index} className={styles.conflictItem}>
-                  <span className={styles.conflictType}>{conflict.type}:</span>
-                  <span className={styles.conflictMessage}>{conflict.message}</span>
-                </li>
-              ))}
-            </ul>
+            {conflicts.map((conflict, i) => {
+              const appt = (conflict as Conflict & { appointment?: { start_time: string; end_time: string } }).appointment;
+              const timeRange = appt
+                ? `${format(new Date(appt.start_time), 'HH:mm')}  ${format(new Date(appt.end_time), 'HH:mm')}`
+                : null;
+
+              const message = (() => {
+                switch (conflict.type) {
+                  case 'provider_appointment':
+                    return `Medicul are deja o programare în acest interval${timeRange ? ` (${timeRange})` : ''}.`;
+                  case 'appointment_overlap':
+                    return `Exista deja o programare în acest interval${timeRange ? ` (${timeRange})` : ''}.`;
+                  case 'blocked_time':
+                    return 'Acest interval este marcat ca blocat.';
+                  case 'outside_working_hours':
+                    return 'Intervalul selectat este în afara programului de lucru.';
+                  default:
+                    return 'Intervalul selectat nu este disponibil.';
+                }
+              })();
+
+              return <p key={i} className={styles.conflictMessage}>{message}</p>;
+            })}
           </div>
 
           {suggestions.length > 0 && (
             <div className={styles.suggestionsSection}>
-              <h4 className={styles.sectionTitle}>Intervale alternative disponibile:</h4>
+              <h4 className={styles.sectionTitle}>Alege un interval liber:</h4>
               <div className={styles.suggestionsList}>
-                {suggestions.map((suggestion, index) => {
+                {suggestions.map((suggestion, i) => {
                   const start = new Date(suggestion.startTime);
                   const end = new Date(suggestion.endTime);
-
+                  const dateLabel = format(start, 'EEEE, d MMM', { locale: ro });
+                  const timeLabel = `${format(start, 'HH:mm')}  ${format(end, 'HH:mm')}`;
                   return (
                     <button
-                      key={index}
+                      key={i}
                       className={styles.suggestionButton}
                       onClick={() => {
-                        if (onSelectSlot) {
-                          onSelectSlot(suggestion.startTime, suggestion.endTime);
-                        }
+                        onSelectSlot?.(suggestion.startTime, suggestion.endTime);
                         onClose();
                       }}
                     >
-                      <div className={styles.suggestionTime}>
-                        {format(start, "EEEE, d MMM 'la' HH:mm", { locale: ro })} -{' '}
-                        {format(end, 'HH:mm', { locale: ro })}
-                      </div>
-                      <div className={styles.suggestionReason}>{suggestion.reason}</div>
+                      <span className={styles.suggestionDate}>{dateLabel}</span>
+                      <span className={styles.suggestionTime}>{timeLabel}</span>
                     </button>
                   );
                 })}

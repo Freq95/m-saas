@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { getInviteFailureMessage } from '@/lib/admin/invite-message';
 
 export default function CreateTenantForm() {
   const router = useRouter();
@@ -13,16 +14,6 @@ export default function CreateTenantForm() {
   const [sendInvite, setSendInvite] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  function getInviteFailureMessage(reason: string | undefined): string {
-    if (reason === 'not_configured') {
-      return 'Tenant created, but invite email was not sent because email service is not configured.';
-    }
-    if (reason === 'provider_error') {
-      return 'Tenant created, but invite email was rejected by the email provider. Check RESEND_API_KEY and EMAIL_FROM domain verification.';
-    }
-    return `Tenant created, but invite email was not sent. Reason: ${reason || 'unknown'}.`;
-  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -43,7 +34,12 @@ export default function CreateTenantForm() {
     }
 
     if (data?.inviteEmail?.requested && !data?.inviteEmail?.sent) {
-      window.alert(getInviteFailureMessage(data?.inviteEmail?.reason));
+      window.alert(
+        getInviteFailureMessage(
+          data?.inviteEmail?.reason,
+          'Tenant created, but invite email was not sent.'
+        )
+      );
     }
 
     const token = typeof data?.inviteToken === 'string' ? data.inviteToken : '';

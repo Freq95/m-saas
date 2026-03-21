@@ -74,3 +74,44 @@
     padding: var(--space-6) var(--space-5);
   }
 }
+
+/* densa wordmark */
+.wordmark {
+  font-size: clamp(3rem, 10vw, 6rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--color-text);
+  margin: 0 0 1rem;
+}
+
+/* Static state (default — no animation class) */
+.wordmark,
+.tagline,
+.hero .actions {
+  opacity: 1;
+  transform: none;
+}
+
+/* Initial hidden state when .animate is present */
+.animate .wordmark,
+.animate .tagline,
+.animate .actions {
+  opacity: 0;
+  transform: translateY(18px);
+}
+
+/* Keyframes */
+@keyframes densaReveal {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Staggered reveals */
+.animate .wordmark {
+  animation: densaReveal 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.05s forwards;
+}
+.animate .tagline {
+  animation: densaReveal 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.25s forwards;
+}
+.animate .actions {
+  animation: densaReveal 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.42s forwards;
+}

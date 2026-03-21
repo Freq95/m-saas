@@ -668,7 +668,7 @@
   background: linear-gradient(180deg,
     color-mix(in srgb, var(--color-accent) 70%, white 30%),
     color-mix(in srgb, var(--color-accent) 82%, black 18%));
-  color: var(--color-accent-contrast);
+  color: var(--color-text);
   padding: 0.38rem 0.42rem;
   border-radius: var(--radius-sm);
   font-size: 0.68rem;
@@ -681,6 +681,7 @@
   transition: opacity var(--transition-fast), transform var(--transition-fast), box-shadow var(--transition-fast);
   min-width: 0;
   border: 1px solid color-mix(in srgb, var(--color-accent) 55%, white 45%);
+  border-left: 3px solid color-mix(in srgb, var(--color-accent) 80%, white 20%);
   box-shadow: 0 6px 12px color-mix(in srgb, var(--color-accent) 18%, transparent);
 }
 
@@ -702,40 +703,6 @@
   box-shadow: var(--focus-ring);
 }
 
-.appointment.statusScheduled {
-  background: #f3f4f6;
-  color: #6b7280;
-  border: 1px solid #e5e7eb;
-}
-
-.appointment.statusFinalizat {
-  background: #dcfce7;
-  color: #15803d;
-  border: 1px solid #bbf7d0;
-}
-
-.appointment.statusAnulat {
-  background: #fef3c7;
-  color: #b45309;
-  border: 1px solid #fde68a;
-  opacity: 0.72;
-}
-
-.appointment.statusAbsent {
-  background: #fee2e2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
-}
-
-.appointment.isPast {
-  opacity: 0.58;
-  filter: saturate(0.72) contrast(0.92);
-}
-
-.appointment.isPast:hover {
-  opacity: 0.78;
-}
-
 .appointment.dragging {
   opacity: 0.5;
   cursor: move;
@@ -747,6 +714,13 @@
 .appointment[draggable="true"]:not(.dragging) { cursor: grab; }
 .appointment[draggable="true"]:active          { cursor: grabbing; }
 
+.appointmentHighlighted {
+  box-shadow: 0 0 0 2px var(--color-accent), 0 8px 20px color-mix(in srgb, var(--color-accent) 32%, transparent) !important;
+  transform: translateY(-1px) scale(1.02);
+  z-index: 20;
+  opacity: 1 !important;
+}
+
 .appointmentHeader {
   display: flex;
   justify-content: space-between;
@@ -756,13 +730,25 @@
 }
 
 .appointmentTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
   font-weight: 500;
   font-size: 0.7rem;
   flex: 1;
   min-width: 0;
+}
+
+.appointmentName {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.appointmentTime {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  font-weight: 600;
 }
 
 .appointmentService {
@@ -770,39 +756,19 @@
   opacity: 0.8;
 }
 
-.statusBadge {
-  font-size: 0.58rem;
-  padding: 0.14rem 0.32rem;
-  border-radius: var(--radius-xs);
-  font-weight: 500;
-  white-space: nowrap;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+/* Status dot — coloured circle shown in WeekView + MonthView + PreviewModal */
+.statusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
   flex-shrink: 0;
+  display: inline-block;
 }
 
-.statusBadge--scheduled {
-  background: #f3f4f6;
-  color: #6b7280;
-  border: 1px solid #e5e7eb;
-}
-
-.statusBadge--completed {
-  background: #dcfce7;
-  color: #15803d;
-  border: 1px solid #bbf7d0;
-}
-
-.statusBadge--cancelled {
-  background: #fef3c7;
-  color: #b45309;
-  border: 1px solid #fde68a;
-}
-
-.statusBadge--no-show {
-  background: #fee2e2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
+/* Strikethrough for cancelled appointments */
+.appointmentStrike {
+  text-decoration: line-through;
+  opacity: 0.7;
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -936,49 +902,27 @@
 
 .monthAppointment {
   font-size: 0.68rem;
-  padding: 0.18rem 0.38rem;
+  padding: 0.18rem 0.4rem;
   border-radius: var(--radius-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   cursor: pointer;
-  background: var(--color-border);
   color: var(--color-text);
-  border: 1px solid var(--color-border-strong);
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
 }
 
-.monthAppointment.scheduled {
-  background: #f3f4f6;
-  color: #6b7280;
-}
-
-.monthAppointment.completed {
-  background: #dcfce7;
-  color: #15803d;
-  opacity: 0.82;
-}
-
-.monthAppointment.cancelled {
-  background: #fef3c7;
-  color: #b45309;
-  opacity: 0.7;
-}
-
-.monthAppointment.no_show {
-  background: #fee2e2;
-  color: #b91c1c;
-  opacity: 0.82;
-}
-
-.monthAppointment.no-show {
-  background: #fee2e2;
-  color: #b91c1c;
-  opacity: 0.82;
+.monthApptDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .monthAppointment.isPast {
-  opacity: 0.52;
-  filter: saturate(0.72);
+  filter: saturate(0.65);
 }
 
 .monthAppointmentMore {
@@ -1579,6 +1523,12 @@
   padding: 0.25rem 0;
 }
 
+.phoneValidationError {
+  font-size: 0.78rem;
+  color: var(--color-error, #dc2626);
+  padding: 0.25rem 0;
+}
+
 .pastDateWarning {
   color: #b45309;
   font-size: 0.75rem;
@@ -1690,7 +1640,6 @@
 
 .conflictList { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; }
 .conflictItem { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.85rem; }
-.conflictType { font-weight: 500; color: color-mix(in srgb, var(--color-danger) 80%, white); }
 .conflictMessage { color: var(--color-text-soft); }
 
 .suggestionsSection { margin-top: 1rem; }
@@ -1715,8 +1664,8 @@
   transform: translateX(4px);
 }
 
-.suggestionTime   { font-weight: 500; font-size: 0.9rem; color: var(--color-text); }
-.suggestionReason { font-size: 0.8rem; color: var(--color-text-soft); }
+.suggestionDate   { font-size: 0.78rem; color: var(--color-text-soft); }
+.suggestionTime   { font-weight: 700; font-size: 0.96rem; color: var(--color-text); }
 
 .noSuggestions {
   padding: 1rem;
@@ -1730,67 +1679,6 @@
 /* ─────────────────────────────────────────────────────────
    QUICK ACTION BUTTONS (preview modal)
 ───────────────────────────────────────────────────────── */
-.quickActionsSection {
-  margin-top: 1.4rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--color-border);
-}
-
-.quickActionsLabel {
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: var(--color-text-soft);
-  margin: 0 0 0.7rem 0;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-}
-
-.quickActionButtons { display: flex; gap: 0.6rem; flex-wrap: wrap; }
-
-.quickActionButton {
-  flex: 1;
-  min-width: 96px;
-  padding: 0.62rem 0.85rem;
-  border-radius: var(--radius-md);
-  font-size: 0.84rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  border: 1px solid;
-}
-
-.quickActionCompleted {
-  background: color-mix(in srgb, var(--color-success) 16%, transparent);
-  color: color-mix(in srgb, var(--color-success) 74%, white);
-  border-color: color-mix(in srgb, var(--color-success) 34%, transparent);
-}
-.quickActionCompleted:hover {
-  background: color-mix(in srgb, var(--color-success) 26%, transparent);
-  border-color: color-mix(in srgb, var(--color-success) 52%, transparent);
-  transform: translateY(-2px);
-}
-
-.quickActionCancelled {
-  background: color-mix(in srgb, var(--color-danger) 16%, transparent);
-  color: color-mix(in srgb, var(--color-danger) 76%, white);
-  border-color: color-mix(in srgb, var(--color-danger) 34%, transparent);
-}
-.quickActionCancelled:hover {
-  background: color-mix(in srgb, var(--color-danger) 26%, transparent);
-  border-color: color-mix(in srgb, var(--color-danger) 52%, transparent);
-  transform: translateY(-2px);
-}
-
-.quickActionNoShow {
-  background: color-mix(in srgb, var(--color-text-soft) 16%, transparent);
-  color: color-mix(in srgb, var(--color-text-soft) 82%, white);
-  border-color: color-mix(in srgb, var(--color-text-soft) 34%, transparent);
-}
-.quickActionNoShow:hover {
-  background: color-mix(in srgb, var(--color-text-soft) 26%, transparent);
-  border-color: color-mix(in srgb, var(--color-text-soft) 52%, transparent);
-  transform: translateY(-2px);
-}
 
 /* ─────────────────────────────────────────────────────────
    MODAL ACTIONS / BUTTONS
@@ -1799,10 +1687,6 @@
   display: flex;
   gap: 0.9rem;
   justify-content: flex-end;
-  margin-top: 1.2rem;
-}
-
-.modalFooterStack {
   margin-top: 1.2rem;
 }
 
@@ -1817,50 +1701,6 @@
   opacity: 1;
 }
 
-.statusSegmentedControl {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.55rem;
-}
-
-.statusSegmentButton {
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-muted);
-  color: var(--color-text-soft);
-  border-radius: var(--radius-md);
-  padding: 0.65rem 0.75rem;
-  font-size: 0.84rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
-}
-
-.statusSegmentButton:hover {
-  background: var(--color-surface-strong);
-  border-color: var(--color-border-strong);
-  color: var(--color-text);
-  transform: translateY(-1px);
-}
-
-.statusSegmentButtonActive {
-  color: white;
-  box-shadow: var(--shadow-sm);
-}
-
-.statusSegmentButton[data-status="completed"].statusSegmentButtonActive {
-  background: #16a34a;
-  border-color: #16a34a;
-}
-
-.statusSegmentButton[data-status="cancelled"].statusSegmentButtonActive {
-  background: #d97706;
-  border-color: #d97706;
-}
-
-.statusSegmentButton[data-status="no-show"].statusSegmentButtonActive {
-  background: #dc2626;
-  border-color: #dc2626;
-}
 
 .cancelButton {
   padding: 0.72rem 1.35rem;
@@ -1957,37 +1797,16 @@
 .previewValue   { font-size: 1rem; color: var(--color-text); font-weight: 400; line-height: 1.5; }
 
 .previewStatusBadge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   padding: 0.3rem 0.7rem;
   border-radius: var(--radius-md);
   font-size: 0.8rem;
   font-weight: 500;
-  text-transform: capitalize;
   letter-spacing: 0.3px;
-}
-
-.statusFinalizat {
-  background: #dcfce7;
-  color: #15803d;
-  border: 1px solid #bbf7d0;
-}
-
-.statusAnulat {
-  background: #fef3c7;
-  color: #b45309;
-  border: 1px solid #fde68a;
-}
-
-.statusAbsent {
-  background: #fee2e2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
-}
-
-.statusScheduled {
-  background: #f3f4f6;
-  color: #6b7280;
-  border: 1px solid #e5e7eb;
+  background: color-mix(in srgb, var(--color-surface-muted) 80%, transparent);
+  border: 1px solid var(--color-border);
 }
 
 .previewActions {
@@ -2114,5 +1933,192 @@
   .deleteSheet { width: 100%; border-radius: var(--radius-lg) var(--radius-lg) 0 0; margin-top: auto; }
   .modalActions { position: sticky; bottom: 0; background: var(--color-surface); padding-top: 0.8rem; }
   .modalFieldRow { grid-template-columns: 1fr; gap: 1rem; }
-  .statusSegmentedControl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+@media (max-width: 767px) {
+  .main {
+    padding: 0;
+  }
+
+  .weekGrid {
+    display: none;
+  }
+
+  .mobileCalendar {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  .mobileToolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem 0.5rem;
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg);
+    flex-shrink: 0;
+  }
+
+  .mobileTodayBtn {
+    background: none;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+    color: var(--color-text-soft);
+    cursor: pointer;
+    min-height: unset;
+  }
+
+  .mobileNavArrow {
+    background: none;
+    border: none;
+    padding: 0.3rem 0.5rem;
+    font-size: 1.1rem;
+    color: var(--color-text);
+    cursor: pointer;
+    min-height: unset;
+  }
+
+  .mobileDateLabel {
+    flex: 1;
+    text-align: center;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--color-text);
+    text-transform: capitalize;
+  }
+
+  .mobileDayStrip {
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+    gap: 0.25rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+    padding-left: max(0.75rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+    border-bottom: 1px solid var(--color-border);
+    background: var(--color-bg);
+    flex-shrink: 0;
+    -webkit-overflow-scrolling: touch;
+    scroll-padding-right: max(1rem, env(safe-area-inset-right));
+  }
+
+  .mobileDayStrip::-webkit-scrollbar {
+    display: none;
+  }
+
+  .mobileDayBtn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.4rem 0.6rem;
+    min-width: 44px;
+    border: none;
+    border-radius: var(--radius-md);
+    background: none;
+    cursor: pointer;
+    flex-shrink: 0;
+    min-height: unset;
+  }
+
+  .mobileDayBtn:last-child {
+    margin-right: 0.35rem;
+  }
+
+  .mobileDayBtnLabel {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--color-text-soft);
+    text-transform: uppercase;
+  }
+
+  .mobileDayBtnNumber {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text);
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+  }
+
+  .mobileDayBtnActive .mobileDayBtnNumber {
+    background: var(--color-accent);
+    color: #fff;
+  }
+
+  .mobileDayBtnToday .mobileDayBtnNumber {
+    border: 2px solid var(--color-accent);
+    color: var(--color-accent);
+  }
+
+  .mobileDayBtnActive.mobileDayBtnToday .mobileDayBtnNumber {
+    background: var(--color-accent);
+    color: #fff;
+    border: none;
+  }
+
+  .mobilePanelWrapper {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .mobileFab {
+    position: absolute;
+    bottom: 1.25rem;
+    right: 1.25rem;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--color-accent);
+    color: #fff;
+    border: none;
+    font-size: 1.6rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+    z-index: 10;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    min-height: unset;
+  }
+
+  .mobileFabIcon {
+    display: block;
+    width: 22px;
+    height: 22px;
+    pointer-events: none;
+    flex-shrink: 0;
+  }
+
+  .mobileFab:active {
+    transform: scale(0.93);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+  }
+}
+
+@media (min-width: 768px) {
+  .mobileCalendar,
+  .mobileToolbar,
+  .mobileDayStrip,
+  .mobileFab {
+    display: none;
+  }
+}
+
+/* FAB replaced by the header circle button — hide on mobile too */
+.mobileFab {
+  display: none;
+}
+

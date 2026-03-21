@@ -9,8 +9,8 @@ import { validateServerEnv } from '@/lib/env-validation'
 validateServerEnv()
 
 export const metadata: Metadata = {
-  title: 'OpsGenie pentru Micro-Servicii',
-  description: 'Gestionare mesaje, programări și automatizări pentru micro-servicii',
+  title: 'densa',
+  description: 'Gestionare centralizata pentru mesaje, programari si automatizari',
 }
 
 export default function RootLayout({

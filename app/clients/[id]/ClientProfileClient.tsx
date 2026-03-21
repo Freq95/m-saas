@@ -186,6 +186,7 @@ export default function ClientProfileClient({
     const filesToUpload = Array.from(e.target.files || []);
     if (filesToUpload.length === 0) return;
 
+    let successCount = 0;
     for (const file of filesToUpload) {
       try {
         const formData = new FormData();
@@ -197,6 +198,7 @@ export default function ClientProfileClient({
         if (!response.ok) {
           throw new Error(`Failed to upload ${file.name}`);
         }
+        successCount++;
       } catch (error) {
         logger.error('Client profile: failed to upload file', error instanceof Error ? error : new Error(String(error)), {
           clientId,
@@ -207,7 +209,9 @@ export default function ClientProfileClient({
     }
 
     e.target.value = '';
-    fetchFiles();
+    if (successCount > 0) {
+      fetchFiles();
+    }
   };
 
   const handleDeleteFile = (fileId: number) => {

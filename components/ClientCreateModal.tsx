@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import styles from './ClientCreateModal.module.css';
+import { validatePhoneInput } from '@/lib/phone-validation';
 
 type ClientPayload = {
   id: number;
@@ -30,21 +31,6 @@ type ClientCreateModalProps = {
   title?: string;
   submitLabel?: string;
 };
-
-const PHONE_REGEX = /^[\d\s\+\-\(\)]+$/;
-
-function validatePhone(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return '';
-  if (!PHONE_REGEX.test(trimmed)) {
-    return 'Telefon invalid. Folositi doar cifre, spatii si +, -, (, )';
-  }
-  const digitCount = trimmed.replace(/\D/g, '').length;
-  if (digitCount < 7 || digitCount > 15) {
-    return 'Telefon invalid. Numarul trebuie sa aiba intre 7 si 15 cifre.';
-  }
-  return '';
-}
 
 export default function ClientCreateModal({
   isOpen,
@@ -154,7 +140,7 @@ export default function ClientCreateModal({
       setErrorMessage('Numele este obligatoriu.');
       return;
     }
-    const nextPhoneError = validatePhone(formData.phone);
+    const nextPhoneError = validatePhoneInput(formData.phone);
     if (nextPhoneError) {
       setPhoneError(nextPhoneError);
       return;
@@ -197,6 +183,7 @@ export default function ClientCreateModal({
       setPhoneError('');
       if (savedClient && onCreated) {
         onCreated(savedClient);
+        onClose();
         return;
       }
       onClose();
@@ -247,11 +234,11 @@ export default function ClientCreateModal({
                 onChange={(event) => {
                   const value = event.target.value;
                   setFormData((prev) => ({ ...prev, phone: value }));
-                  if (phoneError && !validatePhone(value)) {
+                  if (phoneError && !validatePhoneInput(value)) {
                     setPhoneError('');
                   }
                 }}
-                onBlur={() => setPhoneError(validatePhone(formData.phone))}
+                onBlur={() => setPhoneError(validatePhoneInput(formData.phone))}
                 placeholder="+40 123 456 789"
               />
               {phoneError && <div className={styles.fieldError}>{phoneError}</div>}

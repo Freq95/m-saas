@@ -5,6 +5,7 @@ import type { RecurrenceRule } from '@/lib/types/calendar';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { invalidateReadCaches } from '@/lib/cache-keys';
 import { logger } from '@/lib/logger';
+import { generateRecurringInstances } from '@/lib/recurring-utils';
 
 interface RecurringConflict {
   start: Date;
@@ -78,8 +79,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid appointment time range' }, { status: 400 });
     }
 
-    // Generate recurrence group ID
-    const recurrenceGroupId = Date.now();
+    // Generate recurrence group ID atomically to avoid collisions under concurrent requests
+    const recurrenceGroupId = await getNextNumericId('recurrence_groups');
 
     // Generate all recurring instances
     const instances = generateRecurringInstances(
@@ -154,7 +155,9 @@ export async function POST(request: NextRequest) {
       createdAppointments.push(appointment);
     }
 
-    await updateClientStats(client.id, tenantId);
+    if (createdAppointments.length > 0) {
+      await updateClientStats(client.id, tenantId);
+    }
 
     await invalidateReadCaches({ tenantId, userId: normalizedUserId });
 
@@ -179,43 +182,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-// Helper function to generate recurring instances
-function generateRecurringInstances(
-  startTime: Date,
-  endTime: Date,
-  recurrence: RecurrenceRule
-): Array<{ start: Date; end: Date }> {
-  const instances: Array<{ start: Date; end: Date }> = [];
-  const duration = endTime.getTime() - startTime.getTime();
-  const safeInterval = Math.max(1, Number(recurrence.interval) || 1);
-
-  let currentStart = new Date(startTime);
-  let count = 0;
-  const maxCount = recurrence.count || 52; // Default max 52 occurrences
-
-  while (count < maxCount - 1) {
-    // -1 because first instance is already created
-    // Calculate next occurrence based on frequency
-    if (recurrence.frequency === 'daily') {
-      currentStart.setDate(currentStart.getDate() + safeInterval);
-    } else if (recurrence.frequency === 'weekly') {
-      currentStart.setDate(currentStart.getDate() + 7 * safeInterval);
-    } else if (recurrence.frequency === 'monthly') {
-      currentStart.setMonth(currentStart.getMonth() + safeInterval);
-    }
-
-    // Check end condition
-    if (recurrence.end_date && currentStart > new Date(recurrence.end_date)) {
-      break;
-    }
-
-    const currentEnd = new Date(currentStart.getTime() + duration);
-    instances.push({ start: new Date(currentStart), end: currentEnd });
-
-    count++;
-  }
-
-  return instances;
 }

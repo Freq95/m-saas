@@ -1,7 +1,7 @@
 {
   "name": "m-saas",
   "version": "1.0.0",
-  "description": "OpsGenie pentru Micro-Servicii - MVP V1",
+  "description": "densa - MVP V1",
   "private": true,
   "engines": {
     "node": "20.x"

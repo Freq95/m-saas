@@ -11,7 +11,7 @@ interface UseDragAndDropResult {
   isDragging: boolean;
   handleDragStart: (appointment: Appointment, sourceDate: Date) => void;
   handleDragEnd: () => void;
-  handleDrop: (targetDate: Date, targetHour?: number, targetMinute?: 0 | 30) => Promise<{ newStart: Date; newEnd: Date } | null>;
+  handleDrop: (targetDate: Date, targetHour?: number, targetMinute?: 0 | 15 | 30 | 45) => Promise<{ newStart: Date; newEnd: Date } | null>;
 }
 
 export function useDragAndDrop(
@@ -28,7 +28,7 @@ export function useDragAndDrop(
   }, []);
 
   const handleDrop = useCallback(
-    async (targetDate: Date, targetHour?: number, targetMinute: 0 | 30 = 0): Promise<{ newStart: Date; newEnd: Date } | null> => {
+    async (targetDate: Date, targetHour?: number, targetMinute: 0 | 15 | 30 | 45 = 0): Promise<{ newStart: Date; newEnd: Date } | null> => {
       if (!dragData) return null;
 
       const { appointment } = dragData;

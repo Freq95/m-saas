@@ -234,6 +234,19 @@ export function useAppointmentsSWR({
 
   const updateAppointment = useCallback(
     async (id: number, data: UpdateAppointmentInput): Promise<UpdateAppointmentResult> => {
+      let snapshot: Appointment[] | undefined;
+      if (data.startTime && data.endTime) {
+        snapshot = appointments;
+        mutate(
+          appointments.map((apt) =>
+            apt.id === id
+              ? { ...apt, start_time: data.startTime!, end_time: data.endTime! }
+              : apt
+          ),
+          { revalidate: false }
+        );
+      }
+
       try {
         const response = await fetch(`/api/appointments/${id}`, {
           method: 'PATCH',
@@ -252,6 +265,7 @@ export function useAppointmentsSWR({
 
         if (!response.ok) {
           if (response.status === 409) {
+            if (snapshot) mutate(snapshot, { revalidate: false });
             const conflicts = errorData?.conflicts || [];
             const suggestions = errorData?.suggestions || [];
             logger.warn('Calendar hook: update appointment conflict', {
@@ -292,17 +306,24 @@ export function useAppointmentsSWR({
         await mutate();
         return { ok: true, status: response.status, warning: typeof resultData?.warning === 'string' ? resultData.warning : null };
       } catch (err) {
+        if (snapshot) mutate(snapshot, { revalidate: false });
         logger.error('Calendar hook: failed to update appointment', err instanceof Error ? err : new Error(String(err)), {
           appointmentId: id,
         });
         return { ok: false, status: 0, error: 'Eroare de retea la actualizarea programarii.' };
       }
     },
-    [mutate]
+    [mutate, appointments]
   );
 
   const deleteAppointment = useCallback(
     async (id: number): Promise<boolean> => {
+      const snapshot = appointments;
+      mutate(
+        appointments.filter((apt) => apt.id !== id),
+        { revalidate: false }
+      );
+
       try {
         const response = await fetch(`/api/appointments/${id}`, {
           method: 'DELETE',
@@ -310,6 +331,7 @@ export function useAppointmentsSWR({
 
         if (!response.ok) {
           const errorData = await response.json();
+          mutate(snapshot, { revalidate: false });
           logger.error('Calendar hook: delete appointment API error', {
             status: response.status,
             appointmentId: id,
@@ -322,13 +344,14 @@ export function useAppointmentsSWR({
         await mutate();
         return true;
       } catch (err) {
+        mutate(snapshot, { revalidate: false });
         logger.error('Calendar hook: failed to delete appointment', err instanceof Error ? err : new Error(String(err)), {
           appointmentId: id,
         });
         return false;
       }
     },
-    [mutate]
+    [mutate, appointments]
   );
 
   return {

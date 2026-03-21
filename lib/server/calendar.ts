@@ -42,6 +42,7 @@ export async function getAppointmentsData(query: AppointmentQuery = {}) {
   const filter: Record<string, unknown> = {
     user_id: userId,
     deleted_at: { $exists: false },
+    ...(status ? {} : { status: { $ne: 'cancelled' } }),
   };
   if (tenantId) {
     filter.tenant_id = tenantId;

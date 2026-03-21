@@ -1,73 +1,60 @@
 'use client';
 
 import React from 'react';
+import { format } from 'date-fns';
 import styles from '../../page.module.css';
 import type { Appointment, Provider } from '../../hooks/useCalendar';
+import { getCategoryColor, getStatusConfig } from '@/lib/appointment-colors';
 
 interface AppointmentBlockProps {
   appointment: Appointment;
   style: React.CSSProperties;
+  compact?: boolean;
   onClick: (appointment: Appointment) => void;
   onDragStart?: (appointment: Appointment) => void;
   onDragEnd?: () => void;
   isDragging?: boolean;
+  isHighlighted?: boolean;
   enableDragDrop?: boolean;
-  providers?: Provider[];
+  providers?: Provider[]; // kept for API compatibility, no longer used for color
 }
 
 export const AppointmentBlock = React.memo<AppointmentBlockProps>(
-  ({ appointment, style, onClick, onDragStart, onDragEnd, isDragging = false, enableDragDrop = false, providers = [] }) => {
-    const status = appointment.status === 'no_show' ? 'no-show' : appointment.status;
-    const appointmentStatusClass =
-      status === 'completed'
-        ? 'statusFinalizat'
-        : status === 'cancelled'
-          ? 'statusAnulat'
-          : status === 'no-show'
-            ? 'statusAbsent'
-            : 'statusScheduled';
-    const badgeStatusClass = status;
+  ({ appointment, style, compact = false, onClick, onDragStart, onDragEnd, isDragging = false, isHighlighted = false, enableDragDrop = false }) => {
+    const statusCfg = getStatusConfig(appointment.status);
+    const categoryColor = getCategoryColor(appointment.category);
     const isPast = new Date(appointment.end_time).getTime() < Date.now();
+    const startLabel = format(new Date(appointment.start_time), 'HH:mm');
+    const endLabel = format(new Date(appointment.end_time), 'HH:mm');
 
     const handleDragStart = (e: React.DragEvent) => {
       e.stopPropagation();
-      if (onDragStart) {
-        onDragStart(appointment);
-      }
-      // Set drag effect
+      if (onDragStart) onDragStart(appointment);
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', appointment.id.toString());
     };
 
     const handleDragEnd = (e: React.DragEvent) => {
       e.stopPropagation();
-      if (onDragEnd) {
-        onDragEnd();
-      }
+      if (onDragEnd) onDragEnd();
     };
 
-    // Category color takes priority, then provider color
-    const categoryColor = appointment.color;
-    const provider = providers.find((p) => p.id === appointment.provider_id);
-    const accentColor = categoryColor || provider?.color;
-
-    const appointmentStyle: React.CSSProperties = accentColor
-      ? {
-          ...style,
-          borderLeftColor: accentColor,
-          borderLeftWidth: '4px',
-          borderLeftStyle: 'solid' as React.CSSProperties['borderLeftStyle'],
-          ...(categoryColor && {
-            background: `color-mix(in srgb, ${categoryColor} 18%, var(--color-surface))`,
-          }),
-        }
-      : style;
+    const appointmentStyle: React.CSSProperties = {
+      ...style,
+      opacity: isPast ? Math.min(statusCfg.opacity, 0.55) : statusCfg.opacity,
+      borderLeft: `5px solid ${categoryColor}`,
+      background: `color-mix(in srgb, ${categoryColor} 14%, var(--color-surface))`,
+    };
+    const containerStyle: React.CSSProperties = {
+      ...appointmentStyle,
+      ...(compact && { padding: '0 0.42rem' }),
+    };
 
     return (
       <div
-        className={`${styles.appointment} ${styles[appointmentStatusClass]} ${isPast ? styles.isPast : ''} ${isDragging ? styles.dragging : ''}`}
-        style={appointmentStyle}
-        draggable={enableDragDrop && badgeStatusClass === 'scheduled'}
+        className={`${styles.appointment} ${isDragging ? styles.dragging : ''} ${isHighlighted ? styles.appointmentHighlighted : ''}`}
+        style={containerStyle}
+        draggable={enableDragDrop && appointment.status === 'scheduled'}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onClick={(e) => {
@@ -85,35 +72,40 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
         aria-label={`Programare ${appointment.client_name}, ${appointment.service_name}`}
       >
         <div className={styles.appointmentHeader}>
-          <div className={styles.appointmentTitle}>{appointment.client_name}</div>
-          <span className={`${styles.statusBadge} ${styles[appointmentStatusClass]}`}>
-            {badgeStatusClass === 'scheduled' && 'Programat'}
-            {badgeStatusClass === 'completed' && 'Finalizat'}
-            {badgeStatusClass === 'cancelled' && 'Anulat'}
-            {badgeStatusClass === 'no-show' && 'Absent'}
-          </span>
+          <div className={`${styles.appointmentTitle} ${statusCfg.strikethrough ? styles.appointmentStrike : ''}`}>
+            <span className={styles.appointmentName}>{appointment.client_name}</span>
+            <span className={styles.appointmentTime}> · {startLabel}–{endLabel}</span>
+          </div>
+          <span
+            className={styles.statusDot}
+            style={{ background: statusCfg.dot }}
+            aria-label={statusCfg.label}
+          />
         </div>
-        <div className={styles.appointmentService}>{appointment.service_name}</div>
+        {!compact && <div className={styles.appointmentService}>{appointment.service_name}</div>}
       </div>
     );
   },
-  (prev, next) => {
-    // Only re-render if the appointment data changed
-    return (
-      prev.appointment.id === next.appointment.id &&
-      prev.appointment.status === next.appointment.status &&
-      prev.appointment.client_name === next.appointment.client_name &&
-      prev.appointment.service_name === next.appointment.service_name &&
-      prev.appointment.provider_id === next.appointment.provider_id &&
-      prev.appointment.color === next.appointment.color &&
-      prev.style.top === next.style.top &&
-      prev.style.left === next.style.left &&
-      prev.style.width === next.style.width &&
-      prev.style.height === next.style.height &&
-      prev.isDragging === next.isDragging &&
-      prev.providers?.length === next.providers?.length
-    );
-  }
+  (prev, next) =>
+    prev.appointment.id === next.appointment.id &&
+    prev.appointment.status === next.appointment.status &&
+    prev.appointment.client_name === next.appointment.client_name &&
+    prev.appointment.service_name === next.appointment.service_name &&
+    prev.appointment.start_time === next.appointment.start_time &&
+    prev.appointment.end_time === next.appointment.end_time &&
+    prev.appointment.category === next.appointment.category &&
+    prev.appointment.color === next.appointment.color &&
+    prev.style.top === next.style.top &&
+    prev.style.left === next.style.left &&
+    prev.style.width === next.style.width &&
+    prev.style.height === next.style.height &&
+    prev.compact === next.compact &&
+    prev.isDragging === next.isDragging &&
+    prev.isHighlighted === next.isHighlighted &&
+    prev.enableDragDrop === next.enableDragDrop &&
+    prev.onClick === next.onClick &&
+    prev.onDragStart === next.onDragStart &&
+    prev.onDragEnd === next.onDragEnd,
 );
 
 AppointmentBlock.displayName = 'AppointmentBlock';

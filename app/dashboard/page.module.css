@@ -385,8 +385,57 @@
 }
 
 @media (max-width: 700px) {
+  .container {
+    overflow-x: hidden;
+  }
+
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-3);
+  }
+
+  .statCard {
+    padding: var(--space-4);
+  }
+
+  .statValue {
+    font-size: 1.45rem;
+  }
+
   .charts {
     grid-template-columns: 1fr;
   }
 
+  .chartCard {
+    overflow: hidden;
+    padding: var(--space-4);
+  }
+
+  .barChart {
+    gap: 4px;
+  }
+
+  .barItem {
+    min-width: 0;
+  }
+
+  .barValue {
+    font-size: 0.68rem;
+  }
+
+  .barLabel {
+    font-size: 0.62rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .appointmentTime {
+    min-width: 80px;
+  }
+
+  .appointmentItem {
+    gap: var(--space-3);
+    padding: var(--space-3);
+  }
 }

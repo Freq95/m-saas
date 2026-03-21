@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
 import { ObjectId } from 'mongodb';
-import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import UserDetailClient from './UserDetailClient';
 
 type UserDetailPageProps = {
@@ -21,5 +21,16 @@ export default async function UserDetailPage({ params }: UserDetailPageProps) {
     db.collection('team_members').find({ user_id: userId }).toArray(),
   ]);
 
-  return <UserDetailClient user={user} tenant={tenant} memberships={memberships} />;
+  return (
+    <UserDetailClient
+      user={user ? { _id: String(user._id), ...stripMongoId(user) } : null}
+      tenant={tenant ? { _id: String(tenant._id), ...stripMongoId(tenant) } : null}
+      memberships={memberships.map((m: any) => ({
+        _id: String(m._id),
+        ...stripMongoId(m),
+        tenant_id: m.tenant_id ? String(m.tenant_id) : null,
+        user_id: m.user_id ? String(m.user_id) : null,
+      }))}
+    />
+  );
 }

@@ -8,7 +8,6 @@ html,
 body {
   max-width: 100vw;
   overflow-x: hidden;
-  scrollbar-gutter: stable;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -23,7 +22,7 @@ body {
 }
 
 .app-shell-content {
-  padding-top: 72px;
+  padding-top: var(--app-nav-offset, 72px);
 }
 
 .route-fade-in {
@@ -205,11 +204,5 @@ main {
 
   .route-fade-in {
     animation: none;
-  }
-}
-
-@media (max-width: 700px) {
-  .app-shell-content {
-    padding-top: 108px;
   }
 }

@@ -1,6 +1,11 @@
 import { getMongoDbOrThrow } from './db/mongo-utils';
 import type { ConflictCheck } from './types/calendar';
-import { ObjectId } from 'mongodb';
+import { ObjectId, type Document, type Filter } from 'mongodb';
+
+type BusyInterval = Document & {
+  start_time: string | Date;
+  end_time: string | Date;
+};
 
 /**
  * Check if a time slot overlaps with existing appointments
@@ -64,8 +69,8 @@ export async function checkAppointmentConflict(
         tenant_id: tenantId,
         deleted_at: { $exists: false },
         status: 'scheduled',
-        start_time: { $lte: endTime.toISOString() },
-        end_time: { $gte: startTime.toISOString() },
+        start_time: { $lt: endTime.toISOString() },
+        end_time: { $gt: startTime.toISOString() },
       })
       .toArray();
 
@@ -116,10 +121,10 @@ export async function checkAppointmentConflict(
         deleted_at: { $exists: false },
         status: 'scheduled',
         start_time: {
-          $lte: endTime.toISOString(),
+          $lt: endTime.toISOString(),
         },
         end_time: {
-          $gte: startTime.toISOString(),
+          $gt: startTime.toISOString(),
         },
       })
       .toArray();
@@ -199,10 +204,10 @@ export async function checkAppointmentConflict(
         deleted_at: { $exists: false },
         status: 'scheduled',
         start_time: {
-          $lte: endTime.toISOString(),
+          $lt: endTime.toISOString(),
         },
         end_time: {
-          $gte: startTime.toISOString(),
+          $gt: startTime.toISOString(),
         },
       })
       .toArray();
@@ -248,38 +253,33 @@ export async function checkAppointmentConflict(
   // 3. Generate suggestions if conflicts found
   const suggestions: Array<{ start: Date; end: Date }> = [];
   if (includeSuggestions && conflicts.length > 0) {
-    // Find next 3 available slots (simple implementation)
     const duration = endTime.getTime() - startTime.getTime();
+    const searchWindowEnd = new Date(endTime.getTime() + 48 * 60 * 60 * 1000);
+
+    const busyQuery: Filter<BusyInterval> = {
+      user_id: userId,
+      tenant_id: tenantId,
+      deleted_at: { $exists: false },
+      status: { $ne: 'cancelled' },
+      start_time: { $lt: searchWindowEnd.toISOString() },
+      end_time: { $gt: endTime.toISOString() },
+      ...(excludeAppointmentId ? { id: { $ne: excludeAppointmentId } } : {}),
+      ...(providerId ? { provider_id: providerId } : {}),
+      ...(resourceId ? { resource_id: resourceId } : {}),
+    };
+
+    const busyIntervals = (await db.collection('appointments').find(busyQuery).toArray()) as BusyInterval[];
+
     let searchStart = new Date(endTime);
     let foundSlots = 0;
-
-    while (foundSlots < 3) {
+    while (foundSlots < 3 && searchStart < searchWindowEnd) {
       const searchEnd = new Date(searchStart.getTime() + duration);
-
-      // Quick check if this slot is free
-      const hasConflict = await checkAppointmentConflict(
-        userId,
-        tenantId,
-        providerId,
-        resourceId,
-        searchStart,
-        searchEnd,
-        excludeAppointmentId,
-        false
-      );
-
-      if (!hasConflict.hasConflict) {
+      const hasOverlap = busyIntervals.some((b: BusyInterval) => new Date(b.start_time) < searchEnd && new Date(b.end_time) > searchStart);
+      if (!hasOverlap) {
         suggestions.push({ start: new Date(searchStart), end: new Date(searchEnd) });
         foundSlots++;
       }
-
-      // Move to next 15-minute slot
-      searchStart.setMinutes(searchStart.getMinutes() + 15);
-
-      // Safety: don't search more than 7 days ahead
-      if (searchStart.getTime() - startTime.getTime() > 7 * 24 * 60 * 60 * 1000) {
-        break;
-      }
+      searchStart = new Date(searchStart.getTime() + 15 * 60 * 1000);
     }
   }
 

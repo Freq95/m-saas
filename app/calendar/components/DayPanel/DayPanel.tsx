@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useMemo } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import {
   format,
   isSameDay,
@@ -9,6 +9,7 @@ import {
 import { ro } from 'date-fns/locale';
 import styles from './DayPanel.module.css';
 import type { Appointment } from '../../hooks/useCalendar';
+import { getCategoryColor, getStatusConfig, normalizeStatus, STATUS_CONFIG } from '@/lib/appointment-colors';
 
 interface DayPanelProps {
   topControls?: ReactNode;
@@ -20,88 +21,150 @@ interface DayPanelProps {
   onCreateClick: () => void;
   onNavigate: (date: Date) => void;
   onSearchChange?: (query: string) => void;
+  onHoverAppointment?: (id: number | null) => void;
 }
 
-type PanelStatusKey = 'scheduled' | 'completed' | 'cancelled' | 'no-show';
-
-const STATUS_CONFIG: Record<PanelStatusKey, { label: string; pillClass: string }> = {
-  scheduled: { label: 'Programat',  pillClass: 'statusPillScheduled' },
-  completed: { label: 'Finalizat',  pillClass: 'statusPillFinalizat' },
-  cancelled: { label: 'Anulat',     pillClass: 'statusPillAnulat' },
-  'no-show': { label: 'Absent',     pillClass: 'statusPillAbsent' },
-};
-
-function normalizeStatus(status: string): PanelStatusKey {
-  if (status === 'no_show' || status === 'no-show') return 'no-show';
-  if (status === 'completed') return 'completed';
-  if (status === 'cancelled') return 'cancelled';
-  return 'scheduled';
-}
+const STATUS_KEYS = ['scheduled', 'completed', 'cancelled', 'no-show'] as const;
 
 // Appointment card
 function AppointmentCard({
   appointment: apt,
   onClick,
   onStatusChange,
+  onHoverAppointment,
   dateLabel,
 }: {
   appointment: Appointment;
   onClick: (a: Appointment) => void;
   onStatusChange: (id: number, status: string) => void;
-  /** When set, shows a date stamp above the card (used in search results mode) */
+  onHoverAppointment?: (id: number | null) => void;
   dateLabel?: string;
 }) {
-  const start       = new Date(apt.start_time);
-  const end         = new Date(apt.end_time);
-  const isPast      = end.getTime() < Date.now();
-  const status      = normalizeStatus(apt.status);
-  const cfg         = STATUS_CONFIG[status];
-  const durationMin = Math.round((end.getTime() - start.getTime()) / 60_000);
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+
+  const start         = new Date(apt.start_time);
+  const end           = new Date(apt.end_time);
+  const isPast        = end.getTime() < Date.now();
+  const status        = normalizeStatus(apt.status);
+  const statusCfg     = getStatusConfig(status);
+  const categoryColor = getCategoryColor(apt.category);
+  const durationMin   = Math.round((end.getTime() - start.getTime()) / 60_000);
 
   return (
     <div className={styles.cardWrapper}>
       {dateLabel && (
         <div className={styles.cardDateLabel}>{dateLabel}</div>
       )}
-      <div className={`${styles.card} ${isPast ? styles.cardPast : ''}`} onClick={() => onClick(apt)}>
-        <div className={styles.colorBar} style={{ background: apt.color || 'var(--color-accent)' }} />
+      <div
+        className={`${styles.card} ${isPast ? styles.cardPast : ''}`}
+        onClick={() => {
+          if (statusMenuOpen) { setStatusMenuOpen(false); return; }
+          onClick(apt);
+        }}
+        onMouseEnter={() => onHoverAppointment?.(apt.id)}
+        onMouseLeave={() => onHoverAppointment?.(null)}
+      >
+        <div className={styles.colorBar} style={{ background: categoryColor }} />
         <div className={styles.cardBody}>
+
+          {/* Top row: time · duration · service */}
           <div className={styles.timeRow}>
-            <span className={styles.time}>
-              {format(start, 'HH:mm')} - {format(end, 'HH:mm')}
-            </span>
+            <span className={styles.time}>{format(start, 'HH:mm')}</span>
+            <span className={styles.timeSep}>·</span>
             <span className={styles.duration}>{durationMin} min</span>
-          </div>
-          <p className={styles.clientName}>{apt.client_name}</p>
-          <div className={styles.metaRow}>
+            <span className={styles.timeSep}>·</span>
             <span className={styles.service}>{apt.service_name}</span>
-            <span className={`${styles.statusPill} ${styles[cfg.pillClass]}`}>
-              {cfg.label}
-            </span>
           </div>
-          <div className={styles.statusSelector} onClick={(e) => e.stopPropagation()}>
-            <button
-              className={`${styles.statusBtn} ${styles.statusBtnFinalizat} ${status === 'completed' ? styles.statusBtnActive : ''}`}
-              onClick={() => onStatusChange(apt.id, 'completed')}
-              title="Marcheaza ca Finalizat"
+
+          {/* Client name */}
+          <p className={styles.clientName}>{apt.client_name}</p>
+
+          {/* Status control — tap to expand */}
+          <div
+            className={styles.statusLine}
+            onClick={(e) => {
+              e.stopPropagation();
+              setStatusMenuOpen((prev) => !prev);
+            }}
+            role="button"
+            tabIndex={0}
+            aria-expanded={statusMenuOpen}
+            aria-label={`Status: ${statusCfg.label}. Apasa pentru a schimba.`}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setStatusMenuOpen((prev) => !prev);
+              }
+              if (e.key === 'Escape') setStatusMenuOpen(false);
+            }}
+          >
+            <div className={styles.statusLineLeft}>
+              <span
+                className={styles.statusDot}
+                style={{ background: statusCfg.dot }}
+                aria-hidden="true"
+              />
+              <span className={styles.statusValue}>{statusCfg.label}</span>
+            </div>
+            <svg
+              className={`${styles.statusChevron} ${statusMenuOpen ? styles.chevronOpen : ''}`}
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
             >
-              Finalizat
-            </button>
-            <button
-              className={`${styles.statusBtn} ${styles.statusBtnAnulat} ${status === 'cancelled' ? styles.statusBtnActive : ''}`}
-              onClick={() => onStatusChange(apt.id, 'cancelled')}
-              title="Marcheaza ca Anulat"
-            >
-              Anulat
-            </button>
-            <button
-              className={`${styles.statusBtn} ${styles.statusBtnAbsent} ${status === 'no-show' ? styles.statusBtnActive : ''}`}
-              onClick={() => onStatusChange(apt.id, 'no-show')}
-              title="Marcheaza ca Absent"
-            >
-              Absent
-            </button>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
           </div>
+
+          {/* Status dropdown menu */}
+          {statusMenuOpen && (
+            <div className={styles.statusMenu} onClick={(e) => e.stopPropagation()}>
+              {STATUS_KEYS.map((key) => {
+                const cfg = STATUS_CONFIG[key];
+                const isActive = status === key;
+                return (
+                  <button
+                    key={key}
+                    className={`${styles.statusMenuItem} ${isActive ? styles.statusMenuItemActive : ''}`}
+                    onClick={() => {
+                      onStatusChange(apt.id, key);
+                      setStatusMenuOpen(false);
+                    }}
+                  >
+                    <span
+                      className={styles.statusMenuDot}
+                      style={{ background: cfg.dot }}
+                      aria-hidden="true"
+                    />
+                    <span className={styles.statusMenuLabel}>{cfg.label}</span>
+                    {isActive && (
+                      <svg
+                        className={styles.statusMenuCheck}
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
         </div>
       </div>
     </div>
@@ -119,10 +182,10 @@ export function DayPanel({
   onCreateClick,
   onNavigate,
   onSearchChange,
+  onHoverAppointment,
 }: DayPanelProps) {
-  const isSearching  = searchQuery.trim().length > 0;
+  const isSearching = searchQuery.trim().length > 0;
 
-  // Search results: all appointments matching the query, sorted by date
   const searchResults = useMemo(() => {
     if (!isSearching) return [];
     const q = searchQuery.toLowerCase();
@@ -136,7 +199,6 @@ export function DayPanel({
       .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
   }, [appointments, searchQuery, isSearching]);
 
-  // Search result stats
   const searchStats = useMemo(() => ({
     total:     searchResults.length,
     scheduled: searchResults.filter((a) => normalizeStatus(a.status) === 'scheduled').length,
@@ -147,7 +209,6 @@ export function DayPanel({
     }).length,
   }), [searchResults]);
 
-  // Day appointments (normal mode)
   const dayAppointments = useMemo(() => {
     if (!selectedDay) return [];
     return [...appointments]
@@ -167,18 +228,17 @@ export function DayPanel({
 
   const stats = isSearching ? searchStats : dayStats;
 
-  // Group search results by day so we can show date separators
   const groupedResults = useMemo(() => {
     if (!isSearching) return [];
     const groups: { dateKey: string; label: string; items: Appointment[] }[] = [];
     for (const apt of searchResults) {
-      const d    = new Date(apt.start_time);
-      const key  = format(d, 'yyyy-MM-dd');
-      let group  = groups.find((g) => g.dateKey === key);
+      const d   = new Date(apt.start_time);
+      const key = format(d, 'yyyy-MM-dd');
+      let group = groups.find((g) => g.dateKey === key);
       if (!group) {
         const label = isToday(d)
           ? 'Astazi'
-          : format(d, "EEEE, d MMMM yyyy", { locale: ro });
+          : format(d, 'EEEE, d MMMM yyyy', { locale: ro });
         group = { dateKey: key, label: label.charAt(0).toUpperCase() + label.slice(1), items: [] };
         groups.push(group);
       }
@@ -186,6 +246,7 @@ export function DayPanel({
     }
     return groups;
   }, [searchResults, isSearching]);
+
   const searchBar = onSearchChange ? (
     <div className={styles.searchWrapper}>
       <svg className={styles.searchIcon} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
@@ -210,45 +271,41 @@ export function DayPanel({
       )}
     </div>
   ) : null;
+
   return (
     <aside className={styles.panel}>
       {topControls}
 
-      {/* Search mode header */}
       {isSearching ? (
         <>
           <header className={styles.header}>
-            <h3 className={styles.headerDate}>Rezultate cautare: &ldquo;{searchQuery}&rdquo;</h3>
-            <span className={styles.searchResultsBadge}>
-              {searchStats.total}
-            </span>
+            <h3 className={styles.headerDate}>Rezultate: &ldquo;{searchQuery}&rdquo;</h3>
+            <span className={styles.searchResultsBadge}>{searchStats.total}</span>
           </header>
 
-          {/* Stats for search results */}
           {stats.total > 0 && (
-          <div className={styles.statsGrid}>
-            <div className={styles.statCard}>
-              <span className={styles.statCardValue}>{stats.total}</span>
-              <span className={styles.statCardLabel}>Total</span>
+            <div className={styles.statsGrid}>
+              <div className={styles.statCard}>
+                <span className={styles.statCardValue}>{stats.total}</span>
+                <span className={styles.statCardLabel}>Total</span>
+              </div>
+              <div className={styles.statCard}>
+                <span className={`${styles.statCardValue} ${styles.statScheduled}`}>{stats.scheduled}</span>
+                <span className={styles.statCardLabel}>Programate</span>
+              </div>
+              <div className={styles.statCard}>
+                <span className={`${styles.statCardValue} ${styles.statCompleted}`}>{stats.completed}</span>
+                <span className={styles.statCardLabel}>Finalizate</span>
+              </div>
+              <div className={styles.statCard}>
+                <span className={`${styles.statCardValue} ${styles.statOther}`}>{stats.other}</span>
+                <span className={styles.statCardLabel}>Anulate</span>
+              </div>
             </div>
-            <div className={styles.statCard}>
-              <span className={`${styles.statCardValue} ${styles.statScheduled}`}>{stats.scheduled}</span>
-              <span className={styles.statCardLabel}>Programate</span>
-            </div>
-            <div className={styles.statCard}>
-              <span className={`${styles.statCardValue} ${styles.statCompleted}`}>{stats.completed}</span>
-              <span className={styles.statCardLabel}>Finalizate</span>
-            </div>
-            <div className={styles.statCard}>
-              <span className={`${styles.statCardValue} ${styles.statOther}`}>{stats.other}</span>
-              <span className={styles.statCardLabel}>Anulate</span>
-            </div>
-          </div>
           )}
 
           {searchBar}
 
-          {/* Search results list */}
           <div className={styles.list}>
             {groupedResults.length === 0 ? (
               <div className={styles.emptyDay}>
@@ -269,11 +326,11 @@ export function DayPanel({
                       key={apt.id}
                       appointment={apt}
                       onClick={(a) => {
-                        // Navigate to the appointment's day, then open it
                         onNavigate(new Date(a.start_time));
                         onAppointmentClick(a);
                       }}
                       onStatusChange={onQuickStatusChange}
+                      onHoverAppointment={onHoverAppointment}
                     />
                   ))}
                 </div>
@@ -282,7 +339,6 @@ export function DayPanel({
           </div>
         </>
       ) : (
-        /* Normal mode */
         <>
           {!selectedDay ? (
             <div className={styles.emptyPlaceholder}>
@@ -302,30 +358,31 @@ export function DayPanel({
                   type="button"
                   onClick={onCreateClick}
                   aria-label="Adauga programare"
+                  title="Adauga programare"
                 >
-                  + Adauga
+                  +
                 </button>
               </header>
 
               {stats.total > 0 && (
-              <div className={styles.statsGrid}>
-                <div className={styles.statCard}>
-                  <span className={styles.statCardValue}>{stats.total}</span>
-                  <span className={styles.statCardLabel}>Total</span>
+                <div className={styles.statsGrid}>
+                  <div className={styles.statCard}>
+                    <span className={styles.statCardValue}>{stats.total}</span>
+                    <span className={styles.statCardLabel}>Total</span>
+                  </div>
+                  <div className={styles.statCard}>
+                    <span className={`${styles.statCardValue} ${styles.statScheduled}`}>{stats.scheduled}</span>
+                    <span className={styles.statCardLabel}>Programate</span>
+                  </div>
+                  <div className={styles.statCard}>
+                    <span className={`${styles.statCardValue} ${styles.statCompleted}`}>{stats.completed}</span>
+                    <span className={styles.statCardLabel}>Finalizate</span>
+                  </div>
+                  <div className={styles.statCard}>
+                    <span className={`${styles.statCardValue} ${styles.statOther}`}>{stats.other}</span>
+                    <span className={styles.statCardLabel}>Anulate</span>
+                  </div>
                 </div>
-                <div className={styles.statCard}>
-                  <span className={`${styles.statCardValue} ${styles.statScheduled}`}>{stats.scheduled}</span>
-                  <span className={styles.statCardLabel}>Programate</span>
-                </div>
-                <div className={styles.statCard}>
-                  <span className={`${styles.statCardValue} ${styles.statCompleted}`}>{stats.completed}</span>
-                  <span className={styles.statCardLabel}>Finalizate</span>
-                </div>
-                <div className={styles.statCard}>
-                  <span className={`${styles.statCardValue} ${styles.statOther}`}>{stats.other}</span>
-                  <span className={styles.statCardLabel}>Anulate</span>
-                </div>
-              </div>
               )}
 
               {searchBar}
@@ -343,6 +400,7 @@ export function DayPanel({
                       appointment={apt}
                       onClick={onAppointmentClick}
                       onStatusChange={onQuickStatusChange}
+                      onHoverAppointment={onHoverAppointment}
                     />
                   ))
                 )}
@@ -354,4 +412,3 @@ export function DayPanel({
     </aside>
   );
 }
-

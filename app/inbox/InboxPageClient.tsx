@@ -7,6 +7,7 @@ import createDOMPurify from 'dompurify';
 import { format, isSameDay, isToday, isYesterday } from 'date-fns';
 import styles from './page.module.css';
 import { useToast } from '@/lib/useToast';
+import { useIsMobile } from '@/lib/useIsMobile';
 import { ToastContainer } from '@/components/Toast';
 
 /**
@@ -228,6 +229,27 @@ interface SaveableItem {
   savedClientIds?: number[];
 }
 
+type SyncLogLevel = 'info' | 'success' | 'warning' | 'error';
+
+interface SyncLogEntry {
+  id: string;
+  at: string;
+  level: SyncLogLevel;
+  message: string;
+}
+
+interface ProviderSyncPayload {
+  synced?: number;
+  skipped?: number;
+  errors?: number;
+  attachmentFailures?: number;
+  attachmentMissingContent?: number;
+  attachmentUploadFailures?: number;
+  error?: string;
+  message?: string;
+  reason?: string;
+}
+
 interface InboxPageClientProps {
   initialConversations: Conversation[];
   initialSelectedConversationId: number | null;
@@ -282,6 +304,7 @@ export default function InboxPageClient({
       : null;
   const searchParams = useSearchParams();
   const conversationParam = searchParams.get('conversation');
+  const isMobile = useIsMobile();
 
   const initialSelectedConversation = useMemo(() => {
     if (initialSelectedConversationId !== null) {
@@ -323,6 +346,8 @@ export default function InboxPageClient({
   const inboxSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastApiErrorToastRef = useRef<{ key: string; at: number } | null>(null);
   const saveModalBackdropPressStartedRef = useRef(false);
+  const hasManualMobileSelectionRef = useRef(false);
+  const [syncLogs, setSyncLogs] = useState<SyncLogEntry[]>([]);
   
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -339,6 +364,18 @@ export default function InboxPageClient({
       return null;
     }
   };
+
+  const appendSyncLog = useCallback((level: SyncLogLevel, message: string) => {
+    setSyncLogs((prev) => [
+      {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        at: new Date().toISOString(),
+        level,
+        message,
+      },
+      ...prev.slice(0, 11),
+    ]);
+  }, []);
 
   const showApiErrorToast = useCallback(
     (scope: string, status: number, message?: string | null) => {
@@ -397,6 +434,15 @@ export default function InboxPageClient({
       handleSelectConversation(match);
     }
   }, [conversationParam, allConversations, selectedConversation]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+    if (conversationParam) return;
+    if (hasManualMobileSelectionRef.current) return;
+    if (selectedConversation) {
+      setSelectedConversation(null);
+    }
+  }, [isMobile, conversationParam, selectedConversation]);
 
   useEffect(() => {
     if (sessionStatus !== 'authenticated') return;
@@ -465,6 +511,10 @@ export default function InboxPageClient({
 
   const fetchConversations = async (serverSearch?: string) => {
     try {
+      const isCurrentlyMobile =
+        isMobile ||
+        (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches);
+
       const params = new URLSearchParams();
       const trimmedSearch = serverSearch?.trim();
       if (trimmedSearch) {
@@ -503,9 +553,9 @@ export default function InboxPageClient({
                 setSelectedConversation(updatedSelected);
               }
             } else {
-              setSelectedConversation(fallback);
+              setSelectedConversation(isCurrentlyMobile ? null : fallback);
             }
-          } else {
+          } else if (!isCurrentlyMobile) {
             setSelectedConversation(result.conversations[0]);
           }
         }
@@ -639,35 +689,91 @@ export default function InboxPageClient({
     setSyncing(true);
     setSyncError(null);
     setSyncPartiallyFailed(false);
+    appendSyncLog('info', 'Sincronizarea inbox a pornit.');
     try {
-      const [yahooResult, gmailResult] = await Promise.allSettled([
-        fetch('/api/yahoo/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ todayOnly: true }),
-        }),
-        fetch('/api/gmail/sync', { method: 'POST' }),
-      ]);
+      const syncRequests: Array<{ provider: 'Yahoo' | 'Gmail'; request: Promise<Response> }> = [
+        {
+          provider: 'Yahoo',
+          request: fetch('/api/yahoo/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ todayOnly: true }),
+          }),
+        },
+        {
+          provider: 'Gmail',
+          request: fetch('/api/gmail/sync', { method: 'POST' }),
+        },
+      ];
 
-      // Collect errors only from providers that failed for a non-"not configured" reason
-      const errors: string[] = [];
-      for (const result of [yahooResult, gmailResult]) {
+      const settledResults = await Promise.allSettled(syncRequests.map((entry) => entry.request));
+      const blockingErrors: string[] = [];
+      let hasAtLeastOneProviderResult = false;
+
+      for (let index = 0; index < settledResults.length; index += 1) {
+        const provider = syncRequests[index].provider;
+        const result = settledResults[index];
+
         if (result.status === 'rejected') {
-          errors.push(result.reason?.message || 'Sync failed');
-        } else if (!result.value.ok) {
-          const err = await result.value.json().catch(() => ({}));
-          const message = err?.error || err?.message || '';
-          // Ignore "not configured" - provider simply not connected
-          if (message && !message.toLowerCase().includes('not configured') && !message.toLowerCase().includes('not found')) {
-            errors.push(message);
+          const reason = result.reason?.message || 'Cererea de sincronizare a esuat.';
+          appendSyncLog('error', `${provider}: ${reason}`);
+          blockingErrors.push(reason);
+          continue;
+        }
+
+        const response = result.value;
+        const payload = (await response.json().catch(() => ({}))) as ProviderSyncPayload;
+        const responseMessage = payload?.error || payload?.message || payload?.reason || '';
+        const normalizedMessage = responseMessage.toLowerCase();
+        const isNotConfigured =
+          normalizedMessage.includes('not configured') ||
+          normalizedMessage.includes('not found');
+
+        if (!response.ok) {
+          if (isNotConfigured) {
+            appendSyncLog('info', `${provider}: nu este conectat, sincronizarea a fost omisa.`);
+          } else {
+            const fallback = 'Sincronizarea a esuat.';
+            const errorMessage = responseMessage || fallback;
+            appendSyncLog('error', `${provider}: ${errorMessage}`);
+            blockingErrors.push(errorMessage);
+          }
+          continue;
+        }
+
+        hasAtLeastOneProviderResult = true;
+        const synced = typeof payload.synced === 'number' ? payload.synced : 0;
+        const skipped = typeof payload.skipped === 'number' ? payload.skipped : 0;
+        const errors = typeof payload.errors === 'number' ? payload.errors : 0;
+        appendSyncLog(
+          errors > 0 ? 'warning' : 'success',
+          `${provider}: sincronizate ${synced}, omise ${skipped}, erori ${errors}.`
+        );
+
+        if (provider === 'Yahoo') {
+          const attachmentFailures =
+            typeof payload.attachmentFailures === 'number' ? payload.attachmentFailures : 0;
+          if (attachmentFailures > 0) {
+            const missingContent =
+              typeof payload.attachmentMissingContent === 'number' ? payload.attachmentMissingContent : 0;
+            const uploadFailures =
+              typeof payload.attachmentUploadFailures === 'number' ? payload.attachmentUploadFailures : 0;
+            appendSyncLog(
+              'warning',
+              `Yahoo: ${attachmentFailures} atasamente nu au putut fi salvate (${missingContent} fara continut, ${uploadFailures} upload esuat).`
+            );
           }
         }
       }
 
-      if (errors.length > 0) {
-        showApiErrorToast('sync', 500, errors[0]);
-        setSyncError(errors[0]);
+      if (blockingErrors.length > 0) {
+        showApiErrorToast('sync', 500, blockingErrors[0]);
+        setSyncError(blockingErrors[0]);
         setSyncPartiallyFailed(true);
+      } else if (hasAtLeastOneProviderResult) {
+        appendSyncLog('success', 'Sincronizarea inbox s-a incheiat.');
+      } else {
+        appendSyncLog('info', 'Niciun provider activ pentru sincronizare.');
       }
 
       await fetchConversations(searchQuery);
@@ -676,6 +782,7 @@ export default function InboxPageClient({
       const message = error instanceof Error ? error.message : 'Failed to sync inbox';
       setSyncError(message);
       setSyncPartiallyFailed(false);
+      appendSyncLog('error', `Inbox: ${message}`);
       console.error('Inbox sync error:', error);
     } finally {
       setSyncing(false);
@@ -752,6 +859,9 @@ export default function InboxPageClient({
   };
 
   const handleSelectConversation = (conversation: Conversation) => {
+    if (isMobile) {
+      hasManualMobileSelectionRef.current = true;
+    }
     setSelectedConversation(conversation);
     if (conversation.has_unread) {
       updateConversationReadState(conversation.id, true, { silent: true });
@@ -1325,6 +1435,9 @@ export default function InboxPageClient({
     return grouped;
   }, [messages]);
 
+  const showThread = !isMobile || selectedConversation !== null;
+  const showList = !isMobile || selectedConversation === null;
+
   if (loading) {
     return (
       <div className={styles.container}>
@@ -1379,9 +1492,9 @@ export default function InboxPageClient({
     <div className={styles.container}>
 
       <div ref={containerRef} className={styles.inbox}>
-        <div 
-          className={styles.conversationList}
-          style={{ width: `${leftWidth}px` }}
+        <div
+          className={`${styles.conversationList}${!showList ? ` ${styles.conversationListHidden}` : ''}`}
+          style={{ width: isMobile ? undefined : `${leftWidth}px` }}
         >
           <div className={styles.searchContainer}>
             <input
@@ -1422,6 +1535,19 @@ export default function InboxPageClient({
             {lastSyncAt && (
               <div className={styles.lastSyncLabel}>
                 Ultima sincronizare: {format(new Date(lastSyncAt), 'dd.MM.yyyy HH:mm')}
+              </div>
+            )}
+            {syncLogs.length > 0 && (
+              <div className={styles.syncLogPanel}>
+                <div className={styles.syncLogHeader}>Jurnal sincronizare</div>
+                <div className={styles.syncLogList}>
+                  {syncLogs.map((entry) => (
+                    <div key={entry.id} className={`${styles.syncLogItem} ${styles[`syncLog${entry.level.charAt(0).toUpperCase()}${entry.level.slice(1)}`]}`}>
+                      <span className={styles.syncLogTime}>{format(new Date(entry.at), 'HH:mm:ss')}</span>
+                      <span className={styles.syncLogMessage}>{entry.message}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -1493,14 +1619,27 @@ export default function InboxPageClient({
           onMouseDown={() => setIsResizing(true)}
         />
 
-        <div className={styles.thread}>
+        <div className={`${styles.thread}${showThread && isMobile ? ` ${styles.threadVisible}` : ''}`}>
           {selectedConversation ? (
             <>
               <div className={styles.threadHeader}>
-                <div>
-                  <h3>{selectedConversation.contact_name || 'Fără nume'}</h3>
-                  <div className={styles.threadMeta}>
-                    {selectedConversation.contact_email} • {getChannelLabel(selectedConversation.channel, selectedConversation.email_provider)}
+                <div className={styles.threadHeaderTop}>
+                  <button
+                    type="button"
+                    className={styles.mobileBackButton}
+                    onClick={() => setSelectedConversation(null)}
+                    aria-label="Inapoi la conversatii"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M15 18l-6-6 6-6" />
+                    </svg>
+                    Inapoi
+                  </button>
+                  <div className={styles.threadContact}>
+                    <h3>{selectedConversation.contact_name || 'Fără nume'}</h3>
+                    <div className={styles.threadMeta}>
+                      {selectedConversation.contact_email} • {getChannelLabel(selectedConversation.channel, selectedConversation.email_provider)}
+                    </div>
                   </div>
                 </div>
                 <div className={styles.threadHeaderActions}>

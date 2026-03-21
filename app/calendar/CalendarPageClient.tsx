@@ -26,6 +26,7 @@ import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import styles from './page.module.css';
 import { useToast } from '@/lib/useToast';
+import { useIsMobile } from '@/lib/useIsMobile';
 import { ToastContainer } from '@/components/Toast';
 import {
   useCalendar,
@@ -80,6 +81,7 @@ export default function CalendarPageClient({
   initialViewType = 'week',
 }: CalendarPageClientProps) {
   const toast = useToast();
+  const isMobile = useIsMobile();
   const searchParams = useSearchParams();
   const containerRef = useRef<HTMLDivElement>(null);
   const [availableHeight, setAvailableHeight] = useState<number | null>(null);
@@ -150,6 +152,8 @@ export default function CalendarPageClient({
   );
 
   const [selectedDay, setSelectedDay]               = useState<Date>(() => new Date());
+  const [pendingCancelAppointment, setPendingCancelAppointment] = useState<Appointment | null>(null);
+  const [hoveredAppointmentId, setHoveredAppointmentId] = useState<number | null>(null);
   const [services, setServices]                     = useState<Service[]>(initialServices);
   const [seedingDemoServices, setSeedingDemoServices] = useState(false);
   const hasRequestedServicesRef = useRef(false);
@@ -188,6 +192,7 @@ export default function CalendarPageClient({
   const justDroppedRef = useRef(false);
   const justDroppedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handledContactPrefillRef = useRef<number | null>(null);
+  const pendingRescheduleIdRef = useRef<number | null>(null);
 
   const weekStart = useMemo(() => startOfWeek(state.currentDate, { weekStartsOn: 1 }), [state.currentDate]);
   const weekEnd = useMemo(() => endOfWeek(state.currentDate, { weekStartsOn: 1 }), [state.currentDate]);
@@ -305,6 +310,7 @@ export default function CalendarPageClient({
         return true;
       }
       if (result.status === 409) {
+        pendingRescheduleIdRef.current = appointmentId;
         setConflictData({
           conflicts: result.conflicts || [],
           suggestions: result.suggestions || [],
@@ -420,7 +426,7 @@ export default function CalendarPageClient({
   };
 
   /** Click on an empty slot — selects day AND opens create modal */
-  const handleSlotClick = (day: Date, hour?: number, minute: 0 | 30 = 0) => {
+  const handleSlotClick = (day: Date, hour?: number, minute: 0 | 15 | 30 | 45 = 0) => {
     if (justDroppedRef.current) {
       return;
     }
@@ -537,6 +543,10 @@ export default function CalendarPageClient({
     }
 
     try {
+      if (status === 'cancelled') {
+        setPendingCancelAppointment(appointment);
+        return;
+      }
       await updateStatusWithUndo(appointment, status);
     } catch {
       toast.error('Eroare la actualizarea statusului.');
@@ -753,11 +763,6 @@ export default function CalendarPageClient({
     }
   };
 
-  const handleQuickStatusChange = async (status: string) => {
-    if (!state.selectedAppointment) return;
-    await updateStatusWithUndo(state.selectedAppointment, status);
-  };
-
   const navigateToDate = (date: Date) => {
     setSelectedDay(date);
     actions.navigateToDate(date);
@@ -911,6 +916,127 @@ export default function CalendarPageClient({
   );
 
   // ── Render ─────────────────────────────────────────────────────────────────
+  const calendarWithPanel = (
+    <div className={styles.calendarWithPanel}>
+      <WeekView
+        weekDays={weekDays}
+        hours={hours}
+        appointments={appointments}
+        blockedTimes={blockedTimes}
+        selectedDay={selectedDay}
+        onSlotClick={handleSlotClick}
+        onDayHeaderClick={handleDayHeaderClick}
+        onAppointmentClick={handleAppointmentClick}
+        enableDragDrop
+        hoveredAppointmentId={hoveredAppointmentId}
+        draggedAppointment={draggedAppointment}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDrop={async (day, hour, minute) => { await handleDrop(day, hour, minute); }}
+        providers={providers}
+      />
+
+      <DayPanel
+        topControls={weekToolbarControls}
+        selectedDay={selectedDay}
+        appointments={appointments}
+        onAppointmentClick={handleAppointmentClick}
+        onQuickStatusChange={handlePanelStatusChange}
+        onCreateClick={() => handleSlotClick(selectedDay, 9)}
+        onNavigate={(date) => {
+          navigateToDate(date);
+        }}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        onHoverAppointment={setHoveredAppointmentId}
+      />
+    </div>
+  );
+
+  const mobileCalendarView = (
+    <div className={styles.mobileCalendar}>
+      <div className={styles.mobileToolbar}>
+        <button type="button" className={styles.mobileTodayBtn} onClick={handleTodayClick}>
+          Astazi
+        </button>
+        <button type="button" className={styles.mobileNavArrow} onClick={handlePrevWeek} aria-label="Saptamana anterioara">
+          {'<'}
+        </button>
+        <span className={styles.mobileDateLabel}>
+          {format(selectedDay, 'd MMMM yyyy', { locale: ro })}
+        </span>
+        <button type="button" className={styles.mobileNavArrow} onClick={handleNextWeek} aria-label="Saptamana urmatoare">
+          {'>'}
+        </button>
+      </div>
+
+      <div className={styles.mobileDayStrip}>
+        {weekDays.map((day) => {
+          const isActive = isSameDay(day, selectedDay);
+          const isTodayDay = isToday(day);
+          const dayLabel = format(day, 'EEE', { locale: ro }).replace('.', '');
+          const shortDayLabel = `${dayLabel.charAt(0).toUpperCase()}${dayLabel.slice(1, 3)}`;
+
+          return (
+            <button
+              key={day.toISOString()}
+              type="button"
+              className={[
+                styles.mobileDayBtn,
+                isActive ? styles.mobileDayBtnActive : '',
+                isTodayDay ? styles.mobileDayBtnToday : '',
+              ].filter(Boolean).join(' ')}
+              onClick={() => navigateToDate(day)}
+            >
+              <span className={styles.mobileDayBtnLabel}>{shortDayLabel}</span>
+              <span className={styles.mobileDayBtnNumber}>{format(day, 'd')}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className={styles.mobilePanelWrapper}>
+        <DayPanel
+          topControls={null}
+          selectedDay={selectedDay}
+          appointments={appointments}
+          onAppointmentClick={handleAppointmentClick}
+          onQuickStatusChange={handlePanelStatusChange}
+          onCreateClick={() => handleSlotClick(selectedDay, 9)}
+          onNavigate={(date) => {
+            navigateToDate(date);
+          }}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onHoverAppointment={setHoveredAppointmentId}
+        />
+
+        <button
+          type="button"
+          className={styles.mobileFab}
+          aria-label="Adauga programare"
+          onClick={() => handleSlotClick(selectedDay, 9, 0)}
+        >
+          <svg
+            className={styles.mobileFabIcon}
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+
   const showInitialSkeleton = !hasFinishedInitialLoad && loading;
 
   if (showInitialSkeleton) {
@@ -941,38 +1067,7 @@ export default function CalendarPageClient({
       style={availableHeight ? { height: `${availableHeight}px` } : undefined}
     >
       <main className={styles.main}>
-        <div className={styles.calendarWithPanel}>
-          <WeekView
-            weekDays={weekDays}
-            hours={hours}
-            appointments={appointments}
-            blockedTimes={blockedTimes}
-            selectedDay={selectedDay}
-            onSlotClick={handleSlotClick}
-            onDayHeaderClick={handleDayHeaderClick}
-            onAppointmentClick={handleAppointmentClick}
-            enableDragDrop
-            draggedAppointment={draggedAppointment}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-            onDrop={async (day, hour, minute) => { await handleDrop(day, hour, minute); }}
-            providers={providers}
-          />
-
-          <DayPanel
-            topControls={weekToolbarControls}
-            selectedDay={selectedDay}
-            appointments={appointments}
-            onAppointmentClick={handleAppointmentClick}
-            onQuickStatusChange={handlePanelStatusChange}
-            onCreateClick={() => handleSlotClick(selectedDay, 9)}
-            onNavigate={(date) => {
-              navigateToDate(date);
-            }}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-          />
-        </div>
+        {isMobile ? mobileCalendarView : calendarWithPanel}
       </main>
 
       <CreateAppointmentModal
@@ -994,7 +1089,6 @@ export default function CalendarPageClient({
         initialData={editInitialData}
         onModeChange={setAppointmentModalMode}
         appointmentStatus={editInitialData?.status || state.selectedAppointment?.status}
-        onStatusChange={appointmentModalMode === 'create' ? undefined : handleQuickStatusChange}
         onDelete={appointmentModalMode === 'view' ? () => {
           setShowCreateModal(false);
           setShowDeleteConfirm(true);
@@ -1015,12 +1109,50 @@ export default function CalendarPageClient({
         onConfirm={handleConfirmDelete}
       />
 
+      <DeleteConfirmModal
+        isOpen={Boolean(pendingCancelAppointment)}
+        appointment={pendingCancelAppointment}
+        onConfirm={async () => {
+          const apt = pendingCancelAppointment;
+          setPendingCancelAppointment(null);
+          if (!apt) return;
+          await updateStatusWithUndo(apt, 'cancelled');
+        }}
+        onClose={() => setPendingCancelAppointment(null)}
+      />
+
       <ConflictWarningModal
         isOpen={showConflictModal}
         conflicts={conflictData.conflicts}
         suggestions={conflictData.suggestions}
-        onClose={() => setShowConflictModal(false)}
-        onSelectSlot={(startTime, endTime) => {
+        onClose={() => {
+          pendingRescheduleIdRef.current = null;
+          setShowConflictModal(false);
+        }}
+        onSelectSlot={async (startTime, endTime) => {
+          setShowConflictModal(false);
+
+          if (pendingRescheduleIdRef.current !== null) {
+            const id = pendingRescheduleIdRef.current;
+            pendingRescheduleIdRef.current = null;
+            const result = await updateAppointment(id, { startTime, endTime });
+            if (result.ok) {
+              refetch();
+              toast.success('Programarea a fost mutata.');
+            } else if (result.status === 409) {
+              pendingRescheduleIdRef.current = id;
+              setConflictData({
+                conflicts: result.conflicts || [],
+                suggestions: result.suggestions || [],
+              });
+              setShowConflictModal(true);
+              toast.warning(result.error || 'Intervalul ales intra in conflict.');
+            } else {
+              toast.error(result.error || 'Nu s-a putut muta programarea.');
+            }
+            return;
+          }
+
           actions.selectSlot({ start: new Date(startTime), end: new Date(endTime) });
           setEditInitialData((prev) =>
             prev

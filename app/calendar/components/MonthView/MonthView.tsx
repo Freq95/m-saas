@@ -4,6 +4,7 @@ import { format, isSameDay, isSameMonth } from 'date-fns';
 import { ro } from 'date-fns/locale';
 import styles from '../../page.module.css';
 import type { Appointment } from '../../hooks/useCalendar';
+import { getCategoryColor, getStatusConfig } from '@/lib/appointment-colors';
 
 interface MonthViewProps {
   monthDays: Date[];
@@ -22,7 +23,6 @@ export function MonthView({
   onDayClick,
   onAppointmentClick,
 }: MonthViewProps) {
-  const normalizeStatus = (status: string) => (status === 'no_show' ? 'no-show' : status);
   const getAppointmentsForDay = (day: Date) =>
     appointments.filter((apt) => isSameDay(new Date(apt.start_time), day));
 
@@ -66,27 +66,41 @@ export function MonthView({
               <div className={styles.monthDayNumber}>{format(day, 'd')}</div>
               <div className={styles.monthDayAppointments}>
                 {dayAppointments.slice(0, 3).map((apt) => {
-                  const normalizedStatus = normalizeStatus(apt.status);
+                  const statusCfg = getStatusConfig(apt.status);
+                  const categoryColor = getCategoryColor(apt.category);
+                  const isPast = new Date(apt.end_time).getTime() < Date.now();
                   return (
-                  <div
-                    key={apt.id}
-                    className={`${styles.monthAppointment} ${styles[normalizedStatus] ?? ''} ${new Date(apt.end_time).getTime() < Date.now() ? styles.isPast : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onAppointmentClick(apt);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
+                    <div
+                      key={apt.id}
+                      className={`${styles.monthAppointment} ${isPast ? styles.isPast : ''}`}
+                      style={{
+                        opacity: isPast ? Math.min(statusCfg.opacity, 0.55) : statusCfg.opacity,
+                        borderLeft: `3px solid ${categoryColor}`,
+                        background: `color-mix(in srgb, ${categoryColor} 12%, var(--color-surface))`,
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
                         onAppointmentClick(apt);
-                      }
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    title={`${apt.client_name} – ${apt.service_name}`}
-                  >
-                    {format(new Date(apt.start_time), 'HH:mm', { locale: ro })} {apt.client_name}
-                  </div>
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          onAppointmentClick(apt);
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      title={`${apt.client_name} – ${apt.service_name}`}
+                    >
+                      <span
+                        className={styles.monthApptDot}
+                        style={{ background: statusCfg.dot }}
+                        aria-label={statusCfg.label}
+                      />
+                      <span className={statusCfg.strikethrough ? styles.appointmentStrike : undefined}>
+                        {format(new Date(apt.start_time), 'HH:mm', { locale: ro })} {apt.client_name}
+                      </span>
+                    </div>
                   );
                 })}
                 {dayAppointments.length > 3 && (

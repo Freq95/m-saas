@@ -5,12 +5,7 @@ import { ro } from 'date-fns/locale';
 import { useRef } from 'react';
 import styles from '../../page.module.css';
 import type { Appointment } from '../../hooks/useCalendar';
-
-const STATUS_OPTIONS = [
-  { value: 'completed', label: 'Finalizat' },
-  { value: 'cancelled', label: 'Anulat' },
-  { value: 'no-show', label: 'Absent' },
-] as const;
+import { getStatusConfig, normalizeStatus } from '@/lib/appointment-colors';
 
 interface AppointmentPreviewModalProps {
   isOpen: boolean;
@@ -18,7 +13,6 @@ interface AppointmentPreviewModalProps {
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
-  onQuickStatusChange?: (status: string) => Promise<void> | void;
 }
 
 export function AppointmentPreviewModal({
@@ -27,26 +21,10 @@ export function AppointmentPreviewModal({
   onClose,
   onEdit,
   onDelete,
-  onQuickStatusChange,
 }: AppointmentPreviewModalProps) {
   const backdropPressStartedRef = useRef(false);
-  const status = appointment?.status === 'no_show' ? 'no-show' : appointment?.status;
-  const normalizedStatus =
-    status === 'completed'
-      ? 'statusFinalizat'
-      : status === 'cancelled'
-        ? 'statusAnulat'
-        : status === 'no-show'
-          ? 'statusAbsent'
-          : 'statusScheduled';
-  const statusLabel =
-    status === 'completed'
-      ? 'Finalizat'
-      : status === 'cancelled'
-        ? 'Anulat'
-        : status === 'no-show'
-          ? 'Absent'
-          : 'Programat';
+  const currentStatus = normalizeStatus(appointment?.status);
+  const statusCfg = getStatusConfig(currentStatus);
 
   const handleBackdropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     backdropPressStartedRef.current = event.target === event.currentTarget;
@@ -104,8 +82,13 @@ export function AppointmentPreviewModal({
             </div>
             <div className={styles.previewRow}>
               <span className={styles.previewLabel}>Status</span>
-              <span className={`${styles.previewStatusBadge} ${styles[normalizedStatus || 'scheduled']}`}>
-                {statusLabel}
+              <span className={styles.previewStatusBadge}>
+                <span
+                  className={styles.statusDot}
+                  style={{ background: statusCfg.dot }}
+                  aria-hidden="true"
+                />
+                {statusCfg.label}
               </span>
             </div>
             {appointment.notes && (
@@ -116,24 +99,6 @@ export function AppointmentPreviewModal({
             )}
           </div>
 
-          {onQuickStatusChange && (
-            <div className={styles.quickActionsSection}>
-              <p className={styles.quickActionsLabel}>Status</p>
-              <div className={styles.statusSegmentedControl}>
-                {STATUS_OPTIONS.map((statusOption) => (
-                  <button
-                    key={statusOption.value}
-                    type="button"
-                    data-status={statusOption.value}
-                    className={`${styles.statusSegmentButton} ${status !== 'scheduled' && status === statusOption.value ? styles.statusSegmentButtonActive : ''}`}
-                    onClick={() => onQuickStatusChange(statusOption.value)}
-                  >
-                    {statusOption.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         <div className={styles.previewActions}>

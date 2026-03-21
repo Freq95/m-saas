@@ -1,4 +1,4 @@
-import { useReducer, useCallback, useEffect } from 'react';
+import { useReducer, useCallback, useEffect, useMemo } from 'react';
 import { addWeeks, subWeeks, addMonths, subMonths, addDays, subDays } from 'date-fns';
 
 export type CalendarViewType = 'week' | 'workweek' | 'month' | 'day';
@@ -146,22 +146,44 @@ export function useCalendar(
     selectedSlot: null,
   });
 
-  const actions = {
-    setViewType: useCallback((view: CalendarViewType) => {
-      dispatch({ type: 'SET_VIEW_TYPE', payload: view });
-    }, []),
-    navigateToDate: useCallback((date: Date) => {
-      dispatch({ type: 'SET_CURRENT_DATE', payload: date });
-    }, []),
-    goToToday:      useCallback(() => dispatch({ type: 'GO_TO_TODAY' }), []),
-    nextPeriod:     useCallback(() => dispatch({ type: 'NEXT_PERIOD' }), []),
-    prevPeriod:     useCallback(() => dispatch({ type: 'PREV_PERIOD' }), []),
-    selectAppointment: useCallback((a: Appointment | null) => dispatch({ type: 'SET_SELECTED_APPOINTMENT', payload: a }), []),
-    selectSlot:     useCallback((s: { start: Date; end: Date } | null) => dispatch({ type: 'SET_SELECTED_SLOT', payload: s }), []),
-    selectProvider: useCallback((p: Provider | null) => dispatch({ type: 'SET_SELECTED_PROVIDER', payload: p }), []),
-    selectResource: useCallback((r: Resource | null) => dispatch({ type: 'SET_SELECTED_RESOURCE', payload: r }), []),
-    clearSelection: useCallback(() => dispatch({ type: 'CLEAR_SELECTION' }), []),
-  };
+  const setViewType = useCallback((view: CalendarViewType) => {
+    dispatch({ type: 'SET_VIEW_TYPE', payload: view });
+  }, []);
+  const navigateToDate = useCallback((date: Date) => {
+    dispatch({ type: 'SET_CURRENT_DATE', payload: date });
+  }, []);
+  const goToToday = useCallback(() => dispatch({ type: 'GO_TO_TODAY' }), []);
+  const nextPeriod = useCallback(() => dispatch({ type: 'NEXT_PERIOD' }), []);
+  const prevPeriod = useCallback(() => dispatch({ type: 'PREV_PERIOD' }), []);
+  const selectAppointment = useCallback((a: Appointment | null) => dispatch({ type: 'SET_SELECTED_APPOINTMENT', payload: a }), []);
+  const selectSlot = useCallback((s: { start: Date; end: Date } | null) => dispatch({ type: 'SET_SELECTED_SLOT', payload: s }), []);
+  const selectProvider = useCallback((p: Provider | null) => dispatch({ type: 'SET_SELECTED_PROVIDER', payload: p }), []);
+  const selectResource = useCallback((r: Resource | null) => dispatch({ type: 'SET_SELECTED_RESOURCE', payload: r }), []);
+  const clearSelection = useCallback(() => dispatch({ type: 'CLEAR_SELECTION' }), []);
+
+  const actions = useMemo(() => ({
+    setViewType,
+    navigateToDate,
+    goToToday,
+    nextPeriod,
+    prevPeriod,
+    selectAppointment,
+    selectSlot,
+    selectProvider,
+    selectResource,
+    clearSelection,
+  }), [
+    setViewType,
+    navigateToDate,
+    goToToday,
+    nextPeriod,
+    prevPeriod,
+    selectAppointment,
+    selectSlot,
+    selectProvider,
+    selectResource,
+    clearSelection,
+  ]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

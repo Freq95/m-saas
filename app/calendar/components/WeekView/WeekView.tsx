@@ -24,14 +24,15 @@ interface WeekViewProps {
   appointments: Appointment[];
   blockedTimes?: BlockedTime[];
   selectedDay?: Date | null;
-  onSlotClick: (day: Date, hour: number, minute?: 0 | 30) => void;
+  onSlotClick: (day: Date, hour: number, minute?: 0 | 15 | 30 | 45) => void;
   onDayHeaderClick?: (day: Date) => void;
   onAppointmentClick: (appointment: Appointment) => void;
   draggedAppointment?: Appointment | null;
   onDragStart?: (appointment: Appointment, day: Date) => void;
   onDragEnd?: () => void;
-  onDrop?: (day: Date, hour: number, minute?: 0 | 30) => void;
+  onDrop?: (day: Date, hour: number, minute?: 0 | 15 | 30 | 45) => void;
   enableDragDrop?: boolean;
+  hoveredAppointmentId?: number | null;
   providers?: Provider[];
 }
 
@@ -126,14 +127,16 @@ export function WeekView({
   onDragEnd,
   onDrop,
   enableDragDrop = false,
+  hoveredAppointmentId = null,
   providers = [],
 }: WeekViewProps) {
-  const SLOT_HEIGHT = 64;
-  const HALF_SLOT_HEIGHT = SLOT_HEIGHT / 2;
+  const SLOT_HEIGHT = 96;
   const columnHeightPx = hours.length * SLOT_HEIGHT;
-  const halfHourSlots = hours.flatMap((hour) => [
-    { hour, minute: 0 as const },
-    { hour, minute: 30 as const },
+  const quarterHourSlots = hours.flatMap((hour) => [
+    { hour, minute: 0 as 0 | 15 | 30 | 45 },
+    { hour, minute: 15 as 0 | 15 | 30 | 45 },
+    { hour, minute: 30 as 0 | 15 | 30 | 45 },
+    { hour, minute: 45 as 0 | 15 | 30 | 45 },
   ]);
   const CURRENT_TIME_EDGE_PADDING = 18;
   const gridTemplateColumns = `56px repeat(${weekDays.length}, minmax(0, 1fr))`;
@@ -142,7 +145,27 @@ export function WeekView({
   const [currentTimeTopPx, setCurrentTimeTopPx] = useState<number | null>(null);
   const [currentTimeLabel, setCurrentTimeLabel] = useState('');
   const weekBodyRef = useRef<HTMLDivElement>(null);
+  const headerRef = useRef<HTMLDivElement>(null);
+  const dragScrollRafRef = useRef<number | null>(null);
   const todayIsVisible = weekDays.some((day) => isToday(day));
+
+  const cancelDragScroll = () => {
+    if (dragScrollRafRef.current !== null) {
+      cancelAnimationFrame(dragScrollRafRef.current);
+      dragScrollRafRef.current = null;
+    }
+  };
+
+  const startDragScroll = (direction: 'up' | 'down', speed: number) => {
+    cancelDragScroll();
+    const tick = () => {
+      const el = weekBodyRef.current;
+      if (!el) return;
+      el.scrollTop += direction === 'down' ? speed : -speed;
+      dragScrollRafRef.current = requestAnimationFrame(tick);
+    };
+    dragScrollRafRef.current = requestAnimationFrame(tick);
+  };
 
   useEffect(() => {
     const compute = () => {
@@ -179,6 +202,28 @@ export function WeekView({
     el.scrollTo({ top: targetScroll, behavior: 'auto' });
   }, [todayIsVisible, currentTimeTopPx]);
 
+  // Compensate header width for the body's scrollbar so column lines align
+  useEffect(() => {
+    const syncGutter = () => {
+      const body = weekBodyRef.current;
+      const header = headerRef.current;
+      if (!body || !header) return;
+      const scrollbarWidth = body.offsetWidth - body.clientWidth;
+      header.style.paddingRight = `${scrollbarWidth}px`;
+    };
+    syncGutter();
+    window.addEventListener('resize', syncGutter);
+    return () => window.removeEventListener('resize', syncGutter);
+  }, []);
+
+  // Cancel auto-scroll when drag ends
+  useEffect(() => {
+    if (!draggedAppointment) {
+      cancelDragScroll();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draggedAppointment]);
+
   const getAppointmentsForDay = (day: Date) =>
     appointments.filter((apt) => isSameDay(new Date(apt.start_time), day));
 
@@ -192,7 +237,7 @@ export function WeekView({
 
   return (
     <div className={styles.weekGrid}>
-      <div className={styles.weekHeaderRow} style={{ gridTemplateColumns }}>
+      <div ref={headerRef} className={styles.weekHeaderRow} style={{ gridTemplateColumns }}>
         <div className={styles.weekCorner} />
         {weekDays.map((day) => {
           const todayFlag = isToday(day);
@@ -218,8 +263,8 @@ export function WeekView({
 
       <div className={styles.weekBody} ref={weekBodyRef} style={{ gridTemplateColumns }}>
         <div className={styles.timeGutter}>
-          {halfHourSlots.map(({ hour, minute }) => (
-            <div key={`${hour}:${minute}`} className={styles.timeSlot} style={{ height: `${HALF_SLOT_HEIGHT}px` }}>
+          {quarterHourSlots.map(({ hour, minute }) => (
+            <div key={`${hour}:${minute}`} className={styles.timeSlot} style={{ height: `${SLOT_HEIGHT / 4}px` }}>
               {minute === 0 ? `${String(hour).padStart(2, '0')}:00` : ''}
             </div>
           ))}
@@ -252,24 +297,44 @@ export function WeekView({
               className={`${styles.weekDayColumn}${todayFlag ? ` ${styles.isToday}` : ''}`}
               style={{ height: `${columnHeightPx}px` }}
             >
-              {halfHourSlots.map(({ hour, minute }) => {
+              {quarterHourSlots.map(({ hour, minute }) => {
                 const slotKey = `${day.toISOString()}-${hour}:${minute}`;
                 return (
                   <div
                     key={`${hour}:${minute}`}
                     className={`${styles.slot}${dragOverSlot === slotKey ? ` ${styles.dragOver}` : ''}`}
-                    style={{ height: `${HALF_SLOT_HEIGHT}px` }}
+                    style={{ height: `${SLOT_HEIGHT / 4}px` }}
                     onClick={() => onSlotClick(day, hour, minute)}
                     onDragOver={(e) => {
                       if (!enableDragDrop) return;
                       e.preventDefault();
                       e.dataTransfer.dropEffect = 'move';
                       setDragOverSlot(slotKey);
+
+                      // Auto-scroll when cursor is near top/bottom edge
+                      const container = weekBodyRef.current;
+                      if (container) {
+                        const rect = container.getBoundingClientRect();
+                        const ZONE = 80; // px from edge that triggers scroll
+                        const MAX_SPEED = 12;
+                        const y = e.clientY;
+                        if (y < rect.top + ZONE) {
+                          startDragScroll('up', Math.max(2, MAX_SPEED * (1 - (y - rect.top) / ZONE)));
+                        } else if (y > rect.bottom - ZONE) {
+                          startDragScroll('down', Math.max(2, MAX_SPEED * (1 - (rect.bottom - y) / ZONE)));
+                        } else {
+                          cancelDragScroll();
+                        }
+                      }
                     }}
-                    onDragLeave={() => enableDragDrop && setDragOverSlot(null)}
+                    onDragLeave={() => {
+                      if (!enableDragDrop) return;
+                      setDragOverSlot(null);
+                    }}
                     onDrop={(e) => {
                       if (!enableDragDrop || !onDrop) return;
                       e.preventDefault();
+                      cancelDragScroll();
                       setDragOverSlot(null);
                       onDrop(day, hour, minute);
                     }}
@@ -290,23 +355,30 @@ export function WeekView({
                 const aptStart = new Date(apt.start_time).getTime();
                 const aptEnd = new Date(apt.end_time).getTime();
                 const topPercent = ((aptStart - dayStart.getTime()) / dayDuration) * 100;
-                const heightPercent = ((aptEnd - aptStart) / dayDuration) * 100;
+                const naturalHeightPercent = ((aptEnd - aptStart) / dayDuration) * 100;
+                const halfSlotPercent = (SLOT_HEIGHT / 2 / columnHeightPx) * 100;
+                const isCompact = naturalHeightPercent < halfSlotPercent;
+                const finalHeightPercent = isCompact
+                  ? naturalHeightPercent
+                  : Math.max(naturalHeightPercent, halfSlotPercent);
 
                 return (
                   <AppointmentBlock
                     key={apt.id}
                     appointment={apt}
                     style={{
-                      top: `${topPercent}%`,
+                      top: `calc(${topPercent}% + 2px)`,
                       left: `${left}%`,
                       width: `${width}%`,
-                      height: `${Math.max(heightPercent, 3)}%`,
+                      height: `calc(${finalHeightPercent}% - 4px)`,
                     }}
+                    compact={isCompact}
                     onClick={onAppointmentClick}
                     enableDragDrop={enableDragDrop}
                     onDragStart={onDragStart ? (a) => onDragStart(a, day) : undefined}
                     onDragEnd={onDragEnd}
                     isDragging={draggedAppointment?.id === apt.id}
+                    isHighlighted={hoveredAppointmentId === apt.id}
                     providers={providers}
                   />
                 );
@@ -343,3 +415,4 @@ export function WeekView({
     </div>
   );
 }
+

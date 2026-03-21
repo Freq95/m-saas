@@ -19,6 +19,14 @@ import styles from '../../page.module.css';
 import { logger } from '@/lib/logger';
 import { useToast } from '@/lib/useToast';
 import { ToastContainer } from '@/components/Toast';
+import { validatePhoneInput } from '@/lib/phone-validation';
+import {
+  CATEGORY_CONFIG,
+  CATEGORY_KEYS,
+  STATUS_CONFIG,
+  getCategoryColor,
+  normalizeCategoryToKey,
+} from '@/lib/appointment-colors';
 
 interface Service {
   id: number;
@@ -26,14 +34,6 @@ interface Service {
   duration_minutes: number;
   price: number;
 }
-
-const CATEGORIES = [
-  { label: 'Consultatie', color: 'var(--color-accent)' },
-  { label: 'Tratament', color: 'var(--color-success)' },
-  { label: 'Control', color: 'var(--color-accent-strong)' },
-  { label: 'Urgenta', color: 'var(--color-danger)' },
-  { label: 'Altele', color: 'var(--color-text-soft)' },
-] as const;
 
 type AppointmentFormPayload = {
   clientName: string;
@@ -81,7 +81,6 @@ interface CreateAppointmentModalProps {
   initialData?: Partial<AppointmentFormPayload> | null;
   onModeChange?: (mode: 'create' | 'edit' | 'view') => void;
   appointmentStatus?: string;
-  onStatusChange?: (status: string) => Promise<void> | void;
   onDelete?: () => void;
 }
 
@@ -103,13 +102,6 @@ const DEFAULT_RECURRENCE: RecurrenceForm = {
 const MIN_DURATION_MINUTES = 15;
 const DEFAULT_DURATION_MINUTES = 30;
 const TIME_STEP_MINUTES = 15;
-const STATUS_OPTIONS = [
-  { value: 'completed', label: 'Finalizat' },
-  { value: 'cancelled', label: 'Anulat' },
-  { value: 'no-show', label: 'Absent' },
-] as const;
-const PHONE_REGEX = /^[\d\s\+\-\(\)]+$/;
-
 function parseTimeToMinutes(value: string): number | null {
   const [hour, minute] = value.split(':').map(Number);
   if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
@@ -136,21 +128,8 @@ function parseDateInput(value: string): Date | null {
 }
 
 function getStatusLabel(status: string): string {
-  if (status === 'scheduled') return 'Programat';
-  return STATUS_OPTIONS.find((item) => item.value === status)?.label || status;
-}
-
-function validatePhone(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return '';
-  if (!PHONE_REGEX.test(trimmed)) {
-    return 'Telefon invalid. Folositi doar cifre, spatii si +, -, (, )';
-  }
-  const digitCount = trimmed.replace(/\D/g, '').length;
-  if (digitCount < 7 || digitCount > 15) {
-    return 'Telefon invalid. Numarul trebuie sa aiba intre 7 si 15 cifre.';
-  }
-  return '';
+  if (status === 'scheduled') return STATUS_CONFIG.scheduled.label;
+  return STATUS_CONFIG[status as keyof typeof STATUS_CONFIG]?.label || status;
 }
 
 export function CreateAppointmentModal({
@@ -168,7 +147,6 @@ export function CreateAppointmentModal({
   initialData,
   onModeChange,
   appointmentStatus,
-  onStatusChange,
   onDelete,
 }: CreateAppointmentModalProps) {
   const toast = useToast();
@@ -392,7 +370,7 @@ export function CreateAppointmentModal({
     setShowNewClientConfirm(false);
     setPendingSubmitPayload(null);
     setPhoneError('');
-    setSelectedCategory(initialData?.category || '');
+    setSelectedCategory(normalizeCategoryToKey(initialData?.category) || '');
     setSelectedStatus(initialData?.status || appointmentStatus || 'scheduled');
     setIsRecurring(Boolean(initialData?.isRecurring) && allowRecurring);
     setRecurrence({
@@ -683,8 +661,6 @@ export function CreateAppointmentModal({
   const modalTitle =
     title || (mode === 'view' ? 'Detalii programare' : mode === 'edit' ? 'Editeaza programare' : 'Creeaza programare');
   const modalSubmitLabel = submitLabel || (mode === 'edit' ? 'Salveaza modificarile' : 'Salveaza');
-  const activeCategoryColor = CATEGORIES.find((c) => c.label === selectedCategory)?.color;
-
   const handleSubmit = async () => {
     if (isSubmitting) return;
     if (!formData.clientName.trim()) {
@@ -695,7 +671,7 @@ export function CreateAppointmentModal({
       toast.error('Selectati un serviciu.');
       return;
     }
-    const nextPhoneError = validatePhone(formData.clientPhone);
+    const nextPhoneError = validatePhoneInput(formData.clientPhone);
     if (nextPhoneError) {
       setPhoneError(nextPhoneError);
       return;
@@ -718,7 +694,7 @@ export function CreateAppointmentModal({
       endTime: selectedEndDateTime.toISOString(),
       durationMinutes,
       category: selectedCategory || undefined,
-      color: activeCategoryColor,
+      color: selectedCategory ? getCategoryColor(selectedCategory) : undefined,
       ...(mode !== 'create' ? { status: selectedStatus } : {}),
       isRecurring: allowRecurring ? isRecurring : false,
       ...(allowRecurring && isRecurring ? { recurrence } : {}),
@@ -1148,15 +1124,15 @@ export function CreateAppointmentModal({
                   onChange={(e) => {
                     const value = e.target.value;
                     setFormData({ ...formData, clientPhone: value });
-                    if (phoneError && !validatePhone(value)) {
+                    if (phoneError && !validatePhoneInput(value)) {
                       setPhoneError('');
                     }
                   }}
-                  onBlur={() => setPhoneError(validatePhone(formData.clientPhone))}
+                  onBlur={() => setPhoneError(validatePhoneInput(formData.clientPhone))}
                 />
-              )}
+            )}
             {phoneError && (
-              <div className={styles.clientSuggestionError}>{phoneError}</div>
+              <div className={styles.phoneValidationError}>{phoneError}</div>
             )}
           </div>
 
@@ -1170,9 +1146,9 @@ export function CreateAppointmentModal({
                     value={selectedStatus}
                     onChange={(e) => setSelectedStatus(e.target.value)}
                   >
-                    {STATUS_OPTIONS.map((statusOption) => (
-                      <option key={statusOption.value} value={statusOption.value}>
-                        {statusOption.label}
+                    {(Object.entries(STATUS_CONFIG) as [string, { label: string }][]).map(([value, cfg]) => (
+                      <option key={value} value={value}>
+                        {cfg.label}
                       </option>
                     ))}
                   </select>
@@ -1254,22 +1230,25 @@ export function CreateAppointmentModal({
           <div className={styles.modalField}>
             <label>Categorie</label>
             {isViewMode
-              ? renderReadOnlyValue(selectedCategory || 'Fara categorie', !selectedCategory)
+              ? renderReadOnlyValue(selectedCategory ? (CATEGORY_CONFIG[selectedCategory as keyof typeof CATEGORY_CONFIG]?.label ?? selectedCategory) : 'Fara categorie', !selectedCategory)
               : (
                 <div className={styles.categoryPicker}>
-                  {CATEGORIES.map((cat) => (
-                    <button
-                      key={cat.label}
-                      type="button"
-                      className={`${styles.categoryChip} ${selectedCategory === cat.label ? styles.categoryChipActive : ''}`}
-                      style={{ '--chip-color': cat.color } as React.CSSProperties}
-                      onClick={() => setSelectedCategory(selectedCategory === cat.label ? '' : cat.label)}
-                      title={cat.label}
-                    >
-                      <span className={styles.categoryDot} style={{ background: cat.color }} />
-                      {cat.label}
-                    </button>
-                  ))}
+                  {CATEGORY_KEYS.map((key) => {
+                    const cat = CATEGORY_CONFIG[key];
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        className={`${styles.categoryChip} ${selectedCategory === key ? styles.categoryChipActive : ''}`}
+                        style={{ '--chip-color': cat.color } as React.CSSProperties}
+                        onClick={() => setSelectedCategory(selectedCategory === key ? '' : key)}
+                        title={cat.label}
+                      >
+                        <span className={styles.categoryDot} style={{ background: cat.color }} />
+                        {cat.label}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
           </div>
@@ -1374,30 +1353,6 @@ export function CreateAppointmentModal({
           )}
         </div>
         </fieldset>
-
-        {mode === 'view' && onStatusChange && (
-          <div className={styles.modalFooterStack}>
-            <div className={styles.quickActionsSection}>
-              <p className={styles.quickActionsLabel}>Status</p>
-              <div className={styles.statusSegmentedControl}>
-                {STATUS_OPTIONS.map((statusOption) => (
-                  <button
-                    key={statusOption.value}
-                    type="button"
-                    data-status={statusOption.value}
-                    className={`${styles.statusSegmentButton} ${selectedStatus !== 'scheduled' && selectedStatus === statusOption.value ? styles.statusSegmentButtonActive : ''}`}
-                    onClick={async () => {
-                      if (selectedStatus === statusOption.value) return;
-                      await onStatusChange(statusOption.value);
-                    }}
-                  >
-                    {statusOption.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
 
         {mode !== 'view' && (
           <div className={styles.modalActions}>

@@ -1,6 +1,7 @@
 .container {
-  height: 100vh;
-  max-height: 100vh;
+  height: calc(100vh - var(--app-nav-offset, 72px));
+  max-height: calc(100vh - var(--app-nav-offset, 72px));
+  min-height: 0;
   background: transparent;
   display: flex;
   flex-direction: column;
@@ -201,6 +202,69 @@
   margin-top: 0.35rem;
   color: var(--color-text-soft);
   font-size: 0.74rem;
+}
+
+.syncLogPanel {
+  margin-top: 0.45rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: rgba(77, 163, 255, 0.06);
+  overflow: hidden;
+}
+
+.syncLogHeader {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-soft);
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.syncLogList {
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.syncLogItem {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+  padding: 0.36rem 0.5rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.syncLogItem:last-child {
+  border-bottom: none;
+}
+
+.syncLogTime {
+  color: var(--color-text-soft);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.syncLogMessage {
+  color: var(--color-text);
+  min-width: 0;
+  word-break: break-word;
+}
+
+.syncLogInfo .syncLogMessage {
+  color: var(--color-text-soft);
+}
+
+.syncLogSuccess .syncLogMessage {
+  color: #22c55e;
+}
+
+.syncLogWarning .syncLogMessage {
+  color: #f59e0b;
+}
+
+.syncLogError .syncLogMessage {
+  color: #f87171;
 }
 
 .emptyConversations {
@@ -825,3 +889,117 @@
   font-size: 0.9rem;
 }
 
+@media (max-width: 767px) {
+  .container {
+    height: calc(100dvh - var(--app-nav-offset, 72px));
+    max-height: calc(100dvh - var(--app-nav-offset, 72px));
+  }
+
+  .inbox {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .divider {
+    display: none;
+  }
+
+  .conversationList {
+    width: 100% !important;
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    transform: translateX(0);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    border-right: none;
+  }
+
+  .conversationListHidden {
+    transform: translateX(-100%);
+    pointer-events: none;
+    visibility: hidden;
+  }
+
+  .thread {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    transform: translateX(100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .threadVisible {
+    transform: translateX(0);
+  }
+
+  /* Thread header: stack top row + actions vertically on mobile */
+  .threadHeader {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+    padding: 0.6rem 0.75rem;
+  }
+
+  .threadHeaderTop {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  .threadContact {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .threadContact h3 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .threadHeaderActions {
+    display: flex;
+    gap: 0.5rem;
+    padding-top: 0.35rem;
+    border-top: 1px solid var(--color-border);
+  }
+
+  .threadHeaderActions .readToggleButton {
+    flex: 1;
+    text-align: center;
+    font-size: 0.8125rem;
+    padding: 0.4rem 0.5rem;
+  }
+
+  .threadMeta {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.8rem;
+  }
+
+  .mobileBackButton {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    background: none;
+    border: none;
+    color: var(--color-accent);
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 0.25rem 0.5rem 0.25rem 0;
+    flex-shrink: 0;
+  }
+
+  .messageBubble {
+    max-width: 82%;
+  }
+}
+
+@media (min-width: 768px) {
+  .mobileBackButton {
+    display: none;
+  }
+}

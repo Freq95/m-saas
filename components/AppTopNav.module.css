@@ -67,16 +67,19 @@
     align-items: flex-start;
     gap: var(--space-3);
     padding: var(--space-4);
+    background: rgba(6, 10, 18, 0.96);
   }
 
   .links {
     width: 100%;
-    overflow-x: auto;
-    padding-bottom: 0.2rem;
+    overflow: visible;
+    flex-wrap: wrap;
+    row-gap: 0.45rem;
+    padding-bottom: 0;
     gap: var(--space-4);
   }
 
   .indicator {
-    bottom: -0.45rem;
+    display: none;
   }
 }

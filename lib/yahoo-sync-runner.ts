@@ -18,6 +18,10 @@ export type YahooSyncRunResult = {
   synced: number;
   skipped: number;
   errors: number;
+  attachmentFailures: number;
+  attachmentMissingContent: number;
+  attachmentUploadFailures: number;
+  attachmentFailureSamples: string[];
   tagged: number;
   aiTaggingEnabled: boolean;
   markAsReadEnabled: boolean;
@@ -172,8 +176,19 @@ async function runYahooSyncCore(
   let syncedCount = 0;
   let skippedCount = 0;
   let errorCount = 0;
+  let attachmentFailures = 0;
+  let attachmentMissingContent = 0;
+  let attachmentUploadFailures = 0;
+  const attachmentFailureSamples: string[] = [];
   let taggedCount = 0;
   let maxFetchedUid = typeof lastSyncedUid === 'number' ? lastSyncedUid : 0;
+
+  const addAttachmentFailureSample = (filename: string) => {
+    if (!filename) return;
+    if (attachmentFailureSamples.includes(filename)) return;
+    if (attachmentFailureSamples.length >= 5) return;
+    attachmentFailureSamples.push(filename);
+  };
 
   let tagsByName: Map<string, any> | null = null;
   if (enableAiTagging) {
@@ -251,6 +266,9 @@ async function runYahooSyncCore(
         for (const att of email.attachments || []) {
           const originalFilename = att.filename || 'attachment';
           if (!att.content || !(att.content instanceof Buffer)) {
+            attachmentFailures += 1;
+            attachmentMissingContent += 1;
+            addAttachmentFailureSample(originalFilename);
             persistedAttachments.push({
               filename: originalFilename,
               contentType: att.contentType,
@@ -296,6 +314,9 @@ async function runYahooSyncCore(
               persisted: true,
             });
           } catch (attachmentError) {
+            attachmentFailures += 1;
+            attachmentUploadFailures += 1;
+            addAttachmentFailureSample(originalFilename);
             logger.warn('Yahoo sync: Failed to persist attachment', {
               conversationId,
               filename: originalFilename,
@@ -418,6 +439,10 @@ async function runYahooSyncCore(
     synced: syncedCount,
     skipped: skippedCount,
     errors: errorCount,
+    attachmentFailures,
+    attachmentMissingContent,
+    attachmentUploadFailures,
+    attachmentFailureSamples,
     tagged: taggedCount,
     aiTaggingEnabled: enableAiTagging,
     markAsReadEnabled: markAsRead,

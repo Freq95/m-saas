@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { getInviteFailureMessage } from '@/lib/admin/invite-message';
 
 type TenantDetailClientProps = {
   tenant: any;
@@ -40,12 +41,6 @@ export default function TenantDetailClient({
     }
     return null;
   }, [atLimit, maxSeats, seatUsage]);
-
-  function getInviteFailureMessage(reason: string | undefined, fallback: string): string {
-    if (reason === 'not_configured') return `${fallback} Email service is not configured.`;
-    if (reason === 'provider_error') return `${fallback} Email provider rejected the send. Check RESEND_API_KEY and EMAIL_FROM domain verification.`;
-    return `${fallback} Reason: ${reason || 'unknown'}.`;
-  }
 
   function buildInviteUrl(token: string): string {
     if (typeof window === 'undefined') return `/invite/${token}`;

@@ -44,9 +44,10 @@ export default function AppTopNav({
   navClassName,
   logoClassName,
   navLinksClassName,
-  logoText = 'OpsGenie',
+  logoText = 'densa',
 }: AppTopNavProps) {
   const pathname = usePathname();
+  const navRef = useRef<HTMLElement | null>(null);
   const activeSection = section ?? detectSection(pathname);
   const linksRef = useRef<HTMLDivElement | null>(null);
   const [indicator, setIndicator] = useState<IndicatorState>({ x: 0, width: 0, visible: false });
@@ -55,6 +56,34 @@ export default function AppTopNav({
     const match = NAV_ITEMS.find((item) => item.key === activeSection);
     return match?.href ?? null;
   }, [activeSection]);
+
+  useEffect(() => {
+    const navElement = navRef.current;
+    if (!navElement || typeof window === 'undefined') {
+      return;
+    }
+
+    const updateNavOffset = () => {
+      const height = Math.ceil(navElement.getBoundingClientRect().height);
+      document.documentElement.style.setProperty('--app-nav-offset', `${height}px`);
+    };
+
+    updateNavOffset();
+    window.addEventListener('resize', updateNavOffset);
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => updateNavOffset());
+      resizeObserver.observe(navElement);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateNavOffset);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+    };
+  }, [pathname]);
 
   useEffect(() => {
     const updateIndicator = () => {
@@ -85,7 +114,7 @@ export default function AppTopNav({
   }, [activeHref, pathname]);
 
   return (
-    <nav className={navClassName || styles.nav}>
+    <nav ref={navRef} className={navClassName || styles.nav}>
       <Link href="/" prefetch>
         <h1 className={logoClassName || styles.logo}>{logoText}</h1>
       </Link>
