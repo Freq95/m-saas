@@ -13,12 +13,17 @@ async function createTenantIndexes() {
   await db.collection('clients').createIndex({ tenant_id: 1, email: 1 });
   await db.collection('clients').createIndex({ tenant_id: 1, name: 1 });
   await db.collection('clients').createIndex({ tenant_id: 1, created_at: -1 });
+  await db.collection('clients').createIndex({ tenant_id: 1, user_id: 1, deleted_at: 1 });
 
   await db.collection('conversations').createIndex({ tenant_id: 1, updated_at: -1 });
   await db.collection('conversations').createIndex({ tenant_id: 1, channel: 1 });
   await db.collection('conversations').createIndex({ tenant_id: 1, user_id: 1, created_at: -1 });
+  await db.collection('conversations').createIndex({ tenant_id: 1, client_id: 1 });
 
   await db.collection('messages').createIndex({ tenant_id: 1, conversation_id: 1, created_at: -1 });
+
+  await db.collection('message_attachments').createIndex({ tenant_id: 1, conversation_id: 1 });
+  await db.collection('conversation_tags').createIndex({ conversation_id: 1 });
 
   await db.collection('services').createIndex({ tenant_id: 1, is_active: 1 });
   await db.collection('tasks').createIndex({ tenant_id: 1, status: 1, due_date: 1 });

@@ -62,13 +62,12 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     const conversationIds = conversations.map((conv: any) => conv.id);
     const messageCounts = new Map<number, number>();
     if (conversationIds.length > 0) {
-      const messages = await db
-        .collection('messages')
-        .find({ conversation_id: { $in: conversationIds }, tenant_id: tenantId })
-        .toArray();
-      for (const message of messages) {
-        const count = messageCounts.get(message.conversation_id) || 0;
-        messageCounts.set(message.conversation_id, count + 1);
+      const messageAgg = await db.collection('messages').aggregate([
+        { $match: { conversation_id: { $in: conversationIds }, tenant_id: tenantId } },
+        { $group: { _id: '$conversation_id', count: { $sum: 1 } } },
+      ]).toArray();
+      for (const row of messageAgg) {
+        messageCounts.set(row._id, row.count);
       }
     }
 

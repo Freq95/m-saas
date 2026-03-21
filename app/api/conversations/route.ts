@@ -6,6 +6,8 @@ import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { getConversationsData } from '@/lib/server/inbox';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
+import { getCached, invalidateCache } from '@/lib/redis';
+import { conversationsCacheKey } from '@/lib/cache-keys';
 
 // GET /api/conversations - Get all conversations from storage
 export async function GET(request: NextRequest) {
@@ -22,7 +24,16 @@ export async function GET(request: NextRequest) {
     }
 
     const { search } = validationResult.data;
-    const conversations = await getConversationsData({ userId, tenantId, search });
+
+    let conversations;
+    if (search) {
+      conversations = await getConversationsData({ userId, tenantId, search });
+    } else {
+      const cacheKey = conversationsCacheKey({ tenantId, userId });
+      conversations = await getCached(cacheKey, 60, () =>
+        getConversationsData({ userId, tenantId, search })
+      );
+    }
 
     return createSuccessResponse({ conversations });
   } catch (error) {
@@ -72,6 +83,7 @@ export async function POST(request: NextRequest) {
     };
 
     await db.collection('conversations').insertOne(conversationDoc);
+    await invalidateCache(conversationsCacheKey({ tenantId, userId }));
     const conversation = stripMongoId(conversationDoc);
 
     // Add initial message if provided

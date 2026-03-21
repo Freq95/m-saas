@@ -74,6 +74,10 @@ export function dashboardCacheKey(scope: Scope, days: number): string {
   return `${scopePrefix(scope)}:dashboard:days=${days}`;
 }
 
+export function conversationsCacheKey(scope: Scope): string {
+  return `${scopePrefix(scope)}:conversations:list`;
+}
+
 export async function invalidateReadCaches(scope: Scope): Promise<number> {
   const base = scopePrefix(scope);
   const patterns = [

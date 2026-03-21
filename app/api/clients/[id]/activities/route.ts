@@ -54,18 +54,22 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       const latestMessage = new Map<number, any>();
 
       if (conversationIds.length > 0) {
-        const messages = await db
-          .collection('messages')
-          .find({ conversation_id: { $in: conversationIds }, tenant_id: tenantId })
-          .sort({ created_at: -1 })
-          .toArray();
+        const messageAgg = await db.collection('messages').aggregate([
+          { $match: { conversation_id: { $in: conversationIds }, tenant_id: tenantId } },
+          { $sort: { created_at: -1 } },
+          {
+            $group: {
+              _id: '$conversation_id',
+              count: { $sum: 1 },
+              latest_content: { $first: '$content' },
+              latest_created_at: { $first: '$created_at' },
+            },
+          },
+        ]).toArray();
 
-        for (const message of messages) {
-          const currentCount = messageCounts.get(message.conversation_id) || 0;
-          messageCounts.set(message.conversation_id, currentCount + 1);
-          if (!latestMessage.has(message.conversation_id)) {
-            latestMessage.set(message.conversation_id, message);
-          }
+        for (const row of messageAgg) {
+          messageCounts.set(row._id, row.count);
+          latestMessage.set(row._id, { content: row.latest_content, created_at: row.latest_created_at });
         }
       }
 

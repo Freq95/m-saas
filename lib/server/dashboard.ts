@@ -242,6 +242,7 @@ export async function getDashboardData(
             event_at: { $gte: startIso, $lte: endIso },
           },
         },
+        { $limit: 10000 },
         {
           $group: {
             _id: { $substrBytes: ['$event_at', 0, 10] },
