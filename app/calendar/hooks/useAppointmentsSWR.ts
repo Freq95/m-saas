@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import type { Appointment, CalendarViewType } from './useCalendar';
 import { logger } from '@/lib/logger';
 import { parseSessionUserId } from './sessionUser';
+import { authFetcher } from '@/lib/fetcher';
 
 interface UseAppointmentsOptions {
   currentDate: Date;
@@ -70,11 +71,7 @@ interface UpdateAppointmentResult {
 
 // SWR fetcher function
 const fetcher = async (url: string) => {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error('Failed to fetch appointments');
-  }
-  const result = await response.json();
+  const result = await authFetcher<{ appointments?: Appointment[] }>(url);
   return result.appointments || [];
 };
 

@@ -1,4 +1,8 @@
-export default function AdminDocsPage() {
+import { redirect } from 'next/navigation';
+import { getSuperAdmin } from '@/lib/auth-helpers';
+
+export default async function AdminDocsPage() {
+  try { await getSuperAdmin(); } catch { redirect('/login'); }
   const transitionRows = [
     {
       entity: 'tenant',

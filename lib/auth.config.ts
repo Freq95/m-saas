@@ -10,6 +10,14 @@ export const authConfig: NextAuthConfig = {
   },
   providers: [],
   callbacks: {
+    authorized({ auth, request }) {
+      const isLoggedIn = !!auth?.user;
+      const isProtected = request.nextUrl.pathname !== '/login';
+      if (isProtected && !isLoggedIn) {
+        return Response.redirect(new URL('/login', request.nextUrl.origin));
+      }
+      return true;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.userId = String(user.id || '');

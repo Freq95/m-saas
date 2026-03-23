@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import useSWR from 'swr';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { authFetcher } from '@/lib/fetcher';
 import { format } from 'date-fns';
 import { ro } from 'date-fns/locale';
 import styles from './page.module.css';
@@ -48,13 +49,7 @@ interface DashboardData {
   };
 }
 
-const fetchDashboard = async (url: string): Promise<DashboardData> => {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error('Failed to fetch dashboard');
-  }
-  return response.json();
-};
+const fetchDashboard = (url: string) => authFetcher<DashboardData>(url);
 
 const EMPTY_DASHBOARD: DashboardData = {
   messagesPerDay: [],

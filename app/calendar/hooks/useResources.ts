@@ -33,6 +33,10 @@ export function useResources(userId?: number): UseResourcesResult {
         setError(null);
         const response = await fetch(`/api/resources?userId=${effectiveUserId}`, { signal: controller.signal });
 
+        if (response.status === 401 || response.status === 403) {
+          window.location.href = '/login';
+          return;
+        }
         if (!response.ok) {
           if (!controller.signal.aborted) {
             setResources([]);

@@ -1,6 +1,7 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { ObjectId } from 'mongodb';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
+import { getSuperAdmin } from '@/lib/auth-helpers';
 import TenantDetailClient from './TenantDetailClient';
 
 type TenantDetailPageProps = {
@@ -9,6 +10,7 @@ type TenantDetailPageProps = {
 };
 
 export default async function TenantDetailPage({ params, searchParams }: TenantDetailPageProps) {
+  try { await getSuperAdmin(); } catch { redirect('/login'); }
   const { id } = await params;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const initialInviteToken = typeof resolvedSearchParams?.inviteToken === 'string' ? resolvedSearchParams.inviteToken : null;

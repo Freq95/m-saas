@@ -1,7 +1,10 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
+import { getSuperAdmin } from '@/lib/auth-helpers';
 
 export default async function AdminDashboardPage() {
+  try { await getSuperAdmin(); } catch { redirect('/login'); }
   const db = await getMongoDbOrThrow();
   const [totalTenants, totalUsers, activeUsers, pendingInvites, plans, recentTenants] = await Promise.all([
     db.collection('tenants').countDocuments({}),

@@ -1,16 +1,19 @@
 import EmailSettingsPageClient from './EmailSettingsPageClient';
 import { redirect } from 'next/navigation';
+import { getAuthUser } from '@/lib/auth-helpers';
 import { getUserEmailIntegrations } from '@/lib/email-integrations';
-import { auth } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export default async function EmailSettingsPage() {
-  const session = await auth();
-  if (!session?.user?.id) redirect('/login');
-  const userId = Number.parseInt(session.user.id, 10);
-  if (!Number.isFinite(userId) || userId <= 0) redirect('/login');
-  const integrations = await getUserEmailIntegrations(userId);
+  let auth;
+  try {
+    auth = await getAuthUser();
+  } catch {
+    redirect('/login');
+  }
 
-  return <EmailSettingsPageClient initialIntegrations={integrations} initialUserId={userId} />;
+  const integrations = await getUserEmailIntegrations(auth.userId);
+
+  return <EmailSettingsPageClient initialIntegrations={integrations} initialUserId={auth.userId} />;
 }

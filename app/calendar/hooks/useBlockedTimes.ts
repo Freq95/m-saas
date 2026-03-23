@@ -57,6 +57,10 @@ export function useBlockedTimes(
 
         const response = await fetch(`/api/blocked-times?${params}`, { signal: controller.signal });
 
+        if (response.status === 401 || response.status === 403) {
+          window.location.href = '/login';
+          return;
+        }
         if (!response.ok) {
           if (!controller.signal.aborted) {
             setBlockedTimes([]);

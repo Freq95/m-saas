@@ -33,6 +33,10 @@ export function useProviders(userId?: number): UseProvidersResult {
         setError(null);
         const response = await fetch(`/api/providers?userId=${effectiveUserId}`, { signal: controller.signal });
 
+        if (response.status === 401 || response.status === 403) {
+          window.location.href = '/login';
+          return;
+        }
         if (!response.ok) {
           if (!controller.signal.aborted) {
             setProviders([]);

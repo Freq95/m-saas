@@ -1,5 +1,7 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
+import { getSuperAdmin } from '@/lib/auth-helpers';
 
 type TenantsPageProps = {
   searchParams?: Promise<{
@@ -10,6 +12,7 @@ type TenantsPageProps = {
 };
 
 export default async function AdminTenantsPage({ searchParams }: TenantsPageProps) {
+  try { await getSuperAdmin(); } catch { redirect('/login'); }
   const db = await getMongoDbOrThrow();
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const search = resolvedSearchParams?.search?.trim();

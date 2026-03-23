@@ -1,6 +1,7 @@
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { ObjectId } from 'mongodb';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
+import { getSuperAdmin } from '@/lib/auth-helpers';
 import UserDetailClient from './UserDetailClient';
 
 type UserDetailPageProps = {
@@ -8,6 +9,7 @@ type UserDetailPageProps = {
 };
 
 export default async function UserDetailPage({ params }: UserDetailPageProps) {
+  try { await getSuperAdmin(); } catch { redirect('/login'); }
   const { id } = await params;
   if (!ObjectId.isValid(id)) notFound();
   const userId = new ObjectId(id);
