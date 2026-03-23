@@ -195,6 +195,10 @@ export function useAppointmentsSWR({
           }),
         });
 
+        if (response.status === 401 || response.status === 403) {
+          window.location.href = '/login';
+          return { ok: false, error: 'Sesiune expirata.' };
+        }
         if (!response.ok) {
           const errorData = await response.json();
           const isAvailabilityError =
@@ -252,6 +256,11 @@ export function useAppointmentsSWR({
         });
 
         let errorData: any = null;
+        if (response.status === 401 || response.status === 403) {
+          if (snapshot) mutate(snapshot, { revalidate: false });
+          window.location.href = '/login';
+          return { ok: false, status: response.status, error: 'Sesiune expirata.' };
+        }
         if (!response.ok) {
           try {
             errorData = await response.json();
@@ -326,6 +335,11 @@ export function useAppointmentsSWR({
           method: 'DELETE',
         });
 
+        if (response.status === 401 || response.status === 403) {
+          mutate(snapshot, { revalidate: false });
+          window.location.href = '/login';
+          return false;
+        }
         if (!response.ok) {
           const errorData = await response.json();
           mutate(snapshot, { revalidate: false });

@@ -1,23 +1,13 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { getAuthUser } from '@/lib/auth-helpers';
+import { getSuperAdmin } from '@/lib/auth-helpers';
 import AdminSignOutButton from '@/components/AdminSignOutButton';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  let auth;
   try {
-    auth = await getAuthUser();
+    await getSuperAdmin();
   } catch {
     redirect('/login');
-  }
-
-  if (auth.role !== 'super_admin') {
-    return (
-      <div style={{ padding: 24 }}>
-        <h1>403</h1>
-        <p>Super-admin access required.</p>
-      </div>
-    );
   }
 
   return (
