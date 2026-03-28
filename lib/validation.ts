@@ -147,7 +147,6 @@ export const updateServiceSchema = z.object({
 export const yahooSyncSchema = z.object({
   todayOnly: z.boolean().optional().default(false),
   since: dateTimeSchema.optional(),
-  enableAiTagging: z.boolean().optional().default(false),
   markAsRead: z.boolean().optional().default(false),
 });
 

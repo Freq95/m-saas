@@ -42,7 +42,6 @@ export async function POST(request: NextRequest) {
       syncYahooInboxForIntegration(
         integrationId,
         {
-          enableAiTagging: false,
           markAsRead: false,
         },
         tenantId

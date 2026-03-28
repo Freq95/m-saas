@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server';
 import crypto from 'crypto';
 import { getMongoDbOrThrow, getNextNumericId } from '@/lib/db/mongo-utils';
-import { suggestTags } from '@/lib/ai-agent';
 import { linkConversationToClient } from '@/lib/client-matching';
 import { handleApiError, createErrorResponse, createSuccessResponse } from '@/lib/error-handler';
 
@@ -118,31 +117,6 @@ export async function POST(request: NextRequest) {
       created_at: now,
     });
 
-    // Auto-tag
-    const suggestedTags = await suggestTags(content);
-    if (suggestedTags.length > 0) {
-      const allTags = await db.collection('tags').find({ tenant_id: tenantId }).toArray();
-      const tagsByName = new Map<string, any>();
-      for (const tag of allTags) {
-        if (typeof tag.name === 'string') {
-          tagsByName.set(tag.name.toLowerCase(), tag);
-        }
-      }
-
-      const newConvTags = suggestedTags
-        .map((tagName) => tagsByName.get(tagName.toLowerCase()))
-        .filter(Boolean)
-        .map((tag: any) => ({
-          _id: `${conversationId}:${tag.id}`,
-          conversation_id: conversationId,
-          tenant_id: tenantId,
-          tag_id: tag.id,
-        }));
-
-      if (newConvTags.length > 0) {
-        await db.collection('conversation_tags').insertMany(newConvTags, { ordered: false });
-      }
-    }
     return createSuccessResponse({ success: true, conversationId });
   } catch (error) {
     return handleApiError(error, 'Failed to process email webhook');

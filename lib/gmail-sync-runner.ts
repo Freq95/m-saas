@@ -5,7 +5,6 @@ import { fetchGmailMessages, getValidAccessToken } from '@/lib/gmail';
 import { logger } from '@/lib/logger';
 
 export type GmailSyncOptions = {
-  enableAiTagging?: boolean;
   markAsRead?: boolean;
 };
 

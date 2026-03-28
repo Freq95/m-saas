@@ -1,7 +1,6 @@
 import { ObjectId } from 'mongodb';
 import { getMongoDbOrThrow, getNextNumericId } from '@/lib/db/mongo-utils';
 import { fetchYahooEmails, getYahooConfig, markEmailAsRead } from '@/lib/yahoo-mail';
-import { suggestTags } from '@/lib/ai-agent';
 import { getStorageProvider } from '@/lib/storage';
 import { decrypt } from '@/lib/encryption';
 import { logger } from '@/lib/logger';
@@ -9,7 +8,6 @@ import { logger } from '@/lib/logger';
 export type YahooSyncOptions = {
   todayOnly?: boolean;
   since?: string | Date;
-  enableAiTagging?: boolean;
   markAsRead?: boolean;
 };
 
@@ -22,8 +20,6 @@ export type YahooSyncRunResult = {
   attachmentMissingContent: number;
   attachmentUploadFailures: number;
   attachmentFailureSamples: string[];
-  tagged: number;
-  aiTaggingEnabled: boolean;
   markAsReadEnabled: boolean;
   sinceUid: number | null;
   maxFetchedUid: number | null;
@@ -142,7 +138,6 @@ async function runYahooSyncCore(
   const db = await getMongoDbOrThrow();
   const storage = getStorageProvider();
   const todayOnly = Boolean(options.todayOnly);
-  const enableAiTagging = Boolean(options.enableAiTagging);
   const markAsRead = Boolean(options.markAsRead);
 
   let since: Date | undefined;
@@ -180,7 +175,6 @@ async function runYahooSyncCore(
   let attachmentMissingContent = 0;
   let attachmentUploadFailures = 0;
   const attachmentFailureSamples: string[] = [];
-  let taggedCount = 0;
   let maxFetchedUid = typeof lastSyncedUid === 'number' ? lastSyncedUid : 0;
 
   const addAttachmentFailureSample = (filename: string) => {
@@ -189,17 +183,6 @@ async function runYahooSyncCore(
     if (attachmentFailureSamples.length >= 5) return;
     attachmentFailureSamples.push(filename);
   };
-
-  let tagsByName: Map<string, any> | null = null;
-  if (enableAiTagging) {
-    const allTags = await db.collection('tags').find({ tenant_id: tenantId }).toArray();
-    tagsByName = new Map<string, any>();
-    for (const tag of allTags) {
-      if (typeof tag.name === 'string') {
-        tagsByName.set(tag.name.toLowerCase(), tag);
-      }
-    }
-  }
 
   for (const email of emails) {
     try {
@@ -370,26 +353,6 @@ async function runYahooSyncCore(
           }
         }
 
-        if (enableAiTagging && tagsByName) {
-          const suggestedTags = await suggestTags(email.text);
-          if (suggestedTags.length > 0) {
-            const newConvTags = suggestedTags
-              .map((tagName) => tagsByName?.get(tagName.toLowerCase()))
-              .filter(Boolean)
-              .map((tag: any) => ({
-                _id: `${conversationId}:${tag.id}`,
-                conversation_id: conversationId,
-                tenant_id: tenantId,
-                tag_id: tag.id,
-              }));
-
-            if (newConvTags.length > 0) {
-              await db.collection('conversation_tags').insertMany(newConvTags, { ordered: false });
-              taggedCount += newConvTags.length;
-            }
-          }
-        }
-
         if (markAsRead && email.uid) {
           try {
             await markEmailAsRead(config, email.uid);
@@ -443,8 +406,6 @@ async function runYahooSyncCore(
     attachmentMissingContent,
     attachmentUploadFailures,
     attachmentFailureSamples,
-    tagged: taggedCount,
-    aiTaggingEnabled: enableAiTagging,
     markAsReadEnabled: markAsRead,
     sinceUid: lastSyncedUid ?? null,
     maxFetchedUid: maxFetchedUid || null,

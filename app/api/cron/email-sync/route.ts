@@ -110,7 +110,6 @@ export async function POST(request: NextRequest) {
             await syncYahooInboxForIntegration(
               integrationId,
               {
-                enableAiTagging: false,
                 markAsRead: false,
               },
               tenantId ? new ObjectId(tenantId) : undefined

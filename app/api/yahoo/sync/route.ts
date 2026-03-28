@@ -21,12 +21,11 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Invalid input', 400, JSON.stringify(validationResult.error.errors));
     }
 
-    const { todayOnly, since, enableAiTagging, markAsRead } = validationResult.data;
+    const { todayOnly, since, markAsRead } = validationResult.data;
 
     const result = await syncYahooInboxForUser(userId, tenantId, {
       todayOnly,
       since,
-      enableAiTagging,
       markAsRead,
     });
 
