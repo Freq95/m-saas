@@ -4,11 +4,12 @@ import { getDashboardData } from '@/lib/server/dashboard';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { getCached } from '@/lib/redis';
 import { dashboardCacheKey } from '@/lib/cache-keys';
+import { logDataAccess } from '@/lib/audit';
 
 // GET /api/dashboard - Get dashboard statistics
 export async function GET(request: NextRequest) {
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const { userId, dbUserId, tenantId, email, role } = await getAuthUser();
     const searchParams = request.nextUrl.searchParams;
     
     // Validate query parameters
@@ -28,6 +29,20 @@ export async function GET(request: NextRequest) {
     const data = await getCached(cacheKey, 900, async () =>
       getDashboardData(userId, tenantId, numericDays)
     );
+
+    await logDataAccess({
+      actorUserId: dbUserId,
+      actorEmail: email,
+      actorRole: role,
+      tenantId,
+      targetType: 'dashboard',
+      targetId: userId,
+      route: '/api/dashboard',
+      request,
+      metadata: {
+        days: numericDays,
+      },
+    });
     return createSuccessResponse(data);
   } catch (error) {
     return handleApiError(error, 'Failed to fetch dashboard data');

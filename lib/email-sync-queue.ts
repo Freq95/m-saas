@@ -1,4 +1,9 @@
-import { Client } from '@upstash/qstash';
+// QStash (Upstash) is not configured. Sync jobs return { queued: false } immediately.
+// Callers already handle this gracefully with an inline synchronous fallback.
+// To enable: set QSTASH_TOKEN and APP_BASE_URL in environment variables,
+// then restore the Client import and enqueue logic below.
+
+// import { Client } from '@upstash/qstash';
 
 export function getAppBaseUrl(): string {
   const baseUrl = process.env.NEXTAUTH_URL || process.env.APP_BASE_URL;
@@ -9,57 +14,15 @@ export function getAppBaseUrl(): string {
 }
 
 export async function enqueueYahooSyncJob(
-  integrationId: number,
-  tenantId?: string
+  _integrationId: number,
+  _tenantId?: string
 ): Promise<{ queued: boolean; messageId?: string }> {
-  const token = process.env.QSTASH_TOKEN;
-  if (!token) {
-    return { queued: false };
-  }
-
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) {
-    throw new Error('CRON_SECRET is required when QSTASH_TOKEN is configured.');
-  }
-
-  const client = new Client({ token });
-  const baseUrl = getAppBaseUrl();
-  const result = await client.publishJSON({
-    url: `${baseUrl}/api/jobs/email-sync/yahoo`,
-    body: { integrationId, tenantId: tenantId || undefined },
-    headers: {
-      Authorization: `Bearer ${cronSecret}`,
-      'Content-Type': 'application/json',
-    },
-  });
-
-  return { queued: true, messageId: result.messageId };
+  return { queued: false };
 }
 
 export async function enqueueGmailSyncJob(
-  integrationId: number,
-  tenantId?: string
+  _integrationId: number,
+  _tenantId?: string
 ): Promise<{ queued: boolean; messageId?: string }> {
-  const token = process.env.QSTASH_TOKEN;
-  if (!token) {
-    return { queued: false };
-  }
-
-  const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret) {
-    throw new Error('CRON_SECRET is required when QSTASH_TOKEN is configured.');
-  }
-
-  const client = new Client({ token });
-  const baseUrl = getAppBaseUrl();
-  const result = await client.publishJSON({
-    url: `${baseUrl}/api/jobs/email-sync/gmail`,
-    body: { integrationId, tenantId: tenantId || undefined },
-    headers: {
-      Authorization: `Bearer ${cronSecret}`,
-      'Content-Type': 'application/json',
-    },
-  });
-
-  return { queued: true, messageId: result.messageId };
+  return { queued: false };
 }

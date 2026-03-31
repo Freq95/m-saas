@@ -47,13 +47,10 @@ type ClientStatsData = {
   preferred_services: Array<{ name: string; count: number; total_spent: number }>;
 };
 
-export async function getClientProfileData(clientId: number, tenantId?: ObjectId, userId?: number): Promise<ClientProfileData | null> {
+export async function getClientProfileData(clientId: number, tenantId: ObjectId, userId: number): Promise<ClientProfileData | null> {
   const db = await getMongoDbOrThrow();
 
-  const clientFilter: Record<string, unknown> = { id: clientId, deleted_at: { $exists: false } };
-  if (tenantId) clientFilter.tenant_id = tenantId;
-  if (typeof userId === 'number') clientFilter.user_id = userId;
-  const clientDoc = await db.collection('clients').findOne(clientFilter);
+  const clientDoc = await db.collection('clients').findOne({ id: clientId, tenant_id: tenantId, user_id: userId, deleted_at: { $exists: false } });
   if (!clientDoc) return null;
 
   const client = stripMongoId(clientDoc) as ProfileClient;
@@ -61,21 +58,13 @@ export async function getClientProfileData(clientId: number, tenantId?: ObjectId
   const [appointments, services, conversations] = await Promise.all([
     db
       .collection('appointments')
-      .find(typeof userId === 'number'
-        ? (tenantId ? { client_id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } } : { client_id: clientId, user_id: userId, deleted_at: { $exists: false } })
-        : (tenantId ? { client_id: clientId, tenant_id: tenantId, deleted_at: { $exists: false } } : { client_id: clientId, deleted_at: { $exists: false } }))
+      .find({ client_id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } })
       .sort({ start_time: -1 })
       .toArray(),
-    db.collection('services').find(
-      typeof userId === 'number'
-        ? (tenantId ? { user_id: userId, tenant_id: tenantId } : { user_id: userId })
-        : (tenantId ? { tenant_id: tenantId } : {})
-    ).toArray(),
+    db.collection('services').find({ user_id: userId, tenant_id: tenantId }).toArray(),
     db
       .collection('conversations')
-      .find(typeof userId === 'number'
-        ? (tenantId ? { client_id: clientId, user_id: userId, tenant_id: tenantId } : { client_id: clientId, user_id: userId })
-        : (tenantId ? { client_id: clientId, tenant_id: tenantId } : { client_id: clientId }))
+      .find({ client_id: clientId, user_id: userId, tenant_id: tenantId })
       .sort({ updated_at: -1 })
       .toArray(),
   ]);
@@ -88,7 +77,7 @@ export async function getClientProfileData(clientId: number, tenantId?: ObjectId
     const service = serviceById.get(appointment.service_id);
     return {
       ...stripMongoId(appointment),
-      service_name: service?.name || '',
+      service_name: service?.name || (appointment.service_name as string | undefined) || '',
       service_price: typeof appointment.price_at_time === 'number'
         ? appointment.price_at_time
         : (service?.price || 0),
@@ -99,7 +88,7 @@ export async function getClientProfileData(clientId: number, tenantId?: ObjectId
   const messageCounts = new Map<number, number>();
   if (conversationIds.length > 0) {
     const messageAgg = await db.collection('messages').aggregate([
-      { $match: tenantId ? { conversation_id: { $in: conversationIds }, tenant_id: tenantId } : { conversation_id: { $in: conversationIds } } },
+      { $match: { conversation_id: { $in: conversationIds }, tenant_id: tenantId } },
       { $group: { _id: '$conversation_id', count: { $sum: 1 } } },
     ]).toArray();
     for (const row of messageAgg) {
@@ -120,27 +109,18 @@ export async function getClientProfileData(clientId: number, tenantId?: ObjectId
   };
 }
 
-export async function getClientStatsData(clientId: number, tenantId?: ObjectId, userId?: number): Promise<ClientStatsData | null> {
+export async function getClientStatsData(clientId: number, tenantId: ObjectId, userId: number): Promise<ClientStatsData | null> {
   const db = await getMongoDbOrThrow();
 
-  const clientFilter: Record<string, unknown> = { id: clientId, deleted_at: { $exists: false } };
-  if (tenantId) clientFilter.tenant_id = tenantId;
-  if (typeof userId === 'number') clientFilter.user_id = userId;
-  const clientDoc = await db.collection('clients').findOne(clientFilter);
+  const clientDoc = await db.collection('clients').findOne({ id: clientId, tenant_id: tenantId, user_id: userId, deleted_at: { $exists: false } });
   if (!clientDoc) return null;
 
   const [appointments, services] = await Promise.all([
     db
       .collection('appointments')
-      .find(typeof userId === 'number'
-        ? (tenantId ? { client_id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } } : { client_id: clientId, user_id: userId, deleted_at: { $exists: false } })
-        : (tenantId ? { client_id: clientId, tenant_id: tenantId, deleted_at: { $exists: false } } : { client_id: clientId, deleted_at: { $exists: false } }))
+      .find({ client_id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } })
       .toArray(),
-    db.collection('services').find(
-      typeof userId === 'number'
-        ? (tenantId ? { user_id: userId, tenant_id: tenantId } : { user_id: userId })
-        : (tenantId ? { tenant_id: tenantId } : {})
-    ).toArray(),
+    db.collection('services').find({ user_id: userId, tenant_id: tenantId }).toArray(),
   ]);
 
   const serviceById = new Map<number, any>(

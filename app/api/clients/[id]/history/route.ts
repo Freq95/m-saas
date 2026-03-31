@@ -45,7 +45,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         type: 'appointment',
         date: apt.start_time,
         created_at: apt.created_at,
-        title: service?.name || 'Appointment',
+        title: service?.name || (apt.service_name as string | undefined) || 'Appointment',
         description: apt.notes,
         status: apt.status,
         amount: service?.price,
@@ -108,25 +108,6 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         created_at: note.created_at,
         title: (note.content || '').slice(0, 100) || 'Nota',
         description: note.content,
-      });
-    });
-
-    const tasks = await db
-      .collection('tasks')
-      .find({ tenant_id: tenantId, $or: [{ client_id: clientId }, { contact_id: clientId }] })
-      .sort({ due_date: -1, created_at: -1 })
-      .toArray();
-
-    tasks.forEach((task: any) => {
-      timeline.push({
-        id: task.id,
-        type: 'task',
-        date: task.due_date || task.created_at,
-        created_at: task.created_at,
-        title: task.title,
-        description: task.description,
-        status: task.status,
-        due_date: task.due_date,
       });
     });
 

@@ -3,7 +3,8 @@ import { ObjectId } from 'mongodb';
 import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getSuperAdmin } from '@/lib/auth-helpers';
-import { logAdminAudit } from '@/lib/audit';
+import { logAdminAudit, logDataAccess } from '@/lib/audit';
+import { checkUpdateRateLimit } from '@/lib/rate-limit';
 
 async function ensureNotLastActiveSuperAdmin(db: any, targetUser: any, nextRole?: string, nextStatus?: string) {
   const currentIsActiveSuperAdmin = targetUser.role === 'super_admin' && targetUser.status === 'active';
@@ -17,10 +18,23 @@ async function ensureNotLastActiveSuperAdmin(db: any, targetUser: any, nextRole?
   }
 }
 
+function sanitizeAdminUser(user: any) {
+  if (!user) return null;
+  const {
+    password_hash: _passwordHash,
+    reset_token: _resetToken,
+    reset_token_expires: _resetTokenExpires,
+    token: _token,
+    token_hash: _tokenHash,
+    ...safeUser
+  } = user;
+  return safeUser;
+}
+
 export async function GET(_request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    await getSuperAdmin();
+    const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
     if (!ObjectId.isValid(params.id)) return createErrorResponse('Invalid user id', 400);
     const userId = new ObjectId(params.id);
 
@@ -33,7 +47,20 @@ export async function GET(_request: NextRequest, props: { params: Promise<{ id: 
       db.collection('team_members').find({ user_id: userId }).toArray(),
     ]);
 
-    return createSuccessResponse({ user, tenant, memberships });
+    await logDataAccess({
+      actorUserId,
+      actorEmail,
+      actorRole: 'super_admin',
+      targetType: 'user',
+      targetId: userId,
+      route: `/api/admin/users/${params.id}`,
+      request: _request,
+      metadata: {
+        membershipCount: memberships.length,
+      },
+    });
+
+    return createSuccessResponse({ user: sanitizeAdminUser(user), tenant, memberships });
   } catch (error) {
     return handleApiError(error, 'Failed to fetch user');
   }
@@ -43,6 +70,8 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
   const params = await props.params;
   try {
     const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
+    const limited = await checkUpdateRateLimit(String(actorUserId));
+    if (limited) return limited;
     if (!ObjectId.isValid(params.id)) return createErrorResponse('Invalid user id', 400);
     const userId = new ObjectId(params.id);
     const body = await request.json();
@@ -80,7 +109,13 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       updates.status_reason = reason;
     }
 
-    await db.collection('users').updateOne({ _id: userId }, { $set: updates });
+    const shouldInvalidateSessions =
+      !!nextStatus && nextStatus !== before.status && ['suspended', 'deleted'].includes(nextStatus);
+    const updateDoc: { $set: Record<string, unknown>; $inc?: Record<string, number> } = { $set: updates };
+    if (shouldInvalidateSessions) {
+      updateDoc.$inc = { session_version: 1 };
+    }
+    await db.collection('users').updateOne({ _id: userId }, updateDoc);
     if (nextStatus) {
       const memberStatus =
         nextStatus === 'active'
@@ -128,7 +163,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       metadata: nextStatus && nextStatus !== before.status ? { reason: updates.status_reason || null } : null,
     });
 
-    return createSuccessResponse({ user });
+    return createSuccessResponse({ user: sanitizeAdminUser(user) });
   } catch (error) {
     return handleApiError(error, 'Failed to update user');
   }
@@ -138,6 +173,8 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
   const params = await props.params;
   try {
     const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
+    const limited = await checkUpdateRateLimit(String(actorUserId));
+    if (limited) return limited;
     if (!ObjectId.isValid(params.id)) return createErrorResponse('Invalid user id', 400);
     const userId = new ObjectId(params.id);
 
@@ -161,6 +198,9 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
           deleted_by: actorUserId,
           status_reason: reason,
           updated_at: nowIso,
+        },
+        $inc: {
+          session_version: 1,
         },
       }
     );
@@ -188,7 +228,7 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
       metadata: { reason },
     });
 
-    return createSuccessResponse({ success: true, user });
+    return createSuccessResponse({ success: true, user: sanitizeAdminUser(user) });
   } catch (error) {
     return handleApiError(error, 'Failed to delete user');
   }

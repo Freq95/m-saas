@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getSuperAdmin } from '@/lib/auth-helpers';
+import { logDataAccess } from '@/lib/audit';
 
 type TenantsPageProps = {
   searchParams?: Promise<{
@@ -12,7 +13,11 @@ type TenantsPageProps = {
 };
 
 export default async function AdminTenantsPage({ searchParams }: TenantsPageProps) {
-  try { await getSuperAdmin(); } catch { redirect('/login'); }
+  const superAdmin = await getSuperAdmin().catch(() => null);
+  if (!superAdmin) {
+    redirect('/login');
+  }
+  const { userId: actorUserId, email: actorEmail } = superAdmin;
   const db = await getMongoDbOrThrow();
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const search = resolvedSearchParams?.search?.trim();
@@ -31,6 +36,20 @@ export default async function AdminTenantsPage({ searchParams }: TenantsPageProp
   const ownerIds = tenants.map((tenant: any) => tenant.owner_id).filter(Boolean);
   const owners = ownerIds.length ? await db.collection('users').find({ _id: { $in: ownerIds } }).toArray() : [];
   const ownerMap = new Map<string, any>(owners.map((owner: any) => [String(owner._id), owner]));
+
+  await logDataAccess({
+    actorUserId,
+    actorEmail,
+    actorRole: 'super_admin',
+    targetType: 'tenant.collection',
+    route: '/admin/tenants',
+    metadata: {
+      search: search || null,
+      plan: plan || null,
+      status: status || null,
+      resultCount: tenants.length,
+    },
+  });
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>

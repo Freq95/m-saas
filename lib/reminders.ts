@@ -1,6 +1,7 @@
 import { addHours, format } from 'date-fns';
 import { ro } from 'date-fns/locale';
-import { getMongoDbOrThrow, getNextNumericId } from './db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, type FlexDoc } from './db/mongo-utils';
+import { logger } from './logger';
 
 interface ReminderChannel {
   type: 'sms' | 'whatsapp' | 'email';
@@ -28,7 +29,7 @@ export async function processReminders() {
         $lte: reminderTime.toISOString(),
       },
     }).toArray(),
-    db.collection('services').find({ tenant_id: { $exists: true } }).toArray(),
+    db.collection('services').find({ tenant_id: { $exists: true }, deleted_at: { $exists: false } }).toArray(),
     db.collection('users').find({ status: 'active', tenant_id: { $exists: true } }).toArray(),
   ]);
 
@@ -69,7 +70,7 @@ export async function processReminders() {
         if (sent) {
           const reminderId = await getNextNumericId('reminders');
           const sentAt = new Date().toISOString();
-          await db.collection('reminders').insertOne({
+          await db.collection<FlexDoc>('reminders').insertOne({
             _id: reminderId,
             id: reminderId,
             tenant_id: appointment.tenant_id,
@@ -88,7 +89,10 @@ export async function processReminders() {
           continue;
         }
       } catch (error) {
-        console.error(`Failed to send SMS reminder for appointment ${appointment.id}:`, error);
+        logger.error('Failed to send SMS reminder', {
+          appointmentId: appointment.id,
+          error,
+        });
       }
     }
 
@@ -100,7 +104,7 @@ export async function processReminders() {
         const sentAt = new Date().toISOString();
 
         if (sent) {
-          await db.collection('reminders').insertOne({
+          await db.collection<FlexDoc>('reminders').insertOne({
             _id: reminderId,
             id: reminderId,
             tenant_id: appointment.tenant_id,
@@ -117,7 +121,7 @@ export async function processReminders() {
             { $set: { reminder_sent: true, updated_at: sentAt } }
           );
         } else {
-          await db.collection('reminders').insertOne({
+          await db.collection<FlexDoc>('reminders').insertOne({
             _id: reminderId,
             id: reminderId,
             tenant_id: appointment.tenant_id,
@@ -130,10 +134,13 @@ export async function processReminders() {
           });
         }
       } catch (error) {
-        console.error(`Failed to send email reminder for appointment ${appointment.id}:`, error);
+        logger.error('Failed to send email reminder', {
+          appointmentId: appointment.id,
+          error,
+        });
         const reminderId = await getNextNumericId('reminders');
         const sentAt = new Date().toISOString();
-        await db.collection('reminders').insertOne({
+        await db.collection<FlexDoc>('reminders').insertOne({
           _id: reminderId,
           id: reminderId,
           tenant_id: appointment.tenant_id,
@@ -178,7 +185,7 @@ async function sendEmail(to: string, subject: string, message: string): Promise<
   const nodemailer = require('nodemailer');
 
   if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.warn('Email not configured, skipping email reminder');
+    logger.warn('Email not configured, skipping email reminder');
     return false;
   }
 
@@ -202,7 +209,7 @@ async function sendEmail(to: string, subject: string, message: string): Promise<
 
     return true;
   } catch (error) {
-    console.error('Error sending email:', error);
+    logger.error('Error sending email reminder', { error });
     return false;
   }
 }

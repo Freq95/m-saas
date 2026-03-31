@@ -3,7 +3,7 @@
  * Handles finding or creating clients based on contact information
  */
 
-import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from './db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from './db/mongo-utils';
 import { ObjectId } from 'mongodb';
 
 export interface Client {
@@ -224,7 +224,7 @@ export async function findOrCreateClient(
     last_activity_date: now,
   };
 
-  await db.collection('clients').insertOne(newClientDoc);
+  await db.collection<FlexDoc>('clients').insertOne(newClientDoc);
   return normalizeClientDoc(newClientDoc);
 }
 
@@ -244,7 +244,7 @@ export async function updateClientStats(clientId: number, tenantId: ObjectId): P
       tenant_id: tenantId,
       deleted_at: { $exists: false },
     }).toArray(),
-    db.collection('services').find({ tenant_id: tenantId }).toArray(),
+    db.collection('services').find({ tenant_id: tenantId, deleted_at: { $exists: false } }).toArray(),
     db.collection('conversations').find({ client_id: clientId, tenant_id: tenantId }).toArray(),
   ]);
 

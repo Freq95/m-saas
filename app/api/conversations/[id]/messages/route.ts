@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
-import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from '@/lib/db/mongo-utils';
 import { getYahooConfig, sendYahooEmail } from '@/lib/yahoo-mail';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { checkWriteRateLimit } from '@/lib/rate-limit';
 
 // POST /api/conversations/[id]/messages - Send message
 export async function POST(
@@ -12,8 +13,13 @@ export async function POST(
   try {
     const resolvedParams = await params;
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkWriteRateLimit(userId);
+    if (limited) return limited;
     const db = await getMongoDbOrThrow();
     const conversationId = parseInt(resolvedParams.id);
+    if (isNaN(conversationId) || conversationId <= 0) {
+      return createErrorResponse('Invalid conversation ID', 400);
+    }
     const body = await request.json();
 
     // Validate input
@@ -64,7 +70,7 @@ export async function POST(
       created_at: now,
     };
 
-    await db.collection('messages').insertOne(newMessage);
+    await db.collection<FlexDoc>('messages').insertOne(newMessage);
 
     // If it's an outbound email message, send via Yahoo
     if (shouldSendEmail && yahooConfig) {

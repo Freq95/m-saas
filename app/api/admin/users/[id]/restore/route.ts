@@ -4,11 +4,27 @@ import { createErrorResponse, createSuccessResponse, handleApiError } from '@/li
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getSuperAdmin } from '@/lib/auth-helpers';
 import { logAdminAudit } from '@/lib/audit';
+import { checkUpdateRateLimit } from '@/lib/rate-limit';
+
+function sanitizeAdminUser(user: any) {
+  if (!user) return null;
+  const {
+    password_hash: _passwordHash,
+    reset_token: _resetToken,
+    reset_token_expires: _resetTokenExpires,
+    token: _token,
+    token_hash: _tokenHash,
+    ...safeUser
+  } = user;
+  return safeUser;
+}
 
 export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
     const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
+    const limited = await checkUpdateRateLimit(String(actorUserId));
+    if (limited) return limited;
     if (!ObjectId.isValid(params.id)) return createErrorResponse('Invalid user id', 400);
     const userId = new ObjectId(params.id);
 
@@ -57,7 +73,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       metadata: { reason },
     });
 
-    return createSuccessResponse({ success: true, user });
+    return createSuccessResponse({ success: true, user: sanitizeAdminUser(user) });
   } catch (error) {
     return handleApiError(error, 'Failed to restore user');
   }

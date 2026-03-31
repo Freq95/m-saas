@@ -3,14 +3,17 @@ import { ObjectId } from 'mongodb';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { checkUpdateRateLimit } from '@/lib/rate-limit';
 
 export async function DELETE(_request: NextRequest, props: { params: Promise<{ memberId: string }> }) {
   const params = await props.params;
   try {
-    const { dbUserId, tenantId, role } = await getAuthUser();
+    const { userId, dbUserId, tenantId, role } = await getAuthUser();
     if (role !== 'owner') {
       return createErrorResponse('Only clinic owner can remove team members', 403);
     }
+    const limited = await checkUpdateRateLimit(userId);
+    if (limited) return limited;
 
     if (!ObjectId.isValid(params.memberId)) {
       return createErrorResponse('Invalid memberId', 400);
@@ -37,7 +40,10 @@ export async function DELETE(_request: NextRequest, props: { params: Promise<{ m
     );
     await db.collection('users').updateOne(
       { _id: memberUserId, tenant_id: tenantId },
-      { $set: { status: 'deleted', updated_at: nowIso } }
+      {
+        $set: { status: 'deleted', updated_at: nowIso },
+        $inc: { session_version: 1 },
+      }
     );
 
     return createSuccessResponse({ success: true });

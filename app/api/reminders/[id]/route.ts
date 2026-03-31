@@ -4,6 +4,7 @@ import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { ObjectId } from 'mongodb';
+import { checkUpdateRateLimit } from '@/lib/rate-limit';
 
 // Validation schema
 const updateReminderSchema = z.object({
@@ -18,7 +19,7 @@ async function getReminderWithAppointment(reminderId: number, tenantId: ObjectId
   if (typeof userId === 'number') {
     reminderFilter.user_id = userId;
   }
-  const reminder = await db.collection('reminders').findOne(reminderFilter);
+  const reminder = await db.collection('reminders').findOne({ ...reminderFilter, deleted_at: { $exists: false } });
   if (!reminder) return null;
   const appointment = await db.collection('appointments').findOne({
     id: reminder.appointment_id,
@@ -63,8 +64,13 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
   const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkUpdateRateLimit(userId);
+    if (limited) return limited;
     const db = await getMongoDbOrThrow();
     const reminderId = parseInt(params.id);
+    if (isNaN(reminderId) || reminderId <= 0) {
+      return createErrorResponse('Invalid reminder ID', 400);
+    }
     const body = await request.json();
 
     // Validate input
@@ -79,13 +85,8 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       );
     }
 
-    // Validate ID
-    if (isNaN(reminderId) || reminderId <= 0) {
-      return createErrorResponse('Invalid reminder ID', 400);
-    }
-
     // Check if reminder exists
-    const existing = await db.collection('reminders').findOne({ id: reminderId, user_id: userId, tenant_id: tenantId });
+    const existing = await db.collection('reminders').findOne({ id: reminderId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } });
     if (!existing) {
       return createErrorResponse('Not found or not authorized', 404);
     }
@@ -122,6 +123,8 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
   const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkUpdateRateLimit(userId);
+    if (limited) return limited;
     const db = await getMongoDbOrThrow();
     const reminderId = parseInt(params.id);
 
@@ -130,13 +133,12 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
       return createErrorResponse('Invalid reminder ID', 400);
     }
 
-    const existing = await db.collection('reminders').findOne({ id: reminderId, user_id: userId, tenant_id: tenantId });
-    if (!existing) {
-      return createErrorResponse('Not found or not authorized', 404);
-    }
-
-    const result = await db.collection('reminders').deleteOne({ id: reminderId, user_id: userId, tenant_id: tenantId });
-    if (result.deletedCount === 0) {
+    const now = new Date().toISOString();
+    const result = await db.collection('reminders').updateOne(
+      { id: reminderId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } },
+      { $set: { deleted_at: now, deleted_by: userId, updated_at: now } }
+    );
+    if (result.matchedCount === 0) {
       return createErrorResponse('Not found or not authorized', 404);
     }
 

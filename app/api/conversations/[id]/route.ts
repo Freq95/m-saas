@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
-import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, stripMongoId, type FlexDoc } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getConversationMessagesData } from '@/lib/server/inbox';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { logDataAccess } from '@/lib/audit';
+import { checkUpdateRateLimit } from '@/lib/rate-limit';
 
 // GET /api/conversations/[id] - Get conversation with messages
 export async function GET(
@@ -13,8 +15,11 @@ export async function GET(
 ) {
   try {
     const resolvedParams = await params;
-    const { userId, tenantId } = await getAuthUser();
+    const { userId, dbUserId, tenantId, email, role } = await getAuthUser();
     const conversationId = parseInt(resolvedParams.id);
+    if (isNaN(conversationId) || conversationId <= 0) {
+      return createErrorResponse('Invalid conversation ID', 400);
+    }
 
     const { searchParams } = request.nextUrl;
     const limit = parseInt(searchParams.get('limit') || '50');
@@ -36,6 +41,24 @@ export async function GET(
         { status: 404 }
       );
     }
+
+    await logDataAccess({
+      actorUserId: dbUserId,
+      actorEmail: email,
+      actorRole: role,
+      tenantId,
+      targetType: 'conversation',
+      targetId: conversationId,
+      route: `/api/conversations/${resolvedParams.id}`,
+      request,
+      metadata: {
+        limit,
+        offset,
+        beforeId: beforeId || null,
+        returnedMessages: messageData.messages.length,
+      },
+    });
+
     return createSuccessResponse({
       conversation: messageData.conversation,
       messages: messageData.messages,
@@ -55,8 +78,13 @@ export async function PATCH(
   try {
     const resolvedParams = await params;
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkUpdateRateLimit(userId);
+    if (limited) return limited;
     const db = await getMongoDbOrThrow();
     const conversationId = parseInt(resolvedParams.id);
+    if (isNaN(conversationId) || conversationId <= 0) {
+      return createErrorResponse('Invalid conversation ID', 400);
+    }
     const body = await request.json();
 
     // Validate conversation exists
@@ -125,7 +153,7 @@ export async function PATCH(
           }));
 
         if (newConvTags.length > 0) {
-          await db.collection('conversation_tags').insertMany(newConvTags, { ordered: false });
+          await db.collection<FlexDoc>('conversation_tags').insertMany(newConvTags, { ordered: false });
         }
       }
     }

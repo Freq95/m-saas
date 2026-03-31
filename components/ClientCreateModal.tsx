@@ -11,6 +11,11 @@ type ClientPayload = {
   email: string | null;
   phone: string | null;
   notes: string | null;
+  consent_given?: boolean;
+  consent_date?: string | null;
+  consent_method?: string | null;
+  is_minor?: boolean;
+  parent_guardian_name?: string | null;
 };
 
 type ClientFormData = {
@@ -18,6 +23,10 @@ type ClientFormData = {
   email: string;
   phone: string;
   notes: string;
+  consent_given: boolean;
+  consent_method: string;
+  is_minor: boolean;
+  parent_guardian_name: string;
 };
 
 type ClientCreateModalProps = {
@@ -47,12 +56,17 @@ export default function ClientCreateModal({
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [phoneError, setPhoneError] = useState('');
+  const [privacyNoticeText, setPrivacyNoticeText] = useState<string | null>(null);
   const [backdropPressStarted, setBackdropPressStarted] = useState(false);
   const [formData, setFormData] = useState<ClientFormData>({
     name: initialData?.name || '',
     email: initialData?.email || '',
     phone: initialData?.phone || '',
     notes: initialData?.notes || '',
+    consent_given: initialData?.consent_given || false,
+    consent_method: initialData?.consent_method || '',
+    is_minor: initialData?.is_minor || false,
+    parent_guardian_name: initialData?.parent_guardian_name || '',
   });
 
   const isEditMode = mode === 'edit';
@@ -61,6 +75,18 @@ export default function ClientCreateModal({
     setMounted(true);
     return () => setMounted(false);
   }, []);
+
+  useEffect(() => {
+    if (!isOpen || privacyNoticeText !== null) return;
+    fetch('/api/settings/gdpr')
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.gdpr_privacy_notice_text) {
+          setPrivacyNoticeText(data.gdpr_privacy_notice_text);
+        }
+      })
+      .catch(() => null);
+  }, [isOpen, privacyNoticeText]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -72,15 +98,14 @@ export default function ClientCreateModal({
         email: initialData?.email || '',
         phone: initialData?.phone || '',
         notes: initialData?.notes || '',
+        consent_given: initialData?.consent_given || false,
+        consent_method: initialData?.consent_method || '',
+        is_minor: initialData?.is_minor || false,
+        parent_guardian_name: initialData?.parent_guardian_name || '',
       });
       return;
     }
-    setFormData({
-      name: '',
-      email: '',
-      phone: '',
-      notes: '',
-    });
+    setFormData({ name: '', email: '', phone: '', notes: '', consent_given: false, consent_method: '', is_minor: false, parent_guardian_name: '' });
   }, [isOpen, isEditMode, initialData]);
 
   useEffect(() => {
@@ -125,9 +150,13 @@ export default function ClientCreateModal({
         email: initialData?.email || '',
         phone: initialData?.phone || '',
         notes: initialData?.notes || '',
+        consent_given: initialData?.consent_given || false,
+        consent_method: initialData?.consent_method || '',
+        is_minor: initialData?.is_minor || false,
+        parent_guardian_name: initialData?.parent_guardian_name || '',
       });
     } else {
-      setFormData({ name: '', email: '', phone: '', notes: '' });
+      setFormData({ name: '', email: '', phone: '', notes: '', consent_given: false, consent_method: '', is_minor: false, parent_guardian_name: '' });
     }
     setErrorMessage('');
     setPhoneError('');
@@ -161,6 +190,11 @@ export default function ClientCreateModal({
           email: formData.email || undefined,
           phone: formData.phone || undefined,
           notes: formData.notes || undefined,
+          consent_given: formData.consent_given || undefined,
+          consent_date: formData.consent_given ? new Date().toISOString() : undefined,
+          consent_method: formData.consent_method || undefined,
+          is_minor: formData.is_minor || undefined,
+          parent_guardian_name: formData.parent_guardian_name || undefined,
         }),
       });
 
@@ -179,7 +213,7 @@ export default function ClientCreateModal({
         return;
       }
 
-      setFormData({ name: '', email: '', phone: '', notes: '' });
+      setFormData({ name: '', email: '', phone: '', notes: '', consent_given: false, consent_method: '', is_minor: false, parent_guardian_name: '' });
       setPhoneError('');
       if (savedClient && onCreated) {
         onCreated(savedClient);
@@ -264,6 +298,78 @@ export default function ClientCreateModal({
                 placeholder="Detalii utile despre client..."
               />
             </div>
+
+            <div className={`${styles.field} ${styles.fieldFull}`} style={{ borderTop: '1px solid #e5e7eb', paddingTop: '1rem', marginTop: '0.5rem' }}>
+              <label style={{ fontWeight: 600, fontSize: '0.9rem' }}>Consimtamant GDPR</label>
+              {privacyNoticeText && (
+                <p style={{
+                  fontSize: '0.8rem',
+                  color: '#6b7280',
+                  background: '#f9fafb',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '6px',
+                  padding: '0.6rem 0.75rem',
+                  marginTop: '0.5rem',
+                  lineHeight: 1.5,
+                }}>
+                  {privacyNoticeText}
+                </p>
+              )}
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="consent-given" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                <input
+                  id="consent-given"
+                  type="checkbox"
+                  checked={formData.consent_given}
+                  onChange={(e) => setFormData(prev => ({ ...prev, consent_given: e.target.checked }))}
+                  style={{ width: '18px', height: '18px' }}
+                />
+                Consimtamant obtinut
+              </label>
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="consent-method">Metoda</label>
+              <select
+                id="consent-method"
+                value={formData.consent_method}
+                onChange={(e) => setFormData(prev => ({ ...prev, consent_method: e.target.value }))}
+                style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '0.875rem' }}
+              >
+                <option value="">-- Selecteaza --</option>
+                <option value="digital_signature">Semnatura digitala</option>
+                <option value="scanned_document">Document scanat</option>
+                <option value="paper_on_file">Document fizic</option>
+              </select>
+            </div>
+
+            <div className={styles.field}>
+              <label htmlFor="is-minor" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                <input
+                  id="is-minor"
+                  type="checkbox"
+                  checked={formData.is_minor}
+                  onChange={(e) => setFormData(prev => ({ ...prev, is_minor: e.target.checked }))}
+                  style={{ width: '18px', height: '18px' }}
+                />
+                Pacient minor
+              </label>
+            </div>
+
+            {formData.is_minor && (
+              <div className={styles.field}>
+                <label htmlFor="parent-name">Parinte / Tutore</label>
+                <input
+                  id="parent-name"
+                  type="text"
+                  value={formData.parent_guardian_name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, parent_guardian_name: e.target.value }))}
+                  placeholder="Numele parintelui sau tutorelui"
+                />
+              </div>
+            )}
           </div>
 
           {errorMessage && <div className={styles.error}>{errorMessage}</div>}

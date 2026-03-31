@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb';
-import { getMongoDbOrThrow, getNextNumericId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, type FlexDoc } from '@/lib/db/mongo-utils';
 import { fetchYahooEmails, getYahooConfig, markEmailAsRead } from '@/lib/yahoo-mail';
 import { getStorageProvider } from '@/lib/storage';
 import { decrypt } from '@/lib/encryption';
@@ -216,20 +216,20 @@ async function runYahooSyncCore(
 
       let existingMsg: { id: number } | null = null;
       if (email.messageId || email.uid) {
-        existingMsg = await db.collection('messages').findOne({
+        existingMsg = (await db.collection('messages').findOne({
           tenant_id: tenantId,
           $or: [
             email.messageId ? { external_id: email.messageId } : undefined,
             email.uid ? { source_uid: email.uid } : undefined,
           ].filter(Boolean),
-        });
+        } as any)) as { id: number } | null;
       }
 
       if (!existingMsg) {
         const { serializeMessage } = await import('@/lib/email-types');
         const sentAtIso = resolveEmailReceivedAtIso(email);
         const conversationId = await getNextNumericId('conversations');
-        await db.collection('conversations').insertOne({
+        await db.collection<FlexDoc>('conversations').insertOne({
           _id: conversationId,
           id: conversationId,
           user_id: userId,
@@ -272,7 +272,7 @@ async function runYahooSyncCore(
             );
             await storage.upload(storageKey, att.content, att.contentType || 'application/octet-stream');
 
-            await db.collection('message_attachments').insertOne({
+            await db.collection<FlexDoc>('message_attachments').insertOne({
               _id: attachmentId,
               id: attachmentId,
               user_id: userId,
@@ -328,7 +328,7 @@ async function runYahooSyncCore(
           uid: email.uid,
         };
 
-        await db.collection('messages').insertOne({
+        await db.collection<FlexDoc>('messages').insertOne({
           _id: messageId,
           id: messageId,
           tenant_id: tenantId,

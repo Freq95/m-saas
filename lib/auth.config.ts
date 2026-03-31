@@ -24,6 +24,7 @@ export const authConfig: NextAuthConfig = {
         token.dbUserId = String((user as any).dbUserId || '');
         token.role = String((user as any).role || 'staff');
         token.tenantId = (user as any).tenantId ? String((user as any).tenantId) : null;
+        token.sessionVersion = Number((user as any).sessionVersion || 0);
       }
       return token;
     },
@@ -33,6 +34,7 @@ export const authConfig: NextAuthConfig = {
         session.user.dbUserId = String(token.dbUserId || '');
         session.user.role = String(token.role || 'staff');
         session.user.tenantId = token.tenantId ? String(token.tenantId) : null;
+        session.user.sessionVersion = Number(token.sessionVersion || 0);
       }
       return session;
     },

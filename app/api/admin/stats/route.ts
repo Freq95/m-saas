@@ -1,10 +1,11 @@
 import { createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getSuperAdmin } from '@/lib/auth-helpers';
+import { logDataAccess } from '@/lib/audit';
 
 export async function GET() {
   try {
-    await getSuperAdmin();
+    const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
     const db = await getMongoDbOrThrow();
 
     const [totalTenants, totalUsers, byPlan, recentTenants] = await Promise.all([
@@ -19,6 +20,18 @@ export async function GET() {
         .toArray(),
       db.collection('tenants').find({}).sort({ created_at: -1 }).limit(10).toArray(),
     ]);
+
+    await logDataAccess({
+      actorUserId,
+      actorEmail,
+      actorRole: 'super_admin',
+      targetType: 'admin.stats',
+      route: '/api/admin/stats',
+      metadata: {
+        totalTenants,
+        totalUsers,
+      },
+    });
 
     return createSuccessResponse({
       totalTenants,

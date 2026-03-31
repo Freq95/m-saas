@@ -4,7 +4,7 @@ import { ObjectId } from 'mongodb';
 
 type MessagePagination = {
   userId?: number;
-  tenantId?: ObjectId;
+  tenantId: ObjectId;
   limit?: number;
   offset?: number;
   beforeId?: number;
@@ -12,7 +12,7 @@ type MessagePagination = {
 
 type ConversationsQuery = {
   userId: number;
-  tenantId?: ObjectId;
+  tenantId: ObjectId;
   search?: string;
 };
 
@@ -22,10 +22,7 @@ export async function getConversationsData(query: ConversationsQuery) {
   const tenantId = query.tenantId;
   const search = query.search?.trim();
 
-  const conversationFilter: Record<string, unknown> = { user_id: userId };
-  if (tenantId) {
-    conversationFilter.tenant_id = tenantId;
-  }
+  const conversationFilter: Record<string, unknown> = { user_id: userId, tenant_id: tenantId };
   if (search) {
     const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(escaped, 'i');
@@ -64,9 +61,7 @@ export async function getConversationsData(query: ConversationsQuery) {
   }
 
   const conversationIds = conversations.map((conv: any) => conv.id);
-  const messagesMatch = tenantId
-    ? { tenant_id: tenantId, conversation_id: { $in: conversationIds } }
-    : { conversation_id: { $in: conversationIds } };
+  const messagesMatch = { tenant_id: tenantId, conversation_id: { $in: conversationIds } };
 
   // Stats pipeline: project only small scalar fields before $sort to stay under MongoDB's
   // 32 MB in-memory sort limit. Content (potentially large email bodies) is excluded here
@@ -138,7 +133,7 @@ export async function getConversationsData(query: ConversationsQuery) {
     db.collection('messages').aggregate(messageStatsPipeline).toArray(),
     db
       .collection('conversation_tags')
-      .find(tenantId ? { conversation_id: { $in: conversationIds }, tenant_id: tenantId } : { conversation_id: { $in: conversationIds } })
+      .find({ conversation_id: { $in: conversationIds }, tenant_id: tenantId })
       .project({ conversation_id: 1, tag_id: 1 })
       .toArray()
       .then((docs: any[]) => docs.map(stripMongoId)),
@@ -171,7 +166,7 @@ export async function getConversationsData(query: ConversationsQuery) {
   let tagsById = new Map<number, string>();
   if (tagIds.length > 0) {
     const tags = await db.collection('tags')
-      .find(tenantId ? { tenant_id: tenantId, id: { $in: tagIds } } : { id: { $in: tagIds } })
+      .find({ tenant_id: tenantId, id: { $in: tagIds } })
       .project({ id: 1, name: 1 })
       .toArray();
     tagsById = new Map<number, string>(
@@ -235,9 +230,7 @@ export async function getConversationsData(query: ConversationsQuery) {
     .map((conv: any) => conv.id)
     .filter((id: unknown): id is number => typeof id === 'number');
   if (previewConversationIds.length > 0) {
-    const previewMatch = tenantId
-      ? { tenant_id: tenantId, conversation_id: { $in: previewConversationIds } }
-      : { conversation_id: { $in: previewConversationIds } };
+    const previewMatch = { tenant_id: tenantId, conversation_id: { $in: previewConversationIds } };
     const previewRows = await db.collection('messages').aggregate([
       { $match: previewMatch },
       { $project: { conversation_id: 1, content: 1, created_at: 1, id: 1 } },
@@ -274,15 +267,12 @@ export async function getConversationsData(query: ConversationsQuery) {
 
 export async function getConversationMessagesData(
   conversationId: number,
-  pagination: MessagePagination = {}
+  pagination: MessagePagination
 ) {
   const db = await getMongoDbOrThrow();
-  const conversationFilter: Record<string, unknown> = { id: conversationId };
+  const conversationFilter: Record<string, unknown> = { id: conversationId, tenant_id: pagination.tenantId };
   if (typeof pagination.userId === 'number') {
     conversationFilter.user_id = pagination.userId;
-  }
-  if (pagination.tenantId) {
-    conversationFilter.tenant_id = pagination.tenantId;
   }
   const conversationDoc = await db.collection('conversations').findOne(conversationFilter);
   const conversation = conversationDoc ? stripMongoId(conversationDoc) : null;
@@ -302,10 +292,8 @@ export async function getConversationMessagesData(
 
   const messageFilter: Record<string, unknown> = {
     conversation_id: conversationId,
+    tenant_id: pagination.tenantId,
   };
-  if (pagination.tenantId) {
-    messageFilter.tenant_id = pagination.tenantId;
-  }
   if (beforeId) {
     messageFilter.id = { $lt: beforeId };
   }

@@ -65,7 +65,10 @@ export async function POST(request: NextRequest, props: { params: Promise<{ toke
 
     const userUpdateResult = await db.collection('users').updateOne(
       { _id: invite.user_id, tenant_id: invite.tenant_id },
-      { $set: { password_hash: passwordHash, status: 'active', updated_at: nowIso } }
+      {
+        $set: { password_hash: passwordHash, status: 'active', updated_at: nowIso },
+        $inc: { session_version: 1 },
+      }
     );
     if (userUpdateResult.matchedCount === 0) {
       return createErrorResponse('User no longer exists for this invite. Ask your administrator to resend invite.', 409);

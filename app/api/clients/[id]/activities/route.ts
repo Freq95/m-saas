@@ -10,7 +10,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
     const searchParams = request.nextUrl.searchParams;
-    const type = searchParams.get('type'); // 'all' | 'notes' | 'emails' | 'tasks' | 'appointments'
+    const type = searchParams.get('type'); // 'all' | 'notes' | 'emails' | 'appointments'
 
     const activities: any[] = [];
     const client = await db.collection('clients').findOne({ id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } });
@@ -112,30 +112,12 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         return {
           ...stripMongoId(appointment),
           activity_type: 'appointment',
-          title: service?.name || 'Appointment',
+          title: service?.name || (appointment.service_name as string | undefined) || 'Appointment',
           description: appointment.notes,
           activity_date: appointment.start_time,
           service_price: service?.price,
         };
       }));
-    }
-
-    // Get tasks
-    if (!type || type === 'all' || type === 'tasks') {
-      const tasks = await db
-        .collection('tasks')
-        .find({
-          tenant_id: tenantId,
-          $or: [{ client_id: clientId }, { contact_id: clientId }],
-        })
-        .sort({ due_date: -1, created_at: -1 })
-        .toArray();
-
-      activities.push(...tasks.map((task: any) => ({
-        ...stripMongoId(task),
-        activity_type: 'task',
-        activity_date: task.due_date,
-      })));
     }
 
     // Sort all activities by activity_date (most recent first)

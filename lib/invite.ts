@@ -5,7 +5,8 @@ import { sendEmail } from '@/lib/email';
 
 export interface InviteToken {
   _id: ObjectId;
-  token: string;
+  token?: string;
+  token_hash?: string;
   email: string;
   user_id: ObjectId;
   tenant_id: ObjectId;
@@ -18,12 +19,30 @@ export interface InviteToken {
 
 let inviteIndexesEnsured = false;
 
+function hashInviteToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex');
+}
+
 async function ensureInviteIndexes(db: any) {
   if (inviteIndexesEnsured) return;
+  const collection = db.collection('invite_tokens');
+  const indexes = await collection.indexes().catch(() => []);
+  const legacyTokenIndex = indexes.find((index: any) => index.name === 'token_1');
+  if (legacyTokenIndex && !legacyTokenIndex.partialFilterExpression) {
+    await collection.dropIndex('token_1').catch(() => undefined);
+  }
+
   await Promise.all([
-    db.collection('invite_tokens').createIndex({ token: 1 }, { unique: true }),
-    db.collection('invite_tokens').createIndex({ expires_at: 1 }, { expireAfterSeconds: 0 }),
-    db.collection('invite_tokens').createIndex({ email: 1, used_at: 1 }),
+    collection.createIndex(
+      { token_hash: 1 },
+      { unique: true, partialFilterExpression: { token_hash: { $exists: true } } }
+    ),
+    collection.createIndex(
+      { token: 1 },
+      { unique: true, partialFilterExpression: { token: { $exists: true } } }
+    ),
+    collection.createIndex({ expires_at: 1 }, { expireAfterSeconds: 0 }),
+    collection.createIndex({ email: 1, used_at: 1 }),
   ]);
   inviteIndexesEnsured = true;
 }
@@ -45,9 +64,10 @@ export async function createInviteToken(
   const db = await getMongoDbOrThrow();
   await ensureInviteIndexes(db);
   const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = hashInviteToken(token);
 
   await db.collection('invite_tokens').insertOne({
-    token,
+    token_hash: tokenHash,
     email: email.toLowerCase().trim(),
     user_id: userId,
     tenant_id: tenantId,
@@ -63,8 +83,9 @@ export async function createInviteToken(
 
 export async function validateInviteToken(token: string): Promise<InviteToken | null> {
   const db = await getMongoDbOrThrow();
+  const tokenHash = hashInviteToken(token);
   const invite = await db.collection('invite_tokens').findOne({
-    token,
+    $or: [{ token_hash: tokenHash }, { token }],
     used_at: null,
     expires_at: { $gt: new Date() },
   });
@@ -73,9 +94,10 @@ export async function validateInviteToken(token: string): Promise<InviteToken | 
 
 export async function markInviteUsed(token: string): Promise<void> {
   const db = await getMongoDbOrThrow();
+  const tokenHash = hashInviteToken(token);
   const result = await db.collection('invite_tokens').updateOne(
     {
-      token,
+      $or: [{ token_hash: tokenHash }, { token }],
       used_at: null,
       expires_at: { $gt: new Date() },
     },

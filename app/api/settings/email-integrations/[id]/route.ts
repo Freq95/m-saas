@@ -4,6 +4,7 @@ import { deleteEmailIntegration, getEmailIntegrationById } from '@/lib/email-int
 import { integrationIdParamSchema } from '@/lib/validation';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
+import { checkUpdateRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
 import { getStorageProvider } from '@/lib/storage';
 
@@ -12,6 +13,8 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
   const params = await props.params;
   try {
     const { userId, tenantId, email: actorEmail } = await getAuthUser();
+    const limited = await checkUpdateRateLimit(userId);
+    if (limited) return limited;
     // Validate route parameter
     const paramValidation = integrationIdParamSchema.safeParse({ id: params.id });
     if (!paramValidation.success) {

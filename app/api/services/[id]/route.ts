@@ -3,6 +3,7 @@ import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { invalidateReadCaches } from '@/lib/cache-keys';
+import { checkUpdateRateLimit } from '@/lib/rate-limit';
 
 // GET /api/services/[id] - Get a single service
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
@@ -11,8 +12,11 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     const { userId, tenantId } = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const serviceId = parseInt(params.id);
+    if (isNaN(serviceId) || serviceId <= 0) {
+      return createErrorResponse('Invalid service ID', 400);
+    }
 
-    const service = await db.collection('services').findOne({ id: serviceId, user_id: userId, tenant_id: tenantId });
+    const service = await db.collection('services').findOne({ id: serviceId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } });
 
     if (!service) {
       return NextResponse.json(
@@ -32,8 +36,13 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
   const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkUpdateRateLimit(userId);
+    if (limited) return limited;
     const db = await getMongoDbOrThrow();
     const serviceId = parseInt(params.id);
+    if (isNaN(serviceId) || serviceId <= 0) {
+      return createErrorResponse('Invalid service ID', 400);
+    }
     const body = await request.json();
 
     // Validate input
@@ -66,14 +75,14 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
     updates.updated_at = new Date().toISOString();
     const updateResult = await db.collection('services').updateOne(
-      { id: serviceId, user_id: userId, tenant_id: tenantId },
+      { id: serviceId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } },
       { $set: updates }
     );
     if (updateResult.matchedCount === 0) {
       return createErrorResponse('Not found or not authorized', 404);
     }
 
-    const service = await db.collection('services').findOne({ id: serviceId, user_id: userId, tenant_id: tenantId });
+    const service = await db.collection('services').findOne({ id: serviceId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } });
     if (!service) {
       return createErrorResponse('Not found or not authorized', 404);
     }
@@ -89,28 +98,20 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
   const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkUpdateRateLimit(userId);
+    if (limited) return limited;
     const db = await getMongoDbOrThrow();
     const serviceId = parseInt(params.id);
-
-    // Check if service is used in any appointments
-    const appointmentCount = await db.collection('appointments').countDocuments({
-      service_id: serviceId,
-      user_id: userId,
-      tenant_id: tenantId,
-      deleted_at: { $exists: false },
-    });
-    if (appointmentCount > 0) {
-      return NextResponse.json(
-        {
-          error: `Cannot delete service. It is used in ${appointmentCount} appointment(s).`,
-          appointmentCount,
-        },
-        { status: 400 }
-      );
+    if (isNaN(serviceId) || serviceId <= 0) {
+      return createErrorResponse('Invalid service ID', 400);
     }
 
-    const result = await db.collection('services').deleteOne({ id: serviceId, user_id: userId, tenant_id: tenantId });
-    if (result.deletedCount === 0) {
+    const now = new Date().toISOString();
+    const result = await db.collection('services').updateOne(
+      { id: serviceId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } },
+      { $set: { deleted_at: now, deleted_by: userId, updated_at: now } }
+    );
+    if (result.matchedCount === 0) {
       return createErrorResponse('Not found or not authorized', 404);
     }
     await invalidateReadCaches({ tenantId, userId });

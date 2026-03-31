@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server';
 import { AuthError } from '@/lib/auth-helpers';
 import { ZodError } from 'zod';
+import { logger } from '@/lib/logger';
 
 export interface ApiError {
   error: string;
@@ -71,7 +72,7 @@ export function handleApiError(error: unknown, defaultMessage: string = 'An erro
     }
 
     // Default error — log unexpected server errors
-    console.error(`[API Error] ${defaultMessage}:`, error);
+    logger.error(`[API Error] ${defaultMessage}`, error);
     return createErrorResponse(
       defaultMessage,
       500,
@@ -80,7 +81,7 @@ export function handleApiError(error: unknown, defaultMessage: string = 'An erro
   }
 
   // Unknown error type
-  console.error(`[API Error] ${defaultMessage}:`, error);
+  logger.error(`[API Error] ${defaultMessage}`, { error });
   return createErrorResponse(
     defaultMessage,
     500,

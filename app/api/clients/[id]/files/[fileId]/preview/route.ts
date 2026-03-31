@@ -15,6 +15,9 @@ export async function GET(
     const db = await getMongoDbOrThrow();
     const fileId = parseInt(params.fileId);
     const clientId = parseInt(params.id);
+    if (isNaN(clientId) || clientId <= 0 || isNaN(fileId) || fileId <= 0) {
+      return createErrorResponse('Invalid ID', 400);
+    }
 
     const client = await db.collection('clients').findOne({ id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } });
     if (!client) {

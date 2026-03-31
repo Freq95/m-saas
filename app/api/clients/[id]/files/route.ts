@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server';
-import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { buildClientStorageKey, getStorageProvider } from '@/lib/storage';
+import { checkWriteRateLimit } from '@/lib/rate-limit';
 
 // GET /api/clients/[id]/files - Get files for a client
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
@@ -47,6 +48,8 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
   const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
+    const rateLimitResponse = await checkWriteRateLimit(userId);
+    if (rateLimitResponse) return rateLimitResponse;
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
     const formData = await request.formData();
@@ -102,7 +105,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       updated_at: now,
     };
 
-    await db.collection('client_files').insertOne(fileDoc);
+    await db.collection<FlexDoc>('client_files').insertOne(fileDoc);
 
     // Update client's last_activity_date
     await db.collection('clients').updateOne(

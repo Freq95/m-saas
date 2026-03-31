@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import crypto from 'crypto';
-import { getMongoDbOrThrow, getNextNumericId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, type FlexDoc } from '@/lib/db/mongo-utils';
 import { linkConversationToClient } from '@/lib/client-matching';
 import { handleApiError, createErrorResponse, createSuccessResponse } from '@/lib/error-handler';
 
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     } else {
       const now = new Date().toISOString();
       conversationId = await getNextNumericId('conversations');
-      await db.collection('conversations').insertOne({
+      await db.collection<FlexDoc>('conversations').insertOne({
         _id: conversationId,
         id: conversationId,
         user_id: normalizedUserId,
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
     const now = new Date().toISOString();
     const content = text || html?.replace(/<[^>]*>/g, '') || '';
     const messageId = await getNextNumericId('messages');
-    await db.collection('messages').insertOne({
+    await db.collection<FlexDoc>('messages').insertOne({
       _id: messageId,
       id: messageId,
       tenant_id: tenantId,

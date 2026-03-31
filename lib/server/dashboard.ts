@@ -80,6 +80,7 @@ export async function getDashboardData(
     const appointmentProjection = {
       id: 1,
       service_id: 1,
+      service_name: 1,
       client_name: 1,
       start_time: 1,
       end_time: 1,
@@ -91,6 +92,7 @@ export async function getDashboardData(
       .collection('appointments')
       .find({
         ...scopeFilter,
+        deleted_at: { $exists: false },
         start_time: { $gte: startIso, $lte: endIso },
       })
       .project(appointmentProjection);
@@ -98,6 +100,7 @@ export async function getDashboardData(
       .collection('appointments')
       .find({
         ...scopeFilter,
+        deleted_at: { $exists: false },
         start_time: { $gte: todayStartIso, $lte: todayEndIso },
       })
       .project(appointmentProjection)
@@ -320,7 +323,7 @@ export async function getDashboardData(
       return {
         id: appointment.id,
         client_name: appointment.client_name,
-        service_name: service?.name || 'Unknown',
+        service_name: service?.name || (appointment.service_name as string | undefined) || 'Unknown',
         start_time: appointment.start_time,
         end_time: appointment.end_time,
         status: appointment.status === 'no_show' ? 'no-show' : appointment.status,

@@ -13,16 +13,47 @@ interface LogEntry {
   error?: Error;
 }
 
-const REDACT_KEYS = new Set([
+const REDACT_KEY_PATTERNS = [
   'password',
   'token',
   'secret',
   'apikey',
+  'api_key',
+  'authorization',
+  'cookie',
   'encrypted_password',
   'apppassword',
-]);
+  'email',
+  'phone',
+  'name',
+  'content',
+  'message',
+  'subject',
+  'body',
+  'text',
+  'notes',
+];
+
+const EMAIL_PATTERN = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+const PHONE_PATTERN = /(?<!\d)\+?\d[\d\s().-]{6,}\d(?!\d)/g;
+const BEARER_PATTERN = /\bBearer\s+[A-Za-z0-9._-]+\b/gi;
+
+function isSensitiveKey(key: string): boolean {
+  const normalized = key.toLowerCase();
+  return REDACT_KEY_PATTERNS.some((pattern) => normalized.includes(pattern));
+}
+
+function redactString(value: string): string {
+  return value
+    .replace(EMAIL_PATTERN, '[REDACTED_EMAIL]')
+    .replace(PHONE_PATTERN, '[REDACTED_PHONE]')
+    .replace(BEARER_PATTERN, 'Bearer [REDACTED_TOKEN]');
+}
 
 function redactValue(value: unknown): unknown {
+  if (typeof value === 'string') {
+    return redactString(value);
+  }
   if (Array.isArray(value)) {
     return value.map((entry) => redactValue(entry));
   }
@@ -30,13 +61,13 @@ function redactValue(value: unknown): unknown {
     return value;
   }
   if (value instanceof Error) {
-    return value.message;
+    return redactString(value.message);
   }
 
   const input = value as Record<string, unknown>;
   const output: Record<string, unknown> = {};
   for (const [key, nested] of Object.entries(input)) {
-    if (REDACT_KEYS.has(key.toLowerCase())) {
+    if (isSensitiveKey(key)) {
       output[key] = '[REDACTED]';
     } else {
       output[key] = redactValue(nested);
@@ -64,9 +95,10 @@ class Logger {
 
   private formatMessage(entry: LogEntry): string {
     const timestamp = entry.timestamp;
+    const safeMessage = redactString(entry.message);
     const contextStr = entry.context ? ` ${JSON.stringify(redactValue(entry.context))}` : '';
-    const errorStr = entry.error ? ` Error: ${entry.error.message}` : '';
-    return `[${timestamp}] [${entry.level.toUpperCase()}] ${entry.message}${contextStr}${errorStr}`;
+    const errorStr = entry.error ? ` Error: ${redactString(entry.error.message)}` : '';
+    return `[${timestamp}] [${entry.level.toUpperCase()}] ${safeMessage}${contextStr}${errorStr}`;
   }
 
   private log(level: LogLevel, message: string, context?: Record<string, unknown>, error?: Error) {

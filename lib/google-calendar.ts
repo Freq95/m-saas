@@ -1,11 +1,12 @@
 import { google } from 'googleapis';
-import { getMongoDbOrThrow, getNextNumericId } from './db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, type FlexDoc } from './db/mongo-utils';
+import { logger } from './logger';
 
 let oauth2Client: any = null;
 
 export function initGoogleCalendar() {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
-    console.warn('Google Calendar API not configured');
+    logger.warn('Google Calendar API not configured');
     return null;
   }
 
@@ -47,7 +48,7 @@ export async function exportToGoogleCalendar(
   }
 
   const service = appointment.service_id
-    ? await db.collection('services').findOne({ id: appointment.service_id })
+    ? await db.collection('services').findOne({ id: appointment.service_id, deleted_at: { $exists: false } })
     : null;
 
   oauth2Client.setCredentials({ access_token: accessToken });
@@ -88,7 +89,7 @@ export async function exportToGoogleCalendar(
     if (!existing) {
       const syncId = await getNextNumericId('google_calendar_sync');
       const now = new Date().toISOString();
-      await db.collection('google_calendar_sync').insertOne({
+      await db.collection<FlexDoc>('google_calendar_sync').insertOne({
         _id: syncId,
       id: syncId,
       user_id: userId,
@@ -101,7 +102,7 @@ export async function exportToGoogleCalendar(
 
     return eventId;
   } catch (error) {
-    console.error('Error exporting to Google Calendar:', error);
+    logger.error('Error exporting to Google Calendar', { error, userId, appointmentId });
     throw error;
   }
 }

@@ -20,6 +20,14 @@ interface Client {
   last_appointment_date: string | null;
   last_conversation_date: string | null;
   first_contact_date: string;
+  consent_given?: boolean;
+  consent_date?: string | null;
+  consent_method?: string | null;
+  consent_document_key?: string | null;
+  consent_withdrawn?: boolean;
+  consent_withdrawn_date?: string | null;
+  is_minor?: boolean;
+  parent_guardian_name?: string | null;
 }
 
 interface Appointment {
@@ -68,9 +76,12 @@ export default function ClientProfileClient({
   const [showEditClient, setShowEditClient] = useState(false);
   const [pendingDeleteFileId, setPendingDeleteFileId] = useState<number | null>(null);
   const [noteContent, setNoteContent] = useState('');
+  const [showGdprErase, setShowGdprErase] = useState(false);
+  const [gdprErasing, setGdprErasing] = useState(false);
   const { toasts, removeToast, error: toastError } = useToast();
   const addNoteBackdropPressStartedRef = useRef(false);
   const deleteFileBackdropPressStartedRef = useRef(false);
+  const gdprEraseBackdropRef = useRef(false);
 
   useEffect(() => {
     setClient(initialClient);
@@ -117,6 +128,7 @@ export default function ClientProfileClient({
       logger.error('Client profile: failed to fetch client data', error instanceof Error ? error : new Error(String(error)), {
         clientId,
       });
+      toastError('Eroare la incarcarea datelor clientului');
     } finally {
       setLoading(false);
     }
@@ -132,6 +144,7 @@ export default function ClientProfileClient({
       logger.error('Client profile: failed to fetch notes', error instanceof Error ? error : new Error(String(error)), {
         clientId,
       });
+      toastError('Eroare la incarcarea notelor');
     }
   };
 
@@ -145,6 +158,7 @@ export default function ClientProfileClient({
       logger.error('Client profile: failed to fetch files', error instanceof Error ? error : new Error(String(error)), {
         clientId,
       });
+      toastError('Eroare la incarcarea fisierelor');
     }
   };
 
@@ -158,6 +172,7 @@ export default function ClientProfileClient({
       logger.error('Client profile: failed to fetch stats', error instanceof Error ? error : new Error(String(error)), {
         clientId,
       });
+      toastError('Eroare la incarcarea statisticilor');
     }
   };
 
@@ -234,6 +249,45 @@ export default function ClientProfileClient({
         fileId,
       });
       toastError('Eroare la stergerea fisierului');
+    }
+  };
+
+  const handleGdprExport = async () => {
+    try {
+      window.open(`/api/clients/${clientId}/gdpr-export`, '_blank');
+    } catch {
+      toastError('Eroare la exportul datelor');
+    }
+  };
+
+  const handleGdprErase = async () => {
+    setGdprErasing(true);
+    try {
+      const response = await fetch(`/api/clients/${clientId}/gdpr-erase`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: true }),
+      });
+      if (!response.ok) throw new Error('Failed to erase');
+      window.location.href = '/clients';
+    } catch {
+      toastError('Eroare la stergerea definitiva a datelor');
+      setGdprErasing(false);
+    }
+  };
+
+  const handleConsentWithdraw = async () => {
+    try {
+      const response = await fetch(`/api/clients/${clientId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ consent_withdrawn: true }),
+      });
+      if (!response.ok) throw new Error('Failed to withdraw consent');
+      const result = await response.json();
+      setClient(prev => prev ? { ...prev, ...result.client } : prev);
+    } catch {
+      toastError('Eroare la retragerea consimtamantului');
     }
   };
 
@@ -356,6 +410,16 @@ export default function ClientProfileClient({
             <div>
               <h1>{client.name}</h1>
               <div className={styles.meta}>
+                {client.consent_given && !client.consent_withdrawn ? (
+                  <span className={`${styles.badge} ${styles.badgeSuccess}`}>GDPR ✓</span>
+                ) : client.consent_withdrawn ? (
+                  <span className={`${styles.badge} ${styles.badgeWarning}`}>CONSIMTAMANT RETRAS</span>
+                ) : (
+                  <span className={`${styles.badge} ${styles.badgeError}`}>FARA CONSIMTAMANT</span>
+                )}
+                {client.is_minor && (
+                  <span className={`${styles.badge} ${styles.badgeInfo}`}>MINOR</span>
+                )}
                 {client.total_spent >= 1000 && (
                   <span className={`${styles.badge} ${styles.badgeVip}`}>
                     VIP
@@ -500,6 +564,69 @@ export default function ClientProfileClient({
                     ))}
                   </div>
                 )}
+              </div>
+
+              <div className={styles.section}>
+                <h2>GDPR</h2>
+                <div className={styles.statsSecondary}>
+                  <div className={`${styles.statItem} ${styles.statItemSecondary}`}>
+                    <label>Consimtamant</label>
+                    <p>{client.consent_given ? (client.consent_withdrawn ? 'Retras' : 'Da') : 'Nu'}</p>
+                  </div>
+                  {client.consent_date && (
+                    <div className={`${styles.statItem} ${styles.statItemSecondary}`}>
+                      <label>Data consimtamant</label>
+                      <p>{formatDate(client.consent_date)}</p>
+                    </div>
+                  )}
+                  {client.consent_method && (
+                    <div className={`${styles.statItem} ${styles.statItemSecondary}`}>
+                      <label>Metoda</label>
+                      <p>{{
+                        digital_signature: 'Semnatura digitala',
+                        scanned_document: 'Document scanat',
+                        paper_on_file: 'Document fizic',
+                      }[client.consent_method] || client.consent_method}</p>
+                    </div>
+                  )}
+                  {client.is_minor && client.parent_guardian_name && (
+                    <div className={`${styles.statItem} ${styles.statItemSecondary}`}>
+                      <label>Parinte/Tutore</label>
+                      <p>{client.parent_guardian_name}</p>
+                    </div>
+                  )}
+                  {client.consent_withdrawn_date && (
+                    <div className={`${styles.statItem} ${styles.statItemSecondary}`}>
+                      <label>Data retragere</label>
+                      <p>{formatDate(client.consent_withdrawn_date)}</p>
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className={styles.actionButton}
+                    onClick={handleGdprExport}
+                  >
+                    Exporta date (GDPR)
+                  </button>
+                  {client.consent_given && !client.consent_withdrawn && (
+                    <button
+                      type="button"
+                      className={styles.editButton}
+                      onClick={handleConsentWithdraw}
+                    >
+                      Retrage consimtamant
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    style={{ background: '#dc2626', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer', fontSize: '0.875rem' }}
+                    onClick={() => setShowGdprErase(true)}
+                  >
+                    Sterge definitiv (GDPR)
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -670,6 +797,44 @@ export default function ClientProfileClient({
           </div>
         )}
 
+        {showGdprErase && (
+          <div
+            className={styles.modal}
+            onPointerDown={(e) => { gdprEraseBackdropRef.current = e.target === e.currentTarget; }}
+            onClick={(e) => {
+              if (gdprEraseBackdropRef.current && e.target === e.currentTarget) setShowGdprErase(false);
+              gdprEraseBackdropRef.current = false;
+            }}
+          >
+            <div className={styles.modalContent}>
+              <h3>Stergere definitiva (GDPR)</h3>
+              <p style={{ color: '#dc2626', fontWeight: 500 }}>
+                Aceasta actiune este ireversibila!
+              </p>
+              <p>
+                Toate datele pacientului vor fi sterse permanent: programari, conversatii,
+                mesaje, fisiere, note si toate informatiile asociate.
+              </p>
+              <div className={styles.modalActions}>
+                <button
+                  onClick={() => setShowGdprErase(false)}
+                  className={styles.cancelButton}
+                  disabled={gdprErasing}
+                >
+                  Anuleaza
+                </button>
+                <button
+                  onClick={handleGdprErase}
+                  disabled={gdprErasing}
+                  style={{ background: '#dc2626', color: 'white', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer' }}
+                >
+                  {gdprErasing ? 'Se sterge...' : 'Sterge definitiv'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <ClientCreateModal
           isOpen={showEditClient}
           mode="edit"
@@ -680,6 +845,10 @@ export default function ClientProfileClient({
             email: client.email,
             phone: client.phone,
             notes: client.notes,
+            consent_given: client.consent_given,
+            consent_method: client.consent_method,
+            is_minor: client.is_minor,
+            parent_guardian_name: client.parent_guardian_name,
           }}
           title="Editeaza client"
           submitLabel="Salveaza modificarile"

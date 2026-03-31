@@ -24,6 +24,15 @@ function isMongoInfrastructureError(error: unknown): boolean {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
+  cookies: {
+    sessionToken: {
+      options: {
+        sameSite: 'strict',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+      },
+    },
+  },
   providers: [
     Credentials({
       name: 'Email & Password',
@@ -64,6 +73,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             name: user.name || '',
             role: String(user.role || 'staff'),
             tenantId: user.tenant_id ? String(user.tenant_id) : null,
+            sessionVersion: Number(user.session_version || 0),
           };
         } catch (error) {
           if (isMongoInfrastructureError(error)) {

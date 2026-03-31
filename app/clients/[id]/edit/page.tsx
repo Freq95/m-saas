@@ -1,5 +1,6 @@
 import EditClientPageClient from './EditClientPageClient';
 import { getClientProfileData } from '@/lib/server/client-profile';
+import { getAuthUser } from '@/lib/auth-helpers';
 
 export const revalidate = 30;
 
@@ -11,7 +12,8 @@ export default async function EditClientPage({ params }: { params: Promise<{ id:
     return <EditClientPageClient clientId={id} initialClient={null} />;
   }
 
-  const profile = await getClientProfileData(clientId);
+  const { userId, tenantId } = await getAuthUser();
+  const profile = await getClientProfileData(clientId, tenantId, userId);
 
   return (
     <EditClientPageClient

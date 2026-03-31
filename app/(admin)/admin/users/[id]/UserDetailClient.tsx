@@ -104,7 +104,14 @@ export default function UserDetailClient({ user, tenant, memberships }: UserDeta
         <p>Email: {user.email}</p>
         <p>Status: {user.status}</p>
         <p>Tenant: {tenant?.name || 'Platform (no tenant)'}</p>
-        {user.deleted_at && <p>Deleted at: {new Date(user.deleted_at).toLocaleString()}</p>}
+        {user.deleted_at && (
+          <p suppressHydrationWarning>
+            Deleted at:{' '}
+            {new Date(user.deleted_at).toLocaleString('ro-RO', {
+              timeZone: 'Europe/Bucharest',
+            })}
+          </p>
+        )}
       </div>
 
       <form onSubmit={save} style={{ display: 'grid', gap: 8, maxWidth: 420 }}>

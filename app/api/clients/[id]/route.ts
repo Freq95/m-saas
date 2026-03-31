@@ -4,12 +4,14 @@ import { handleApiError, createSuccessResponse, createErrorResponse } from '@/li
 import { getClientProfileData } from '@/lib/server/client-profile';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { invalidateReadCaches } from '@/lib/cache-keys';
+import { logDataAccess } from '@/lib/audit';
+import { checkUpdateRateLimit } from '@/lib/rate-limit';
 
 // GET /api/clients/[id] - Get client details with history
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const { userId, dbUserId, tenantId, email, role } = await getAuthUser();
     const clientId = parseInt(params.id);
     if (isNaN(clientId) || clientId <= 0) {
       return createErrorResponse('Invalid client ID', 400);
@@ -19,6 +21,17 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     if (!profile) {
       return createErrorResponse('Client not found', 404);
     }
+
+    await logDataAccess({
+      actorUserId: dbUserId,
+      actorEmail: email,
+      actorRole: role,
+      tenantId,
+      targetType: 'client',
+      targetId: clientId,
+      route: `/api/clients/${params.id}`,
+      request,
+    });
 
     return createSuccessResponse(profile);
   } catch (error) {
@@ -36,6 +49,8 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       return createErrorResponse('Invalid client ID', 400);
     }
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkUpdateRateLimit(userId);
+    if (limited) return limited;
     const body = await request.json();
 
     // Verify client exists and belongs to this user before updating
@@ -56,7 +71,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       return createErrorResponse('Invalid input', 400, JSON.stringify(validationResult.error.errors));
     }
 
-    const { name, email, phone, notes } = validationResult.data;
+    const { name, email, phone, notes, consent_given, consent_date, consent_method, consent_withdrawn, is_minor, parent_guardian_name } = validationResult.data;
 
     const updates: Record<string, unknown> = {};
 
@@ -75,6 +90,16 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     if (notes !== undefined) {
       updates.notes = notes;
     }
+
+    if (consent_given !== undefined) updates.consent_given = consent_given;
+    if (consent_date !== undefined) updates.consent_date = consent_date;
+    if (consent_method !== undefined) updates.consent_method = consent_method;
+    if (consent_withdrawn !== undefined) {
+      updates.consent_withdrawn = consent_withdrawn;
+      if (consent_withdrawn) updates.consent_withdrawn_date = new Date().toISOString();
+    }
+    if (is_minor !== undefined) updates.is_minor = is_minor;
+    if (parent_guardian_name !== undefined) updates.parent_guardian_name = parent_guardian_name;
 
     if (Object.keys(updates).length === 0) {
       return createErrorResponse('No fields to update', 400);
@@ -117,6 +142,8 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
     }
 
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkUpdateRateLimit(userId);
+    if (limited) return limited;
 
     // Verify client exists and belongs to this user
     const existing = await db.collection('clients').findOne({

@@ -3,6 +3,7 @@ import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { getStorageProvider } from '@/lib/storage';
+import { checkUpdateRateLimit } from '@/lib/rate-limit';
 
 // PATCH /api/clients/[id]/files/[fileId] - Update file description
 export async function PATCH(
@@ -11,7 +12,9 @@ export async function PATCH(
 ) {
   const params = await props.params;
   try {
-    const { tenantId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
+    const limited = await checkUpdateRateLimit(userId);
+    if (limited) return limited;
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
     const fileId = parseInt(params.fileId);
@@ -29,6 +32,7 @@ export async function PATCH(
     let file = await db.collection('client_files').findOne({
       id: fileId,
       client_id: clientId,
+      user_id: userId,
       tenant_id: tenantId,
     });
     let collectionName = 'client_files';
@@ -37,6 +41,7 @@ export async function PATCH(
       file = await db.collection('contact_files').findOne({
         id: fileId,
         contact_id: clientId,
+        user_id: userId,
         tenant_id: tenantId,
       });
       collectionName = 'contact_files';
@@ -78,7 +83,9 @@ export async function DELETE(
 ) {
   const params = await props.params;
   try {
-    const { tenantId } = await getAuthUser();
+    const { userId, tenantId } = await getAuthUser();
+    const limited = await checkUpdateRateLimit(userId);
+    if (limited) return limited;
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
     const fileId = parseInt(params.fileId);
@@ -93,6 +100,7 @@ export async function DELETE(
     let file = await db.collection('client_files').findOne({
       id: fileId,
       client_id: clientId,
+      user_id: userId,
       tenant_id: tenantId,
     });
     let collectionName = 'client_files';
@@ -101,6 +109,7 @@ export async function DELETE(
       file = await db.collection('contact_files').findOne({
         id: fileId,
         contact_id: clientId,
+        user_id: userId,
         tenant_id: tenantId,
       });
       collectionName = 'contact_files';

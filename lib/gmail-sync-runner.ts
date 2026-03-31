@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb';
-import { getMongoDbOrThrow, getNextNumericId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, type FlexDoc } from '@/lib/db/mongo-utils';
 import { decrypt } from '@/lib/encryption';
 import { fetchGmailMessages, getValidAccessToken } from '@/lib/gmail';
 import { logger } from '@/lib/logger';
@@ -142,11 +142,11 @@ export async function syncGmailInboxForIntegration(
         created_at: nowIso,
         updated_at: nowIso,
       };
-      await db.collection('conversations').insertOne(conversationDoc);
+      await db.collection<FlexDoc>('conversations').insertOne(conversationDoc);
 
       const { serializeMessage } = await import('@/lib/email-types');
       const messageId = await getNextNumericId('messages');
-      await db.collection('messages').insertOne({
+      await db.collection<FlexDoc>('messages').insertOne({
         _id: messageId,
         id: messageId,
         tenant_id: integration.tenant_id,

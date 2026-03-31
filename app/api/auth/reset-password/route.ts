@@ -89,6 +89,9 @@ export async function POST(request: NextRequest) {
           password_hash: passwordHash,
           updated_at: now,
         },
+        $inc: {
+          session_version: 1,
+        },
         $unset: {
           reset_token: '',
           reset_token_expires: '',

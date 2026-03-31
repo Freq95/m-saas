@@ -2,9 +2,14 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getSuperAdmin } from '@/lib/auth-helpers';
+import { logDataAccess } from '@/lib/audit';
 
 export default async function AdminDashboardPage() {
-  try { await getSuperAdmin(); } catch { redirect('/login'); }
+  const superAdmin = await getSuperAdmin().catch(() => null);
+  if (!superAdmin) {
+    redirect('/login');
+  }
+  const { userId: actorUserId, email: actorEmail } = superAdmin;
   const db = await getMongoDbOrThrow();
   const [totalTenants, totalUsers, activeUsers, pendingInvites, plans, recentTenants] = await Promise.all([
     db.collection('tenants').countDocuments({}),
@@ -20,6 +25,18 @@ export default async function AdminDashboardPage() {
       .toArray(),
     db.collection('tenants').find({}).sort({ created_at: -1 }).limit(10).toArray(),
   ]);
+
+  await logDataAccess({
+    actorUserId,
+    actorEmail,
+    actorRole: 'super_admin',
+    targetType: 'admin.dashboard',
+    route: '/admin',
+    metadata: {
+      totalTenants,
+      totalUsers,
+    },
+  });
 
   return (
     <div style={{ display: 'grid', gap: 16 }}>

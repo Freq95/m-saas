@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { ObjectId } from 'mongodb';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { getSuperAdmin } from '@/lib/auth-helpers';
+import { logDataAccess } from '@/lib/audit';
 import UserDetailClient from './UserDetailClient';
 
 type UserDetailPageProps = {
@@ -9,7 +10,11 @@ type UserDetailPageProps = {
 };
 
 export default async function UserDetailPage({ params }: UserDetailPageProps) {
-  try { await getSuperAdmin(); } catch { redirect('/login'); }
+  const superAdmin = await getSuperAdmin().catch(() => null);
+  if (!superAdmin) {
+    redirect('/login');
+  }
+  const { userId: actorUserId, email: actorEmail } = superAdmin;
   const { id } = await params;
   if (!ObjectId.isValid(id)) notFound();
   const userId = new ObjectId(id);
@@ -22,6 +27,18 @@ export default async function UserDetailPage({ params }: UserDetailPageProps) {
     user.tenant_id ? db.collection('tenants').findOne({ _id: user.tenant_id }) : null,
     db.collection('team_members').find({ user_id: userId }).toArray(),
   ]);
+
+  await logDataAccess({
+    actorUserId,
+    actorEmail,
+    actorRole: 'super_admin',
+    targetType: 'user',
+    targetId: userId,
+    route: `/admin/users/${id}`,
+    metadata: {
+      membershipCount: memberships.length,
+    },
+  });
 
   return (
     <UserDetailClient

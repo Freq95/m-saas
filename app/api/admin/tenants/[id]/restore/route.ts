@@ -4,6 +4,7 @@ import { createErrorResponse, createSuccessResponse, handleApiError } from '@/li
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getSuperAdmin } from '@/lib/auth-helpers';
 import { logAdminAudit } from '@/lib/audit';
+import { checkUpdateRateLimit } from '@/lib/rate-limit';
 
 async function restoreTenantCascade(db: any, tenantId: ObjectId) {
   const nowIso = new Date().toISOString();
@@ -39,6 +40,8 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
   const params = await props.params;
   try {
     const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
+    const limited = await checkUpdateRateLimit(String(actorUserId));
+    if (limited) return limited;
     if (!ObjectId.isValid(params.id)) return createErrorResponse('Invalid tenant id', 400);
     const tenantId = new ObjectId(params.id);
 

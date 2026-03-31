@@ -3,7 +3,7 @@ import { ObjectId } from 'mongodb';
 
 type AppointmentQuery = {
   userId?: number;
-  tenantId?: ObjectId;
+  tenantId: ObjectId;
   startDate?: string | Date;
   endDate?: string | Date;
   providerId?: number;
@@ -25,7 +25,7 @@ const SERVICES_PROJECTION = {
   updated_at: 1,
 };
 
-export async function getAppointmentsData(query: AppointmentQuery = {}) {
+export async function getAppointmentsData(query: AppointmentQuery) {
   const db = await getMongoDbOrThrow();
   if (!query.userId) {
     throw new Error('userId is required');
@@ -41,12 +41,10 @@ export async function getAppointmentsData(query: AppointmentQuery = {}) {
 
   const filter: Record<string, unknown> = {
     user_id: userId,
+    tenant_id: tenantId,
     deleted_at: { $exists: false },
     ...(status ? {} : { status: { $ne: 'cancelled' } }),
   };
-  if (tenantId) {
-    filter.tenant_id = tenantId;
-  }
   if (startDate || endDate) {
     const range: Record<string, string> = {};
     if (startDate) range.$gte = startDate;
@@ -75,11 +73,7 @@ export async function getAppointmentsData(query: AppointmentQuery = {}) {
 
     const matchingServices = await db
       .collection('services')
-      .find(
-        tenantId
-          ? { user_id: userId, tenant_id: tenantId, name: regex }
-          : { user_id: userId, name: regex }
-      )
+      .find({ user_id: userId, tenant_id: tenantId, name: regex, deleted_at: { $exists: false } })
       .project({ id: 1 })
       .toArray();
     const matchingServiceIds = matchingServices
@@ -115,6 +109,7 @@ export async function getAppointmentsData(query: AppointmentQuery = {}) {
       color: 1,
       notes: 1,
       reminder_sent: 1,
+      service_name: 1,
       created_at: 1,
       updated_at: 1,
     })
@@ -122,7 +117,7 @@ export async function getAppointmentsData(query: AppointmentQuery = {}) {
 
   const servicesQuery = db
     .collection('services')
-    .find(tenantId ? { user_id: userId, tenant_id: tenantId } : { user_id: userId })
+    .find({ user_id: userId, tenant_id: tenantId })
     .project(SERVICES_PROJECTION);
 
   const [appointments, services] = await Promise.all([
@@ -138,18 +133,18 @@ export async function getAppointmentsData(query: AppointmentQuery = {}) {
     const service = serviceById.get(appointment.service_id);
     return {
       ...appointment,
-      service_name: service?.name || '',
+      service_name: service?.name || (appointment.service_name as string | undefined) || '',
       duration_minutes: service?.duration_minutes,
       service_price: service?.price,
     };
   });
 }
 
-export async function getServicesData(userId: number, tenantId?: ObjectId) {
+export async function getServicesData(userId: number, tenantId: ObjectId) {
   const db = await getMongoDbOrThrow();
   const servicesQuery = db
     .collection('services')
-    .find(tenantId ? { user_id: userId, tenant_id: tenantId } : { user_id: userId })
+    .find({ user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } })
     .project(SERVICES_PROJECTION)
     .sort({ name: 1 });
   const services = await servicesQuery.toArray();

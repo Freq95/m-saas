@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getSuperAdmin } from '@/lib/auth-helpers';
+import { logDataAccess } from '@/lib/audit';
 
 type AuditPageProps = {
   searchParams?: Promise<{
@@ -9,7 +10,11 @@ type AuditPageProps = {
 };
 
 export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
-  try { await getSuperAdmin(); } catch { redirect('/login'); }
+  const superAdmin = await getSuperAdmin().catch(() => null);
+  if (!superAdmin) {
+    redirect('/login');
+  }
+  const { userId: actorUserId, email: actorEmail } = superAdmin;
   const db = await getMongoDbOrThrow();
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const action = resolvedSearchParams?.action?.trim();
@@ -19,6 +24,18 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
   }
 
   const logs = await db.collection('audit_logs').find(filter).sort({ created_at: -1 }).limit(200).toArray();
+
+  await logDataAccess({
+    actorUserId,
+    actorEmail,
+    actorRole: 'super_admin',
+    targetType: 'audit_logs',
+    route: '/admin/audit',
+    metadata: {
+      action: action || null,
+      resultCount: logs.length,
+    },
+  });
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>

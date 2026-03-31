@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { checkWriteRateLimit } from '@/lib/rate-limit';
 
 // Validation schemas
 const createReminderSchema = z.object({
@@ -51,6 +52,7 @@ export async function GET(request: NextRequest) {
     const reminderFilter: Record<string, any> = {
       appointment_id: { $in: appointmentIds },
       tenant_id: tenantId,
+      deleted_at: { $exists: false },
     };
     if (status) reminderFilter.status = status;
     if (channel) reminderFilter.channel = channel;
@@ -86,6 +88,8 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { userId, tenantId } = await getAuthUser();
+    const rateLimitResponse = await checkWriteRateLimit(userId);
+    if (rateLimitResponse) return rateLimitResponse;
     const db = await getMongoDbOrThrow();
     const body = await request.json();
 
@@ -136,7 +140,7 @@ export async function POST(request: NextRequest) {
       updated_at: now,
     };
 
-    await db.collection('reminders').insertOne(reminderDoc);
+    await db.collection<FlexDoc>('reminders').insertOne(reminderDoc);
 
     return createSuccessResponse({
       reminder: stripMongoId(reminderDoc),

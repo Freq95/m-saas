@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getSuperAdmin } from '@/lib/auth-helpers';
+import { logDataAccess } from '@/lib/audit';
 
 type AdminUsersPageProps = {
   searchParams?: Promise<{
@@ -12,7 +13,11 @@ type AdminUsersPageProps = {
 };
 
 export default async function AdminUsersPage({ searchParams }: AdminUsersPageProps) {
-  try { await getSuperAdmin(); } catch { redirect('/login'); }
+  const superAdmin = await getSuperAdmin().catch(() => null);
+  if (!superAdmin) {
+    redirect('/login');
+  }
+  const { userId: actorUserId, email: actorEmail } = superAdmin;
   const db = await getMongoDbOrThrow();
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const search = resolvedSearchParams?.search?.trim() || '';
@@ -46,6 +51,20 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
     existing.push(membership);
     membershipMap.set(key, existing);
   }
+
+  await logDataAccess({
+    actorUserId,
+    actorEmail,
+    actorRole: 'super_admin',
+    targetType: 'user.collection',
+    route: '/admin/users',
+    metadata: {
+      search: search || null,
+      role: role || null,
+      status: status || null,
+      resultCount: users.length,
+    },
+  });
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>

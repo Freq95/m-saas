@@ -13,7 +13,7 @@ export default async function EmailSettingsPage() {
     redirect('/login');
   }
 
-  const integrations = await getUserEmailIntegrations(auth.userId);
+  const integrations = await getUserEmailIntegrations(auth.userId, auth.tenantId);
 
   return <EmailSettingsPageClient initialIntegrations={integrations} initialUserId={auth.userId} />;
 }

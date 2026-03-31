@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMongoDbOrThrow, getNextNumericId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, type FlexDoc } from '@/lib/db/mongo-utils';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { getCached } from '@/lib/redis';
 import { blockedTimesCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
 import { logger } from '@/lib/logger';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
+import { createBlockedTimeSchema, BLOCKED_TIME_RECURRENCE_MAX } from '@/lib/validation';
 
 function toDate(value: unknown): Date | null {
   if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
@@ -108,31 +109,26 @@ export async function POST(request: NextRequest) {
     const limited = await checkWriteRateLimit(userId);
     if (limited) return limited;
     const body = await request.json();
-    const { providerId, resourceId, startTime, endTime, reason, recurrence } = body;
 
-    if (!startTime || !endTime || !reason) {
+    const parsed = createBlockedTimeSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: 'startTime, endTime, and reason are required' },
+        { error: 'Invalid input', details: parsed.error.errors },
         { status: 400 }
       );
     }
 
+    const { startTime, endTime, reason, providerId, resourceId, recurrence } = parsed.data;
+
     const db = await getMongoDbOrThrow();
     const userIdNumber = Number(userId);
-    const providerIdNumber = providerId ? Number(providerId) : undefined;
-    const resourceIdNumber = resourceId ? Number(resourceId) : undefined;
+    const providerIdNumber = providerId ?? undefined;
+    const resourceIdNumber = resourceId ?? undefined;
     const startDateObj = toDate(startTime);
     const endDateObj = toDate(endTime);
 
-    if (
-      Number.isNaN(userIdNumber) ||
-      !startDateObj ||
-      !endDateObj ||
-      startDateObj >= endDateObj ||
-      (providerIdNumber !== undefined && Number.isNaN(providerIdNumber)) ||
-      (resourceIdNumber !== undefined && Number.isNaN(resourceIdNumber))
-    ) {
-      return NextResponse.json({ error: 'Invalid input fields' }, { status: 400 });
+    if (!startDateObj || !endDateObj || startDateObj >= endDateObj) {
+      return NextResponse.json({ error: 'Invalid time range' }, { status: 400 });
     }
 
     const nextId = await getNextNumericId('blocked_times');
@@ -162,7 +158,7 @@ export async function POST(request: NextRequest) {
       blockedTime.recurrence_group_id = recurrenceGroupId;
     }
 
-    await db.collection('blocked_times').insertOne(blockedTime);
+    await db.collection<FlexDoc>('blocked_times').insertOne(blockedTime);
 
     // If recurring, create additional instances
     if (recurrence && recurrenceGroupId) {
@@ -206,7 +202,7 @@ function generateRecurringInstances(
 
   let currentStart = new Date(startTime);
   let count = 0;
-  const maxCount = recurrence.count || 52; // Default max 52 occurrences
+  const maxCount = Math.min(recurrence.count || BLOCKED_TIME_RECURRENCE_MAX, BLOCKED_TIME_RECURRENCE_MAX);
 
   while (count < maxCount) {
     // Calculate next occurrence based on frequency

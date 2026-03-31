@@ -3,7 +3,7 @@
  * Handles storing and retrieving email integration credentials
  */
 
-import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from './db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from './db/mongo-utils';
 import { encrypt, decrypt } from './encryption';
 import { logger } from './logger';
 import { ObjectId } from 'mongodb';
@@ -178,7 +178,7 @@ export async function saveEmailIntegration(
       updated_at: now,
     };
 
-    await db.collection('email_integrations').insertOne(doc);
+    await db.collection<FlexDoc>('email_integrations').insertOne(doc);
     return normalizeEmailIntegration(doc);
   } catch (error) {
     logger.error('Error saving email integration', { error, userId, provider, email });

@@ -268,13 +268,17 @@ export async function checkAppointmentConflict(
       ...(resourceId ? { resource_id: resourceId } : {}),
     };
 
-    const busyIntervals = (await db.collection('appointments').find(busyQuery).toArray()) as BusyInterval[];
+    const busyIntervals = (await db.collection('appointments').find(busyQuery as any).toArray()) as unknown as BusyInterval[];
 
     let searchStart = new Date(endTime);
     let foundSlots = 0;
     while (foundSlots < 3 && searchStart < searchWindowEnd) {
       const searchEnd = new Date(searchStart.getTime() + duration);
-      const hasOverlap = busyIntervals.some((b: BusyInterval) => new Date(b.start_time) < searchEnd && new Date(b.end_time) > searchStart);
+      const hasOverlap = busyIntervals.some((b: BusyInterval) => {
+        const bStart = new Date(b.start_time);
+        const bEnd = new Date(b.end_time);
+        return !isNaN(bStart.getTime()) && !isNaN(bEnd.getTime()) && bStart < searchEnd && bEnd > searchStart;
+      });
       if (!hasOverlap) {
         suggestions.push({ start: new Date(searchStart), end: new Date(searchEnd) });
         foundSlots++;

@@ -11,6 +11,7 @@ type ClientsQuery = {
   sortOrder?: string;
   page?: number;
   limit?: number;
+  consentFilter?: 'all' | 'consented' | 'not_consented' | 'withdrawn';
 };
 
 type PaginationInfo = {
@@ -40,6 +41,7 @@ export async function getClientsData(query: ClientsQuery = {}): Promise<ClientsR
   const sortOrder = query.sortOrder ?? 'DESC';
   const page = query.page ?? 1;
   const limit = query.limit ?? DEFAULT_PAGE_SIZE;
+  const consentFilter = query.consentFilter ?? 'all';
   const offset = (page - 1) * limit;
 
   const filter: Record<string, unknown> = {
@@ -57,6 +59,18 @@ export async function getClientsData(query: ClientsQuery = {}): Promise<ClientsR
       { email: regex },
       { phone: regex },
     ];
+  }
+
+  if (consentFilter === 'consented') {
+    filter.consent_given = true;
+    filter.consent_withdrawn = { $ne: true };
+  } else if (consentFilter === 'not_consented') {
+    filter.$and = [
+      { $or: [{ consent_given: { $ne: true } }, { consent_given: { $exists: false } }] },
+      { consent_withdrawn: { $ne: true } },
+    ];
+  } else if (consentFilter === 'withdrawn') {
+    filter.consent_withdrawn = true;
   }
 
   const validSortColumns = new Set([
@@ -96,6 +110,8 @@ export async function getClientsData(query: ClientsQuery = {}): Promise<ClientsR
       created_at: 1,
       updated_at: 1,
       deleted_at: 1,
+      consent_given: 1,
+      consent_withdrawn: 1,
     })
     .sort(sort)
     .skip(offset)

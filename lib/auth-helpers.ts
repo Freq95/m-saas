@@ -31,6 +31,19 @@ export interface AuthContext {
 
 const ROLE_HIERARCHY: UserRole[] = ['staff', 'owner', 'super_admin'];
 
+function parseSessionVersion(rawValue: unknown): number {
+  const parsed =
+    typeof rawValue === 'number'
+      ? rawValue
+      : typeof rawValue === 'string'
+        ? Number.parseInt(rawValue, 10)
+        : 0;
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new AuthError('Invalid session version', 401);
+  }
+  return Math.trunc(parsed);
+}
+
 export async function getAuthUser(): Promise<AuthContext> {
   const session = await auth();
   const userIdRaw = session?.user?.id?.trim();
@@ -57,17 +70,53 @@ export async function getAuthUser(): Promise<AuthContext> {
     throw new AuthError('Invalid tenant identifier in session', 401);
   }
 
+  const sessionVersion = parseSessionVersion(session.user.sessionVersion);
+  const db = await getMongoDbOrThrow();
+  const dbUserId = new ObjectId(dbUserIdRaw);
+  const tenantId = new ObjectId(session.user.tenantId);
+
+  const [dbUser, tenant, membership] = await Promise.all([
+    db.collection('users').findOne({ _id: dbUserId, tenant_id: tenantId }),
+    db.collection('tenants').findOne({ _id: tenantId }),
+    db.collection('team_members').findOne({ user_id: dbUserId, tenant_id: tenantId }),
+  ]);
+
+  if (!dbUser) {
+    throw new AuthError('User account not found', 401);
+  }
+
+  const dbSessionVersion = parseSessionVersion(dbUser.session_version ?? 0);
+  if (dbSessionVersion !== sessionVersion) {
+    throw new AuthError('Session expired. Please sign in again.', 401);
+  }
+
+  if (dbUser.status !== 'active') {
+    throw new AuthError('User account is not active', 403);
+  }
+  if (!tenant || tenant.status !== 'active') {
+    throw new AuthError('Tenant is not active', 403);
+  }
+  if (!membership || membership.status !== 'active') {
+    throw new AuthError('Membership is not active', 403);
+  }
+
+  if (typeof dbUser.id === 'number' && Number.isFinite(dbUser.id)) {
+    if (Math.trunc(dbUser.id) !== userId) {
+      throw new AuthError('Session user identifier mismatch', 401);
+    }
+  }
+
   return {
     userId,
     userIdRaw,
-    dbUserId: new ObjectId(dbUserIdRaw),
-    tenantId: new ObjectId(session.user.tenantId),
-    email: session.user.email || '',
-    name: session.user.name || '',
-    role: (session.user.role || 'staff') as UserRole,
-    userStatus: 'active',
-    tenantStatus: 'active',
-    membershipStatus: 'active',
+    dbUserId,
+    tenantId,
+    email: dbUser.email || session.user.email || '',
+    name: dbUser.name || session.user.name || '',
+    role: (dbUser.role || session.user.role || 'staff') as UserRole,
+    userStatus: String(dbUser.status || 'active'),
+    tenantStatus: String(tenant.status || 'active'),
+    membershipStatus: String(membership.status || 'active'),
   };
 }
 
@@ -83,11 +132,16 @@ export async function getSuperAdmin(): Promise<{ userId: ObjectId; userIdRaw: st
   if (!ObjectId.isValid(userIdRaw)) {
     throw new AuthError('Invalid super-admin identifier', 401);
   }
+  const sessionVersion = parseSessionVersion(session.user.sessionVersion);
   const db = await getMongoDbOrThrow();
   const userId = new ObjectId(userIdRaw);
   const superAdmin = await db.collection('users').findOne({ _id: userId, role: 'super_admin' });
   if (!superAdmin) {
     throw new AuthError('Super-admin account not found', 403);
+  }
+  const dbSessionVersion = parseSessionVersion(superAdmin.session_version ?? 0);
+  if (dbSessionVersion !== sessionVersion) {
+    throw new AuthError('Session expired. Please sign in again.', 401);
   }
   if (superAdmin.status !== 'active') {
     throw new AuthError('Super-admin account is not active', 403);

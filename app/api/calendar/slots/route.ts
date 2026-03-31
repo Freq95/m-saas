@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     // Get service duration
     let serviceDuration = 60; // default
     if (serviceId) {
-      const serviceDoc = await db.collection('services').findOne({ id: Number(serviceId), tenant_id: tenantId });
+      const serviceDoc = await db.collection('services').findOne({ id: Number(serviceId), tenant_id: tenantId, deleted_at: { $exists: false } });
       if (serviceDoc?.duration_minutes) {
         serviceDuration = serviceDoc.duration_minutes;
       }

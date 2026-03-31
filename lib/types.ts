@@ -89,20 +89,6 @@ export interface Client {
   updated_at: string;
 }
 
-export interface Task {
-  id: number;
-  user_id: number;
-  client_id: number | null;
-  contact_id: number | null; // Legacy support
-  title: string;
-  description: string | null;
-  due_date: string | null;
-  status: 'open' | 'completed' | 'cancelled';
-  priority: 'low' | 'medium' | 'high';
-  created_at: string;
-  updated_at: string;
-}
-
 export interface Reminder {
   id: number;
   appointment_id: number;

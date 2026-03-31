@@ -5,6 +5,7 @@ declare module 'next-auth' {
     role: string;
     tenantId: string | null;
     dbUserId: string;
+    sessionVersion: number;
   }
 
   interface Session {
@@ -15,6 +16,7 @@ declare module 'next-auth' {
       name: string;
       role: string;
       tenantId: string | null;
+      sessionVersion: number;
     };
   }
 }
@@ -25,5 +27,6 @@ declare module 'next-auth/jwt' {
     dbUserId: string;
     role: string;
     tenantId: string | null;
+    sessionVersion: number;
   }
 }

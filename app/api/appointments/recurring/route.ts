@@ -6,6 +6,7 @@ import { getAuthUser } from '@/lib/auth-helpers';
 import { invalidateReadCaches } from '@/lib/cache-keys';
 import { logger } from '@/lib/logger';
 import { generateRecurringInstances } from '@/lib/recurring-utils';
+import { checkWriteRateLimit } from '@/lib/rate-limit';
 
 interface RecurringConflict {
   start: Date;
@@ -18,6 +19,8 @@ interface RecurringConflict {
 export async function POST(request: NextRequest) {
   try {
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkWriteRateLimit(userId);
+    if (limited) return limited;
     const body = await request.json();
     const { createRecurringAppointmentSchema } = await import('@/lib/validation');
     const validationResult = createRecurringAppointmentSchema.safeParse(body);
@@ -40,6 +43,7 @@ export async function POST(request: NextRequest) {
       category,
       color,
       recurrence,
+      forceNewClient,
     } = validationResult.data;
 
     const db = await getMongoDbOrThrow();
@@ -63,7 +67,8 @@ export async function POST(request: NextRequest) {
       tenantId,
       clientName,
       clientEmail || undefined,
-      clientPhone || undefined
+      clientPhone || undefined,
+      forceNewClient
     );
 
     const recurrenceRule: RecurrenceRule = {
@@ -99,7 +104,7 @@ export async function POST(request: NextRequest) {
     const conflicts: RecurringConflict[] = [];
 
     // Get service details
-    const service = await db.collection('services').findOne({ id: normalizedServiceId, tenant_id: tenantId });
+    const service = await db.collection('services').findOne({ id: normalizedServiceId, tenant_id: tenantId, deleted_at: { $exists: false } });
     const serviceName = service?.name || 'Unknown Service';
 
     // Create each instance

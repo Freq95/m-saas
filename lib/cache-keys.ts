@@ -41,6 +41,7 @@ export function clientsListCacheKey(
     sortOrder?: string;
     page?: number;
     limit?: number;
+    consentFilter?: string;
   }
 ): string {
   return `${scopePrefix(scope)}:clients:list:${serializeQuery(params)}`;

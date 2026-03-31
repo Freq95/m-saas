@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { getServicesData } from '@/lib/server/calendar';
 import { getAuthUser } from '@/lib/auth-helpers';
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
       updated_at: now,
     };
 
-    await db.collection('services').insertOne(serviceDoc);
+    await db.collection<FlexDoc>('services').insertOne(serviceDoc);
     await invalidateReadCaches({ tenantId, userId });
 
     return createSuccessResponse({ service: stripMongoId(serviceDoc) }, 201);

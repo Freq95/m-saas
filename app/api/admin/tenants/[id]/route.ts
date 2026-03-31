@@ -3,11 +3,25 @@ import { ObjectId } from 'mongodb';
 import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getSuperAdmin } from '@/lib/auth-helpers';
-import { logAdminAudit } from '@/lib/audit';
+import { logAdminAudit, logDataAccess } from '@/lib/audit';
+import { checkUpdateRateLimit } from '@/lib/rate-limit';
 
 function parseTenantId(id: string): ObjectId | null {
   if (!ObjectId.isValid(id)) return null;
   return new ObjectId(id);
+}
+
+function sanitizeAdminUser(user: any) {
+  if (!user) return null;
+  const {
+    password_hash: _passwordHash,
+    reset_token: _resetToken,
+    reset_token_expires: _resetTokenExpires,
+    token: _token,
+    token_hash: _tokenHash,
+    ...safeUser
+  } = user;
+  return safeUser;
 }
 
 async function cascadeTenantStatus(db: any, tenantId: ObjectId, targetStatus: 'suspended' | 'deleted') {
@@ -40,6 +54,9 @@ async function cascadeTenantStatus(db: any, tenantId: ObjectId, targetStatus: 's
             pre_tenant_disable_status: currentStatus,
             disabled_by_tenant: true,
             updated_at: nowIso,
+          },
+          $inc: {
+            session_version: 1,
           },
         }
       );
@@ -80,7 +97,7 @@ async function restoreTenantCascade(db: any, tenantId: ObjectId) {
 export async function GET(_request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    await getSuperAdmin();
+    const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
     const tenantId = parseTenantId(params.id);
     if (!tenantId) return createErrorResponse('Invalid tenant id', 400);
 
@@ -110,9 +127,23 @@ export async function GET(_request: NextRequest, props: { params: Promise<{ id: 
 
     const seatUsage = enrichedMembers.filter((member: any) => ['active', 'pending_invite'].includes(member.status)).length;
 
+    await logDataAccess({
+      actorUserId,
+      actorEmail,
+      actorRole: 'super_admin',
+      targetType: 'tenant',
+      targetId: tenantId,
+      route: `/api/admin/tenants/${params.id}`,
+      request: _request,
+      metadata: {
+        memberCount: enrichedMembers.length,
+        seatUsage,
+      },
+    });
+
     return createSuccessResponse({
       tenant,
-      owner,
+      owner: sanitizeAdminUser(owner),
       members: enrichedMembers,
       seatUsage,
       maxSeats: tenant.max_seats || 1,
@@ -127,6 +158,8 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
   const params = await props.params;
   try {
     const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
+    const limited = await checkUpdateRateLimit(String(actorUserId));
+    if (limited) return limited;
     const tenantId = parseTenantId(params.id);
     if (!tenantId) return createErrorResponse('Invalid tenant id', 400);
     const body = await request.json();
@@ -209,6 +242,8 @@ export async function DELETE(_request: NextRequest, props: { params: Promise<{ i
   const params = await props.params;
   try {
     const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
+    const limited = await checkUpdateRateLimit(String(actorUserId));
+    if (limited) return limited;
     const tenantId = parseTenantId(params.id);
     if (!tenantId) return createErrorResponse('Invalid tenant id', 400);
 

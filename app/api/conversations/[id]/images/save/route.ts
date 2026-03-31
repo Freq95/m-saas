@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from '@/lib/db/mongo-utils';
 import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { linkConversationToClient } from '@/lib/client-matching';
 import { parseStoredMessage, serializeMessage } from '@/lib/email-types';
@@ -208,7 +208,7 @@ export async function POST(
       updated_at: now,
     };
 
-    await db.collection('client_files').insertOne(fileDoc);
+    await db.collection<FlexDoc>('client_files').insertOne(fileDoc);
     await db.collection('clients').updateOne(
       { id: targetClientId, tenant_id: tenantId },
       { $set: { last_activity_date: now, updated_at: now } }

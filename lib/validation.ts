@@ -79,7 +79,7 @@ export const updateAppointmentSchema = z.object({
     endType: z.enum(['date', 'count']).optional(),
     endDate: z.string().date().optional(),
     end_date: z.string().date().optional(),
-    count: z.number().int().positive().optional(),
+    count: z.number().int().positive().max(52).optional(),
   }).strict().optional().nullable(),
   status: z.enum(['scheduled', 'completed', 'cancelled', 'no-show']).optional(),
   notes: z.string().max(2000).optional(),
@@ -92,7 +92,7 @@ const recurrenceSchema = z
     endType: z.enum(['date', 'count']).optional(),
     endDate: z.string().date().optional(),
     end_date: z.string().date().optional(),
-    count: z.number().int().positive().optional(),
+    count: z.number().int().positive().max(52).optional(),
   })
   .strict();
 
@@ -110,15 +110,23 @@ export const createRecurringAppointmentSchema = z
     category: z.string().max(120).optional(),
     color: z.string().max(120).optional(),
     recurrence: recurrenceSchema,
+    forceNewClient: z.boolean().optional(),
   })
   .strict();
 
 // Client schemas
+export const consentMethodEnum = z.enum(['digital_signature', 'scanned_document', 'paper_on_file']);
+
 export const createClientSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255),
   email: emailSchema.optional(),
   phone: phoneSchema,
   notes: z.string().max(5000).optional(),
+  consent_given: z.boolean().optional(),
+  consent_date: z.string().datetime().optional(),
+  consent_method: consentMethodEnum.optional(),
+  is_minor: z.boolean().optional(),
+  parent_guardian_name: z.string().max(255).optional(),
 });
 
 export const updateClientSchema = z.object({
@@ -126,6 +134,12 @@ export const updateClientSchema = z.object({
   email: emailSchema.optional(),
   phone: phoneSchema,
   notes: z.string().max(5000).optional(),
+  consent_given: z.boolean().optional(),
+  consent_date: z.string().datetime().optional(),
+  consent_method: consentMethodEnum.optional(),
+  consent_withdrawn: z.boolean().optional(),
+  is_minor: z.boolean().optional(),
+  parent_guardian_name: z.string().max(255).optional(),
 });
 
 // Service schemas
@@ -185,11 +199,6 @@ export const calendarSlotsQuerySchema = z.object({
   resourceId: z.string().regex(/^\d+$/).transform(Number).optional(),
 });
 
-export const tasksQuerySchema = z.object({
-  contactId: z.string().regex(/^\d+$/).transform(Number).optional(),
-  status: z.enum(['open', 'completed', 'cancelled']).optional(),
-});
-
 export const remindersQuerySchema = z.object({
   status: z.enum(['pending', 'sent', 'failed']).optional(),
 });
@@ -197,35 +206,6 @@ export const remindersQuerySchema = z.object({
 // Client note schema
 export const createNoteSchema = z.object({
   content: z.string().min(1, 'Note content is required').max(5000),
-});
-
-// Task create schema
-export const createTaskSchema = z.object({
-  contactId: z.number().int().positive().optional(),
-  title: z.string().min(1, 'Title is required').max(255),
-  description: z.string().max(2000).optional(),
-  dueDate: z.string().datetime().optional().nullable(),
-  status: z.enum(['open', 'completed', 'cancelled']).optional().default('open'),
-  priority: z.enum(['low', 'medium', 'high']).optional().default('medium'),
-});
-
-// Task update schema
-export const updateTaskSchema = z.object({
-  title: z.string().min(1).max(255).optional(),
-  description: z.string().max(2000).optional(),
-  dueDate: z.string().datetime().optional().nullable(),
-  status: z.enum(['open', 'completed', 'cancelled']).optional(),
-  priority: z.enum(['low', 'medium', 'high']).optional(),
-});
-
-// Waitlist schemas
-export const createWaitlistEntrySchema = z.object({
-  clientId: z.number().int().positive(),
-  serviceId: z.number().int().positive(),
-  providerId: z.number().int().positive().optional(),
-  preferredDays: z.array(z.string().max(20)).optional().default([]),
-  preferredTimes: z.array(z.string().max(20)).optional().default([]),
-  notes: z.string().max(2000).optional().default(''),
 });
 
 // Provider schemas
@@ -262,4 +242,25 @@ export const createYahooIntegrationSchema = z.object({
 // Route parameter validation schemas
 export const integrationIdParamSchema = z.object({
   id: z.string().regex(/^\d+$/, 'Integration ID must be a number').transform((val) => parseInt(val, 10)),
+});
+
+// Blocked times schemas
+const blockedTimeRecurrenceSchema = z.object({
+  frequency: z.enum(['daily', 'weekly', 'monthly']),
+  interval: z.number().int().min(1).max(52),
+  count: z.number().int().min(1).max(50).optional(),
+  end_date: z.string().optional(),
+  endDate: z.string().optional(),
+}).optional().nullable();
+
+export const BLOCKED_TIME_REASON_MAX = 200;
+export const BLOCKED_TIME_RECURRENCE_MAX = 50;
+
+export const createBlockedTimeSchema = z.object({
+  startTime: z.string().min(1, 'Start time is required'),
+  endTime: z.string().min(1, 'End time is required'),
+  reason: z.string().min(1, 'Reason is required').max(BLOCKED_TIME_REASON_MAX),
+  providerId: z.number().int().positive().optional().nullable(),
+  resourceId: z.number().int().positive().optional().nullable(),
+  recurrence: blockedTimeRecurrenceSchema,
 });

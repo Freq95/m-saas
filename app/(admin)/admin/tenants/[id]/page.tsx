@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { ObjectId } from 'mongodb';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { getSuperAdmin } from '@/lib/auth-helpers';
+import { logDataAccess } from '@/lib/audit';
 import TenantDetailClient from './TenantDetailClient';
 
 type TenantDetailPageProps = {
@@ -10,7 +11,11 @@ type TenantDetailPageProps = {
 };
 
 export default async function TenantDetailPage({ params, searchParams }: TenantDetailPageProps) {
-  try { await getSuperAdmin(); } catch { redirect('/login'); }
+  const superAdmin = await getSuperAdmin().catch(() => null);
+  if (!superAdmin) {
+    redirect('/login');
+  }
+  const { userId: actorUserId, email: actorEmail } = superAdmin;
   const { id } = await params;
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const initialInviteToken = typeof resolvedSearchParams?.inviteToken === 'string' ? resolvedSearchParams.inviteToken : null;
@@ -41,6 +46,19 @@ export default async function TenantDetailPage({ params, searchParams }: TenantD
   });
 
   const seatUsage = enrichedMembers.filter((member: any) => ['active', 'pending_invite'].includes(member.status)).length;
+
+  await logDataAccess({
+    actorUserId,
+    actorEmail,
+    actorRole: 'super_admin',
+    targetType: 'tenant',
+    targetId: tenantId,
+    route: `/admin/tenants/${id}`,
+    metadata: {
+      memberCount: enrichedMembers.length,
+      seatUsage,
+    },
+  });
 
   return (
     <TenantDetailClient

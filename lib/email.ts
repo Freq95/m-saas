@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { logger } from '@/lib/logger';
 
 export type EmailSendResult =
   | { ok: true; provider: 'resend'; id?: string }
@@ -7,7 +8,10 @@ export type EmailSendResult =
 export async function sendEmail(options: { to: string; subject: string; html: string }): Promise<EmailSendResult> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    console.warn('[EMAIL] RESEND_API_KEY not set. Would have sent:', options.to, options.subject);
+    logger.warn('[EMAIL] RESEND_API_KEY not set. Email send skipped.', {
+      to: options.to,
+      subject: options.subject,
+    });
     return { ok: false, reason: 'not_configured' };
   }
 
@@ -19,7 +23,7 @@ export async function sendEmail(options: { to: string; subject: string; html: st
     });
 
     if (result?.error) {
-      console.error('[EMAIL] Resend error:', {
+      logger.error('[EMAIL] Resend provider error', {
         name: result.error.name,
         message: result.error.message,
         to: options.to,
@@ -30,7 +34,7 @@ export async function sendEmail(options: { to: string; subject: string; html: st
 
     return { ok: true, provider: 'resend', id: typeof result?.data?.id === 'string' ? result.data.id : undefined };
   } catch (error) {
-    console.error('[EMAIL] Unexpected email send exception:', error);
+    logger.error('[EMAIL] Unexpected email send exception', { error });
     return { ok: false, reason: 'provider_error' };
   }
 }

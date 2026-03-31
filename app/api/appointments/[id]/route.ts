@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from '@/lib/db/mongo-utils';
 import { updateClientStats } from '@/lib/client-matching';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { checkAppointmentConflict } from '@/lib/calendar-conflicts';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { invalidateReadCaches } from '@/lib/cache-keys';
 import { logger } from '@/lib/logger';
+import { checkUpdateRateLimit } from '@/lib/rate-limit';
 import { generateRecurringInstances } from '@/lib/recurring-utils';
 
 const CONFLICT_MESSAGE_BY_TYPE: Record<string, string> = {
@@ -71,7 +72,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       client_name: clientDoc?.name || appointmentDoc.client_name,
       client_email: clientDoc?.email || appointmentDoc.client_email,
       client_phone: clientDoc?.phone || appointmentDoc.client_phone,
-      service_name: serviceDoc?.name || null,
+      service_name: serviceDoc?.name || (appointmentDoc.service_name as string | null) || null,
     };
 
     return createSuccessResponse({ appointment });
@@ -85,6 +86,8 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
   const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkUpdateRateLimit(userId);
+    if (limited) return limited;
     const db = await getMongoDbOrThrow();
     const appointmentId = Number(params.id);
     const body = await request.json();
@@ -239,11 +242,13 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         id: serviceId,
         user_id: existingAppointment.user_id,
         tenant_id: tenantId,
+        deleted_at: { $exists: false },
       });
       if (!serviceDoc) {
         return createErrorResponse('Service not found', 400);
       }
       updates.service_id = serviceId;
+      updates.service_name = serviceDoc.name || null;
       updates.price_at_time = typeof serviceDoc.price === 'number' ? serviceDoc.price : null;
     }
 
@@ -360,7 +365,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
         const nextRecurringId = await getNextNumericId('appointments');
         const nowIso = new Date().toISOString();
-        await db.collection('appointments').insertOne({
+        await db.collection<FlexDoc>('appointments').insertOne({
           id: nextRecurringId,
           _id: nextRecurringId,
           tenant_id: tenantId,
@@ -602,6 +607,8 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
   const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkUpdateRateLimit(userId);
+    if (limited) return limited;
     const db = await getMongoDbOrThrow();
     const appointmentId = Number(params.id);
 

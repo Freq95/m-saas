@@ -71,6 +71,10 @@ export default function LoginForm({ successMessage }: LoginFormProps) {
       <button type="submit" disabled={submitting}>
         {submitting ? 'Signing in...' : 'Sign in'}
       </button>
+      <div style={{ textAlign: 'center', marginTop: '2rem', fontSize: '0.8rem', color: '#9ca3af' }}>
+        <Link href="/privacy" style={{ color: '#6b7280', marginRight: '1rem' }}>Politica de confidentialitate</Link>
+        <Link href="/terms" style={{ color: '#6b7280' }}>Termeni si conditii</Link>
+      </div>
     </form>
   );
 }

@@ -1,76 +1,57 @@
-# m-saas - OpsGenie for Micro-Services
+# densa — CRM & Scheduling for Clinics
 
-**SaaS platform for managing messages, appointments, and automation** for micro-services (salons, dental clinics, workshops).
-
-**Current Status:** MVP V1 ~75% complete (February 2026)
-
----
-
-## What is m-saas?
-
-A unified platform that helps small businesses (salons, clinics, workshops) manage:
-- **Inbox:** All messages (email, Facebook, forms) in one place
-- **Calendar:** Appointment scheduling with automatic slot blocking
-- **AI Agent:** Semi-automatic response suggestions in Romanian
-- **Reminders:** Automated appointment reminders (email/SMS)
-- **CRM:** Client management with history and statistics
-- **Dashboard:** Business metrics and analytics
+Multi-tenant SaaS platform for managing appointments, clients, email inbox, and team — built for clinics and service businesses. Interface in Romanian.
 
 ---
 
 ## Quick Start
 
 ### Prerequisites
-- Node.js 18+
+- Node.js 20+
 - MongoDB (Atlas or local)
-- Optional: OpenAI API key (for AI Agent)
 
 ### Installation
 
 ```bash
-# 1. Install dependencies
 npm install
-
-# 2. Configure environment
-cp .env.example .env
-# Edit .env with your MongoDB URI and API keys
-
-# 3. Initialize MongoDB collections
-npm run db:init:mongo
-
-# 4. Start development server
+cp .env.example .env    # Edit with your MongoDB URI + secrets
+node migrations/001_init_mongodb.js
 npm run dev
 ```
 
-Application available at: **http://localhost:3000**
+Application at **http://localhost:3000**
 
 ---
 
 ## Tech Stack
 
-- **Framework:** Next.js 14 (App Router) + TypeScript
-- **Database:** MongoDB (confirmed in use)
-- **AI:** OpenAI API (for response suggestions)
-- **Email:** Yahoo Mail (IMAP/SMTP)
-- **UI:** React + Tailwind CSS + Dark mode
-- **Deployment:** Vercel (planned)
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 16 (App Router) + TypeScript |
+| Database | MongoDB (Atlas) |
+| Auth | NextAuth v5 (JWT, credentials) |
+| File Storage | Cloudflare R2 |
+| Cache / Rate Limit | Upstash Redis (optional, in-memory fallback) |
+| Job Queue | Upstash QStash (optional, inline fallback) |
+| Email (transactional) | Resend |
+| Email (sync) | Gmail API + Yahoo IMAP/SMTP |
+| Validation | Zod |
+| Deployment | Vercel |
 
 ---
 
-## Current Features (What's Working)
+## Features
 
-✅ **Yahoo Mail Integration** - Full IMAP/SMTP integration
-✅ **Calendar & Appointments** - Week/month views with slot blocking
-✅ **CRM (Client Management)** - Auto-creation, deduplication, notes/files
-✅ **Dashboard Analytics** - Messages/appointments charts, revenue tracking
-✅ **Services Management** - Service catalog with pricing
-✅ **UI/UX** - Dark mode, keyboard accessibility, Apple-style modals
-
-⚠️ **AI Agent** - API exists but returns mock data (OpenAI integration pending)
-⚠️ **Reminders** - API complete but not automated (cron job needed)
-
-❌ **Gmail/Outlook** - Not implemented
-❌ **Auth/Multi-tenancy** - Not implemented (hardcoded userId)
+- **Dashboard** — today's appointments, revenue stats, recent activity
+- **Calendar** — weekly view, drag-and-drop, recurring appointments, conflict detection, blocked times, provider/resource assignment
+- **Clients (CRM)** — search, notes, files (R2), activity history, CSV export, GDPR consent tracking, soft delete
+- **Inbox** — email conversations (Gmail + Yahoo), reply via SMTP, attachments, inline images, client linking
+- **Services** — catalog with pricing, soft delete (historical appointments preserve service name)
+- **Settings** — email integrations (Gmail OAuth, Yahoo), service management
+- **Team** — invite members, role assignment (owner/staff), seat limits
+- **Admin Panel** — tenant management, user management, audit logs, access logs, security incident register with breach notification workflow
+- **Auth** — login, password reset, invite acceptance, session invalidation, 5-minute session refresh
+- **Reminders** — API exists, processing gated behind feature flag (no UI yet)
 
 ---
 
@@ -78,106 +59,53 @@ Application available at: **http://localhost:3000**
 
 | Document | Purpose |
 |----------|---------|
-| **[STATUS.md](STATUS.md)** | Current status, features checklist, recent sessions, next steps |
-| **[GUIDE.md](GUIDE.md)** | Setup guide, API reference, integrations, architecture |
-| **[API_SURFACE_STATUS.md](API_SURFACE_STATUS.md)** | Endpoint status classification (core vs feature-flagged) |
-| **[archived/](archived/)** | Historical documents, session logs, analysis reports |
-
----
-
-## Project Structure
-
-```
-m-saas/
-├── app/              # Next.js App Router
-│   ├── api/          # API routes
-│   ├── dashboard/    # Dashboard page
-│   ├── inbox/        # Inbox page
-│   ├── calendar/     # Calendar page
-│   └── clients/      # CRM pages
-├── lib/              # Utilities
-│   ├── db/           # MongoDB client
-│   ├── yahoo-mail.ts # Yahoo integration
-│   └── calendar.ts   # Calendar logic
-├── components/       # React components
-└── docs/             # (Removed - see root README, STATUS, GUIDE)
-```
-
----
-
-## Development Workflow
-
-### For AI Agents (Claude Code, Cursor)
-
-1. **Start session:** Read [STATUS.md](STATUS.md) for current status
-2. **Implementation:** Check [GUIDE.md](GUIDE.md) for API/setup details
-3. **End session:** Update STATUS.md with session notes
-
-### For Developers
-
-1. **Onboarding:** Read this README → STATUS.md → GUIDE.md
-2. **Daily work:** Check STATUS.md "Next Steps"
-3. **API docs:** See GUIDE.md "API Reference" section
-4. **Setup help:** See GUIDE.md "Setup & Installation" section
+| [PRODUCT.md](PRODUCT.md) | Feature-by-feature product documentation |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Technical architecture, API surface, database schema, deployment |
+| [CODE-HEALTH.md](CODE-HEALTH.md) | Known issues, technical debt, priority matrix |
 
 ---
 
 ## Key Commands
 
 ```bash
-# Development
 npm run dev              # Start dev server
-npm run build            # Build for production
-npm run typecheck        # TypeScript checks (no emit)
-npm run check:unused-exports # Unused exports scan
+npm run build            # Production build
+npm run typecheck        # TypeScript checks
+npm run check:cleanup    # Build + typecheck + unused exports + dead CSS
 
-# Database
 npm run db:init:mongo    # Initialize MongoDB collections
-npm run db:migrate:mongo # Migrate JSON to MongoDB
+npm run db:indexes       # Create tenant indexes
+npm run db:validate:mongo # Validate data integrity
 
-# Testing
-npm run test:webhooks    # Test webhook endpoints
-npm run test:yahoo       # Test Yahoo sync endpoint
+npm run bench:baseline   # Run performance benchmarks
+npm run bench:report     # Generate benchmark report
 ```
 
 ---
 
-## Next Steps (Priority Order)
+## Project Structure
 
-**Priority 1 (Critical):**
-1. Implement authentication + multi-tenancy
-2. Calendar backend hardening (auth, conflict checks)
-3. AI Agent integration (replace mock with real OpenAI)
-4. Automated reminders (cron job setup)
-
-**Priority 2:**
-5. Gmail integration (OAuth2)
-6. Google Calendar two-way sync
-
-**Priority 3:**
-7. Testing & bug fixes
-8. Mobile responsiveness
-9. Production deployment
-
-See [STATUS.md](STATUS.md) for detailed next steps.
-
----
-
-## Contributing
-
-This is a private project. For questions or suggestions, check documentation first:
-- [STATUS.md](STATUS.md) - What's done, what's next
-- [GUIDE.md](GUIDE.md) - How to set up and use
-- [archived/](archived/) - Historical context
+```
+app/
+  (admin)/admin/     # Super-admin pages
+  (auth)/            # Login, password reset, invite
+  api/               # API route handlers
+  calendar/          # Calendar page
+  clients/           # CRM pages
+  dashboard/         # Dashboard page
+  inbox/             # Inbox page
+  settings/          # Settings pages
+components/          # Shared React components
+lib/                 # Utilities, services, validation
+  db/                # MongoDB client
+  server/            # Server-side data fetchers
+scripts/             # DB migrations, benchmarks, admin tools
+migrations/          # MongoDB collection/index creation
+tests/               # Vitest test files
+```
 
 ---
 
-## License
+**Private project — Not open source**
 
-Private project - Not open source
-
----
-
-**Last Updated:** 2026-02-09
-**MVP Progress:** ~75% complete
-**Database:** MongoDB
+**Last updated:** 2026-03-31

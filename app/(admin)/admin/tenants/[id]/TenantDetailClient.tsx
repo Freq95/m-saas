@@ -155,10 +155,11 @@ export default function TenantDetailClient({
 
   async function addUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formElement = event.currentTarget;
     setError(null);
     setNotice(null);
     setWorking(true);
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formElement);
     const response = await fetch(`/api/admin/tenants/${tenant._id}/users`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -183,7 +184,7 @@ export default function TenantDetailClient({
     } else {
       setNotice('User created and invite email sent.');
     }
-    event.currentTarget.reset();
+    formElement.reset();
     router.refresh();
     setWorking(false);
   }
@@ -214,7 +215,14 @@ export default function TenantDetailClient({
       )}
       <div style={{ border: '1px solid #334155', padding: 12 }}>
         <p>Status: {tenant.status}</p>
-        {tenant.deleted_at && <p>Deleted at: {new Date(tenant.deleted_at).toLocaleString()}</p>}
+        {tenant.deleted_at && (
+          <p suppressHydrationWarning>
+            Deleted at:{' '}
+            {new Date(tenant.deleted_at).toLocaleString('ro-RO', {
+              timeZone: 'Europe/Bucharest',
+            })}
+          </p>
+        )}
         <p>Plan: {tenant.plan}</p>
         <p><strong>Seats: {seatUsage} / {maxSeats} used</strong></p>
         {seatWarning && <p style={{ color: '#facc15' }}>{seatWarning}</p>}

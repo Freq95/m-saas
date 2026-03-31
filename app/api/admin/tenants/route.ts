@@ -4,7 +4,7 @@ import { createErrorResponse, createSuccessResponse, handleApiError } from '@/li
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getSuperAdmin } from '@/lib/auth-helpers';
 import { createInviteToken, sendInviteEmail } from '@/lib/invite';
-import { logAdminAudit } from '@/lib/audit';
+import { logAdminAudit, logDataAccess } from '@/lib/audit';
 
 function slugify(name: string): string {
   return name
@@ -31,7 +31,7 @@ async function ensureTenantIndexes(db: any) {
 
 export async function GET(request: NextRequest) {
   try {
-    await getSuperAdmin();
+    const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
     const db = await getMongoDbOrThrow();
     await ensureTenantIndexes(db);
     const search = request.nextUrl.searchParams.get('search')?.trim();
@@ -78,6 +78,23 @@ export async function GET(request: NextRequest) {
       owner_email: ownerMap.get(String(tenant.owner_id))?.email || null,
       users_count: userCountMap.get(String(tenant._id)) || 0,
     }));
+
+    await logDataAccess({
+      actorUserId,
+      actorEmail,
+      actorRole: 'super_admin',
+      targetType: 'tenant.collection',
+      route: '/api/admin/tenants',
+      request,
+      metadata: {
+        search: search || null,
+        plan: plan || null,
+        status: status || null,
+        page,
+        limit,
+        resultCount: items.length,
+      },
+    });
 
     return createSuccessResponse({
       tenants: items,
@@ -148,6 +165,7 @@ export async function POST(request: NextRequest) {
       role: 'owner',
       tenant_id: tenantId,
       status: 'pending_invite',
+      session_version: 0,
       created_at: nowIso,
       updated_at: nowIso,
     };

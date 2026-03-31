@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { getAuthUser } from '@/lib/auth-helpers';
+import { handleApiError } from '@/lib/error-handler';
 
 /**
  * OpenAPI/Swagger API Documentation
@@ -6,6 +8,11 @@ import { NextResponse } from 'next/server';
  * Note: Advanced scheduling/experimental routes are intentionally excluded.
  */
 export async function GET() {
+  try {
+    await getAuthUser();
+  } catch (error) {
+    return handleApiError(error, 'Unauthorized');
+  }
   const openApiSpec = {
     openapi: '3.0.0',
     info: {

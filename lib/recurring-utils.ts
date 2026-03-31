@@ -22,7 +22,7 @@ export function generateRecurringInstances(
   const instances: Array<{ start: Date; end: Date }> = [];
   const duration = endTime.getTime() - startTime.getTime();
   const safeInterval = Math.max(1, Number(recurrence.interval) || 1);
-  const maxCount = recurrence.count || 52;
+  const maxCount = Math.min(recurrence.count || 52, 52);
   const recurrenceEndDate = recurrence.end_date || recurrence.endDate;
   const recurrenceEnd = recurrenceEndDate ? new Date(recurrenceEndDate) : null;
 

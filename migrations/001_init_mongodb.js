@@ -25,6 +25,8 @@ const collections = [
   'conversations',
   'messages',
   'audit_logs',
+  'data_access_logs',
+  'security_incidents',
   'tags',
   'conversation_tags',
   'services',
@@ -56,7 +58,8 @@ const indexPlan = {
     { key: { tenant_id: 1, email: 1 } },
   ],
   invite_tokens: [
-    { key: { token: 1 }, unique: true },
+    { key: { token_hash: 1 }, unique: true, partialFilterExpression: { token_hash: { $exists: true } } },
+    { key: { token: 1 }, unique: true, partialFilterExpression: { token: { $exists: true } } },
     { key: { expires_at: 1 }, expireAfterSeconds: 0 },
     { key: { email: 1, used_at: 1 } },
   ],
@@ -143,6 +146,21 @@ const indexPlan = {
     { key: { action: 1, created_at: -1 } },
     { key: { actor_user_id: 1, created_at: -1 } },
     { key: { target_type: 1, target_id: 1, created_at: -1 } },
+  ],
+  data_access_logs: [
+    { key: { created_at: -1 } },
+    { key: { actor_user_id: 1, created_at: -1 } },
+    { key: { tenant_id: 1, created_at: -1 } },
+    { key: { route: 1, created_at: -1 } },
+    { key: { target_type: 1, target_id: 1, created_at: -1 } },
+  ],
+  security_incidents: [
+    { key: { created_at: -1 } },
+    { key: { status: 1, created_at: -1 } },
+    { key: { severity: 1, created_at: -1 } },
+    { key: { discovered_at: -1 } },
+    { key: { notification_due_at: 1 } },
+    { key: { affected_tenant_ids: 1, created_at: -1 } },
   ],
 };
 

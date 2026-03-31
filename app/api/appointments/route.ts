@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from '@/lib/db/mongo-utils';
 import { isSlotAvailable } from '@/lib/calendar';
 import { exportToGoogleCalendar } from '@/lib/google-calendar';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
@@ -8,11 +8,12 @@ import { getAuthUser } from '@/lib/auth-helpers';
 import { getCached } from '@/lib/redis';
 import { appointmentsListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
+import { logDataAccess } from '@/lib/audit';
 
 // GET /api/appointments - Get appointments
 export async function GET(request: NextRequest) {
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const { userId, dbUserId, tenantId, email, role } = await getAuthUser();
     const searchParams = request.nextUrl.searchParams;
 
     // Validate query parameters
@@ -48,6 +49,24 @@ export async function GET(request: NextRequest) {
         search,
       });
       return { appointments };
+    });
+
+    await logDataAccess({
+      actorUserId: dbUserId,
+      actorEmail: email,
+      actorRole: role,
+      tenantId,
+      targetType: 'appointment.collection',
+      route: '/api/appointments',
+      request,
+      metadata: {
+        startDate: startDate || null,
+        endDate: endDate || null,
+        providerId: providerId || null,
+        resourceId: resourceId || null,
+        status: status || null,
+        search: search || null,
+      },
     });
 
     return createSuccessResponse(payload);
@@ -95,7 +114,7 @@ export async function POST(request: NextRequest) {
       exportToGoogle,
       googleAccessToken,
     } = validationResult.data;
-    const serviceDoc = await db.collection('services').findOne({ id: serviceId, user_id: userId, tenant_id: tenantId });
+    const serviceDoc = await db.collection('services').findOne({ id: serviceId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } });
 
     const start = typeof startTime === 'string' ? new Date(startTime) : startTime;
 
@@ -148,6 +167,7 @@ export async function POST(request: NextRequest) {
       user_id: userId,
       conversation_id: conversationId || null,
       service_id: serviceId,
+      service_name: serviceDoc?.name || null,
       client_id: client.id,
       client_name: clientName,
       client_email: clientEmail || null,
@@ -166,7 +186,7 @@ export async function POST(request: NextRequest) {
       updated_at: now,
     };
 
-    await db.collection('appointments').insertOne(appointmentDoc);
+    await db.collection<FlexDoc>('appointments').insertOne(appointmentDoc);
 
     // Link appointment to client and update stats
     await linkAppointmentToClient(appointmentId, client.id, tenantId);

@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
           role: userRole,
           tenant_id: tenantId,
           status: 'pending_invite',
+          session_version: 0,
           created_at: nowIso,
           updated_at: nowIso,
         });

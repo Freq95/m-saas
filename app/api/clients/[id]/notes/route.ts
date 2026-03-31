@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server';
-import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { checkWriteRateLimit } from '@/lib/rate-limit';
 
 // GET /api/clients/[id]/notes - Get notes for a client
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
@@ -46,6 +47,8 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
   const params = await props.params;
   try {
     const { userId, tenantId } = await getAuthUser();
+    const limited = await checkWriteRateLimit(userId);
+    if (limited) return limited;
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
 
@@ -83,7 +86,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       updated_at: now,
     };
 
-    await db.collection('client_notes').insertOne(noteDoc);
+    await db.collection<FlexDoc>('client_notes').insertOne(noteDoc);
 
     // Update client's last_activity_date
     await db.collection('clients').updateOne(

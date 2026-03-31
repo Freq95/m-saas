@@ -16,6 +16,8 @@ interface Client {
   total_appointments: number;
   last_appointment_date: string | null;
   last_conversation_date: string | null;
+  consent_given?: boolean;
+  consent_withdrawn?: boolean;
 }
 
 interface PaginationInfo {
@@ -41,6 +43,7 @@ export default function ClientsPageClient({
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortBy, setSortBy] = useState('last_activity_date');
   const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+  const [consentFilter, setConsentFilter] = useState<'all' | 'consented' | 'not_consented' | 'withdrawn'>('all');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState<PaginationInfo | null>(initialPagination);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -52,6 +55,7 @@ export default function ClientsPageClient({
     currentSortBy: string,
     currentSortOrder: string,
     currentPage: number,
+    currentConsentFilter: string,
   ) => {
     try {
       setLoading(true);
@@ -61,6 +65,7 @@ export default function ClientsPageClient({
         sortOrder: currentSortOrder,
         page: currentPage.toString(),
         limit: '20',
+        consentFilter: currentConsentFilter,
       });
 
       const response = await fetch(`/api/clients?${params}`);
@@ -75,6 +80,7 @@ export default function ClientsPageClient({
         sortBy: currentSortBy,
         sortOrder: currentSortOrder,
         page: currentPage,
+        consentFilter: currentConsentFilter,
       });
     } finally {
       setLoading(false);
@@ -93,8 +99,8 @@ export default function ClientsPageClient({
       skipInitialFetch.current = false;
       return;
     }
-    fetchClients(debouncedSearch, sortBy, sortOrder, page);
-  }, [fetchClients, page, debouncedSearch, sortBy, sortOrder]);
+    fetchClients(debouncedSearch, sortBy, sortOrder, page, consentFilter);
+  }, [fetchClients, page, debouncedSearch, sortBy, sortOrder, consentFilter]);
 
   useEffect(() => {
     if (!loading) {
@@ -173,6 +179,20 @@ export default function ClientsPageClient({
               <option value="name-ASC">Nume (A-Z)</option>
               <option value="name-DESC">Nume (Z-A)</option>
             </select>
+
+            <select
+              value={consentFilter}
+              onChange={(e) => {
+                setConsentFilter(e.target.value as typeof consentFilter);
+                if (page !== 1) setPage(1);
+              }}
+              className={styles.filterSelect}
+            >
+              <option value="all">Toate (GDPR)</option>
+              <option value="consented">Cu consimtamant</option>
+              <option value="not_consented">Fara consimtamant</option>
+              <option value="withdrawn">Consimtamant retras</option>
+            </select>
           </div>
         </div>
 
@@ -205,6 +225,7 @@ export default function ClientsPageClient({
                   <th>Total cheltuit</th>
                   <th>Programari</th>
                   <th>Ultima vizita</th>
+                  <th>GDPR</th>
                 </tr>
               </thead>
               <tbody>
@@ -238,6 +259,13 @@ export default function ClientsPageClient({
                     </td>
                     <td>{client.total_appointments}</td>
                     <td>{formatDate(client.last_appointment_date)}</td>
+                    <td>
+                      {client.consent_given && !client.consent_withdrawn ? (
+                        <span style={{ color: '#166534', fontWeight: 500, fontSize: '0.8rem' }}>✓</span>
+                      ) : (
+                        <span style={{ color: '#991b1b', fontWeight: 500, fontSize: '0.8rem' }}>✗</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

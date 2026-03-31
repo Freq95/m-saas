@@ -4,7 +4,8 @@ import { createErrorResponse, createSuccessResponse, handleApiError } from '@/li
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getSuperAdmin } from '@/lib/auth-helpers';
 import { createInviteToken, sendInviteEmail } from '@/lib/invite';
-import { logAdminAudit } from '@/lib/audit';
+import { checkUpdateRateLimit } from '@/lib/rate-limit';
+import { logAdminAudit, logDataAccess } from '@/lib/audit';
 
 async function getNextUserId(db: any): Promise<number> {
   const latest = await db.collection('users').find({ id: { $type: 'number' } }).sort({ id: -1 }).limit(1).next();
@@ -18,7 +19,7 @@ function parseTenantId(id: string): ObjectId | null {
 export async function GET(_request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    await getSuperAdmin();
+    const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
     const tenantId = parseTenantId(params.id);
     if (!tenantId) return createErrorResponse('Invalid tenant id', 400);
 
@@ -30,16 +31,31 @@ export async function GET(_request: NextRequest, props: { params: Promise<{ id: 
       : [];
     const userMap = new Map<string, any>(users.map((user: any) => [String(user._id), user]));
 
+    const enrichedUsers = members.map((member: any) => {
+      const user = userMap.get(String(member.user_id));
+      return {
+        ...member,
+        email: user?.email || null,
+        name: user?.name || null,
+        user_status: user?.status || null,
+      };
+    });
+
+    await logDataAccess({
+      actorUserId,
+      actorEmail,
+      actorRole: 'super_admin',
+      targetType: 'tenant.members',
+      targetId: tenantId,
+      route: `/api/admin/tenants/${params.id}/users`,
+      request: _request,
+      metadata: {
+        resultCount: enrichedUsers.length,
+      },
+    });
+
     return createSuccessResponse({
-      users: members.map((member: any) => {
-        const user = userMap.get(String(member.user_id));
-        return {
-          ...member,
-          email: user?.email || null,
-          name: user?.name || null,
-          user_status: user?.status || null,
-        };
-      }),
+      users: enrichedUsers,
     });
   } catch (error) {
     return handleApiError(error, 'Failed to list tenant users');
@@ -50,6 +66,8 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
   const params = await props.params;
   try {
     const { userId: actorUserId, email: actorEmail } = await getSuperAdmin();
+    const limited = await checkUpdateRateLimit(String(actorUserId));
+    if (limited) return limited;
     const tenantId = parseTenantId(params.id);
     if (!tenantId) return createErrorResponse('Invalid tenant id', 400);
 
@@ -91,6 +109,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       role,
       tenant_id: tenantId,
       status: 'pending_invite',
+      session_version: 0,
       created_at: nowIso,
       updated_at: nowIso,
     });

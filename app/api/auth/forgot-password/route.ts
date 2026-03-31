@@ -7,7 +7,7 @@ import { createErrorResponse } from '@/lib/error-handler';
 import { getRedis } from '@/lib/redis';
 import { withRedisPrefix } from '@/lib/redis-prefix';
 
-const FORGOT_PASSWORD_LIMIT = 7;
+const FORGOT_PASSWORD_LIMIT = 3;
 const FORGOT_PASSWORD_WINDOW_MS = 60 * 60 * 1000;
 const forgotPasswordFallbackStore = new Map<string, { count: number; resetAt: number }>();
 let forgotPasswordLimiter: Ratelimit | null = null;

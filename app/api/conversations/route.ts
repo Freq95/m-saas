@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
-import { getMongoDbOrThrow, getNextNumericId, stripMongoId } from '@/lib/db/mongo-utils';
+import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { getConversationsData } from '@/lib/server/inbox';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
 import { getCached, invalidateCache } from '@/lib/redis';
 import { conversationsCacheKey } from '@/lib/cache-keys';
+import { logDataAccess } from '@/lib/audit';
 
 // GET /api/conversations - Get all conversations from storage
 export async function GET(request: NextRequest) {
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const { userId, dbUserId, tenantId, email, role } = await getAuthUser();
     const searchParams = request.nextUrl.searchParams;
     const { conversationsQuerySchema } = await import('@/lib/validation');
     const queryParams = {
@@ -34,6 +35,19 @@ export async function GET(request: NextRequest) {
         getConversationsData({ userId, tenantId, search })
       );
     }
+
+    await logDataAccess({
+      actorUserId: dbUserId,
+      actorEmail: email,
+      actorRole: role,
+      tenantId,
+      targetType: 'conversation.collection',
+      route: '/api/conversations',
+      request,
+      metadata: {
+        search: search || null,
+      },
+    });
 
     return createSuccessResponse({ conversations });
   } catch (error) {
@@ -82,14 +96,14 @@ export async function POST(request: NextRequest) {
       updated_at: now,
     };
 
-    await db.collection('conversations').insertOne(conversationDoc);
+    await db.collection<FlexDoc>('conversations').insertOne(conversationDoc);
     await invalidateCache(conversationsCacheKey({ tenantId, userId }));
     const conversation = stripMongoId(conversationDoc);
 
     // Add initial message if provided
     if (initialMessage) {
       const messageId = await getNextNumericId('messages');
-      await db.collection('messages').insertOne({
+      await db.collection<FlexDoc>('messages').insertOne({
         _id: messageId,
         id: messageId,
         tenant_id: tenantId,
