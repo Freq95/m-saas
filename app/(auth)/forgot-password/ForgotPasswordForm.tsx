@@ -44,11 +44,11 @@ export function ForgotPasswordForm() {
   return (
     <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
       <h2>Recuperare parola</h2>
-      <p style={{ color: '#94a3b8', margin: 0 }}>
+      <p style={{ color: 'var(--color-text-muted)', margin: 0 }}>
         Introdu adresa de email folosita la autentificare.
       </p>
-      {message && <p style={{ color: '#22c55e' }}>{message}</p>}
-      {error && <p style={{ color: '#f87171' }}>{error}</p>}
+      {message && <p style={{ color: 'var(--color-success)' }}>{message}</p>}
+      {error && <p style={{ color: 'var(--color-danger)' }}>{error}</p>}
       <label style={{ display: 'grid', gap: 6 }}>
         <span>Email</span>
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
@@ -56,7 +56,7 @@ export function ForgotPasswordForm() {
       <button type="submit" disabled={submitting}>
         {submitting ? 'Se trimite...' : 'Trimite link de resetare'}
       </button>
-      <Link href="/login" style={{ color: '#93c5fd', fontSize: 14 }}>
+      <Link href="/login" style={{ color: 'var(--color-info)', fontSize: 14 }}>
         Inapoi la login
       </Link>
     </form>

@@ -194,7 +194,7 @@ export default function DashboardPageClient() {
                   );
                 })
               ) : (
-                <div style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
+                <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>
                   Nu exista date pentru ultimele 7 zile
                 </div>
               )}

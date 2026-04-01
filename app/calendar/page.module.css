@@ -1129,7 +1129,7 @@
   width: 100%;
   min-width: 260px;
   max-width: 320px;
-  background: #111827;
+  background: var(--color-calendar-slot-bg);
   opacity: 1;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -1281,7 +1281,7 @@
   width: 100%;
   min-width: 200px;
   max-width: 260px;
-  background: #111827;
+  background: var(--color-calendar-slot-bg);
   opacity: 1;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -1468,7 +1468,7 @@
 .clientSuggestions {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: #111827;
+  background: var(--color-calendar-slot-bg);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
@@ -1530,15 +1530,15 @@
 }
 
 .pastDateWarning {
-  color: #b45309;
+  color: var(--color-warning-text);
   font-size: 0.75rem;
   margin-top: 4px;
 }
 
 .sameNameBanner {
   margin-top: 0.55rem;
-  border: 1px solid color-mix(in srgb, #eab308 45%, var(--color-border));
-  background: color-mix(in srgb, #fef3c7 72%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-warning) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-warning-bg) 72%, var(--color-surface));
   border-radius: var(--radius-md);
   padding: 0.8rem;
   display: flex;
@@ -1548,7 +1548,7 @@
 
 .sameNameBannerText {
   font-size: 0.78rem;
-  color: color-mix(in srgb, #854d0e 82%, var(--color-text));
+  color: color-mix(in srgb, var(--color-warning-text) 82%, var(--color-text));
   line-height: 1.45;
 }
 
@@ -1569,9 +1569,9 @@
 }
 
 .sameNameBannerPrimary {
-  border: 1px solid color-mix(in srgb, #ca8a04 50%, transparent);
-  background: color-mix(in srgb, #facc15 28%, transparent);
-  color: color-mix(in srgb, #854d0e 88%, var(--color-text));
+  border: 1px solid color-mix(in srgb, var(--color-warning) 50%, transparent);
+  background: color-mix(in srgb, var(--color-warning) 28%, transparent);
+  color: color-mix(in srgb, var(--color-warning-text) 88%, var(--color-text));
 }
 
 .sameNameBannerSecondary {
@@ -2061,7 +2061,7 @@
 
   .mobileDayBtnActive .mobileDayBtnNumber {
     background: var(--color-accent);
-    color: #fff;
+    color: var(--color-text-on-accent);
   }
 
   .mobileDayBtnToday .mobileDayBtnNumber {
@@ -2071,7 +2071,7 @@
 
   .mobileDayBtnActive.mobileDayBtnToday .mobileDayBtnNumber {
     background: var(--color-accent);
-    color: #fff;
+    color: var(--color-text-on-accent);
     border: none;
   }
 
@@ -2091,7 +2091,7 @@
     height: 52px;
     border-radius: 50%;
     background: var(--color-accent);
-    color: #fff;
+    color: var(--color-text-on-accent);
     border: none;
     font-size: 1.6rem;
     display: flex;

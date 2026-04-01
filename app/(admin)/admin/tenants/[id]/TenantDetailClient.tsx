@@ -225,13 +225,13 @@ export default function TenantDetailClient({
         )}
         <p>Plan: {tenant.plan}</p>
         <p><strong>Seats: {seatUsage} / {maxSeats} used</strong></p>
-        {seatWarning && <p style={{ color: '#facc15' }}>{seatWarning}</p>}
+        {seatWarning && <p style={{ color: 'var(--color-warning)' }}>{seatWarning}</p>}
         <p>Owner: {owner?.name || '-'} ({owner?.email || '-'})</p>
       </div>
 
       <form onSubmit={saveTenantChanges} style={{ display: 'grid', gap: 8, maxWidth: 400 }}>
-        {error && <p style={{ color: '#f87171' }}>{error}</p>}
-        {notice && <p style={{ color: '#facc15' }}>{notice}</p>}
+        {error && <p style={{ color: 'var(--color-danger)' }}>{error}</p>}
+        {notice && <p style={{ color: 'var(--color-warning)' }}>{notice}</p>}
         <label style={{ display: 'grid', gap: 6 }}>
           <span>Plan</span>
           <select value={plan} onChange={(e) => setPlan(e.target.value)}>
@@ -290,7 +290,7 @@ export default function TenantDetailClient({
           <input name="name" placeholder="Name" required />
           <input type="email" name="email" placeholder="Email" required />
           <input type="hidden" name="role" value="staff" />
-          <span style={{ fontSize: 13, color: '#666' }}>Role: staff (only role available in MVP)</span>
+          <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Role: staff (only role available in MVP)</span>
           <button type="submit" disabled={working || atLimit}>Send invite</button>
         </form>
       </section>

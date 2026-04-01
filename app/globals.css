@@ -68,8 +68,8 @@ input, textarea, select {
 }
 
 option {
-  background: #111827;
-  color: #e6edf8;
+  background: var(--color-calendar-slot-bg);
+  color: var(--color-text);
 }
 
 button:focus-visible,

@@ -213,25 +213,25 @@
 
 .statusScheduled {
   background: rgba(148, 163, 184, 0.14);
-  color: #cbd5e1;
+  color: var(--color-metric-neutral);
   border: 1px solid rgba(148, 163, 184, 0.2);
 }
 
 .statusCompleted {
   background: rgba(34, 197, 94, 0.16);
-  color: #86efac;
+  color: var(--color-metric-positive);
   border: 1px solid rgba(34, 197, 94, 0.28);
 }
 
 .statusCancelled {
   background: rgba(245, 158, 11, 0.16);
-  color: #fcd34d;
+  color: var(--color-metric-warning);
   border: 1px solid rgba(245, 158, 11, 0.28);
 }
 
 .statusNoShow {
   background: rgba(239, 68, 68, 0.16);
-  color: #fca5a5;
+  color: var(--color-metric-negative);
   border: 1px solid rgba(239, 68, 68, 0.28);
 }
 

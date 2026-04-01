@@ -162,8 +162,8 @@ export default function IncidentsClient({ incidents }: IncidentsClientProps) {
     <div style={{ display: 'grid', gap: 16 }}>
       <section style={{ border: '1px solid #334155', padding: 12, display: 'grid', gap: 8 }}>
         <h2>Create Incident</h2>
-        {error && <p style={{ color: '#f87171' }}>{error}</p>}
-        {notice && <p style={{ color: '#4ade80' }}>{notice}</p>}
+        {error && <p style={{ color: 'var(--color-danger)' }}>{error}</p>}
+        {notice && <p style={{ color: 'var(--color-success)' }}>{notice}</p>}
         <form onSubmit={createIncident} style={{ display: 'grid', gap: 8, maxWidth: 780 }}>
           <input name="title" placeholder="Incident title" required minLength={3} />
           <textarea name="summary" placeholder="What happened, initial impact, and current risk." required minLength={10} rows={4} />

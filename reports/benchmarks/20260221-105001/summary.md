@@ -1,3 +1,4 @@
+> Scope Note (2026-04-01): This is a historical benchmark snapshot. Light mode and PWA changes are UI/runtime features and are outside this report's original benchmark scope.
 # Benchmark Summary
 
 - Run ID: `20260221-105001`
@@ -29,4 +30,5 @@ No metrics captured.
 
 ## Edge Checks
 No edge checks captured.
+
 

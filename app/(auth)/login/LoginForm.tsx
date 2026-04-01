@@ -55,8 +55,8 @@ export default function LoginForm({ successMessage }: LoginFormProps) {
   return (
     <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
       <h2>Login</h2>
-      {successMessage && <p style={{ color: '#22c55e' }}>{successMessage}</p>}
-      {error && <p style={{ color: '#f87171' }}>{error}</p>}
+      {successMessage && <p style={{ color: 'var(--color-success)' }}>{successMessage}</p>}
+      {error && <p style={{ color: 'var(--color-danger)' }}>{error}</p>}
       <label style={{ display: 'grid', gap: 6 }}>
         <span>Email</span>
         <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
@@ -65,15 +65,15 @@ export default function LoginForm({ successMessage }: LoginFormProps) {
         <span>Password</span>
         <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
       </label>
-      <Link href="/forgot-password" style={{ color: '#93c5fd', fontSize: 14 }}>
+      <Link href="/forgot-password" style={{ color: 'var(--color-info)', fontSize: 14 }}>
         Ai uitat parola?
       </Link>
       <button type="submit" disabled={submitting}>
         {submitting ? 'Signing in...' : 'Sign in'}
       </button>
-      <div style={{ textAlign: 'center', marginTop: '2rem', fontSize: '0.8rem', color: '#9ca3af' }}>
-        <Link href="/privacy" style={{ color: '#6b7280', marginRight: '1rem' }}>Politica de confidentialitate</Link>
-        <Link href="/terms" style={{ color: '#6b7280' }}>Termeni si conditii</Link>
+      <div style={{ textAlign: 'center', marginTop: '2rem', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
+        <Link href="/privacy" style={{ color: 'var(--color-text-soft)', marginRight: '1rem' }}>Politica de confidentialitate</Link>
+        <Link href="/terms" style={{ color: 'var(--color-text-soft)' }}>Termeni si conditii</Link>
       </div>
     </form>
   );

@@ -1,3 +1,4 @@
+> Scope Note (2026-04-01): This is a historical benchmark snapshot. Light mode and PWA changes are UI/runtime features and are outside this report's original benchmark scope.
 # Benchmark Summary
 
 - Run ID: `20260220-085452`
@@ -50,4 +51,5 @@
 | revoked-invite-rejected | no | {"inviteStatus":429,"inviteMs":14.4,"removeStatus":-1,"acceptStatus":-1,"acceptMs":-1} |
 | cross-tenant-nested-denied | no | {"createStatus":429,"ownerBStatus":-1,"clientId":null} |
 | staff-forbidden-endpoints | no | {"statuses":[{"name":"edge.staff.forbidden.team","status":429,"durationMs":11.71},{"name":"edge.staff.forbidden.invite","status":429,"durationMs":13.08},{"name":"edge.staff.forbidden.settings","status":429,"durationMs":11.59}]} |
+
 

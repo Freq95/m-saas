@@ -99,22 +99,22 @@
 
 .badgeVip {
   background: rgba(77, 163, 255, 0.16);
-  color: #d3e9ff;
+  color: var(--color-info-text);
   border-color: rgba(77, 163, 255, 0.35);
 }
 
 .badgeActive,
 .statusScheduled,
 .badgeDefault {
-  background: #f3f4f6;
-  color: #6b7280;
-  border-color: #e5e7eb;
+  background: var(--color-neutral-bg);
+  color: var(--color-neutral-text);
+  border-color: var(--color-neutral-border);
 }
 
 .statusFinalizat {
-  background: #dcfce7;
-  color: #15803d;
-  border-color: #bbf7d0;
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+  border-color: var(--color-success-border);
 }
 
 .badgeInactive,
@@ -125,15 +125,15 @@
 }
 
 .statusAnulat {
-  background: #fef3c7;
-  color: #b45309;
-  border-color: #fde68a;
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  border-color: var(--color-warning-border);
 }
 
 .statusAbsent {
-  background: #fee2e2;
-  color: #b91c1c;
-  border-color: #fecaca;
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  border-color: var(--color-danger-border);
 }
 
 .emailLink {
@@ -183,7 +183,7 @@
 .submitButton {
   background: rgba(77, 163, 255, 0.16);
   border-color: rgba(77, 163, 255, 0.34);
-  color: #d9ecff;
+  color: var(--color-info-text);
 }
 
 .editButton:hover,
@@ -202,11 +202,11 @@
 }
 
 .previewButton {
-  color: #cae7ff;
+  color: var(--color-info-text);
 }
 
 .deleteButton {
-  color: #f3b5b5;
+  color: var(--color-danger-text);
 }
 
 .deleteButton:hover {
@@ -262,7 +262,7 @@
 }
 
 .tabActive {
-  color: #d9ecff;
+  color: var(--color-info-text);
   background: linear-gradient(135deg, rgba(27, 99, 219, 0.22) 0%, rgba(77, 163, 255, 0.18) 100%);
   border-color: rgba(77, 163, 255, 0.38);
 }
@@ -584,21 +584,21 @@
 }
 
 .badgeSuccess {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
 }
 
 .badgeWarning {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
 }
 
 .badgeError {
-  background: #fecaca;
-  color: #991b1b;
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
 }
 
 .badgeInfo {
-  background: #dbeafe;
-  color: #1e40af;
+  background: var(--color-info-bg);
+  color: var(--color-info-text);
 }

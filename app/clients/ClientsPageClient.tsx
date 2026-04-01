@@ -261,9 +261,9 @@ export default function ClientsPageClient({
                     <td>{formatDate(client.last_appointment_date)}</td>
                     <td>
                       {client.consent_given && !client.consent_withdrawn ? (
-                        <span style={{ color: '#166534', fontWeight: 500, fontSize: '0.8rem' }}>✓</span>
+                        <span style={{ color: 'var(--color-success-text)', fontWeight: 500, fontSize: '0.8rem' }}>✓</span>
                       ) : (
-                        <span style={{ color: '#991b1b', fontWeight: 500, fontSize: '0.8rem' }}>✗</span>
+                        <span style={{ color: 'var(--color-danger-text)', fontWeight: 500, fontSize: '0.8rem' }}>✗</span>
                       )}
                     </td>
                   </tr>

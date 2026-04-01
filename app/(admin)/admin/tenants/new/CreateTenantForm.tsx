@@ -52,7 +52,7 @@ export default function CreateTenantForm() {
   return (
     <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12, maxWidth: 520 }}>
       <h1>Create Tenant</h1>
-      {error && <p style={{ color: '#f87171' }}>{error}</p>}
+      {error && <p style={{ color: 'var(--color-danger)' }}>{error}</p>}
       <label style={{ display: 'grid', gap: 6 }}>
         <span>Clinic name</span>
         <input value={clinicName} onChange={(e) => setClinicName(e.target.value)} required />

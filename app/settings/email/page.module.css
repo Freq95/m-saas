@@ -28,13 +28,13 @@
 
 .connectedBanner {
   background: rgba(52, 211, 153, 0.12);
-  color: #bbf7d0;
+  color: var(--color-success-text);
   border-color: rgba(52, 211, 153, 0.28);
 }
 
 .notConnectedBanner {
   background: rgba(248, 113, 113, 0.12);
-  color: #fecaca;
+  color: var(--color-danger-text);
   border-color: rgba(248, 113, 113, 0.24);
 }
 
@@ -81,7 +81,7 @@
 }
 
 .statusConnected {
-  color: #6ee7b7;
+  color: var(--color-success-text);
   font-weight: 600;
   padding: 0.28rem 0.75rem;
   background: rgba(52, 211, 153, 0.14);
@@ -91,7 +91,7 @@
 }
 
 .statusDisconnected {
-  color: #fca5a5;
+  color: var(--color-metric-negative);
   font-weight: 600;
   padding: 0.28rem 0.75rem;
   background: rgba(248, 113, 113, 0.14);
@@ -149,7 +149,7 @@
 
 .testButton {
   background: rgba(52, 211, 153, 0.18);
-  color: #6ee7b7;
+  color: var(--color-success-text);
   border: 1px solid rgba(52, 211, 153, 0.35);
 }
 
@@ -160,7 +160,7 @@
 
 .deleteButton {
   background: rgba(248, 113, 113, 0.16);
-  color: #fca5a5;
+  color: var(--color-metric-negative);
   border: 1px solid rgba(248, 113, 113, 0.34);
 }
 
@@ -219,7 +219,7 @@
 
 .error {
   background: rgba(127, 29, 29, 0.34);
-  color: #fca5a5;
+  color: var(--color-metric-negative);
   border: 1px solid rgba(248, 113, 113, 0.24);
   padding: 0.75rem;
   border-radius: var(--radius-md);

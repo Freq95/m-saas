@@ -808,7 +808,7 @@ export default function ClientProfileClient({
           >
             <div className={styles.modalContent}>
               <h3>Stergere definitiva (GDPR)</h3>
-              <p style={{ color: '#dc2626', fontWeight: 500 }}>
+              <p style={{ color: 'var(--color-danger)', fontWeight: 500 }}>
                 Aceasta actiune este ireversibila!
               </p>
               <p>

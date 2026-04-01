@@ -89,7 +89,7 @@ export function ResetPasswordForm() {
     <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
       <h2>Seteaza parola noua</h2>
       {checking ? <p>Se valideaza linkul...</p> : null}
-      {error && <p style={{ color: '#f87171' }}>{error}</p>}
+      {error && <p style={{ color: 'var(--color-danger)' }}>{error}</p>}
       {!checking && validToken ? (
         <>
           <label style={{ display: 'grid', gap: 6 }}>
@@ -105,7 +105,7 @@ export function ResetPasswordForm() {
           </button>
         </>
       ) : null}
-      <Link href="/login" style={{ color: '#93c5fd', fontSize: 14 }}>
+      <Link href="/login" style={{ color: 'var(--color-info)', fontSize: 14 }}>
         Inapoi la login
       </Link>
     </form>

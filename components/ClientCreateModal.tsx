@@ -304,9 +304,9 @@ export default function ClientCreateModal({
               {privacyNoticeText && (
                 <p style={{
                   fontSize: '0.8rem',
-                  color: '#6b7280',
-                  background: '#f9fafb',
-                  border: '1px solid #e5e7eb',
+                  color: 'var(--color-text-soft)',
+                  background: 'var(--color-surface-muted)',
+                  border: '1px solid var(--color-border)',
                   borderRadius: '6px',
                   padding: '0.6rem 0.75rem',
                   marginTop: '0.5rem',

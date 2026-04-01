@@ -62,13 +62,13 @@ export default function InvitePage() {
   }
 
   if (loading) return <p>Se incarca invitatia...</p>;
-  if (!invite) return <p style={{ color: '#f87171' }}>{error || 'Invitatie invalida.'}</p>;
+  if (!invite) return <p style={{ color: 'var(--color-danger)' }}>{error || 'Invitatie invalida.'}</p>;
 
   return (
     <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
       <h2>Seteaza parola</h2>
       <p>Te alaturi la: <strong>{invite.tenantName}</strong></p>
-      {error && <p style={{ color: '#f87171' }}>{error}</p>}
+      {error && <p style={{ color: 'var(--color-danger)' }}>{error}</p>}
       <label style={{ display: 'grid', gap: 6 }}>
         <span>Email</span>
         <input type="email" value={invite.email} readOnly />

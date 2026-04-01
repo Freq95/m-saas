@@ -47,7 +47,8 @@ Application at **http://localhost:3000**
 - **Clients (CRM)** — search, notes, files (R2), activity history, CSV export, GDPR consent tracking, soft delete
 - **Inbox** — email conversations (Gmail + Yahoo), reply via SMTP, attachments, inline images, client linking
 - **Services** — catalog with pricing, soft delete (historical appointments preserve service name)
-- **Settings** — email integrations (Gmail OAuth, Yahoo), service management
+- **Theme system** - dark/light mode support via centralized theme tokens and client-side theme provider
+- **PWA installability** - manifest + icons + service worker (installable on Android Chrome and iOS Safari 'Add to Home Screen')
 - **Team** — invite members, role assignment (owner/staff), seat limits
 - **Admin Panel** — tenant management, user management, audit logs, access logs, security incident register with breach notification workflow
 - **Auth** — login, password reset, invite acceptance, session invalidation, 5-minute session refresh
@@ -81,6 +82,10 @@ npm run bench:baseline   # Run performance benchmarks
 npm run bench:report     # Generate benchmark report
 ```
 
+PWA note:
+- `npm run dev` keeps PWA disabled to avoid stale service-worker caches during development.
+- Test install/offline behavior with `npm run build && npm run start` or on Vercel.
+
 ---
 
 ## Project Structure
@@ -108,4 +113,5 @@ tests/               # Vitest test files
 
 **Private project — Not open source**
 
-**Last updated:** 2026-03-31
+**Last updated:** 2026-04-01
+

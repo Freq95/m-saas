@@ -115,7 +115,7 @@ export default function UserDetailClient({ user, tenant, memberships }: UserDeta
       </div>
 
       <form onSubmit={save} style={{ display: 'grid', gap: 8, maxWidth: 420 }}>
-        {error && <p style={{ color: '#f87171' }}>{error}</p>}
+        {error && <p style={{ color: 'var(--color-danger)' }}>{error}</p>}
         <label style={{ display: 'grid', gap: 6 }}>
           <span>Name</span>
           <input value={name} onChange={(e) => setName(e.target.value)} />
