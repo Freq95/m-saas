@@ -62,6 +62,42 @@
   opacity: 1;
 }
 
+.rightCluster {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.settingsIcon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  min-height: unset;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-soft);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.settingsIcon:hover {
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+}
+
+.settingsIconActive {
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+}
+
 .themeToggle {
   flex-shrink: 0;
   display: inline-flex;
@@ -85,22 +121,169 @@
   border-color: var(--color-border-strong);
 }
 
+.powerButton {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  min-height: unset;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-soft);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.powerButton:hover {
+  color: var(--color-danger-text);
+  background: var(--color-danger-bg, rgba(239, 68, 68, 0.08));
+  border-color: var(--color-danger-border, rgba(239, 68, 68, 0.3));
+}
+
+/* ── Logout modal ─────────────────────────────────────────── */
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--color-bg) 76%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(var(--blur-sm));
+  animation: overlayFadeIn var(--transition-fast);
+}
+
+@keyframes overlayFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.modal {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem 1.5rem;
+  width: min(92vw, 480px);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-lg);
+}
+
+.modal h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 620;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+
+.modalBody {
+  margin: 0.5rem 0 0;
+  color: var(--color-text-soft);
+  line-height: 1.5;
+  font-size: 0.9rem;
+}
+
+.modalFooter {
+  display: flex;
+  gap: 0.9rem;
+  justify-content: flex-end;
+  margin-top: 1.2rem;
+}
+
+.btnGhost {
+  padding: 0.72rem 1.35rem;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-weight: 400;
+  color: var(--color-text-soft);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.btnGhost:hover {
+  background: var(--color-surface-strong);
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+  transform: translateY(-1px);
+}
+
+.btnDanger {
+  padding: 0.7rem 1.4rem;
+  background: transparent;
+  color: color-mix(in srgb, var(--color-danger) 78%, white);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 45%, transparent);
+  border-radius: var(--radius-md);
+  font-size: 0.92rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.btnDanger:hover {
+  background: color-mix(in srgb, var(--color-danger) 18%, transparent);
+  border-color: color-mix(in srgb, var(--color-danger) 68%, transparent);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 600px) {
+  .modal {
+    width: 100%;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    margin-top: auto;
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+  .modalOverlay {
+    align-items: flex-end;
+  }
+  .modalFooter {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .btnGhost,
+  .btnDanger {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 @media (max-width: 700px) {
   .nav {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-3);
-    padding: var(--space-4);
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-4);
+    padding: var(--space-3) var(--space-4);
     background: var(--color-surface-strong);
   }
 
+  /* Logo stays left, rightCluster stays right — on same row */
+  .nav > a:first-child {
+    flex: 0 0 auto;
+  }
+
+  .rightCluster {
+    margin-left: auto;
+  }
+
+  /* Nav links wrap below on second row */
   .links {
+    order: 3;
     width: 100%;
     overflow: visible;
-    flex-wrap: wrap;
-    row-gap: 0.45rem;
-    padding-bottom: 0;
-    gap: var(--space-4);
+    flex-wrap: nowrap;
+    gap: var(--space-5);
+    padding-bottom: var(--space-1);
+  }
+
+  .link {
+    font-size: 0.82rem;
+    padding-bottom: var(--space-2);
   }
 
   .indicator {

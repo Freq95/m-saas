@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState, useEffect } from 'react';
 import {
   format,
   isSameDay,
@@ -184,6 +184,14 @@ export function DayPanel({
   onSearchChange,
   onHoverAppointment,
 }: DayPanelProps) {
+  type StatusFilter = 'all' | 'scheduled' | 'completed' | 'cancelled';
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+
+  // Reset filter when day changes
+  useEffect(() => {
+    setStatusFilter('all');
+  }, [selectedDay]);
+
   const isSearching = searchQuery.trim().length > 0;
 
   const searchResults = useMemo(() => {
@@ -197,7 +205,7 @@ export function DayPanel({
         apt.notes?.toLowerCase().includes(q)
       )
       .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-  }, [appointments, searchQuery, isSearching]);
+  }, [appointments, searchQuery]);
 
   const searchStats = useMemo(() => ({
     total:     searchResults.length,
@@ -226,6 +234,17 @@ export function DayPanel({
     }).length,
   }), [dayAppointments]);
 
+  const filteredDayAppointments = useMemo(() => {
+    if (statusFilter === 'all') return dayAppointments;
+    if (statusFilter === 'scheduled') return dayAppointments.filter((a) => normalizeStatus(a.status) === 'scheduled');
+    if (statusFilter === 'completed') return dayAppointments.filter((a) => normalizeStatus(a.status) === 'completed');
+    if (statusFilter === 'cancelled') return dayAppointments.filter((a) => {
+      const s = normalizeStatus(a.status);
+      return s === 'cancelled' || s === 'no-show';
+    });
+    return dayAppointments;
+  }, [dayAppointments, statusFilter]);
+
   const stats = isSearching ? searchStats : dayStats;
 
   const groupedResults = useMemo(() => {
@@ -245,7 +264,7 @@ export function DayPanel({
       group.items.push(apt);
     }
     return groups;
-  }, [searchResults, isSearching]);
+  }, [searchResults]);
 
   const searchBar = onSearchChange ? (
     <div className={styles.searchWrapper}>
@@ -358,28 +377,55 @@ export function DayPanel({
                   type="button"
                   onClick={onCreateClick}
                   aria-label="Adauga programare"
-                  title="Adauga programare"
                 >
-                  +
+                  + Programare
                 </button>
               </header>
 
-              {stats.total > 0 && (
+              {dayStats.total > 0 && (
                 <div className={styles.statsGrid}>
-                  <div className={styles.statCard}>
-                    <span className={styles.statCardValue}>{stats.total}</span>
+                  <div
+                    className={`${styles.statCard} ${statusFilter === 'all' ? styles.statCardActive : ''}`}
+                    onClick={() => setStatusFilter('all')}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={statusFilter === 'all'}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setStatusFilter('all'); }}
+                  >
+                    <span className={styles.statCardValue}>{dayStats.total}</span>
                     <span className={styles.statCardLabel}>Total</span>
                   </div>
-                  <div className={styles.statCard}>
-                    <span className={`${styles.statCardValue} ${styles.statScheduled}`}>{stats.scheduled}</span>
+                  <div
+                    className={`${styles.statCard} ${statusFilter === 'scheduled' ? styles.statCardActive : ''}`}
+                    onClick={() => setStatusFilter(statusFilter === 'scheduled' ? 'all' : 'scheduled')}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={statusFilter === 'scheduled'}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setStatusFilter(statusFilter === 'scheduled' ? 'all' : 'scheduled'); }}
+                  >
+                    <span className={`${styles.statCardValue} ${styles.statScheduled}`}>{dayStats.scheduled}</span>
                     <span className={styles.statCardLabel}>Programate</span>
                   </div>
-                  <div className={styles.statCard}>
-                    <span className={`${styles.statCardValue} ${styles.statCompleted}`}>{stats.completed}</span>
+                  <div
+                    className={`${styles.statCard} ${statusFilter === 'completed' ? styles.statCardActive : ''}`}
+                    onClick={() => setStatusFilter(statusFilter === 'completed' ? 'all' : 'completed')}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={statusFilter === 'completed'}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setStatusFilter(statusFilter === 'completed' ? 'all' : 'completed'); }}
+                  >
+                    <span className={`${styles.statCardValue} ${styles.statCompleted}`}>{dayStats.completed}</span>
                     <span className={styles.statCardLabel}>Finalizate</span>
                   </div>
-                  <div className={styles.statCard}>
-                    <span className={`${styles.statCardValue} ${styles.statOther}`}>{stats.other}</span>
+                  <div
+                    className={`${styles.statCard} ${statusFilter === 'cancelled' ? styles.statCardActive : ''}`}
+                    onClick={() => setStatusFilter(statusFilter === 'cancelled' ? 'all' : 'cancelled')}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={statusFilter === 'cancelled'}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setStatusFilter(statusFilter === 'cancelled' ? 'all' : 'cancelled'); }}
+                  >
+                    <span className={`${styles.statCardValue} ${styles.statOther}`}>{dayStats.other}</span>
                     <span className={styles.statCardLabel}>Anulate</span>
                   </div>
                 </div>
@@ -388,13 +434,17 @@ export function DayPanel({
               {searchBar}
 
               <div className={styles.list}>
-                {dayAppointments.length === 0 ? (
+                {filteredDayAppointments.length === 0 ? (
                   <div className={styles.emptyDay}>
                     <svg className={styles.emptyDayEmoji} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    <p className={styles.emptyDayText}>Nicio programare pentru aceasta zi. Apasa + Adauga pentru a crea una.</p>
+                    <p className={styles.emptyDayText}>
+                      {statusFilter !== 'all'
+                        ? 'Nicio programare cu acest status pentru aceasta zi.'
+                        : 'Nicio programare pentru aceasta zi. Apasa + Programare pentru a crea una.'}
+                    </p>
                   </div>
                 ) : (
-                  dayAppointments.map((apt) => (
+                  filteredDayAppointments.map((apt) => (
                     <AppointmentCard
                       key={apt.id}
                       appointment={apt}

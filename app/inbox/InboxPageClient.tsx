@@ -30,13 +30,13 @@ function EmailHtmlContent({ html }: { html: string }) {
       'img', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
       'table', 'tr', 'td', 'th', 'tbody', 'thead', 'tfoot', 'blockquote',
       'hr', 'pre', 'code', 'center', 'font', 'style', 'head', 'body', 'html',
-      'meta', 'link', 'button', 'form', 'input', 'select', 'textarea'
+      'meta', 'link'
     ],
     ALLOWED_ATTR: [
       'href', 'src', 'alt', 'title', 'class', 'style', 'width', 'height',
       'bgcolor', 'color', 'align', 'valign', 'border', 'cellpadding', 'cellspacing',
       'colspan', 'rowspan', 'target', 'rel', 'id', 'name', 'type', 'value',
-      'action', 'method', 'role', 'aria-label'
+      'role', 'aria-label'
     ],
     ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
     ALLOW_DATA_ATTR: true,
@@ -75,6 +75,42 @@ function EmailHtmlContent({ html }: { html: string }) {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
+    @font-face {
+      font-family: 'Chillax';
+      src: url('/fonts/chillax/Chillax-Light.woff2') format('woff2');
+      font-weight: 300;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Chillax';
+      src: url('/fonts/chillax/Chillax-Regular.woff2') format('woff2');
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Chillax';
+      src: url('/fonts/chillax/Chillax-Medium.woff2') format('woff2');
+      font-weight: 500;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Chillax';
+      src: url('/fonts/chillax/Chillax-Semibold.woff2') format('woff2');
+      font-weight: 600;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Chillax';
+      src: url('/fonts/chillax/Chillax-Bold.woff2') format('woff2');
+      font-weight: 700;
+      font-style: normal;
+      font-display: swap;
+    }
+
     * {
       box-sizing: border-box;
     }
@@ -86,7 +122,7 @@ function EmailHtmlContent({ html }: { html: string }) {
       color: #000000;
     }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-family: 'Chillax', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       line-height: 1.6;
     }
     img {

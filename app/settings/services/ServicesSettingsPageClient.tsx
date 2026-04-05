@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import { ToastContainer } from '@/components/Toast';
 import { useToast } from '@/lib/useToast';
 import navStyles from '../../dashboard/page.module.css';
@@ -66,7 +66,9 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
 
   const [addForm, setAddForm] = useState<ServiceFormState>(EMPTY_FORM);
   const [editForm, setEditForm] = useState<ServiceFormState>(EMPTY_FORM);
-  const [deleteErrors, setDeleteErrors] = useState<Record<number, string>>({});
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deleteBackdropPressRef = useRef(false);
   const toast = useToast();
 
   function openAddForm() {
@@ -178,13 +180,8 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
   }
 
   async function handleDeleteService(id: number) {
-    setSaving(true);
-    setError(null);
-    setDeleteErrors((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
+    setIsDeleting(true);
+    setDeleteError(null);
 
     try {
       const response = await fetch(`/api/services/${id}`, { method: 'DELETE' });
@@ -195,40 +192,35 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
           response.status === 400
             ? 'Serviciul este folosit in programari si nu poate fi sters.'
             : data.error || 'Nu am putut sterge serviciul.';
-        setDeleteErrors((prev) => ({ ...prev, [id]: message }));
+        setDeleteError(message);
         return;
       }
 
       setServices((prev) => prev.filter((service) => service.id !== id));
       setConfirmDeleteId(null);
+      setDeleteError(null);
       toast.success('Serviciu sters.');
     } catch {
-      const message = 'Nu am putut sterge serviciul.';
-      setDeleteErrors((prev) => ({ ...prev, [id]: message }));
-      toast.error(message);
+      setDeleteError('Nu am putut sterge serviciul.');
     } finally {
-      setSaving(false);
+      setIsDeleting(false);
     }
   }
 
   return (
     <div className={navStyles.container}>
       <div className={styles.container}>
-        <div className={styles.header}>
-          <h1>Servicii</h1>
+        <div className={styles.tabRow}>
+          <SettingsTabs activeTab="services" />
           <button
             type="button"
             className={styles.primaryButton}
             onClick={() => (showAddForm ? closeAddForm() : openAddForm())}
             disabled={saving}
           >
-            {showAddForm ? 'Anuleaza' : '+ Adauga'}
+            {showAddForm ? 'Anuleaza' : '+ Manopera'}
           </button>
         </div>
-        <p className={styles.description}>
-          Gestioneaza lista de servicii afisata in calendar si folosita la programari.
-        </p>
-        <SettingsTabs activeTab="services" />
 
         {showAddForm && (
           <div className={styles.formCard}>
@@ -283,7 +275,7 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
           <div className={styles.emptyState}>
             <p>Niciun serviciu adaugat inca.</p>
             <button type="button" className={styles.primaryButton} onClick={openAddForm} disabled={saving}>
-              + Adauga primul serviciu
+              + Adauga prima manopera
             </button>
           </div>
         ) : (
@@ -291,7 +283,7 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
             <table className={styles.table}>
               <thead>
                 <tr>
-                  <th>Servicii</th>
+                  <th>Servicii Medicale</th>
                   <th>Durata (min)</th>
                   <th>Pret RON</th>
                   <th aria-label="Actiuni" />
@@ -300,8 +292,6 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
               <tbody>
                 {services.map((service) => {
                   const isEditing = editingId === service.id;
-                  const isConfirmingDelete = confirmDeleteId === service.id;
-                  const deleteError = deleteErrors[service.id];
 
                   return (
                     <Fragment key={service.id}>
@@ -372,8 +362,10 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
                                   className={styles.iconButton}
                                   onClick={() => startEdit(service)}
                                   disabled={saving}
+                                  aria-label="Editeaza serviciu"
+                                  title="Editeaza"
                                 >
-                                  Editeaza
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                 </button>
                                 <button
                                   type="button"
@@ -383,45 +375,16 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
                                     setEditingId(null);
                                   }}
                                   disabled={saving}
+                                  aria-label="Sterge serviciu"
+                                  title="Sterge"
                                 >
-                                  Sterge
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                                 </button>
                               </div>
                             </td>
                           </>
                         )}
                       </tr>
-                      {isConfirmingDelete && !isEditing && (
-                        <tr className={styles.confirmDeleteRow}>
-                          <td colSpan={4} className={styles.confirmDeleteCell}>
-                            <span>Esti sigur?</span>
-                            <button
-                              type="button"
-                              className={styles.dangerButton}
-                              onClick={() => handleDeleteService(service.id)}
-                              disabled={saving}
-                            >
-                              Da
-                            </button>
-                            <button
-                              type="button"
-                              className={styles.secondaryButton}
-                              onClick={() => {
-                                setConfirmDeleteId(null);
-                                setDeleteErrors((prev) => {
-                                  const next = { ...prev };
-                                  delete next[service.id];
-                                  return next;
-                                });
-                              }}
-                              disabled={saving}
-                            >
-                              Nu
-                            </button>
-                            {deleteError && <p className={styles.inlineError}>{deleteError}</p>}
-                          </td>
-                        </tr>
-                      )}
                     </Fragment>
                   );
                 })}
@@ -430,8 +393,61 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
           </div>
         )}
       </div>
+      {confirmDeleteId !== null && (() => {
+        const serviceToDelete = services.find((s) => s.id === confirmDeleteId);
+        return (
+          <div
+            className={styles.overlay}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-modal-title"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && !isDeleting) {
+                setConfirmDeleteId(null);
+                setDeleteError(null);
+              }
+            }}
+            onPointerDown={(e) => { deleteBackdropPressRef.current = e.target === e.currentTarget; }}
+            onClick={(e) => {
+              if (isDeleting) return;
+              const endedOnBackdrop = e.target === e.currentTarget;
+              if (deleteBackdropPressRef.current && endedOnBackdrop) {
+                setConfirmDeleteId(null);
+                setDeleteError(null);
+              }
+              deleteBackdropPressRef.current = false;
+            }}
+          >
+            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+              <h3 id="delete-modal-title">Ștergere serviciu</h3>
+              <p className={styles.modalBody}>
+                Sigur vrei să ștergi serviciul <strong>{serviceToDelete?.name}</strong>?
+              </p>
+              {deleteError && <p className={styles.modalError}>{deleteError}</p>}
+              <div className={styles.modalFooter}>
+                <button
+                  type="button"
+                  className={styles.btnGhost}
+                  autoFocus
+                  onClick={() => { setConfirmDeleteId(null); setDeleteError(null); }}
+                  disabled={isDeleting}
+                >
+                  Renunță
+                </button>
+                <button
+                  type="button"
+                  className={styles.btnDanger}
+                  disabled={isDeleting}
+                  onClick={() => handleDeleteService(confirmDeleteId)}
+                >
+                  {isDeleting ? 'Se șterge...' : 'Șterge'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       <ToastContainer toasts={toast.toasts} onClose={toast.removeToast} />
     </div>
   );
 }
-

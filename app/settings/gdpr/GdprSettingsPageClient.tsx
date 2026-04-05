@@ -43,16 +43,9 @@ export default function GdprSettingsPageClient({ initialText }: GdprSettingsPage
   return (
     <div className={navStyles.container}>
       <div className={styles.container}>
-        <SettingsTabs activeTab="gdpr" />
-
-        <header className={styles.header}>
-          <div>
-            <h1>Setari GDPR</h1>
-            <p className={styles.description}>
-              Personalizeaza textul notificarii GDPR afisate pacientilor la inregistrarea consimtamantului.
-            </p>
-          </div>
-        </header>
+        <div className={styles.tabRow}>
+          <SettingsTabs activeTab="gdpr" />
+        </div>
 
         <div className={styles.formCard}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>

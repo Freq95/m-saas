@@ -64,14 +64,16 @@
 }
 
 .addButton {
-  background: rgba(77, 163, 255, 0.16);
-  color: var(--color-info-text);
-  border-color: rgba(77, 163, 255, 0.34);
+  background: var(--color-today-badge);
+  color: var(--color-text-on-accent);
+  border-color: transparent;
+  transition: background var(--transition-fast), transform var(--transition-fast), border-color var(--transition-fast);
 }
 
 .addButton:hover {
-  background: rgba(77, 163, 255, 0.22);
-  border-color: rgba(77, 163, 255, 0.44);
+  background: var(--color-accent);
+  border-color: transparent;
+  transform: translateY(-1px);
 }
 
 .filtersCard,
@@ -91,13 +93,14 @@
   display: flex;
   gap: var(--space-2);
   flex-wrap: wrap;
+  align-items: center;
 }
 
 .searchInput,
 .filterSelect {
   min-height: 42px;
   padding: 0.65rem 0.82rem;
-  background: rgba(15, 23, 42, 0.36);
+  background: var(--color-surface-muted);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   color: var(--color-text);
@@ -142,7 +145,7 @@
 }
 
 .table thead {
-  background: rgba(9, 16, 34, 0.5);
+  background: var(--color-surface-muted);
 }
 
 .table th {

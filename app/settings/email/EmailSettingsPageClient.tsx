@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ro } from 'date-fns/locale';
 import DOMPurify from 'dompurify';
-import { signOut } from 'next-auth/react';
 import { emailSchema } from '@/lib/validation';
 import { fetchWithRetry } from '@/lib/retry';
 import { useToast } from '@/lib/useToast';
@@ -52,26 +51,58 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
   const [fetchingEmail, setFetchingEmail] = useState<number | null>(null);
   const [lastEmailByIntegration, setLastEmailByIntegration] = useState<Record<number, EmailMessage | null>>({});
   const [deleting, setDeleting] = useState<number | null>(null);
-  const toast = useToast();
-  
+  const [disconnectTargetId, setDisconnectTargetId] = useState<number | null>(null);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [disconnectError, setDisconnectError] = useState<string | null>(null);
+  const disconnectBackdropPressRef = useRef(false);
+  const {
+    toasts,
+    removeToast,
+    success: toastSuccess,
+    error: toastError,
+    info: toastInfo,
+  } = useToast();
+
   // Store AbortControllers for cleanup
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
 
+  const loadIntegrations = useCallback(async () => {
+    try {
+      const response = await fetchWithRetry(
+        '/api/settings/email-integrations',
+        {},
+        { maxRetries: 2, initialDelay: 500 }
+      );
+
+      if (!response.ok) {
+        toastError('Failed to load integrations');
+        return;
+      }
+
+      const data = await response.json();
+      setIntegrations(data.integrations || []);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      toastError(`Failed to load integrations: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [toastError]);
+
   useEffect(() => {
     if (initialIntegrations.length === 0) {
-      loadIntegrations();
+      void loadIntegrations();
     } else {
       setLoading(false);
     }
 
-    // Cleanup function to abort all pending requests on unmount
     return () => {
       abortControllersRef.current.forEach((controller) => {
         controller.abort();
       });
       abortControllersRef.current.clear();
     };
-  }, [initialIntegrations.length]);
+  }, [initialIntegrations.length, loadIntegrations]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -79,41 +110,17 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
     const errorCode = params.get('error');
 
     if (connected === 'gmail') {
-      toast.success('Gmail conectat cu succes!');
-      loadIntegrations();
+      toastSuccess('Gmail conectat cu succes!');
+      void loadIntegrations();
       window.history.replaceState({}, '', '/settings/email');
       return;
     }
 
     if (errorCode) {
-      toast.error('Conectarea Gmail a esuat. Incearca din nou.');
+      toastError('Conectarea Gmail a esuat. Incearca din nou.');
       window.history.replaceState({}, '', '/settings/email');
     }
-  }, []);
-
-  async function loadIntegrations() {
-    try {
-      const response = await fetchWithRetry(
-        '/api/settings/email-integrations',
-        {},
-        { maxRetries: 2, initialDelay: 500 }
-      );
-      
-      if (!response.ok) {
-        toast.error('Failed to load integrations');
-        return;
-      }
-      
-      const data = await response.json();
-      const integrationsList = data.integrations || [];
-      setIntegrations(integrationsList);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      toast.error(`Failed to load integrations: ${errorMessage}`);
-    } finally {
-      setLoading(false);
-    }
-  }
+  }, [loadIntegrations, toastError, toastSuccess]);
 
   function validateEmail(email: string): boolean {
     setEmailError(null);
@@ -127,34 +134,29 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
 
   async function saveYahooIntegration() {
     const password = yahooPassword;
-    
+
     if (!yahooEmail || !password) {
       setError('Please enter both email and password');
       return;
     }
 
-    // Validate email format
-    if (!validateEmail(yahooEmail)) {
-      return;
-    }
+    if (!validateEmail(yahooEmail)) return;
 
     setSaving(true);
     setError(null);
-    
+
     const passwordToSend = password;
-    
-    if (yahooPasswordRef.current) {
-      yahooPasswordRef.current.value = '';
-    }
+
+    if (yahooPasswordRef.current) yahooPasswordRef.current.value = '';
     setYahooPassword('');
-    
+
     const requestId = 'save-yahoo';
     const controller = new AbortController();
     abortControllersRef.current.set(requestId, controller);
-    
+
     try {
       const timeoutId = setTimeout(() => controller.abort(), 30000);
-      
+
       const response = await fetchWithRetry(
         '/api/settings/email-integrations/yahoo',
         {
@@ -169,25 +171,23 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
         },
         { maxRetries: 2, initialDelay: 1000 }
       );
-      
+
       clearTimeout(timeoutId);
       abortControllersRef.current.delete(requestId);
-      
+
       const data = await response.json();
-      
+
       if (!response.ok) {
         const errorMsg = data.error || data.message || data.details || 'Failed to save integration';
         throw new Error(errorMsg);
       }
-      
-      toast.success('Yahoo Mail integration connected successfully!');
-      
+
+      toastSuccess('Yahoo Mail conectat cu succes!');
       setShowYahooForm(false);
       setYahooEmail('');
       setError(null);
       setEmailError(null);
-      
-      // Single reload - update state directly from response
+
       if (data.integration) {
         setIntegrations((prev) => {
           const existing = prev.findIndex(i => i.provider === 'yahoo');
@@ -219,51 +219,57 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
       const error = err instanceof Error ? err : new Error('Unknown error');
       if (error.name === 'AbortError') {
         setError('Connection timeout. The connection test took too long. Please try again.');
-        toast.error('Connection timeout. Please try again.');
+        toastError('Connection timeout. Please try again.');
       } else {
         const errorMsg = error.message || 'Failed to save integration';
         setError(errorMsg);
-        toast.error(errorMsg);
+        toastError(errorMsg);
       }
-      if (yahooPasswordRef.current) {
-        yahooPasswordRef.current.value = '';
-      }
+      if (yahooPasswordRef.current) yahooPasswordRef.current.value = '';
       setYahooPassword('');
     } finally {
       setSaving(false);
-      if (yahooPasswordRef.current) {
-        yahooPasswordRef.current.value = '';
-      }
+      if (yahooPasswordRef.current) yahooPasswordRef.current.value = '';
       setYahooPassword('');
     }
   }
 
-  async function deleteIntegration(id: number) {
-    if (!window.confirm('Are you sure you want to disconnect this integration?')) {
-      return;
+  const handleDisconnectBackdropPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    disconnectBackdropPressRef.current = e.target === e.currentTarget;
+  };
+
+  const handleDisconnectBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isDisconnecting) return;
+    const endedOnBackdrop = e.target === e.currentTarget;
+    if (disconnectBackdropPressRef.current && endedOnBackdrop) {
+      setDisconnectTargetId(null);
+      setDisconnectError(null);
     }
-    
-    setDeleting(id);
+    disconnectBackdropPressRef.current = false;
+  };
+
+  const handleDisconnectConfirm = async () => {
+    if (isDisconnecting || disconnectTargetId === null) return;
+    setDisconnectError(null);
+    setIsDisconnecting(true);
+    setDeleting(disconnectTargetId);
     try {
       const response = await fetchWithRetry(
-        `/api/settings/email-integrations/${id}`,
+        `/api/settings/email-integrations/${disconnectTargetId}`,
         { method: 'DELETE' },
         { maxRetries: 2, initialDelay: 500 }
       );
-      
-      if (!response.ok) {
-        throw new Error('Failed to delete integration');
-      }
-      
-      toast.success('Integration disconnected successfully');
+      if (!response.ok) throw new Error('Failed to delete integration');
+      setDisconnectTargetId(null);
+      toastSuccess('Integrare deconectată');
       await loadIntegrations();
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      toast.error(`Failed to delete integration: ${errorMessage}`);
+    } catch {
+      setDisconnectError('Nu s-a putut deconecta integrarea. Încearcă din nou.');
     } finally {
+      setIsDisconnecting(false);
       setDeleting(null);
     }
-  }
+  };
 
   async function testConnection(id: number) {
     setTesting(id);
@@ -273,17 +279,17 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
         { method: 'POST' },
         { maxRetries: 2, initialDelay: 500 }
       );
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
-        toast.success('Connection test successful!');
+        toastSuccess('Conexiune funcțională!');
       } else {
-        toast.error('Connection test failed: ' + (data.error || 'Unknown error'));
+        toastError('Test eșuat: ' + (data.error || 'Unknown error'));
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      toast.error(`Failed to test connection: ${errorMessage}`);
+      toastError(`Failed to test connection: ${errorMessage}`);
     } finally {
       setTesting(null);
     }
@@ -298,22 +304,22 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
         { method: 'POST' },
         { maxRetries: 2, initialDelay: 1000 }
       );
-      
+
       const data = await response.json();
-      
+
       if (data.success) {
         if (data.email) {
           setLastEmailByIntegration((prev) => ({ ...prev, [id]: data.email }));
-          toast.success('Email fetched successfully');
+          toastSuccess('Email preluat cu succes');
         } else {
-          toast.info(data.message || 'No emails found');
+          toastInfo(data.message || 'Niciun email găsit');
         }
       } else {
-        toast.error('Failed to fetch email: ' + (data.error || 'Unknown error'));
+        toastError('Eroare la preluare: ' + (data.error || 'Unknown error'));
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      toast.error(`Failed to fetch email: ${errorMessage}`);
+      toastError(`Failed to fetch email: ${errorMessage}`);
     } finally {
       setFetchingEmail(null);
     }
@@ -329,431 +335,464 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
     .filter((value): value is string => Boolean(value))
     .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] || null;
 
+  const disconnectTarget = disconnectTargetId !== null
+    ? integrations.find(i => i.id === disconnectTargetId)
+    : null;
+
   if (loading) {
     return (
       <div className={navStyles.container}>
         <div className={styles.container}>
-          <div role="status" aria-live="polite" aria-label="Loading integrations">
-            Loading...
-          </div>
+          <div role="status" aria-live="polite">Încărcare...</div>
         </div>
       </div>
     );
   }
 
-  // Enhanced DOMPurify configuration for better security
   const sanitizeHtml = (html: string): string => {
     return DOMPurify.sanitize(html, {
       ALLOWED_TAGS: [
         'p', 'br', 'strong', 'em', 'u', 'b', 'i', 'a', 'ul', 'ol', 'li',
         'img', 'div', 'span', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
         'table', 'tr', 'td', 'th', 'tbody', 'thead', 'tfoot', 'blockquote',
-        'hr', 'pre', 'code', 'center', 'font'
+        'hr', 'pre', 'code', 'center', 'font',
       ],
       ALLOWED_ATTR: [
         'href', 'target', 'rel', 'src', 'alt', 'title', 'width', 'height',
         'class', 'id', 'colspan', 'rowspan', 'align', 'valign',
-        'bgcolor', 'color', 'border', 'cellpadding', 'cellspacing'
+        'bgcolor', 'color', 'border', 'cellpadding', 'cellspacing',
       ],
-      // Security enhancements
-      ALLOW_DATA_ATTR: false, // Disable data attributes
-      ALLOW_UNKNOWN_PROTOCOLS: false, // Only allow known protocols (http, https, mailto)
-      FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button'], // Explicitly forbid dangerous tags
-      FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'], // Forbid event handlers
-      KEEP_CONTENT: true, // Keep text content even if tags are removed
-      RETURN_DOM: false, // Return string, not DOM
+      ALLOW_DATA_ATTR: false,
+      ALLOW_UNKNOWN_PROTOCOLS: false,
+      FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input', 'button'],
+      FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
+      KEEP_CONTENT: true,
+      RETURN_DOM: false,
       RETURN_DOM_FRAGMENT: false,
       RETURN_TRUSTED_TYPE: false,
-      SAFE_FOR_TEMPLATES: false, // Not using in templates, so false is safer
-      SANITIZE_DOM: true, // Sanitize DOM
-      WHOLE_DOCUMENT: false, // Not a full document
+      SAFE_FOR_TEMPLATES: false,
+      SANITIZE_DOM: true,
+      WHOLE_DOCUMENT: false,
     });
   };
+
+  // Shared SVG icons
+  // Test connection: wifi signal icon
+  const IconWifi = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+      <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+      <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+      <circle cx="12" cy="20" r="1" fill="currentColor" />
+    </svg>
+  );
+  // Fetch last email: refresh/sync icon
+  const IconRefresh = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="23 4 23 10 17 10" />
+      <polyline points="1 20 1 14 7 14" />
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+    </svg>
+  );
+  const IconX = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  );
+  const IconClock = () => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="10" />
+      <path d="M12 6v6l4 2" />
+    </svg>
+  );
 
   return (
     <div className={navStyles.container}>
       <div className={styles.container}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem' }}>
-          <h1>Email Integrations</h1>
-          <button
-            type="button"
-            className={styles.deleteButton}
-            onClick={() => signOut({ callbackUrl: '/login' })}
-            aria-label="Deconectare"
-          >
-            Deconectare
-          </button>
-        </div>
-        <p className={styles.description}>
-          Conecteaza-ti contul Gmail pentru a sincroniza mesajele. Foloseste OAuth 2.0 - nu este nevoie de parole
-          de aplicatie.
-        </p>
-        <SettingsTabs activeTab="email" />
-        {activeIntegrations.length > 0 ? (
-          <div className={styles.connectedBanner}>
-            <span>
-              Conectat: {activeIntegrations.map((integration) => `${integration.provider} (${integration.email})`).join(', ')}
+        <div className={styles.tabRow}>
+          <SettingsTabs activeTab="email" />
+          {activeIntegrations.length > 0 && (
+            <span className={styles.tabStatus}>
+              <span className={styles.tabStatusDot} />
+              {activeIntegrations.map((i) => i.provider).join(', ')}
+              {latestSyncAt && (
+                <span className={styles.tabStatusSync}>
+                  · {format(new Date(latestSyncAt), 'dd MMM HH:mm', { locale: ro })}
+                </span>
+              )}
             </span>
-            {latestSyncAt && (
-              <span>
-                {' '}Ultima sincronizare: {format(new Date(latestSyncAt), 'dd MMM HH:mm', { locale: ro })}
-              </span>
+          )}
+        </div>
+
+        {/* Integrations table */}
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Furnizor</th>
+                <th className={styles.colEmail}>Cont conectat</th>
+                <th className={styles.colSync}>Ultima sincronizare</th>
+                <th className={styles.colActions} />
+              </tr>
+            </thead>
+            <tbody>
+              {/* Yahoo Mail */}
+              <tr className={styles.row}>
+                <td>
+                  <div className={styles.providerRow}>
+                    <span className={yahooIntegration?.is_active ? styles.statusDot : styles.statusDotOff} />
+                    <span className={styles.providerName}>Yahoo Mail</span>
+                  </div>
+                </td>
+                <td className={styles.colEmail}>
+                  {yahooIntegration
+                    ? <span className={styles.cellMuted}>{yahooIntegration.email}</span>
+                    : <span className={styles.cellEmpty}>—</span>
+                  }
+                </td>
+                <td className={styles.colSync}>
+                  {yahooIntegration?.last_sync_at
+                    ? <span className={styles.cellMuted}>{format(new Date(yahooIntegration.last_sync_at), 'dd MMM HH:mm', { locale: ro })}</span>
+                    : <span className={styles.cellEmpty}>—</span>
+                  }
+                </td>
+                <td>
+                  <div className={styles.actionGroup}>
+                    {yahooIntegration ? (
+                      <>
+                        <button
+                          className={styles.iconButton}
+                          onClick={() => testConnection(yahooIntegration.id)}
+                          disabled={testing === yahooIntegration.id || fetchingEmail === yahooIntegration.id || deleting === yahooIntegration.id}
+                          title="Test conexiune"
+                          aria-label="Test Yahoo Mail connection"
+                        >
+                          {testing === yahooIntegration.id ? <IconClock /> : <IconWifi />}
+                        </button>
+                        <button
+                          className={styles.iconButton}
+                          onClick={() => fetchLastEmail(yahooIntegration.id)}
+                          disabled={testing === yahooIntegration.id || fetchingEmail === yahooIntegration.id || deleting === yahooIntegration.id}
+                          title="Preia ultimul email"
+                          aria-label="Fetch last email from Yahoo Mail"
+                        >
+                          {fetchingEmail === yahooIntegration.id ? <IconClock /> : <IconRefresh />}
+                        </button>
+                        <button
+                          className={styles.iconButtonDanger}
+                          onClick={() => setDisconnectTargetId(yahooIntegration.id)}
+                          disabled={testing === yahooIntegration.id || fetchingEmail === yahooIntegration.id || deleting === yahooIntegration.id}
+                          title="Deconectează"
+                          aria-label="Disconnect Yahoo Mail"
+                        >
+                          <IconX />
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        className={styles.connectBtn}
+                        onClick={() => setShowYahooForm(!showYahooForm)}
+                        aria-label="Conectează Yahoo Mail"
+                      >
+                        {showYahooForm ? 'Anulează' : 'Conectează'}
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+
+              {/* Gmail */}
+              <tr className={styles.row}>
+                <td>
+                  <div className={styles.providerRow}>
+                    <span className={gmailIntegration?.is_active ? styles.statusDot : styles.statusDotOff} />
+                    <span className={styles.providerName}>Gmail</span>
+                  </div>
+                </td>
+                <td className={styles.colEmail}>
+                  {gmailIntegration
+                    ? <span className={styles.cellMuted}>{gmailIntegration.email}</span>
+                    : <span className={styles.cellEmpty}>—</span>
+                  }
+                </td>
+                <td className={styles.colSync}>
+                  {gmailIntegration?.last_sync_at
+                    ? <span className={styles.cellMuted}>{format(new Date(gmailIntegration.last_sync_at), 'dd MMM HH:mm', { locale: ro })}</span>
+                    : <span className={styles.cellEmpty}>—</span>
+                  }
+                </td>
+                <td>
+                  <div className={styles.actionGroup}>
+                    {gmailIntegration ? (
+                      <>
+                        <button
+                          className={styles.iconButton}
+                          onClick={() => testConnection(gmailIntegration.id)}
+                          disabled={testing === gmailIntegration.id || fetchingEmail === gmailIntegration.id || deleting === gmailIntegration.id}
+                          title="Test conexiune"
+                          aria-label="Test Gmail connection"
+                        >
+                          {testing === gmailIntegration.id ? <IconClock /> : <IconWifi />}
+                        </button>
+                        <button
+                          className={styles.iconButton}
+                          onClick={() => fetchLastEmail(gmailIntegration.id)}
+                          disabled={testing === gmailIntegration.id || fetchingEmail === gmailIntegration.id || deleting === gmailIntegration.id}
+                          title="Preia ultimul email"
+                          aria-label="Fetch last Gmail email"
+                        >
+                          {fetchingEmail === gmailIntegration.id ? <IconClock /> : <IconRefresh />}
+                        </button>
+                        <button
+                          className={styles.iconButtonDanger}
+                          onClick={() => setDisconnectTargetId(gmailIntegration.id)}
+                          disabled={testing === gmailIntegration.id || fetchingEmail === gmailIntegration.id || deleting === gmailIntegration.id}
+                          title="Deconectează"
+                          aria-label="Disconnect Gmail"
+                        >
+                          <IconX />
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        className={styles.connectBtn}
+                        onClick={() => { window.location.href = '/api/auth/google/email'; }}
+                        aria-label="Conectează Gmail"
+                      >
+                        Conectează
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+
+              {/* Outlook */}
+              <tr className={styles.row}>
+                <td>
+                  <div className={styles.providerRow}>
+                    <span className={styles.statusDotOff} />
+                    <span className={styles.providerName}>Outlook</span>
+                  </div>
+                </td>
+                <td className={styles.colEmail}>
+                  <span className={styles.cellEmpty}>—</span>
+                </td>
+                <td className={styles.colSync}>
+                  <span className={styles.cellEmpty}>—</span>
+                </td>
+                <td>
+                  <div className={styles.actionGroup}>
+                    <button className={styles.connectBtn} disabled aria-label="Outlook în curând">
+                      În curând
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        {/* Yahoo connect form */}
+        {showYahooForm && !yahooIntegration && (
+          <div className={styles.formCard}>
+            <h3>Conectează Yahoo Mail</h3>
+            <p className={styles.formNote}>
+              Folosește o parolă pentru aplicații Yahoo.{' '}
+              <a href="https://login.yahoo.com/myaccount/security/" target="_blank" rel="noopener noreferrer">
+                Creează o parolă pentru aplicații
+              </a>
+            </p>
+            {error && (
+              <div className={styles.error} role="alert" aria-live="assertive">
+                {error}
+              </div>
             )}
-          </div>
-        ) : (
-          <div className={styles.notConnectedBanner}>
-            Niciun cont de email conectat
+            <div className={styles.formGrid}>
+              <div className={styles.field}>
+                <label htmlFor="yahoo-email">Adresă email</label>
+                <input
+                  id="yahoo-email"
+                  type="email"
+                  placeholder="utilizator@yahoo.com"
+                  value={yahooEmail}
+                  onChange={(e) => {
+                    setYahooEmail(e.target.value);
+                    if (emailError) validateEmail(e.target.value);
+                  }}
+                  onBlur={(e) => validateEmail(e.target.value)}
+                  aria-required="true"
+                  aria-invalid={!!emailError}
+                />
+                {emailError && (
+                  <span className={styles.fieldError} role="alert">{emailError}</span>
+                )}
+              </div>
+              <div className={styles.field}>
+                <label htmlFor="yahoo-password">Parolă aplicație</label>
+                <input
+                  id="yahoo-password"
+                  type="password"
+                  placeholder="xxxx xxxx xxxx xxxx"
+                  ref={yahooPasswordRef}
+                  value={yahooPassword}
+                  onChange={(e) => setYahooPassword(e.target.value)}
+                  aria-required="true"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !saving) {
+                      e.preventDefault();
+                      saveYahooIntegration();
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            <div className={styles.formActions}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowYahooForm(false);
+                  setError(null);
+                  setEmailError(null);
+                  setYahooEmail('');
+                  setYahooPassword('');
+                  if (yahooPasswordRef.current) yahooPasswordRef.current.value = '';
+                }}
+                className={styles.secondaryButton}
+              >
+                Anulează
+              </button>
+              <button
+                type="button"
+                onClick={saveYahooIntegration}
+                disabled={saving || !yahooEmail.trim() || !yahooPassword || !!emailError}
+                className={styles.primaryButton}
+              >
+                {saving ? 'Se conectează...' : 'Conectează'}
+              </button>
+            </div>
           </div>
         )}
-        
-        {/* Yahoo Mail */}
-        <div className={styles.integrationCard} role="region" aria-label="Yahoo Mail integration">
-          <div className={styles.integrationHeader}>
-            <div>
-              <h2>Yahoo Mail</h2>
-              <p className={styles.providerDescription}>
-                Connect your Yahoo Mail account using an App Password. 
-                <a 
-                  href="https://login.yahoo.com/myaccount/security/" 
-                  target="_blank" 
-                  rel="noopener noreferrer" 
-                  className={styles.link}
-                  aria-label="Add Yahoo Connection by Creating an App Password"
-                >
-                  Add Yahoo Connection by Creating an App Password
-                </a>
-              </p>
-            </div>
-            {yahooIntegration ? (
-              <span 
-                className={yahooIntegration.is_active ? styles.statusConnected : styles.statusDisconnected}
-                role="status"
-                aria-live="polite"
-                aria-label={yahooIntegration.is_active ? 'Yahoo Mail connected' : 'Yahoo Mail disconnected'}
+
+        {/* Email previews */}
+        {yahooLastEmail && yahooIntegration && (
+          <div className={styles.emailPreview} role="article" aria-label="Yahoo Mail — ultimul email">
+            <div className={styles.emailHeader}>
+              <h3>Ultimul email — Yahoo Mail</h3>
+              <button
+                onClick={() => setLastEmailByIntegration((prev) => ({ ...prev, [yahooIntegration.id]: null }))}
+                className={styles.closeButton}
+                title="Închide"
+                aria-label="Close email preview"
               >
-                {yahooIntegration.is_active ? 'Connected' : 'Disconnected'}
-              </span>
-            ) : (
-              <span 
-                className={styles.statusDisconnected}
-                role="status"
-                aria-label="Yahoo Mail not connected"
-              >
-                Not Connected
-              </span>
-            )}
-          </div>
-          
-          {yahooIntegration ? (
-            <div className={styles.integrationDetails}>
-              <p><strong>Email:</strong> {yahooIntegration.email}</p>
-              {yahooIntegration.last_sync_at && (
-                <p><strong>Last Sync:</strong> {new Date(yahooIntegration.last_sync_at).toLocaleString()}</p>
-              )}
-              <div className={styles.actions} role="group" aria-label="Integration actions">
-                <button 
-                  onClick={() => testConnection(yahooIntegration.id)} 
-                  className={styles.testButton}
-                  disabled={testing === yahooIntegration.id || fetchingEmail === yahooIntegration.id || deleting === yahooIntegration.id}
-                  aria-label="Test Yahoo Mail connection"
-                  aria-busy={testing === yahooIntegration.id}
-                >
-                  {testing === yahooIntegration.id ? 'Testing...' : 'Test Connection'}
-                </button>
-                <button 
-                  onClick={() => fetchLastEmail(yahooIntegration.id)} 
-                  className={styles.fetchButton}
-                  disabled={testing === yahooIntegration.id || fetchingEmail === yahooIntegration.id || deleting === yahooIntegration.id}
-                  aria-label="Fetch last email from Yahoo Mail"
-                  aria-busy={fetchingEmail === yahooIntegration.id}
-                >
-                  {fetchingEmail === yahooIntegration.id ? 'Fetching...' : 'Fetch Last Email'}
-                </button>
-                <button 
-                  onClick={() => deleteIntegration(yahooIntegration.id)} 
-                  className={styles.deleteButton}
-                  disabled={testing === yahooIntegration.id || fetchingEmail === yahooIntegration.id || deleting === yahooIntegration.id}
-                  aria-label="Disconnect Yahoo Mail integration"
-                  aria-busy={deleting === yahooIntegration.id}
-                >
-                  {deleting === yahooIntegration.id ? 'Disconnecting...' : 'Disconnect'}
-                </button>
-              </div>
-              {yahooLastEmail && (
-                <div className={styles.emailPreview} role="article" aria-label="Last email preview">
-                  <div className={styles.emailHeader}>
-                    <h3>Last Email Received</h3>
-                    <button 
-                      onClick={() => {
-                        if (!yahooIntegration) return;
-                        setLastEmailByIntegration((prev) => ({ ...prev, [yahooIntegration.id]: null }));
-                      }}
-                      className={styles.closeButton}
-                      title="Close"
-                      aria-label="Close email preview"
-                    >
-                      ÃƒÆ’Ã¢â‚¬â€
-                    </button>
-                  </div>
-                  <div className={styles.emailMeta}>
-                    <p><strong>From:</strong> {yahooLastEmail.from}</p>
-                    <p><strong>To:</strong> {yahooLastEmail.to}</p>
-                    <p><strong>Subject:</strong> {yahooLastEmail.subject || '(No subject)'}</p>
-                    <p><strong>Date:</strong> {new Date(yahooLastEmail.date).toLocaleString()}</p>
-                  </div>
-                  <div className={styles.emailContent}>
-                    {yahooLastEmail.html ? (
-                      <div 
-                        className={styles.emailHtml}
-                        dangerouslySetInnerHTML={{ 
-                          __html: sanitizeHtml(yahooLastEmail.html)
-                        }}
-                        aria-label="Email content"
-                      />
-                    ) : (
-                      <div className={styles.emailText} aria-label="Email text content">
-                        <pre>{yahooLastEmail.text || yahooLastEmail.cleanText || '(No content)'}</pre>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+                <IconX />
+              </button>
             </div>
-          ) : (
-            <div>
-              {!showYahooForm ? (
-                <button 
-                  onClick={() => setShowYahooForm(true)} 
-                  className={styles.connectButton}
-                  aria-label="Connect Yahoo Mail account"
-                >
-                  Connect Yahoo Mail
-                </button>
+            <div className={styles.emailMeta}>
+              <p><strong>De la:</strong> {yahooLastEmail.from}</p>
+              <p><strong>Către:</strong> {yahooLastEmail.to}</p>
+              <p><strong>Subiect:</strong> {yahooLastEmail.subject || '(fără subiect)'}</p>
+              <p><strong>Data:</strong> {new Date(yahooLastEmail.date).toLocaleString('ro-RO')}</p>
+            </div>
+            <div className={styles.emailContent}>
+              {yahooLastEmail.html ? (
+                <div
+                  className={styles.emailHtml}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(yahooLastEmail.html) }}
+                  aria-label="Email content"
+                />
               ) : (
-                <div className={styles.form} role="form" aria-label="Yahoo Mail connection form">
-                  {error && (
-                    <div 
-                      className={styles.error} 
-                      role="alert" 
-                      aria-live="assertive"
-                      aria-atomic="true"
-                    >
-                      {error}
-                    </div>
-                  )}
-                  <label htmlFor="yahoo-email" className="sr-only">
-                    Yahoo Email Address
-                  </label>
-                  <input
-                    id="yahoo-email"
-                    type="email"
-                    placeholder="Yahoo Email"
-                    value={yahooEmail}
-                    onChange={(e) => {
-                      setYahooEmail(e.target.value);
-                      if (emailError) {
-                        validateEmail(e.target.value);
-                      }
-                    }}
-                    onBlur={(e) => validateEmail(e.target.value)}
-                    className={styles.input}
-                    aria-label="Yahoo email address"
-                    aria-required="true"
-                    aria-invalid={!!emailError}
-                    aria-describedby={emailError ? 'email-error' : undefined}
-                  />
-                  {emailError && (
-                    <div 
-                      id="email-error"
-                      className={styles.error} 
-                      role="alert"
-                      aria-live="polite"
-                    >
-                      {emailError}
-                    </div>
-                  )}
-                  <label htmlFor="yahoo-password" className="sr-only">
-                    Yahoo App Password
-                  </label>
-                  <input
-                    id="yahoo-password"
-                    type="password"
-                    placeholder="App Password (recommended)"
-                    ref={yahooPasswordRef}
-                    value={yahooPassword}
-                    onChange={(e) => setYahooPassword(e.target.value)}
-                    className={styles.input}
-                    aria-label="Yahoo App Password"
-                    aria-required="true"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !saving) {
-                        e.preventDefault();
-                        saveYahooIntegration();
-                      }
-                    }}
-                  />
-                  <div className={styles.formActions} role="group" aria-label="Form actions">
-                    <button 
-                      type="button"
-                      onClick={saveYahooIntegration} 
-                      disabled={saving || !yahooEmail.trim() || !yahooPassword || !!emailError} 
-                      className={styles.saveButton}
-                      aria-label="Save Yahoo Mail integration"
-                      aria-busy={saving}
-                    >
-                      {saving ? 'Connecting...' : 'Save'}
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setShowYahooForm(false);
-                        setError(null);
-                        setEmailError(null);
-                        setYahooEmail('');
-                        setYahooPassword('');
-                        if (yahooPasswordRef.current) {
-                          yahooPasswordRef.current.value = '';
-                        }
-                      }} 
-                      className={styles.cancelButton}
-                      aria-label="Cancel Yahoo Mail connection"
-                    >
-                      Cancel
-                    </button>
-                  </div>
+                <div className={styles.emailText} aria-label="Email text content">
+                  <pre>{yahooLastEmail.text || yahooLastEmail.cleanText || '(fără conținut)'}</pre>
                 </div>
               )}
             </div>
-          )}
-        </div>
-
-        {/* Gmail */}
-        <div className={styles.integrationCard} role="region" aria-label="Gmail integration">
-          <div className={styles.integrationHeader}>
-            <div>
-              <h2>Gmail</h2>
-              <p className={styles.providerDescription}>
-                Conecteaza-ti contul Gmail cu OAuth 2.0 pentru sincronizare in siguranta.
-              </p>
-            </div>
-            {gmailIntegration ? (
-              <span
-                className={gmailIntegration.is_active ? styles.statusConnected : styles.statusDisconnected}
-                role="status"
-                aria-live="polite"
-                aria-label={gmailIntegration.is_active ? 'Gmail connected' : 'Gmail disconnected'}
-              >
-                {gmailIntegration.is_active ? 'Connected' : 'Disconnected'}
-              </span>
-            ) : (
-              <span className={styles.statusDisconnected} aria-label="Gmail not connected">
-                Not Connected
-              </span>
-            )}
           </div>
-          {gmailIntegration ? (
-            <div className={styles.integrationDetails}>
-              <p><strong>Email:</strong> {gmailIntegration.email}</p>
-              {gmailIntegration.last_sync_at && (
-                <p><strong>Last Sync:</strong> {new Date(gmailIntegration.last_sync_at).toLocaleString()}</p>
+        )}
+
+        {gmailLastEmail && gmailIntegration && (
+          <div className={styles.emailPreview} role="article" aria-label="Gmail — ultimul email">
+            <div className={styles.emailHeader}>
+              <h3>Ultimul email — Gmail</h3>
+              <button
+                onClick={() => setLastEmailByIntegration((prev) => ({ ...prev, [gmailIntegration.id]: null }))}
+                className={styles.closeButton}
+                title="Închide"
+                aria-label="Close email preview"
+              >
+                <IconX />
+              </button>
+            </div>
+            <div className={styles.emailMeta}>
+              <p><strong>De la:</strong> {gmailLastEmail.from}</p>
+              <p><strong>Către:</strong> {gmailLastEmail.to}</p>
+              <p><strong>Subiect:</strong> {gmailLastEmail.subject || '(fără subiect)'}</p>
+              <p><strong>Data:</strong> {new Date(gmailLastEmail.date).toLocaleString('ro-RO')}</p>
+            </div>
+            <div className={styles.emailContent}>
+              {gmailLastEmail.html ? (
+                <div
+                  className={styles.emailHtml}
+                  dangerouslySetInnerHTML={{ __html: sanitizeHtml(gmailLastEmail.html) }}
+                  aria-label="Email content"
+                />
+              ) : (
+                <div className={styles.emailText} aria-label="Email text content">
+                  <pre>{gmailLastEmail.text || gmailLastEmail.cleanText || '(fără conținut)'}</pre>
+                </div>
               )}
-              <div className={styles.actions} role="group" aria-label="Gmail actions">
+            </div>
+          </div>
+        )}
+
+        {/* Disconnect confirmation modal */}
+        {disconnectTargetId !== null && (
+          <div
+            className={styles.overlay}
+            onPointerDown={handleDisconnectBackdropPointerDown}
+            onClick={handleDisconnectBackdropClick}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && !isDisconnecting) {
+                setDisconnectTargetId(null);
+                setDisconnectError(null);
+              }
+            }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="disconnect-modal-title"
+          >
+            <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+              <h3 id="disconnect-modal-title">Deconectare integrare</h3>
+              <p className={styles.modalBody}>
+                Sigur vrei să deconectezi integrarea pentru <strong>{disconnectTarget?.email || disconnectTarget?.provider}</strong>?
+              </p>
+              {disconnectError && (
+                <p className={styles.modalError}>{disconnectError}</p>
+              )}
+              <div className={styles.modalFooter}>
                 <button
-                  onClick={() => testConnection(gmailIntegration.id)}
-                  className={styles.testButton}
-                  disabled={testing === gmailIntegration.id || fetchingEmail === gmailIntegration.id || deleting === gmailIntegration.id}
-                  aria-label="Test Gmail connection"
+                  type="button"
+                  className={styles.btnGhost}
+                  autoFocus
+                  onClick={() => { setDisconnectTargetId(null); setDisconnectError(null); }}
+                  disabled={isDisconnecting}
                 >
-                  {testing === gmailIntegration.id ? 'Testing...' : 'Test Connection'}
+                  Renunță
                 </button>
                 <button
-                  onClick={() => fetchLastEmail(gmailIntegration.id)}
-                  className={styles.fetchButton}
-                  disabled={testing === gmailIntegration.id || fetchingEmail === gmailIntegration.id || deleting === gmailIntegration.id}
-                  aria-label="Fetch last email from Gmail"
-                  aria-busy={fetchingEmail === gmailIntegration.id}
+                  type="button"
+                  className={styles.btnDanger}
+                  disabled={isDisconnecting}
+                  onClick={handleDisconnectConfirm}
                 >
-                  {fetchingEmail === gmailIntegration.id ? 'Fetching...' : 'Fetch Last Email'}
-                </button>
-                <button
-                  onClick={() => deleteIntegration(gmailIntegration.id)}
-                  className={styles.deleteButton}
-                  disabled={testing === gmailIntegration.id || fetchingEmail === gmailIntegration.id || deleting === gmailIntegration.id}
-                  aria-label="Disconnect Gmail integration"
-                >
-                  {deleting === gmailIntegration.id ? 'Disconnecting...' : 'Disconnect'}
+                  {isDisconnecting ? 'Se deconectează...' : 'Deconectează'}
                 </button>
               </div>
-              {gmailLastEmail && (
-                <div className={styles.emailPreview} role="article" aria-label="Last email preview">
-                  <div className={styles.emailHeader}>
-                    <h3>Last Email Received</h3>
-                    <button
-                      onClick={() => {
-                        if (!gmailIntegration) return;
-                        setLastEmailByIntegration((prev) => ({ ...prev, [gmailIntegration.id]: null }));
-                      }} 
-                      className={styles.closeButton}
-                      title="Close"
-                      aria-label="Close email preview"
-                    >
-                      ÃƒÆ’Ã¢â‚¬â€
-                    </button>
-                  </div>
-                  <div className={styles.emailMeta}>
-                    <p><strong>From:</strong> {gmailLastEmail.from}</p>
-                    <p><strong>To:</strong> {gmailLastEmail.to}</p>
-                    <p><strong>Subject:</strong> {gmailLastEmail.subject || '(No subject)'}</p>
-                    <p><strong>Date:</strong> {new Date(gmailLastEmail.date).toLocaleString()}</p>
-                  </div>
-                  <div className={styles.emailContent}>
-                    {gmailLastEmail.html ? (
-                      <div
-                        className={styles.emailHtml}
-                        dangerouslySetInnerHTML={{
-                          __html: sanitizeHtml(gmailLastEmail.html)
-                        }}
-                        aria-label="Email content"
-                      />
-                    ) : (
-                      <div className={styles.emailText} aria-label="Email text content">
-                        <pre>{gmailLastEmail.text || gmailLastEmail.cleanText || '(No content)'}</pre>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
-          ) : (
-            <button
-              type="button"
-              className={styles.connectButton}
-              onClick={() => {
-                window.location.href = '/api/auth/google/email';
-              }}
-              aria-label="Conecteaza cu Google"
-            >
-              Conecteaza cu Google
-            </button>
-          )}
-        </div>
-
-        {/* Outlook - Placeholder */}
-        <div className={styles.integrationCard} role="region" aria-label="Outlook integration">
-          <div className={styles.integrationHeader}>
-            <div>
-              <h2>Outlook</h2>
-              <p className={styles.providerDescription}>
-                Connect your Outlook account using OAuth 2.0 (coming soon)
-              </p>
-            </div>
-            <span className={styles.statusDisconnected} aria-label="Outlook not connected">Not Connected</span>
           </div>
-          <button disabled className={styles.connectButton} aria-label="Outlook connection coming soon">
-            Connect with Microsoft (Coming Soon)
-          </button>
-        </div>
+        )}
       </div>
-      <ToastContainer toasts={toast.toasts} onClose={toast.removeToast} />
+      <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );
 }

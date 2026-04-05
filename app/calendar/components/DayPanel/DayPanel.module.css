@@ -67,16 +67,15 @@
 
 /* ── Header ── */
 .header {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0.45rem;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
   padding: 0.65rem 1.15rem;
   border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
 }
 
 .headerDate {
-  grid-column: 1 / 4;
   margin: 0;
   font-size: 1rem;
   font-weight: 620;
@@ -87,34 +86,31 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .addBtn {
-  width: 36px;
-  height: 36px;
-  min-height: unset;
-  padding: 0;
-  border-radius: 50%;
+  min-height: 30px;
+  height: 30px;
+  padding: 0 0.75rem;
+  border-radius: var(--radius-md);
   border: none;
   background: var(--color-today-badge);
   color: var(--color-text-on-accent);
-  font-size: 1.35rem;
-  font-weight: 300;
-  line-height: 1;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 0.25rem;
   cursor: pointer;
-  transition: background 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  transition: background 150ms ease, transform 150ms ease;
   flex-shrink: 0;
-  justify-self: center;
-  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.35);
 }
 
 .addBtn:hover {
   background: var(--color-accent);
-  box-shadow: 0 4px 12px rgba(77, 163, 255, 0.35);
-  transform: scale(1.06);
+  transform: translateY(-1px);
 }
 
 /* ── Stats strip ── */
@@ -127,7 +123,7 @@
 }
 
 .statCard {
-  background: rgba(9, 16, 34, 0.35);
+  background: var(--color-surface-muted);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: 0.42rem 0.45rem;
@@ -135,6 +131,18 @@
   flex-direction: column;
   align-items: center;
   gap: 0.12rem;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.statCard:hover {
+  background: var(--color-surface-strong);
+  border-color: var(--color-border-strong);
+}
+
+.statCardActive {
+  background: var(--color-surface-strong);
+  border-color: var(--color-border-strong);
 }
 
 .statCardValue {
@@ -573,7 +581,6 @@
     padding: 0.5rem 0.75rem;
   }
   .service { font-size: 0.7rem; }
-  .statusPill { font-size: 0.55rem; padding: 0.1rem 0.35rem; }
   .statCard { padding: 0.35rem 0.45rem; }
   .statCardLabel { font-size: 0.54rem; }
   .statusValue { font-size: 0.7rem; }

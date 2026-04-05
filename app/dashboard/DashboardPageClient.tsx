@@ -133,12 +133,12 @@ export default function DashboardPageClient() {
   }
 
   const dashboard = data ?? EMPTY_DASHBOARD;
+  const messagesPerDayMaxCount = Math.max(...dashboard.messagesPerDay.map((item) => item.count || 0), 1);
+  const clientGrowthMaxCount = Math.max(...dashboard.clients.growth.map((item) => item.count || 0), 1);
 
   return (
     <div className={styles.container}>
       <main className={styles.main}>
-        <h2 className={styles.title}>Dashboard</h2>
-
         <div className={styles.statsGrid}>
           <div className={styles.statCard}>
             <div className={styles.statLabel}>Mesaje astazi</div>
@@ -165,10 +165,6 @@ export default function DashboardPageClient() {
             <div className={styles.statValue}>{dashboard.noShowRate || 0}%</div>
           </div>
 
-          <div className={styles.statCard}>
-            <div className={styles.statLabel}>Venit estimat (7 zile)</div>
-            <div className={styles.statValue}>{dashboard.estimatedRevenue.toFixed(2)} lei</div>
-          </div>
         </div>
 
         <div className={styles.charts}>
@@ -177,12 +173,11 @@ export default function DashboardPageClient() {
             <div className={styles.barChart}>
               {dashboard.messagesPerDay.length > 0 ? (
                 dashboard.messagesPerDay.map((item, idx) => {
-                  const maxCount = Math.max(...dashboard.messagesPerDay.map((m) => m.count || 0), 1);
                   const date = new Date(item.date);
                   const dateStr = Number.isNaN(date.getTime())
                     ? String(item.date || '').split('T')[0]
                     : date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' });
-                  const barHeight = maxCount > 0 ? ((item.count || 0) / maxCount) * 100 : 0;
+                  const barHeight = messagesPerDayMaxCount > 0 ? ((item.count || 0) / messagesPerDayMaxCount) * 100 : 0;
                   return (
                     <div key={idx} className={styles.barItem}>
                       <div className={styles.barValue}>{item.count || 0}</div>
@@ -202,57 +197,33 @@ export default function DashboardPageClient() {
           </div>
 
           <div className={styles.chartCard}>
-            <h3>Programari astazi</h3>
-            <div className={styles.appointmentsList}>
-              {dashboard.today.appointmentsList.length > 0 ? (
-                dashboard.today.appointmentsList.map((apt) => {
-                  const startTime = new Date(apt.start_time);
-                  const endTime = new Date(apt.end_time);
-                  const statusValue = apt.status === 'no_show' ? 'no-show' : (apt.status || 'scheduled');
-                  const statusLabel = {
-                    scheduled: 'Programat',
-                    completed: 'Finalizat',
-                    cancelled: 'Anulat',
-                    'no-show': 'Absent',
-                  }[statusValue] || statusValue;
-                  const statusClass = {
-                    scheduled: styles.statusScheduled,
-                    completed: styles.statusCompleted,
-                    cancelled: styles.statusCancelled,
-                    'no-show': styles.statusNoShow,
-                  }[statusValue] || '';
-
+            <h3>Crestere Clienti (7 zile)</h3>
+            <div className={styles.growthChart}>
+              {dashboard.clients.growth.length > 0 ? (
+                dashboard.clients.growth.map((item, idx) => {
+                  const date = new Date(item.date);
+                  const dateStr = Number.isNaN(date.getTime())
+                    ? String(item.date || '').split('T')[0]
+                    : date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' });
+                  const barHeight = clientGrowthMaxCount > 0 ? ((item.count || 0) / clientGrowthMaxCount) * 100 : 0;
                   return (
-                    <div key={apt.id} className={styles.appointmentItem}>
-                      <div className={styles.appointmentTime}>
-                        <span className={styles.timeStart}>
-                          {format(startTime, 'HH:mm', { locale: ro })}
-                        </span>
-                        <span className={styles.timeSeparator}>-</span>
-                        <span className={styles.timeEnd}>
-                          {format(endTime, 'HH:mm', { locale: ro })}
-                        </span>
+                    <div key={idx} className={styles.growthBar}>
+                      <div className={styles.growthValue}>{item.count || 0}</div>
+                      <div className={styles.growthBarContainer}>
+                        <div className={styles.growthBarFill} style={{ height: `${barHeight}%` }} />
                       </div>
-                      <div className={styles.appointmentDetails}>
-                        <div className={styles.appointmentClient}>{apt.client_name || 'Unknown'}</div>
-                        <div className={styles.appointmentService}>{apt.service_name || 'Unknown'}</div>
-                      </div>
-                      <div className={`${styles.appointmentStatus} ${statusClass}`}>{statusLabel}</div>
+                      <div className={styles.growthLabel}>{dateStr}</div>
                     </div>
                   );
                 })
               ) : (
-                <div className={styles.emptyAppointments}>
-                  <p>Nu exista programari pentru astazi</p>
-                </div>
+                <div className={styles.empty}>Nu exista date</div>
               )}
             </div>
           </div>
         </div>
 
         <div className={styles.clientsSection}>
-          <h3 className={styles.sectionTitle}>Clienti</h3>
-
           <div className={styles.clientGrid}>
             <div className={styles.clientCard}>
               <h4>Top Clienti</h4>
@@ -301,28 +272,49 @@ export default function DashboardPageClient() {
             </div>
 
             <div className={styles.clientCard}>
-              <h4>Crestere Clienti (7 zile)</h4>
-              <div className={styles.growthChart}>
-                {dashboard.clients.growth.length > 0 ? (
-                  dashboard.clients.growth.map((item, idx) => {
-                    const maxCount = Math.max(...dashboard.clients.growth.map((g) => g.count || 0), 1);
-                    const date = new Date(item.date);
-                    const dateStr = Number.isNaN(date.getTime())
-                      ? String(item.date || '').split('T')[0]
-                      : date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' });
-                    const barHeight = maxCount > 0 ? ((item.count || 0) / maxCount) * 100 : 0;
+              <h4>Programari astazi</h4>
+              <div className={styles.appointmentsList}>
+                {dashboard.today.appointmentsList.length > 0 ? (
+                  dashboard.today.appointmentsList.map((apt) => {
+                    const startTime = new Date(apt.start_time);
+                    const endTime = new Date(apt.end_time);
+                    const statusValue = apt.status === 'no_show' ? 'no-show' : (apt.status || 'scheduled');
+                    const statusLabel = {
+                      scheduled: 'Programat',
+                      completed: 'Finalizat',
+                      cancelled: 'Anulat',
+                      'no-show': 'Absent',
+                    }[statusValue] || statusValue;
+                    const statusClass = {
+                      scheduled: styles.statusScheduled,
+                      completed: styles.statusCompleted,
+                      cancelled: styles.statusCancelled,
+                      'no-show': styles.statusNoShow,
+                    }[statusValue] || '';
+
                     return (
-                      <div key={idx} className={styles.growthBar}>
-                        <div className={styles.growthValue}>{item.count || 0}</div>
-                        <div className={styles.growthBarContainer}>
-                          <div className={styles.growthBarFill} style={{ height: `${barHeight}%` }} />
+                      <div key={apt.id} className={styles.appointmentItem}>
+                        <div className={styles.appointmentTime}>
+                          <span className={styles.timeStart}>
+                            {format(startTime, 'HH:mm', { locale: ro })}
+                          </span>
+                          <span className={styles.timeSeparator}>-</span>
+                          <span className={styles.timeEnd}>
+                            {format(endTime, 'HH:mm', { locale: ro })}
+                          </span>
                         </div>
-                        <div className={styles.growthLabel}>{dateStr}</div>
+                        <div className={styles.appointmentDetails}>
+                          <div className={styles.appointmentClient}>{apt.client_name || 'Unknown'}</div>
+                          <div className={styles.appointmentService}>{apt.service_name || 'Unknown'}</div>
+                        </div>
+                        <div className={`${styles.appointmentStatus} ${statusClass}`}>{statusLabel}</div>
                       </div>
                     );
                   })
                 ) : (
-                  <div className={styles.empty}>Nu exista date</div>
+                  <div className={styles.emptyAppointments}>
+                    <p>Nu exista programari pentru astazi</p>
+                  </div>
                 )}
               </div>
             </div>

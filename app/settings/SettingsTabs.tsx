@@ -11,7 +11,7 @@ interface SettingsTabsProps {
 
 const TABS: Array<{ key: SettingsTabKey; href: string; label: string }> = [
   { key: 'email', href: '/settings/email', label: 'Email' },
-  { key: 'services', href: '/settings/services', label: 'Servicii' },
+  { key: 'services', href: '/settings/services', label: 'Servicii Medicale' },
   { key: 'gdpr', href: '/settings/gdpr', label: 'GDPR' },
 ];
 

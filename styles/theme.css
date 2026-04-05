@@ -1,62 +1,164 @@
-:root {
-  --font-sans: 'Satoshi', 'Avenir Next', 'Segoe UI', 'Inter', system-ui, -apple-system, sans-serif;
+/* ============================================================
+   densa — Design System Tokens
+   Font: Chillax (display-led grotesk with softer personality)
+   Theme: dark (glassmorphism default) + [data-theme="light"]
+   All component classes consume these vars — no hardcoded values.
+   ============================================================ */
 
-  --color-bg: #06080d;
-  --color-bg-elevated: rgba(13, 18, 30, 0.78);
-  --color-surface: rgba(17, 24, 39, 0.64);
+@font-face {
+  font-family: 'Chillax';
+  src: url('/fonts/chillax/Chillax-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Chillax';
+  src: url('/fonts/chillax/Chillax-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Chillax';
+  src: url('/fonts/chillax/Chillax-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Chillax';
+  src: url('/fonts/chillax/Chillax-Semibold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Chillax';
+  src: url('/fonts/chillax/Chillax-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* ── Typography ──────────────────────────────────────────── */
+  --font-sans: 'Chillax', 'Avenir Next', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, 'Cascadia Code', monospace;
+
+  --text-xs:   0.75rem;    /* 12px — meta, labels, timestamps */
+  --text-sm:   0.8125rem;  /* 13px — secondary text, captions */
+  --text-base: 0.9375rem;  /* 15px — body default */
+  --text-md:   1rem;       /* 16px — slightly emphasized body */
+  --text-lg:   1.125rem;   /* 18px — section headers, card titles */
+  --text-xl:   1.375rem;   /* 22px — page sub-headings */
+  --text-2xl:  1.75rem;    /* 28px — page headings, stat values */
+
+  --lh-xs:      1.35;
+  --lh-sm:      1.4;
+  --lh-base:    1.55;
+  --lh-md:      1.5;
+  --lh-lg:      1.45;
+  --lh-xl:      1.35;
+  --lh-2xl:     1.25;
+  --lh-heading: 1.2;
+
+  --fw-regular:  400;
+  --fw-medium:   500;
+  --fw-semibold: 600;
+  --fw-bold:     700;
+
+  /* ── Spacing ─────────────────────────────────────────────── */
+  --space-1:  0.25rem;   /*  4px */
+  --space-2:  0.5rem;    /*  8px */
+  --space-3:  0.75rem;   /* 12px */
+  --space-4:  1rem;      /* 16px */
+  --space-5:  1.25rem;   /* 20px */
+  --space-6:  1.5rem;    /* 24px */
+  --space-7:  2rem;      /* 32px */
+  --space-8:  2.5rem;    /* 40px */
+  --space-9:  3rem;      /* 48px */
+  --space-10: 4rem;      /* 64px */
+
+  /* ── Component heights ───────────────────────────────────── */
+  --height-btn-sm: 32px;
+  --height-btn:    40px;
+  --height-btn-lg: 48px;
+  --height-input:  40px;
+
+  /* ── Colors — dark (default) ─────────────────────────────── */
+  --color-bg:            #06080d;
+  --color-bg-elevated:   rgba(13, 18, 30, 0.78);
+  --color-surface:       rgba(17, 24, 39, 0.64);
   --color-surface-strong: rgba(17, 24, 39, 0.86);
   --color-surface-muted: rgba(30, 41, 59, 0.45);
-  --color-border: rgba(148, 163, 184, 0.2);
+  --color-border:        rgba(148, 163, 184, 0.2);
   --color-border-strong: rgba(148, 163, 184, 0.3);
-  --color-text: #e6edf8;
+
+  --color-text:       #e6edf8;
   --color-text-muted: #9fb0cb;
-  --color-text-soft: #7f93b2;
-  --color-accent: #4da3ff;
-  --color-accent-strong: #2d88ff;
+  --color-text-soft:  #7f93b2;
+
+  --color-accent:          #4da3ff;
+  --color-accent-strong:   #2d88ff;
+  --color-accent-subtle:   rgba(77, 163, 255, 0.14);
   --color-accent-contrast: #061324;
-  --color-danger: #f87171;
+  --color-text-on-accent:  #fff;
+
+  --color-danger:  #f87171;
   --color-success: #34d399;
 
-  /* Semantic status tokens */
-  --color-success-text: #34d399;
-  --color-success-bg: rgba(52, 211, 153, 0.12);
+  /* Semantic status — dark */
+  --color-success-text:   #34d399;
+  --color-success-bg:     rgba(52, 211, 153, 0.12);
   --color-success-border: rgba(52, 211, 153, 0.22);
-  --color-warning: #f59e0b;
-  --color-warning-text: #fbbf24;
-  --color-warning-bg: rgba(245, 158, 11, 0.12);
+
+  --color-warning:        #f59e0b;
+  --color-warning-text:   #fbbf24;
+  --color-warning-bg:     rgba(245, 158, 11, 0.12);
   --color-warning-border: rgba(245, 158, 11, 0.28);
-  --color-danger-text: #f87171;
-  --color-danger-bg: rgba(248, 113, 113, 0.12);
+
+  --color-danger-text:   #f87171;
+  --color-danger-bg:     rgba(248, 113, 113, 0.12);
   --color-danger-border: rgba(248, 113, 113, 0.22);
-  --color-info: #60a5fa;
-  --color-info-text: #60a5fa;
-  --color-info-bg: rgba(96, 165, 250, 0.12);
+
+  --color-info:        #60a5fa;
+  --color-info-text:   #60a5fa;
+  --color-info-bg:     rgba(96, 165, 250, 0.12);
   --color-info-border: rgba(96, 165, 250, 0.22);
-  --color-neutral-bg: rgba(148, 163, 184, 0.1);
-  --color-neutral-text: #9fb0cb;
+
+  --color-neutral-bg:     rgba(148, 163, 184, 0.1);
+  --color-neutral-text:   #9fb0cb;
   --color-neutral-border: rgba(148, 163, 184, 0.18);
 
   /* Metrics */
   --color-metric-positive: #86efac;
-  --color-metric-warning: #fcd34d;
+  --color-metric-warning:  #fcd34d;
   --color-metric-negative: #fca5a5;
-  --color-metric-neutral: #cbd5e1;
+  --color-metric-neutral:  #cbd5e1;
 
   /* Misc */
-  --color-today-badge: #f97316;
-  --color-text-on-accent: #fff;
+  --color-today-badge:      #f97316;
   --color-calendar-slot-bg: rgba(17, 24, 39, 0.82);
 
+  /* ── Gradients ───────────────────────────────────────────── */
   --gradient-app: radial-gradient(900px 500px at 10% -5%, rgba(45, 136, 255, 0.2), transparent 65%),
     radial-gradient(700px 460px at 90% 0%, rgba(77, 163, 255, 0.16), transparent 65%),
     linear-gradient(180deg, #04060b 0%, #070b14 55%, #091022 100%);
   --gradient-accent: linear-gradient(135deg, #1b63db 0%, #4da3ff 100%);
 
+  /* ── Shape ───────────────────────────────────────────────── */
   --radius-xs: 8px;
   --radius-sm: 10px;
   --radius-md: 14px;
   --radius-lg: 18px;
+  --radius-pill: 999px;
 
+  /* ── Elevation ───────────────────────────────────────────── */
   --shadow-sm: 0 6px 18px rgba(2, 7, 18, 0.24);
   --shadow-md: 0 14px 34px rgba(2, 7, 18, 0.35);
   --shadow-lg: 0 24px 48px rgba(2, 7, 18, 0.45);
@@ -64,67 +166,65 @@
   --blur-sm: 8px;
   --blur-md: 14px;
 
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-5: 1.25rem;
-  --space-6: 1.5rem;
-  --space-7: 2rem;
-  --space-8: 2.5rem;
-  --space-9: 3rem;
-
+  /* ── Interaction ─────────────────────────────────────────── */
   --max-content-width: 1240px;
   --focus-ring: 0 0 0 2px rgba(6, 8, 13, 0.95), 0 0 0 4px rgba(77, 163, 255, 0.85);
   --transition-fast: 200ms ease-out;
   --transition-base: 300ms ease-out;
 }
 
+/* ── Light theme overrides ───────────────────────────────────── */
 [data-theme="light"] {
-  --color-bg: #f0f4f8;
-  --color-bg-elevated: rgba(255, 255, 255, 0.94);
-  --color-surface: rgba(255, 255, 255, 0.82);
+  --color-bg:             #f0f4f8;
+  --color-bg-elevated:    rgba(255, 255, 255, 0.94);
+  --color-surface:        rgba(255, 255, 255, 0.82);
   --color-surface-strong: rgba(255, 255, 255, 0.97);
-  --color-surface-muted: rgba(226, 232, 240, 0.55);
-  --color-border: rgba(100, 116, 139, 0.2);
-  --color-border-strong: rgba(100, 116, 139, 0.35);
-  --color-text: #0f172a;
+  --color-surface-muted:  rgba(226, 232, 240, 0.55);
+  --color-border:         rgba(100, 116, 139, 0.2);
+  --color-border-strong:  rgba(100, 116, 139, 0.35);
+
+  --color-text:       #0f172a;
   --color-text-muted: #475569;
-  --color-text-soft: #64748b;
-  --color-accent: #2563eb;
-  --color-accent-strong: #1d4ed8;
+  --color-text-soft:  #64748b;
+
+  --color-accent:          #2563eb;
+  --color-accent-strong:   #1d4ed8;
+  --color-accent-subtle:   rgba(37, 99, 235, 0.1);
   --color-accent-contrast: #eff6ff;
-  --color-danger: #dc2626;
+
+  --color-danger:  #dc2626;
   --color-success: #16a34a;
 
-  /* Semantic status tokens — light */
-  --color-success-text: #15803d;
-  --color-success-bg: #dcfce7;
+  /* Semantic status — light */
+  --color-success-text:   #15803d;
+  --color-success-bg:     #dcfce7;
   --color-success-border: #bbf7d0;
-  --color-warning: #d97706;
-  --color-warning-text: #b45309;
-  --color-warning-bg: #fef3c7;
+
+  --color-warning:        #d97706;
+  --color-warning-text:   #b45309;
+  --color-warning-bg:     #fef3c7;
   --color-warning-border: #fde68a;
-  --color-danger-text: #b91c1c;
-  --color-danger-bg: #fee2e2;
+
+  --color-danger-text:   #b91c1c;
+  --color-danger-bg:     #fee2e2;
   --color-danger-border: #fecaca;
-  --color-info: #2563eb;
-  --color-info-text: #1e40af;
-  --color-info-bg: #dbeafe;
+
+  --color-info:        #2563eb;
+  --color-info-text:   #1e40af;
+  --color-info-bg:     #dbeafe;
   --color-info-border: #bfdbfe;
-  --color-neutral-bg: #f3f4f6;
-  --color-neutral-text: #6b7280;
+
+  --color-neutral-bg:     #f3f4f6;
+  --color-neutral-text:   #6b7280;
   --color-neutral-border: #e5e7eb;
 
   /* Metrics — light */
   --color-metric-positive: #16a34a;
-  --color-metric-warning: #ca8a04;
+  --color-metric-warning:  #ca8a04;
   --color-metric-negative: #dc2626;
-  --color-metric-neutral: #64748b;
+  --color-metric-neutral:  #64748b;
 
   /* Misc — light */
-  --color-today-badge: #f97316;
-  --color-text-on-accent: #fff;
   --color-calendar-slot-bg: #f8fafc;
 
   --gradient-app: radial-gradient(900px 500px at 10% -5%, rgba(37, 99, 235, 0.06), transparent 65%),

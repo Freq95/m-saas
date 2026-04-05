@@ -3,6 +3,9 @@ const withPWA = require('next-pwa')({
   disable: process.env.NODE_ENV === 'development',
   register: true,
   skipWaiting: true,
+  // Do not let the SW cache API calls — always hit the network for live data.
+  // Static assets (JS/CSS/images) are still precached for fast repeat loads.
+  runtimeCaching: [],
 });
 
 /** @type {import('next').NextConfig} */
@@ -25,7 +28,7 @@ const nextConfig = {
       {
         source: '/(.*)',
         headers: [
-          { key: 'X-Frame-Options', value: 'DENY' },
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           {
             key: 'Strict-Transport-Security',
@@ -37,9 +40,11 @@ const nextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline'",
+              "font-src 'self' data:",
+              // Keep remote email images blocked inside srcdoc iframes to avoid tracking pixels and phishing-style UI spoofing.
               "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com",
               "connect-src 'self' https://*.r2.cloudflarestorage.com",
-              "frame-ancestors 'none'",
+              "frame-ancestors 'self'",
             ].join('; '),
           },
         ],

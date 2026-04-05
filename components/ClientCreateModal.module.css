@@ -42,7 +42,7 @@
   min-width: 36px;
   padding: 0;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.5);
+  background: var(--color-surface-muted);
   border: 1px solid var(--color-border);
   color: var(--color-text-soft);
 }
@@ -82,7 +82,7 @@
 .field input,
 .field textarea {
   width: 100%;
-  background: rgba(15, 23, 42, 0.42);
+  background: var(--color-surface-muted);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   color: var(--color-text);
@@ -126,7 +126,7 @@
 }
 
 .cancelButton {
-  background: rgba(15, 23, 42, 0.5);
+  background: var(--color-surface-muted);
   color: var(--color-text);
 }
 

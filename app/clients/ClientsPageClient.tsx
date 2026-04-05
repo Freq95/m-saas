@@ -128,29 +128,11 @@ export default function ClientsPageClient({
   return (
     <div className={navStyles.container}>
       <div className={styles.container}>
-        <header className={styles.header}>
-          <div>
-            <p className={styles.eyebrow}>CRM</p>
-            <h1>Clienti</h1>
-          </div>
-          <div className={styles.headerActions}>
-            <a href="/api/clients/export" download className={styles.exportButton}>
-              Export CSV
-            </a>
-            <button
-              type="button"
-              onClick={() => setShowCreateModal(true)}
-              className={styles.addButton}
-            >
-              Adauga client
-            </button>
-          </div>
-        </header>
-
         <div className={styles.filtersCard}>
           <div className={styles.filters}>
             <input
               type="text"
+              aria-label="Cauta dupa nume, email sau telefon"
               placeholder="Cauta dupa nume, email sau telefon"
               value={search}
               onChange={(e) => {
@@ -161,6 +143,7 @@ export default function ClientsPageClient({
             />
 
             <select
+              aria-label="Sorteaza dupa"
               value={`${sortBy}-${sortOrder}`}
               onChange={(e) => {
                 const [col, order] = e.target.value.split('-');
@@ -181,6 +164,7 @@ export default function ClientsPageClient({
             </select>
 
             <select
+              aria-label="Filtreaza dupa consimtamant GDPR"
               value={consentFilter}
               onChange={(e) => {
                 setConsentFilter(e.target.value as typeof consentFilter);
@@ -193,6 +177,17 @@ export default function ClientsPageClient({
               <option value="not_consented">Fara consimtamant</option>
               <option value="withdrawn">Consimtamant retras</option>
             </select>
+
+            <a href="/api/clients/export" download className={styles.exportButton}>
+              Export CSV
+            </a>
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(true)}
+              className={styles.addButton}
+            >
+              + Adauga client
+            </button>
           </div>
         </div>
 
