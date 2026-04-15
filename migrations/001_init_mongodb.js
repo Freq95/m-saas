@@ -30,6 +30,8 @@ const collections = [
   'tags',
   'conversation_tags',
   'services',
+  'calendars',
+  'calendar_shares',
   'appointments',
   'tasks',
   'providers',
@@ -94,10 +96,36 @@ const indexPlan = {
     { key: { tenant_id: 1, conversation_id: 1, tag_id: 1 }, unique: true },
   ],
   services: [{ key: { tenant_id: 1, user_id: 1 } }],
+  calendars: [
+    { key: { tenant_id: 1, owner_user_id: 1, is_active: 1 } },
+    { key: { tenant_id: 1, resource_id: 1 } },
+    {
+      key: { tenant_id: 1, owner_user_id: 1 },
+      unique: true,
+      partialFilterExpression: { is_default: true, is_active: true },
+    },
+  ],
+  calendar_shares: [
+    { key: { calendar_id: 1, status: 1 } },
+    { key: { shared_with_user_id: 1, status: 1 } },
+    { key: { shared_with_email: 1, status: 1 } },
+    {
+      key: { invite_token_hash: 1 },
+      unique: true,
+      partialFilterExpression: { invite_token_hash: { $type: 'string' } },
+    },
+    {
+      key: { calendar_id: 1, shared_with_email: 1 },
+      unique: true,
+      partialFilterExpression: { $or: [{ status: 'pending' }, { status: 'accepted' }] },
+    },
+    { key: { expires_at: 1 }, expireAfterSeconds: 0 },
+  ],
   appointments: [
     { key: { tenant_id: 1, user_id: 1, start_time: 1 } },
     { key: { tenant_id: 1, user_id: 1, status: 1 } },
     { key: { tenant_id: 1, client_id: 1 } },
+    { key: { calendar_id: 1, start_time: 1 } },
   ],
   tasks: [
     { key: { tenant_id: 1, user_id: 1, status: 1 } },

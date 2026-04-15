@@ -3,6 +3,7 @@ import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getAvailableSlots, getSuggestedSlots } from '@/lib/calendar';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { getTenantTimeZone } from '@/lib/timezone';
 
 // GET /api/calendar/slots - Get available time slots
 export async function GET(request: NextRequest) {
@@ -14,8 +15,6 @@ export async function GET(request: NextRequest) {
     const { calendarSlotsQuerySchema } = await import('@/lib/validation');
     const queryParams = {
       date: searchParams.get('date') || undefined,
-      providerId: searchParams.get('providerId') || undefined,
-      resourceId: searchParams.get('resourceId') || undefined,
     };
 
     const validationResult = calendarSlotsQuerySchema.safeParse(queryParams);
@@ -23,7 +22,7 @@ export async function GET(request: NextRequest) {
       return handleApiError(validationResult.error, 'Invalid query parameters');
     }
 
-    const { date, providerId, resourceId } = validationResult.data;
+    const { date } = validationResult.data;
     const serviceId = searchParams.get('serviceId');
     const suggested = searchParams.get('suggested') === 'true';
 
@@ -38,11 +37,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const tenantTimeZone = await getTenantTimeZone(tenantId);
+
     if (suggested) {
       // Get 2-3 suggested slots for next few days
       const suggestions = await getSuggestedSlots(userId, tenantId, serviceDuration, 7, {
-        providerId,
-        resourceId,
+        timeZone: tenantTimeZone,
       });
       return createSuccessResponse({
         suggestions: suggestions.map(s => ({
@@ -57,8 +57,7 @@ export async function GET(request: NextRequest) {
     } else if (date) {
       // Get slots for specific date
       const slots = await getAvailableSlots(userId, tenantId, new Date(date), serviceDuration, { start: '09:00', end: '18:00' }, {
-        providerId,
-        resourceId,
+        timeZone: tenantTimeZone,
       });
       return createSuccessResponse({
         slots: slots.map(slot => ({

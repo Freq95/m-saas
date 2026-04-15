@@ -1,9 +1,13 @@
 export { useCalendar } from './useCalendar';
 export { useAppointmentsSWR } from './useAppointmentsSWR';
 export { useCalendarNavigation } from './useCalendarNavigation';
-export { useProviders } from './useProviders';
-export { useResources } from './useResources';
-export { useBlockedTimes } from './useBlockedTimes';
+export { useCalendarList } from './useCalendarList';
+export { usePendingShares } from './usePendingShares';
+export { useCalendarScopeSelection } from './useCalendarScopeSelection';
 export { parseSessionUserId } from './sessionUser';
-export type { Appointment, Provider, Resource, CalendarState } from './useCalendar';
+export { parseSessionDbUserId } from './sessionUser';
+export type { Appointment, CalendarState, CalendarPermissions } from './useCalendar';
 export type { CreateAppointmentInput, UpdateAppointmentInput } from './useAppointmentsSWR';
+export type { CalendarListItem } from './useCalendarList';
+export type { PendingCalendarShare } from './usePendingShares';
+export type { CalendarScope } from './useCalendarScopeSelection';

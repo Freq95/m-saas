@@ -4,9 +4,17 @@
  */
 
 import { z } from 'zod';
+import { isDentistPaletteColor, normalizeDentistColor } from './calendar-color-policy';
 
 // Common validation patterns
 export const emailSchema = z.string().email('Invalid email format').toLowerCase().trim();
+const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Invalid color format');
+const dentistPaletteColorSchema = z
+  .string()
+  .transform((value) => normalizeDentistColor(value))
+  .refine((value): value is string => Boolean(value) && isDentistPaletteColor(value), {
+    message: 'Selecteaza o culoare valida din paleta presetata',
+  });
 const phoneSchema = z.string()
   .regex(/^[\d\s\+\-\(\)]+$/, 'Invalid phone format')
   .refine((value) => {
@@ -45,6 +53,8 @@ export const createMessageSchema = z.object({
 // Appointment schemas
 export const createAppointmentSchema = z.object({
   conversationId: z.number().int().positive().optional(),
+  calendarId: z.number().int().positive().optional(),
+  dentistUserId: z.number().int().positive().optional(),
   serviceId: z.number().int().positive(),
   clientName: z.string().min(1, 'Client name is required').max(255),
   clientEmail: emailSchema.optional(),
@@ -52,8 +62,6 @@ export const createAppointmentSchema = z.object({
   forceNewClient: z.boolean().optional(),
   startTime: dateTimeSchema,
   endTime: dateTimeSchema.optional(), // Will be calculated if not provided
-  providerId: z.number().int().positive().optional(),
-  resourceId: z.number().int().positive().optional(),
   category: z.string().max(120).optional(),
   color: z.string().max(120).optional(),
   notes: z.string().max(2000).optional(),
@@ -68,8 +76,6 @@ export const updateAppointmentSchema = z.object({
   clientName: z.string().min(1).max(255).optional(),
   clientEmail: emailSchema.optional(),
   clientPhone: phoneSchema,
-  providerId: z.number().int().positive().optional().nullable(),
-  resourceId: z.number().int().positive().optional().nullable(),
   category: z.string().max(120).optional().nullable(),
   color: z.string().max(120).optional().nullable(),
   isRecurring: z.boolean().optional(),
@@ -85,6 +91,43 @@ export const updateAppointmentSchema = z.object({
   notes: z.string().max(2000).optional(),
 });
 
+const calendarPermissionsSchema = z
+  .object({
+    can_view: z.boolean().optional().default(true),
+    can_create: z.boolean().optional().default(false),
+    can_edit_own: z.boolean().optional().default(false),
+    can_edit_all: z.boolean().optional().default(false),
+    can_delete_own: z.boolean().optional().default(false),
+    can_delete_all: z.boolean().optional().default(false),
+  })
+  .strict()
+  .transform((permissions) => ({
+    ...permissions,
+    can_view: true,
+  }));
+
+export const createCalendarSchema = z.object({
+  name: z.string().min(1, 'Calendar name is required').max(255),
+  color: hexColorSchema.optional(),
+});
+
+export const updateCalendarSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  color: hexColorSchema.optional(),
+  colorMode: z.enum(['category', 'dentist']).optional(),
+});
+
+export const createCalendarShareSchema = z.object({
+  email: emailSchema,
+  permissions: calendarPermissionsSchema,
+  dentistColor: dentistPaletteColorSchema,
+});
+
+export const updateCalendarShareSchema = z.object({
+  permissions: calendarPermissionsSchema.optional(),
+  dentistColor: dentistPaletteColorSchema.optional(),
+});
+
 const recurrenceSchema = z
   .object({
     frequency: z.enum(['daily', 'weekly', 'monthly']),
@@ -98,14 +141,14 @@ const recurrenceSchema = z
 
 export const createRecurringAppointmentSchema = z
   .object({
+    calendarId: z.number().int().positive().optional(),
+    dentistUserId: z.number().int().positive().optional(),
     serviceId: z.number().int().positive(),
     clientName: z.string().min(1, 'Client name is required').max(255),
     clientEmail: emailSchema.optional(),
     clientPhone: phoneSchema,
     startTime: dateTimeSchema,
     endTime: dateTimeSchema,
-    providerId: z.number().int().positive().optional(),
-    resourceId: z.number().int().positive().optional(),
     notes: z.string().max(2000).optional(),
     category: z.string().max(120).optional(),
     color: z.string().max(120).optional(),
@@ -115,7 +158,7 @@ export const createRecurringAppointmentSchema = z
   .strict();
 
 // Client schemas
-export const consentMethodEnum = z.enum(['digital_signature', 'scanned_document', 'paper_on_file']);
+const consentMethodEnum = z.enum(['digital_signature', 'scanned_document', 'paper_on_file']);
 
 export const createClientSchema = z.object({
   name: z.string().min(1, 'Name is required').max(255),
@@ -176,13 +219,14 @@ export const yahooSendSchema = z.object({
 export const appointmentsQuerySchema = z.object({
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
-  providerId: z.string().regex(/^\d+$/).transform(Number).optional(),
-  resourceId: z.string().regex(/^\d+$/).transform(Number).optional(),
+  calendarIds: z
+    .string()
+    .trim()
+    .regex(/^\d+(,\d+)*$/, 'Invalid calendarIds')
+    .transform((value) => value.split(',').map((item) => Number.parseInt(item, 10)))
+    .optional(),
   status: z.enum(['scheduled', 'completed', 'cancelled', 'no-show']).optional(),
   search: z.string().max(120).optional(),
-});
-
-export const servicesQuerySchema = z.object({
 });
 
 export const conversationsQuerySchema = z.object({
@@ -195,8 +239,6 @@ export const dashboardQuerySchema = z.object({
 
 export const calendarSlotsQuerySchema = z.object({
   date: z.string().datetime().optional(),
-  providerId: z.string().regex(/^\d+$/).transform(Number).optional(),
-  resourceId: z.string().regex(/^\d+$/).transform(Number).optional(),
 });
 
 export const remindersQuerySchema = z.object({
@@ -206,25 +248,6 @@ export const remindersQuerySchema = z.object({
 // Client note schema
 export const createNoteSchema = z.object({
   content: z.string().min(1, 'Note content is required').max(5000),
-});
-
-// Provider schemas
-export const createProviderSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(255),
-  email: emailSchema,
-  role: z.string().min(1, 'Role is required').max(100),
-  color: z.string().max(20).optional(),
-  workingHours: z.record(z.string(), z.object({
-    start: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format'),
-    end: z.string().regex(/^\d{2}:\d{2}$/, 'Invalid time format'),
-    breaks: z.array(z.unknown()).optional().default([]),
-  })).optional(),
-});
-
-// Resource schemas
-export const createResourceSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(255),
-  type: z.enum(['chair', 'room', 'equipment']),
 });
 
 // Team invite schema
@@ -244,23 +267,3 @@ export const integrationIdParamSchema = z.object({
   id: z.string().regex(/^\d+$/, 'Integration ID must be a number').transform((val) => parseInt(val, 10)),
 });
 
-// Blocked times schemas
-const blockedTimeRecurrenceSchema = z.object({
-  frequency: z.enum(['daily', 'weekly', 'monthly']),
-  interval: z.number().int().min(1).max(52),
-  count: z.number().int().min(1).max(50).optional(),
-  end_date: z.string().optional(),
-  endDate: z.string().optional(),
-}).optional().nullable();
-
-export const BLOCKED_TIME_REASON_MAX = 200;
-export const BLOCKED_TIME_RECURRENCE_MAX = 50;
-
-export const createBlockedTimeSchema = z.object({
-  startTime: z.string().min(1, 'Start time is required'),
-  endTime: z.string().min(1, 'End time is required'),
-  reason: z.string().min(1, 'Reason is required').max(BLOCKED_TIME_REASON_MAX),
-  providerId: z.number().int().positive().optional().nullable(),
-  resourceId: z.number().int().positive().optional().nullable(),
-  recurrence: blockedTimeRecurrenceSchema,
-});

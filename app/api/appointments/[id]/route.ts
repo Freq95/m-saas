@@ -1,50 +1,62 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from '@/lib/db/mongo-utils';
 import { updateClientStats } from '@/lib/client-matching';
+import { canDeleteAppointment, canEditAppointment, getCalendarAuth } from '@/lib/calendar-auth';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { checkAppointmentConflict } from '@/lib/calendar-conflicts';
-import { getAuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, type AuthContext } from '@/lib/auth-helpers';
+import {
+  getServiceOwnerScopeFromAppointment,
+} from '@/lib/appointment-service';
 import { invalidateReadCaches } from '@/lib/cache-keys';
 import { logger } from '@/lib/logger';
 import { checkUpdateRateLimit } from '@/lib/rate-limit';
 import { generateRecurringInstances } from '@/lib/recurring-utils';
+import { attachCalendarDisplayData } from '@/lib/server/calendar';
+import { getTenantTimeZone } from '@/lib/timezone';
 
 const CONFLICT_MESSAGE_BY_TYPE: Record<string, string> = {
-  provider_appointment: 'Providerul are deja o programare in acest interval.',
-  resource_appointment: 'Resursa este deja ocupata in acest interval.',
+  calendar_appointment: 'Exista deja o alta programare in acest interval.',
   appointment_overlap: 'Exista deja o alta programare in acest interval.',
-  blocked_time: 'Intervalul este blocat.',
-  outside_working_hours: 'Intervalul este in afara programului de lucru.',
 };
 
 function formatConflictPayload(conflict: any) {
   const baseMessage = CONFLICT_MESSAGE_BY_TYPE[conflict.type] || 'Conflict detectat.';
-  if (conflict.type === 'blocked_time' && conflict.blockedTime?.reason) {
-    return {
-      type: conflict.type,
-      message: `${baseMessage} Motiv: ${conflict.blockedTime.reason}.`,
-    };
-  }
-  if ((conflict.type === 'provider_appointment' || conflict.type === 'resource_appointment') && conflict.appointment) {
+  if (conflict.appointment) {
     return {
       type: conflict.type,
       message: `${baseMessage} ${conflict.appointment.client_name || 'Client'} (${conflict.appointment.start_time} - ${conflict.appointment.end_time}).`,
     };
   }
-  if (conflict.type === 'outside_working_hours' && conflict.workingHours) {
-    return {
-      type: conflict.type,
-      message: `${baseMessage} Program: ${conflict.workingHours.start}-${conflict.workingHours.end}.`,
-    };
-  }
   return { type: conflict.type, message: baseMessage };
+}
+
+function matchesLegacyAppointmentOwner(
+  appointment: Record<string, any>,
+  auth: Pick<AuthContext, 'userId' | 'tenantId'>
+): boolean {
+  return appointment.user_id === auth.userId && appointment.tenant_id?.toString() === auth.tenantId.toString();
+}
+
+function appointmentMutationFilter(
+  appointmentId: number,
+  appointment: Record<string, any>
+) {
+  return typeof appointment.calendar_id === 'number'
+    ? { id: appointmentId, deleted_at: { $exists: false } }
+    : {
+        id: appointmentId,
+        user_id: appointment.user_id,
+        tenant_id: appointment.tenant_id,
+        deleted_at: { $exists: false },
+      };
 }
 
 // GET /api/appointments/[id] - Get single appointment
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const appointmentId = Number(params.id);
 
@@ -54,17 +66,28 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
 
     const appointmentDoc = await db.collection('appointments').findOne({
       id: appointmentId,
-      user_id: userId,
-      tenant_id: tenantId,
       deleted_at: { $exists: false },
     });
     if (!appointmentDoc) {
       return createErrorResponse('Appointment not found', 404);
     }
 
+    if (typeof appointmentDoc.calendar_id === 'number') {
+      await getCalendarAuth(auth, appointmentDoc.calendar_id);
+    } else if (!matchesLegacyAppointmentOwner(appointmentDoc, auth)) {
+      return createErrorResponse('Appointment not found', 404);
+    }
+
+    const serviceOwnerScope = getServiceOwnerScopeFromAppointment(appointmentDoc);
     const [clientDoc, serviceDoc] = await Promise.all([
-      appointmentDoc.client_id ? db.collection('clients').findOne({ id: appointmentDoc.client_id, tenant_id: tenantId }) : null,
-      appointmentDoc.service_id ? db.collection('services').findOne({ id: appointmentDoc.service_id, tenant_id: tenantId }) : null,
+      appointmentDoc.client_id ? db.collection('clients').findOne({ id: appointmentDoc.client_id, tenant_id: appointmentDoc.tenant_id }) : null,
+      appointmentDoc.service_id && serviceOwnerScope
+        ? db.collection('services').findOne({
+            id: appointmentDoc.service_id,
+            tenant_id: serviceOwnerScope.serviceOwnerTenantId,
+            user_id: serviceOwnerScope.serviceOwnerUserId,
+          })
+        : null,
     ]);
 
     const appointment = {
@@ -74,8 +97,9 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       client_phone: clientDoc?.phone || appointmentDoc.client_phone,
       service_name: serviceDoc?.name || (appointmentDoc.service_name as string | null) || null,
     };
+    const [decoratedAppointment] = await attachCalendarDisplayData([appointment]);
 
-    return createSuccessResponse({ appointment });
+    return createSuccessResponse({ appointment: decoratedAppointment || appointment });
   } catch (error) {
     return handleApiError(error, 'Failed to fetch appointment');
   }
@@ -85,7 +109,8 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
 export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
+    const { userId, tenantId, dbUserId } = auth;
     const limited = await checkUpdateRateLimit(userId);
     if (limited) return limited;
     const db = await getMongoDbOrThrow();
@@ -114,8 +139,6 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       clientName,
       clientEmail,
       clientPhone,
-      providerId,
-      resourceId,
       category,
       color,
       isRecurring,
@@ -125,13 +148,28 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     // Get existing appointment
     const existingAppointment = await db.collection('appointments').findOne({
       id: appointmentId,
-      user_id: userId,
-      tenant_id: tenantId,
       deleted_at: { $exists: false },
     });
     if (!existingAppointment) {
+      return createErrorResponse('Appointment not found', 404);
+    }
+
+    if (typeof existingAppointment.calendar_id === 'number') {
+      const calendarAuth = await getCalendarAuth(auth, existingAppointment.calendar_id);
+      if (!canEditAppointment(calendarAuth, existingAppointment as any, dbUserId)) {
+        return createErrorResponse('Not authorized to edit this appointment', 403);
+      }
+    } else if (!matchesLegacyAppointmentOwner(existingAppointment, auth)) {
       return createErrorResponse('Not found or not authorized', 404);
     }
+
+    const appointmentTenantId = existingAppointment.tenant_id;
+    const appointmentUserId = existingAppointment.user_id;
+    const appointmentCalendarId = typeof existingAppointment.calendar_id === 'number'
+      ? existingAppointment.calendar_id
+      : undefined;
+    const appointmentTimeZone = await getTenantTimeZone(appointmentTenantId);
+    const mutationFilter = appointmentMutationFilter(appointmentId, existingAppointment);
 
     const updates: Record<string, unknown> = {};
     const shouldCreateRecurringInstances =
@@ -162,9 +200,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
     const hasTimeOrAllocationChange =
       startTime !== undefined ||
-      endTime !== undefined ||
-      providerId !== undefined ||
-      resourceId !== undefined;
+      endTime !== undefined;
 
     // If times or assignment are being changed, check for conflicts
     if (hasTimeOrAllocationChange) {
@@ -184,24 +220,18 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         return createErrorResponse('Invalid appointment time range', 400);
       }
 
-      const targetProviderId =
-        providerId === null
-          ? null
-          : (providerId !== undefined ? providerId : (existingAppointment.provider_id ?? null));
-      const targetResourceId =
-        resourceId === null
-          ? null
-          : (resourceId !== undefined ? resourceId : (existingAppointment.resource_id ?? null));
-
       // Check for conflicts (excluding this appointment)
       const conflictCheck = await checkAppointmentConflict(
-        existingAppointment.user_id,
-        tenantId,
-        targetProviderId || undefined,
-        targetResourceId || undefined,
+        appointmentUserId,
+        appointmentTenantId,
         newStartTime,
         newEndTime,
-        appointmentId // Exclude current appointment from conflict check
+        appointmentId,
+        true,
+        {
+          calendarId: appointmentCalendarId,
+          timeZone: appointmentTimeZone,
+        }
       );
 
       if (conflictCheck.hasConflict) {
@@ -225,12 +255,6 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       if (endTime) {
         updates.end_time = newEndTime.toISOString();
       }
-      if (providerId !== undefined) {
-        updates.provider_id = targetProviderId;
-      }
-      if (resourceId !== undefined) {
-        updates.resource_id = targetResourceId;
-      }
     }
 
     if (notes !== undefined) {
@@ -238,14 +262,18 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     }
 
     if (serviceId !== undefined) {
+      const serviceOwnerScope = getServiceOwnerScopeFromAppointment(existingAppointment);
+      if (!serviceOwnerScope) {
+        return createErrorResponse('Assigned dentist context is missing for this appointment', 400);
+      }
       const serviceDoc = await db.collection('services').findOne({
         id: serviceId,
-        user_id: existingAppointment.user_id,
-        tenant_id: tenantId,
+        user_id: serviceOwnerScope.serviceOwnerUserId,
+        tenant_id: serviceOwnerScope.serviceOwnerTenantId,
         deleted_at: { $exists: false },
       });
       if (!serviceDoc) {
-        return createErrorResponse('Service not found', 400);
+        return createErrorResponse('Selected service was not found for the assigned dentist', 400);
       }
       updates.service_id = serviceId;
       updates.service_name = serviceDoc.name || null;
@@ -270,8 +298,8 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
       const { findOrCreateClient } = await import('@/lib/client-matching');
       const linkedClient = await findOrCreateClient(
-        existingAppointment.user_id,
-        tenantId,
+        appointmentUserId,
+        appointmentTenantId,
         normalizedName,
         normalizedEmail || undefined,
         normalizedPhone || undefined,
@@ -315,7 +343,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
     const previousClientId = typeof existingAppointment.client_id === 'number' ? existingAppointment.client_id : null;
     const updateResult = await db.collection('appointments').updateOne(
-      { id: appointmentId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } },
+      mutationFilter,
       { $set: updates }
     );
     if (updateResult.matchedCount === 0) {
@@ -323,10 +351,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     }
 
     const appointmentDoc = await db.collection('appointments').findOne({
-      id: appointmentId,
-      user_id: userId,
-      tenant_id: tenantId,
-      deleted_at: { $exists: false },
+      ...mutationFilter,
     });
     if (!appointmentDoc) {
       return createErrorResponse('Appointment not found', 404);
@@ -353,11 +378,15 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       for (const instance of recurringInstances) {
         const conflictCheck = await checkAppointmentConflict(
           appointmentDoc.user_id,
-          tenantId,
-          appointmentDoc.provider_id || undefined,
-          appointmentDoc.resource_id || undefined,
+          appointmentTenantId,
           instance.start,
-          instance.end
+          instance.end,
+          undefined,
+          true,
+          {
+            calendarId: typeof appointmentDoc.calendar_id === 'number' ? appointmentDoc.calendar_id : undefined,
+            timeZone: appointmentTimeZone,
+          }
         );
         if (conflictCheck.hasConflict) {
           continue;
@@ -368,8 +397,13 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         await db.collection<FlexDoc>('appointments').insertOne({
           id: nextRecurringId,
           _id: nextRecurringId,
-          tenant_id: tenantId,
+          tenant_id: appointmentTenantId,
           user_id: appointmentDoc.user_id,
+          calendar_id: appointmentDoc.calendar_id || null,
+          created_by_user_id: appointmentDoc.created_by_user_id || null,
+          dentist_db_user_id: appointmentDoc.dentist_db_user_id || null,
+          service_owner_user_id: appointmentDoc.service_owner_user_id || appointmentDoc.user_id,
+          service_owner_tenant_id: appointmentDoc.service_owner_tenant_id || appointmentTenantId,
           conversation_id: appointmentDoc.conversation_id || null,
           service_id: appointmentDoc.service_id,
           service_name: appointmentDoc.service_name || null,
@@ -380,8 +414,6 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
           start_time: instance.start.toISOString(),
           end_time: instance.end.toISOString(),
           status: 'scheduled',
-          provider_id: appointmentDoc.provider_id || null,
-          resource_id: appointmentDoc.resource_id || null,
           category: appointmentDoc.category || null,
           color: appointmentDoc.color || null,
           notes: appointmentDoc.notes || null,
@@ -398,8 +430,9 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     else if (shouldSyncRecurringSeriesFromAnchor) {
       await syncRecurringSeriesFromAnchor({
         db,
-        tenantId,
+        tenantId: appointmentTenantId,
         anchorAppointment: appointmentDoc,
+        timeZone: appointmentTimeZone,
       });
     }
 
@@ -425,9 +458,13 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         recurrence !== undefined
       )
     ) {
-      await Promise.all(Array.from(impactedClientIds).map((clientId) => updateClientStats(clientId, tenantId)));
+      await Promise.all(Array.from(impactedClientIds).map((clientId) => updateClientStats(clientId, appointmentTenantId)));
     }
-    await invalidateReadCaches({ tenantId, userId });
+    await invalidateReadCaches({
+      tenantId: appointmentTenantId,
+      userId: appointmentUserId,
+      calendarId: appointmentCalendarId,
+    });
     return createSuccessResponse({ appointment: stripMongoId(appointmentDoc), warning });
   } catch (error) {
     return handleApiError(error, 'Failed to update appointment');
@@ -438,10 +475,12 @@ async function syncRecurringSeriesFromAnchor({
   db,
   tenantId,
   anchorAppointment,
+  timeZone,
 }: {
   db: any;
   tenantId: any;
   anchorAppointment: any;
+  timeZone: string;
 }): Promise<void> {
   if (!anchorAppointment.recurrence || !anchorAppointment.recurrence_group_id) {
     return;
@@ -514,10 +553,14 @@ async function syncRecurringSeriesFromAnchor({
     const conflictCheck = await checkAppointmentConflict(
       anchorAppointment.user_id,
       tenantId,
-      anchorAppointment.provider_id || undefined,
-      anchorAppointment.resource_id || undefined,
       desired.start,
-      desired.end
+      desired.end,
+      undefined,
+      true,
+      {
+        calendarId: typeof anchorAppointment.calendar_id === 'number' ? anchorAppointment.calendar_id : undefined,
+        timeZone,
+      }
     );
     if (conflictCheck.hasConflict) {
       continue;
@@ -530,6 +573,11 @@ async function syncRecurringSeriesFromAnchor({
       _id: nextRecurringId,
       tenant_id: tenantId,
       user_id: anchorAppointment.user_id,
+      calendar_id: anchorAppointment.calendar_id || null,
+      created_by_user_id: anchorAppointment.created_by_user_id || null,
+      dentist_db_user_id: anchorAppointment.dentist_db_user_id || null,
+      service_owner_user_id: anchorAppointment.service_owner_user_id || anchorAppointment.user_id,
+      service_owner_tenant_id: anchorAppointment.service_owner_tenant_id || tenantId,
       conversation_id: anchorAppointment.conversation_id || null,
       service_id: anchorAppointment.service_id,
       service_name: anchorAppointment.service_name || null,
@@ -540,8 +588,6 @@ async function syncRecurringSeriesFromAnchor({
       start_time: desired.start.toISOString(),
       end_time: desired.end.toISOString(),
       status: 'scheduled',
-      provider_id: anchorAppointment.provider_id || null,
-      resource_id: anchorAppointment.resource_id || null,
       category: anchorAppointment.category || null,
       color: anchorAppointment.color || null,
       notes: anchorAppointment.notes || null,
@@ -572,13 +618,14 @@ async function syncRecurringSeriesFromAnchor({
           {
             $set: {
               service_id: anchorAppointment.service_id,
+              dentist_db_user_id: anchorAppointment.dentist_db_user_id || null,
+              service_owner_user_id: anchorAppointment.service_owner_user_id || anchorAppointment.user_id,
+              service_owner_tenant_id: anchorAppointment.service_owner_tenant_id || tenantId,
               service_name: anchorAppointment.service_name || null,
               client_id: anchorAppointment.client_id || null,
               client_name: anchorAppointment.client_name || null,
               client_email: anchorAppointment.client_email || null,
               client_phone: anchorAppointment.client_phone || null,
-              provider_id: anchorAppointment.provider_id || null,
-              resource_id: anchorAppointment.resource_id || null,
               category: anchorAppointment.category || null,
               color: anchorAppointment.color || null,
               notes: anchorAppointment.notes || null,
@@ -606,7 +653,8 @@ async function syncRecurringSeriesFromAnchor({
 export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
+    const { userId, dbUserId } = auth;
     const limited = await checkUpdateRateLimit(userId);
     if (limited) return limited;
     const db = await getMongoDbOrThrow();
@@ -619,22 +667,24 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
     const existingAppointment = await db.collection('appointments').findOne(
       {
         id: appointmentId,
-        user_id: userId,
-        tenant_id: tenantId,
         deleted_at: { $exists: false },
       }
     );
     if (!existingAppointment) {
+      return createErrorResponse('Appointment not found', 404);
+    }
+
+    if (typeof existingAppointment.calendar_id === 'number') {
+      const calendarAuth = await getCalendarAuth(auth, existingAppointment.calendar_id);
+      if (!canDeleteAppointment(calendarAuth, existingAppointment as any, dbUserId)) {
+        return createErrorResponse('Not authorized to delete this appointment', 403);
+      }
+    } else if (!matchesLegacyAppointmentOwner(existingAppointment, auth)) {
       return createErrorResponse('Not found or not authorized', 404);
     }
 
     const result = await db.collection('appointments').updateOne(
-      {
-        id: appointmentId,
-        user_id: userId,
-        tenant_id: tenantId,
-        deleted_at: { $exists: false },
-      },
+      appointmentMutationFilter(appointmentId, existingAppointment),
       {
         $set: {
           deleted_at: new Date().toISOString(),
@@ -647,9 +697,13 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
       return createErrorResponse('Not found or not authorized', 404);
     }
     if (typeof existingAppointment.client_id === 'number') {
-      await updateClientStats(existingAppointment.client_id, tenantId);
+      await updateClientStats(existingAppointment.client_id, existingAppointment.tenant_id);
     }
-    await invalidateReadCaches({ tenantId, userId });
+    await invalidateReadCaches({
+      tenantId: existingAppointment.tenant_id,
+      userId: existingAppointment.user_id,
+      calendarId: typeof existingAppointment.calendar_id === 'number' ? existingAppointment.calendar_id : undefined,
+    });
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     return handleApiError(error, 'Failed to delete appointment');

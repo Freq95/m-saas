@@ -1,11 +1,26 @@
 import { useReducer, useCallback, useEffect, useMemo } from 'react';
 import { addWeeks, subWeeks, addMonths, subMonths, addDays, subDays } from 'date-fns';
+import type { CalendarColorMode } from '@/lib/calendar-color-policy';
 
 export type CalendarViewType = 'week' | 'workweek' | 'month' | 'day';
+
+export interface CalendarPermissions {
+  can_view: boolean;
+  can_create: boolean;
+  can_edit_own: boolean;
+  can_edit_all: boolean;
+  can_delete_own: boolean;
+  can_delete_all: boolean;
+}
+
+export interface AppointmentCalendarSettings {
+  color_mode?: CalendarColorMode;
+}
 
 interface Appointment {
   id: number;
   service_id?: number;
+  service_owner_user_id?: number;
   client_id?: number;
   client_name: string;
   client_email?: string;
@@ -15,8 +30,6 @@ interface Appointment {
   end_time: string;
   status: string;
   notes?: string;
-  provider_id?: number;
-  resource_id?: number;
   category?: string;
   color?: string;
   recurrence?: {
@@ -27,28 +40,25 @@ interface Appointment {
     count?: number;
   } | null;
   recurrence_group_id?: number;
-}
-
-interface Provider {
-  id: number;
-  name: string;
-  email?: string;
-  role?: string;
-  color: string;
-}
-
-interface Resource {
-  id: number;
-  name: string;
-  type: 'chair' | 'room' | 'equipment';
+  calendar_id?: number | null;
+  created_by_user_id?: string | null;
+  dentist_db_user_id?: string | null;
+  dentist_display_name?: string | null;
+  calendar_name?: string | null;
+  calendar_color?: string | null;
+  calendar_is_default?: boolean | null;
+  calendar_settings?: AppointmentCalendarSettings | null;
+  dentist_color?: string | null;
+  can_edit?: boolean;
+  can_delete?: boolean;
+  can_drag?: boolean;
+  can_change_status?: boolean;
 }
 
 interface CalendarState {
   viewType: CalendarViewType;
   currentDate: Date;
   selectedAppointment: Appointment | null;
-  selectedProvider: Provider | null;
-  selectedResource: Resource | null;
   selectedSlot: { start: Date; end: Date } | null;
 }
 
@@ -56,8 +66,6 @@ type CalendarAction =
   | { type: 'SET_VIEW_TYPE'; payload: CalendarViewType }
   | { type: 'SET_CURRENT_DATE'; payload: Date }
   | { type: 'SET_SELECTED_APPOINTMENT'; payload: Appointment | null }
-  | { type: 'SET_SELECTED_PROVIDER'; payload: Provider | null }
-  | { type: 'SET_SELECTED_RESOURCE'; payload: Resource | null }
   | { type: 'SET_SELECTED_SLOT'; payload: { start: Date; end: Date } | null }
   | { type: 'GO_TO_TODAY' }
   | { type: 'NEXT_PERIOD' }
@@ -74,12 +82,6 @@ function calendarReducer(state: CalendarState, action: CalendarAction): Calendar
 
     case 'SET_SELECTED_APPOINTMENT':
       return { ...state, selectedAppointment: action.payload };
-
-    case 'SET_SELECTED_PROVIDER':
-      return { ...state, selectedProvider: action.payload };
-
-    case 'SET_SELECTED_RESOURCE':
-      return { ...state, selectedResource: action.payload };
 
     case 'SET_SELECTED_SLOT':
       return { ...state, selectedSlot: action.payload };
@@ -127,8 +129,6 @@ interface UseCalendarResult {
     prevPeriod: () => void;
     selectAppointment: (appointment: Appointment | null) => void;
     selectSlot: (slot: { start: Date; end: Date } | null) => void;
-    selectProvider: (provider: Provider | null) => void;
-    selectResource: (resource: Resource | null) => void;
     clearSelection: () => void;
   };
 }
@@ -141,8 +141,6 @@ export function useCalendar(
     viewType: initialViewType,
     currentDate: new Date(initialDate),
     selectedAppointment: null,
-    selectedProvider: null,
-    selectedResource: null,
     selectedSlot: null,
   });
 
@@ -157,8 +155,6 @@ export function useCalendar(
   const prevPeriod = useCallback(() => dispatch({ type: 'PREV_PERIOD' }), []);
   const selectAppointment = useCallback((a: Appointment | null) => dispatch({ type: 'SET_SELECTED_APPOINTMENT', payload: a }), []);
   const selectSlot = useCallback((s: { start: Date; end: Date } | null) => dispatch({ type: 'SET_SELECTED_SLOT', payload: s }), []);
-  const selectProvider = useCallback((p: Provider | null) => dispatch({ type: 'SET_SELECTED_PROVIDER', payload: p }), []);
-  const selectResource = useCallback((r: Resource | null) => dispatch({ type: 'SET_SELECTED_RESOURCE', payload: r }), []);
   const clearSelection = useCallback(() => dispatch({ type: 'CLEAR_SELECTION' }), []);
 
   const actions = useMemo(() => ({
@@ -169,8 +165,6 @@ export function useCalendar(
     prevPeriod,
     selectAppointment,
     selectSlot,
-    selectProvider,
-    selectResource,
     clearSelection,
   }), [
     setViewType,
@@ -180,8 +174,6 @@ export function useCalendar(
     prevPeriod,
     selectAppointment,
     selectSlot,
-    selectProvider,
-    selectResource,
     clearSelection,
   ]);
 
@@ -206,4 +198,4 @@ export function useCalendar(
   return { state, actions };
 }
 
-export type { Appointment, Provider, Resource, CalendarState };
+export type { Appointment, CalendarState };

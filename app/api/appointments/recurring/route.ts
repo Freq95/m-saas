@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow, getNextNumericId } from '@/lib/db/mongo-utils';
+import { AppointmentWriteBusyError, withAppointmentWriteLocks } from '@/lib/appointment-write-lock';
+import { buildAppointmentDentistFields, resolveAppointmentDentistAssignment } from '@/lib/appointment-service';
 import { checkAppointmentConflict } from '@/lib/calendar-conflicts';
+import {
+  getCalendarAuth,
+  getOrCreateDefaultCalendar,
+  requireCalendarPermission,
+} from '@/lib/calendar-auth';
 import type { RecurrenceRule } from '@/lib/types/calendar';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { invalidateReadCaches } from '@/lib/cache-keys';
 import { logger } from '@/lib/logger';
 import { generateRecurringInstances } from '@/lib/recurring-utils';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
+import { getTenantTimeZone } from '@/lib/timezone';
 
 interface RecurringConflict {
   start: Date;
@@ -18,7 +26,8 @@ interface RecurringConflict {
 // POST /api/appointments/recurring - Create recurring appointments
 export async function POST(request: NextRequest) {
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
+    const { userId, tenantId, dbUserId } = auth;
     const limited = await checkWriteRateLimit(userId);
     if (limited) return limited;
     const body = await request.json();
@@ -31,14 +40,14 @@ export async function POST(request: NextRequest) {
       );
     }
     const {
+      calendarId,
+      dentistUserId,
       serviceId,
       clientName,
       clientEmail,
       clientPhone,
       startTime,
       endTime,
-      providerId,
-      resourceId,
       notes,
       category,
       color,
@@ -47,24 +56,35 @@ export async function POST(request: NextRequest) {
     } = validationResult.data;
 
     const db = await getMongoDbOrThrow();
-    const normalizedUserId = Number(userId);
     const normalizedServiceId = Number(serviceId);
-    const normalizedProviderId = providerId ? Number(providerId) : undefined;
-    const normalizedResourceId = resourceId ? Number(resourceId) : undefined;
 
-    if (
-      Number.isNaN(normalizedUserId) ||
-      Number.isNaN(normalizedServiceId) ||
-      (normalizedProviderId !== undefined && Number.isNaN(normalizedProviderId)) ||
-      (normalizedResourceId !== undefined && Number.isNaN(normalizedResourceId))
-    ) {
+    let appointmentUserId: number;
+    let appointmentTenantId = tenantId;
+    let targetCalendarId: number;
+    let createdByUserId = dbUserId;
+
+    if (typeof calendarId === 'number') {
+      const calendarAuth = await getCalendarAuth(auth, calendarId);
+      requireCalendarPermission(calendarAuth, 'can_create');
+      appointmentUserId = calendarAuth.calendarOwnerId;
+      appointmentTenantId = calendarAuth.calendarTenantId;
+      targetCalendarId = calendarAuth.calendarId;
+    } else {
+      const defaultCalendar = await getOrCreateDefaultCalendar(auth);
+      appointmentUserId = userId;
+      targetCalendarId = defaultCalendar.id;
+    }
+
+    const dentistAssignment = await resolveAppointmentDentistAssignment(auth, targetCalendarId, dentistUserId);
+
+    if (Number.isNaN(normalizedServiceId)) {
       return NextResponse.json({ error: 'Invalid numeric fields' }, { status: 400 });
     }
 
     const { findOrCreateClient, updateClientStats } = await import('@/lib/client-matching');
     const client = await findOrCreateClient(
-      normalizedUserId,
-      tenantId,
+      appointmentUserId,
+      appointmentTenantId,
       clientName,
       clientEmail || undefined,
       clientPhone || undefined,
@@ -102,69 +122,114 @@ export async function POST(request: NextRequest) {
 
     const createdAppointments: Record<string, unknown>[] = [];
     const conflicts: RecurringConflict[] = [];
+    const tenantTimeZone = await getTenantTimeZone(appointmentTenantId);
 
     // Get service details
-    const service = await db.collection('services').findOne({ id: normalizedServiceId, tenant_id: tenantId, deleted_at: { $exists: false } });
-    const serviceName = service?.name || 'Unknown Service';
+    const service = await db.collection('services').findOne({
+      id: normalizedServiceId,
+      user_id: dentistAssignment.serviceOwnerUserId,
+      tenant_id: dentistAssignment.serviceOwnerTenantId,
+      deleted_at: { $exists: false },
+    });
+    if (!service) {
+      return NextResponse.json(
+        { error: 'Selected service was not found for the chosen dentist' },
+        { status: 400 }
+      );
+    }
+    const serviceName = service.name;
 
     // Create each instance
     for (const instance of instances) {
-      // Check for conflicts
-      const conflictCheck = await checkAppointmentConflict(
-        normalizedUserId,
-        tenantId,
-        normalizedProviderId,
-        normalizedResourceId,
-        instance.start,
-        instance.end
+      const creationResult = await withAppointmentWriteLocks(
+        {
+          tenantId: appointmentTenantId,
+          userId: appointmentUserId,
+          calendarId: targetCalendarId,
+          startTime: instance.start,
+          endTime: instance.end,
+          timeZone: tenantTimeZone,
+        },
+        async () => {
+          const conflictCheck = await checkAppointmentConflict(
+            appointmentUserId,
+            appointmentTenantId,
+            instance.start,
+            instance.end,
+            undefined,
+            true,
+            {
+              calendarId: targetCalendarId,
+              timeZone: tenantTimeZone,
+            }
+          );
+
+          if (conflictCheck.hasConflict) {
+            return { conflictCheck };
+          }
+
+          const nextId = await getNextNumericId('appointments');
+
+          const appointment: Record<string, unknown> = {
+            id: nextId,
+            _id: nextId,
+            tenant_id: appointmentTenantId,
+            user_id: appointmentUserId,
+            calendar_id: targetCalendarId,
+            created_by_user_id: createdByUserId,
+            ...buildAppointmentDentistFields(dentistAssignment),
+            service_id: normalizedServiceId,
+            service_name: serviceName,
+            client_id: client.id,
+            client_name: clientName,
+            client_email: clientEmail || null,
+            client_phone: clientPhone || null,
+            start_time: instance.start.toISOString(),
+            end_time: instance.end.toISOString(),
+            status: 'scheduled',
+            recurrence: recurrenceRule,
+            recurrence_group_id: recurrenceGroupId,
+            reminder_sent: false,
+            price_at_time: typeof service.price === 'number' ? service.price : null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+
+          if (notes) appointment.notes = notes;
+          if (category !== undefined) appointment.category = category || null;
+          if (color !== undefined) appointment.color = color || null;
+
+          await db.collection('appointments').insertOne(appointment);
+          return { appointment };
+        }
       );
 
-      if (conflictCheck.hasConflict) {
+      if ('conflictCheck' in creationResult) {
+        const conflictCheck = creationResult.conflictCheck;
         conflicts.push({
           start: instance.start,
           end: instance.end,
-          conflicts: conflictCheck.conflicts,
+          conflicts: conflictCheck ? conflictCheck.conflicts : [],
         });
-        continue; // Skip this instance
+        continue;
       }
 
-      const nextId = await getNextNumericId('appointments');
-
-      const appointment: Record<string, unknown> = {
-        id: nextId,
-        _id: nextId,
-        tenant_id: tenantId,
-        user_id: normalizedUserId,
-        service_id: normalizedServiceId,
-        service_name: serviceName,
-        client_id: client.id,
-        client_name: clientName,
-        start_time: instance.start.toISOString(),
-        end_time: instance.end.toISOString(),
-        status: 'scheduled',
-        recurrence: recurrenceRule,
-        recurrence_group_id: recurrenceGroupId,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      if (clientEmail) appointment.client_email = clientEmail;
-      if (clientPhone) appointment.client_phone = clientPhone;
-      if (normalizedProviderId) appointment.provider_id = normalizedProviderId;
-      if (normalizedResourceId) appointment.resource_id = normalizedResourceId;
-      if (notes) appointment.notes = notes;
-      if (category !== undefined) appointment.category = category || null;
-      if (color !== undefined) appointment.color = color || null;
-
-      await db.collection('appointments').insertOne(appointment);
-      createdAppointments.push(appointment);
+      createdAppointments.push({
+        ...creationResult.appointment,
+        created_by_user_id: createdByUserId ? createdByUserId.toString() : null,
+        dentist_db_user_id: dentistAssignment.dentistDbUserId.toString(),
+      });
     }
 
     if (createdAppointments.length > 0) {
-      await updateClientStats(client.id, tenantId);
+      await updateClientStats(client.id, appointmentTenantId);
     }
 
-    await invalidateReadCaches({ tenantId, userId: normalizedUserId });
+    await invalidateReadCaches({
+      tenantId: appointmentTenantId,
+      userId: appointmentUserId,
+      calendarId: targetCalendarId,
+    });
 
     return NextResponse.json(
       {
@@ -178,6 +243,12 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    if (error instanceof AppointmentWriteBusyError) {
+      return NextResponse.json(
+        { error: 'Another booking is being created for this slot. Please try again.' },
+        { status: 409 }
+      );
+    }
     logger.error(
       'Recurring appointments: failed to create appointments',
       error instanceof Error ? error : new Error(String(error))

@@ -1,6 +1,6 @@
 'use client';
 
-import { type ReactNode, useMemo, useState, useEffect } from 'react';
+import { type ReactNode, useMemo, useState, useEffect, useRef } from 'react';
 import {
   format,
   isSameDay,
@@ -9,7 +9,7 @@ import {
 import { ro } from 'date-fns/locale';
 import styles from './DayPanel.module.css';
 import type { Appointment } from '../../hooks/useCalendar';
-import { getCategoryColor, getStatusConfig, normalizeStatus, STATUS_CONFIG } from '@/lib/appointment-colors';
+import { getStatusConfig, normalizeStatus, resolveAppointmentColor, STATUS_CONFIG } from '@/lib/calendar-color-policy';
 
 interface DayPanelProps {
   topControls?: ReactNode;
@@ -19,15 +19,198 @@ interface DayPanelProps {
   onAppointmentClick: (appointment: Appointment) => void;
   onQuickStatusChange: (id: number, status: string) => void;
   onCreateClick: () => void;
+  canCreate?: boolean;
   onNavigate: (date: Date) => void;
   onSearchChange?: (query: string) => void;
   onHoverAppointment?: (id: number | null) => void;
+  calendarScopeValue?: string;
+  calendarScopeOptions?: Array<{
+    value: string;
+    label: string;
+    color?: string | null;
+    group?: 'all' | 'own' | 'shared';
+  }>;
+  onCalendarScopeChange?: (value: string) => void;
 }
 
 const STATUS_KEYS = ['scheduled', 'completed', 'cancelled', 'no-show'] as const;
 
+function readGroupLabel(group: 'all' | 'own' | 'shared' | undefined): string | null {
+  if (group === 'own') return 'Calendarele mele';
+  if (group === 'shared') return 'Partajate';
+  return null;
+}
+
+export function CalendarScopeDropdown({
+  value,
+  options,
+  onChange,
+  className,
+  triggerClassName,
+  menuClassName,
+}: {
+  value: string;
+  options: Array<{
+    value: string;
+    label: string;
+    color?: string | null;
+    group?: 'all' | 'own' | 'shared';
+  }>;
+  onChange: (value: string) => void;
+  className?: string;
+  triggerClassName?: string;
+  menuClassName?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const selectedOption = options.find((option) => option.value === value) || options[0] || null;
+
+  const groupedOptions = useMemo(() => {
+    const groups: Array<{
+      key: string;
+      label: string | null;
+      items: typeof options;
+    }> = [];
+
+    for (const option of options) {
+      const key = option.group || 'all';
+      let existingGroup = groups.find((group) => group.key === key);
+      if (!existingGroup) {
+        existingGroup = {
+          key,
+          label: readGroupLabel(option.group),
+          items: [],
+        };
+        groups.push(existingGroup);
+      }
+      existingGroup.items.push(option);
+    }
+
+    return groups;
+  }, [options]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
+
+  return (
+    <div className={[styles.scopePicker, className].filter(Boolean).join(' ')} ref={containerRef}>
+      <button
+        type="button"
+        className={[
+          styles.scopeTrigger,
+          isOpen ? styles.scopeTriggerOpen : '',
+          triggerClassName,
+        ].filter(Boolean).join(' ')}
+        onClick={() => setIsOpen((prev) => !prev)}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-label="Selecteaza calendarul afisat"
+      >
+        <div className={styles.scopeTriggerLeft}>
+          <span
+            className={styles.scopeDot}
+            style={{ background: selectedOption?.color || 'var(--color-accent)' }}
+            aria-hidden="true"
+          />
+          <span className={styles.scopeLabel}>{selectedOption?.label || 'Calendar'}</span>
+        </div>
+        <svg
+          className={`${styles.statusChevron} ${isOpen ? styles.chevronOpen : ''}`}
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+
+      {isOpen && (
+        <div
+          className={[styles.scopeMenu, menuClassName].filter(Boolean).join(' ')}
+          role="listbox"
+          aria-label="Lista calendare"
+        >
+          {groupedOptions.map((group) => (
+            <div key={group.key} className={styles.scopeMenuGroup}>
+              {group.label && <div className={styles.scopeMenuGroupLabel}>{group.label}</div>}
+              {group.items.map((option) => {
+                const isActive = option.value === value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    className={`${styles.scopeMenuItem}${isActive ? ` ${styles.scopeMenuItemActive}` : ''}`}
+                    onClick={() => {
+                      onChange(option.value);
+                      setIsOpen(false);
+                    }}
+                    role="option"
+                    aria-selected={isActive}
+                  >
+                    <span
+                      className={styles.scopeMenuDot}
+                      style={{ background: option.color || 'var(--color-accent)' }}
+                      aria-hidden="true"
+                    />
+                    <span className={styles.scopeMenuLabel}>{option.label}</span>
+                    {isActive && (
+                      <svg
+                        className={styles.scopeMenuCheck}
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Appointment card
-function AppointmentCard({
+export function AppointmentCard({
   appointment: apt,
   onClick,
   onStatusChange,
@@ -47,8 +230,9 @@ function AppointmentCard({
   const isPast        = end.getTime() < Date.now();
   const status        = normalizeStatus(apt.status);
   const statusCfg     = getStatusConfig(status);
-  const categoryColor = getCategoryColor(apt.category);
+  const resolvedColor = resolveAppointmentColor(apt);
   const durationMin   = Math.round((end.getTime() - start.getTime()) / 60_000);
+  const canChangeStatus = apt.can_change_status !== false;
 
   return (
     <div className={styles.cardWrapper}>
@@ -64,7 +248,7 @@ function AppointmentCard({
         onMouseEnter={() => onHoverAppointment?.(apt.id)}
         onMouseLeave={() => onHoverAppointment?.(null)}
       >
-        <div className={styles.colorBar} style={{ background: categoryColor }} />
+        <div className={styles.colorBar} style={{ background: resolvedColor }} />
         <div className={styles.cardBody}>
 
           {/* Top row: time · duration · service */}
@@ -78,19 +262,24 @@ function AppointmentCard({
 
           {/* Client name */}
           <p className={styles.clientName}>{apt.client_name}</p>
+          {apt.dentist_display_name && (
+            <p className={styles.clientMeta}>Pentru {apt.dentist_display_name}</p>
+          )}
 
           {/* Status control — tap to expand */}
           <div
-            className={styles.statusLine}
+            className={`${styles.statusLine}${!canChangeStatus ? ` ${styles.statusLineDisabled}` : ''}`}
             onClick={(e) => {
+              if (!canChangeStatus) return;
               e.stopPropagation();
               setStatusMenuOpen((prev) => !prev);
             }}
-            role="button"
-            tabIndex={0}
-            aria-expanded={statusMenuOpen}
-            aria-label={`Status: ${statusCfg.label}. Apasa pentru a schimba.`}
+            role={canChangeStatus ? 'button' : undefined}
+            tabIndex={canChangeStatus ? 0 : -1}
+            aria-expanded={canChangeStatus ? statusMenuOpen : undefined}
+            aria-label={canChangeStatus ? `Status: ${statusCfg.label}. Apasa pentru a schimba.` : `Status: ${statusCfg.label}.`}
             onKeyDown={(e) => {
+              if (!canChangeStatus) return;
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
                 setStatusMenuOpen((prev) => !prev);
@@ -123,7 +312,7 @@ function AppointmentCard({
           </div>
 
           {/* Status dropdown menu */}
-          {statusMenuOpen && (
+          {canChangeStatus && statusMenuOpen && (
             <div className={styles.statusMenu} onClick={(e) => e.stopPropagation()}>
               {STATUS_KEYS.map((key) => {
                 const cfg = STATUS_CONFIG[key];
@@ -180,9 +369,13 @@ export function DayPanel({
   onAppointmentClick,
   onQuickStatusChange,
   onCreateClick,
+  canCreate = true,
   onNavigate,
   onSearchChange,
   onHoverAppointment,
+  calendarScopeValue = 'all',
+  calendarScopeOptions = [],
+  onCalendarScopeChange,
 }: DayPanelProps) {
   type StatusFilter = 'all' | 'scheduled' | 'completed' | 'cancelled';
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -246,6 +439,7 @@ export function DayPanel({
   }, [dayAppointments, statusFilter]);
 
   const stats = isSearching ? searchStats : dayStats;
+  const showCalendarScopeControl = calendarScopeOptions.length > 0 && typeof onCalendarScopeChange === 'function';
 
   const groupedResults = useMemo(() => {
     if (!isSearching) return [];
@@ -372,15 +566,28 @@ export function DayPanel({
                     ? `Astazi, ${format(selectedDay, 'd MMMM', { locale: ro })}`
                     : format(selectedDay, 'EEEE, d MMMM', { locale: ro })}
                 </h3>
+              </header>
+
+              <div className={styles.headerActionRow}>
+                {showCalendarScopeControl ? (
+                  <CalendarScopeDropdown
+                    value={calendarScopeValue}
+                    options={calendarScopeOptions}
+                    onChange={onCalendarScopeChange as (value: string) => void}
+                  />
+                ) : (
+                  <div />
+                )}
                 <button
                   className={styles.addBtn}
                   type="button"
                   onClick={onCreateClick}
                   aria-label="Adauga programare"
+                  disabled={!canCreate}
                 >
-                  + Programare
+                  {canCreate ? '+ Programare' : 'Fara creare'}
                 </button>
-              </header>
+              </div>
 
               {dayStats.total > 0 && (
                 <div className={styles.statsGrid}>

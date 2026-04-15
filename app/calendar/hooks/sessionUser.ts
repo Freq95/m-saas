@@ -7,3 +7,7 @@ export function parseSessionUserId(session: Session | null | undefined): number 
   return Number.isFinite(parsed) && String(parsed) === rawId ? parsed : null;
 }
 
+export function parseSessionDbUserId(session: Session | null | undefined): string | null {
+  const rawId = session?.user?.dbUserId;
+  return typeof rawId === 'string' && rawId.trim() ? rawId : null;
+}

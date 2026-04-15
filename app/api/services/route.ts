@@ -6,14 +6,46 @@ import { getAuthUser } from '@/lib/auth-helpers';
 import { getCached } from '@/lib/redis';
 import { servicesListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
+import { resolveAppointmentDentistAssignment } from '@/lib/appointment-service';
 
 // GET /api/services - Get services
 export async function GET(request: NextRequest) {
   try {
-    const { userId, tenantId } = await getAuthUser();
-    const cacheKey = servicesListCacheKey({ tenantId, userId });
+    const auth = await getAuthUser();
+    const searchParams = request.nextUrl.searchParams;
+    const rawCalendarId = searchParams.get('calendarId');
+    const rawDentistUserId = searchParams.get('dentistUserId');
+    const hasSharedBookingParams = Boolean(rawCalendarId || rawDentistUserId);
+
+    if (hasSharedBookingParams && (!rawCalendarId || !rawDentistUserId)) {
+      return NextResponse.json(
+        { error: 'calendarId and dentistUserId must be provided together' },
+        { status: 400 }
+      );
+    }
+
+    let targetUserId = auth.userId;
+    let targetTenantId = auth.tenantId;
+
+    if (rawCalendarId && rawDentistUserId) {
+      const calendarId = Number.parseInt(rawCalendarId, 10);
+      const dentistUserId = Number.parseInt(rawDentistUserId, 10);
+
+      if (!Number.isInteger(calendarId) || calendarId <= 0 || !Number.isInteger(dentistUserId) || dentistUserId <= 0) {
+        return NextResponse.json(
+          { error: 'Invalid calendarId or dentistUserId' },
+          { status: 400 }
+        );
+      }
+
+      const dentistAssignment = await resolveAppointmentDentistAssignment(auth, calendarId, dentistUserId);
+      targetUserId = dentistAssignment.serviceOwnerUserId;
+      targetTenantId = dentistAssignment.serviceOwnerTenantId;
+    }
+
+    const cacheKey = servicesListCacheKey({ tenantId: targetTenantId, userId: targetUserId });
     const payload = await getCached(cacheKey, 1800, async () => {
-      const services = await getServicesData(userId, tenantId);
+      const services = await getServicesData(targetUserId, targetTenantId);
       return { services };
     });
 
@@ -26,7 +58,8 @@ export async function GET(request: NextRequest) {
 // POST /api/services - Create service
 export async function POST(request: NextRequest) {
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
+    const { userId, tenantId } = auth;
     const limited = await checkWriteRateLimit(userId);
     if (limited) return limited;
     const db = await getMongoDbOrThrow();
@@ -46,6 +79,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { name, durationMinutes, price, description } = validationResult.data;
+
     const now = new Date().toISOString();
     const serviceId = await getNextNumericId('services');
     const serviceDoc = {
@@ -62,7 +96,10 @@ export async function POST(request: NextRequest) {
     };
 
     await db.collection<FlexDoc>('services').insertOne(serviceDoc);
-    await invalidateReadCaches({ tenantId, userId });
+    await invalidateReadCaches({
+      tenantId,
+      userId,
+    });
 
     return createSuccessResponse({ service: stripMongoId(serviceDoc) }, 201);
   } catch (error) {

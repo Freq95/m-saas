@@ -45,3 +45,14 @@ uploads/*
 next-env.d.ts
 
 nul
+
+# Documentation
+ARCHITECTURE.md
+CODE-HEALTH.md
+PRODUCT.md
+SMS-FEATURE-PLAN.md
+templates/GDPR-ROPA.md
+
+# ui-review
+app/ui-review/*
+ui-review-board.html

@@ -69,10 +69,9 @@
 .header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.5rem;
   padding: 0.65rem 1.15rem;
-  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
 }
 
 .headerDate {
@@ -87,6 +86,15 @@
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+}
+
+.headerActionRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 1.15rem 0.7rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
 }
 
 .addBtn {
@@ -111,6 +119,152 @@
 .addBtn:hover {
   background: var(--color-accent);
   transform: translateY(-1px);
+}
+
+.addBtn:disabled {
+  background: color-mix(in srgb, var(--color-text-soft) 16%, transparent);
+  color: var(--color-text-soft);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.scopePicker {
+  position: relative;
+  min-width: 0;
+  width: min(100%, 220px);
+  justify-self: start;
+}
+
+.scopeTrigger {
+  width: 100%;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  padding: 0.28rem 0.38rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+  user-select: none;
+  outline: none;
+}
+
+.scopeTrigger:hover,
+.scopeTriggerOpen {
+  background: color-mix(in srgb, var(--color-border) 35%, transparent);
+  border-color: color-mix(in srgb, var(--color-border) 60%, transparent);
+}
+
+.scopeTrigger:focus-visible {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+.scopeTriggerLeft {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  min-width: 0;
+}
+
+.scopeDot,
+.scopeMenuDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.scopeLabel {
+  font-size: 0.73rem;
+  font-weight: 590;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scopeMenu {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  min-width: 100%;
+  width: max-content;
+  max-width: min(320px, calc(100vw - 2rem));
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.45rem;
+  background: var(--color-surface);
+  border: 1px solid color-mix(in srgb, var(--color-border) 85%, transparent);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  animation: statusMenuIn 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.scopeMenuGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.scopeMenuGroup + .scopeMenuGroup {
+  padding-top: 0.25rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+}
+
+.scopeMenuGroupLabel {
+  padding: 0 0.42rem 0.15rem;
+  font-size: 0.64rem;
+  font-weight: 660;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-soft);
+}
+
+.scopeMenuItem {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  padding: 0.42rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-text-soft);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  min-height: unset;
+  transition: background 100ms ease, color 100ms ease;
+}
+
+.scopeMenuItem:hover {
+  background: color-mix(in srgb, var(--color-border) 40%, transparent);
+  color: var(--color-text);
+}
+
+.scopeMenuItemActive {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.scopeMenuLabel {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scopeMenuCheck {
+  color: var(--color-accent);
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 /* ── Stats strip ── */
@@ -278,6 +432,15 @@
   letter-spacing: -0.01em;
 }
 
+.clientMeta {
+  margin: 0.14rem 0 0;
+  font-size: 0.73rem;
+  color: var(--color-text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── Status control (interactive row) ── */
 .statusLine {
   display: flex;
@@ -297,6 +460,16 @@
 .statusLine:hover {
   background: color-mix(in srgb, var(--color-border) 35%, transparent);
   border-color: color-mix(in srgb, var(--color-border) 60%, transparent);
+}
+
+.statusLineDisabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.statusLineDisabled:hover {
+  background: transparent;
+  border-color: transparent;
 }
 
 .statusLine:focus-visible {
@@ -561,20 +734,35 @@
 }
 
 @media (max-width: 767px) {
-  /* Mirror the mobile day-strip: 7 equal columns, same padding & gap
-     Date spans cols 1-5 → + button lands in col 6 (above SÂM) */
   .header {
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 0.25rem;
     padding-left: max(0.75rem, env(safe-area-inset-left));
     padding-right: max(1rem, env(safe-area-inset-right));
   }
-  .headerDate {
-    grid-column: 1 / 6;
+
+  .headerActionRow {
+    padding-left: max(0.75rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
   }
 }
 
 @media (max-width: 640px) {
+  .headerActionRow {
+    grid-template-columns: 1fr;
+  }
+
+  .scopePicker {
+    width: 100%;
+  }
+
+  .addBtn {
+    justify-self: flex-start;
+  }
+
+  .scopeMenu {
+    width: 100%;
+    max-width: none;
+  }
+
   .statsGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.35rem;

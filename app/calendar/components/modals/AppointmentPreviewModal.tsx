@@ -5,7 +5,7 @@ import { ro } from 'date-fns/locale';
 import { useRef } from 'react';
 import styles from '../../page.module.css';
 import type { Appointment } from '../../hooks/useCalendar';
-import { getStatusConfig, normalizeStatus } from '@/lib/appointment-colors';
+import { getStatusConfig, normalizeStatus } from '@/lib/calendar-color-policy';
 
 interface AppointmentPreviewModalProps {
   isOpen: boolean;

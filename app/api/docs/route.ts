@@ -141,7 +141,6 @@ export async function GET() {
       '/api/services': {
         get: {
           summary: 'Get services',
-          parameters: [{ name: 'userId', in: 'query', schema: { type: 'integer', default: 1 } }],
           responses: {
             '200': { description: 'Success' },
           },

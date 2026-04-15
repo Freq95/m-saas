@@ -4,7 +4,7 @@ import { format, isSameDay, isSameMonth } from 'date-fns';
 import { ro } from 'date-fns/locale';
 import styles from '../../page.module.css';
 import type { Appointment } from '../../hooks/useCalendar';
-import { getCategoryColor, getStatusConfig } from '@/lib/appointment-colors';
+import { getStatusConfig, resolveAppointmentColor } from '@/lib/calendar-color-policy';
 
 interface MonthViewProps {
   monthDays: Date[];
@@ -67,7 +67,7 @@ export function MonthView({
               <div className={styles.monthDayAppointments}>
                 {dayAppointments.slice(0, 3).map((apt) => {
                   const statusCfg = getStatusConfig(apt.status);
-                  const categoryColor = getCategoryColor(apt.category);
+                  const resolvedColor = resolveAppointmentColor(apt);
                   const isPast = new Date(apt.end_time).getTime() < Date.now();
                   return (
                     <div
@@ -75,8 +75,8 @@ export function MonthView({
                       className={`${styles.monthAppointment} ${isPast ? styles.isPast : ''}`}
                       style={{
                         opacity: isPast ? Math.min(statusCfg.opacity, 0.55) : statusCfg.opacity,
-                        borderLeft: `3px solid ${categoryColor}`,
-                        background: `color-mix(in srgb, ${categoryColor} 12%, var(--color-surface))`,
+                        borderLeft: `3px solid ${resolvedColor}`,
+                        background: `color-mix(in srgb, ${resolvedColor} 12%, var(--color-surface))`,
                       }}
                       onClick={(e) => {
                         e.stopPropagation();

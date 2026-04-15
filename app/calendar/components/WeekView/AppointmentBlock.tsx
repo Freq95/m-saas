@@ -3,8 +3,8 @@
 import React from 'react';
 import { format } from 'date-fns';
 import styles from '../../page.module.css';
-import type { Appointment, Provider } from '../../hooks/useCalendar';
-import { getCategoryColor, getStatusConfig } from '@/lib/appointment-colors';
+import type { Appointment } from '../../hooks/useCalendar';
+import { getStatusConfig, resolveAppointmentColor } from '@/lib/calendar-color-policy';
 
 interface AppointmentBlockProps {
   appointment: Appointment;
@@ -16,16 +16,16 @@ interface AppointmentBlockProps {
   isDragging?: boolean;
   isHighlighted?: boolean;
   enableDragDrop?: boolean;
-  providers?: Provider[]; // kept for API compatibility, no longer used for color
 }
 
 export const AppointmentBlock = React.memo<AppointmentBlockProps>(
   ({ appointment, style, compact = false, onClick, onDragStart, onDragEnd, isDragging = false, isHighlighted = false, enableDragDrop = false }) => {
     const statusCfg = getStatusConfig(appointment.status);
-    const categoryColor = getCategoryColor(appointment.category);
+    const resolvedColor = resolveAppointmentColor(appointment);
     const isPast = new Date(appointment.end_time).getTime() < Date.now();
     const startLabel = format(new Date(appointment.start_time), 'HH:mm');
     const endLabel = format(new Date(appointment.end_time), 'HH:mm');
+    const canDrag = enableDragDrop && appointment.status === 'scheduled' && appointment.can_drag !== false;
 
     const handleDragStart = (e: React.DragEvent) => {
       e.stopPropagation();
@@ -42,8 +42,8 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
     const appointmentStyle: React.CSSProperties = {
       ...style,
       opacity: isPast ? Math.min(statusCfg.opacity, 0.55) : statusCfg.opacity,
-      borderLeft: `5px solid ${categoryColor}`,
-      background: `color-mix(in srgb, ${categoryColor} 14%, var(--color-surface))`,
+      borderLeft: `5px solid ${resolvedColor}`,
+      background: `color-mix(in srgb, ${resolvedColor} 14%, var(--color-surface))`,
     };
     const containerStyle: React.CSSProperties = {
       ...appointmentStyle,
@@ -54,7 +54,7 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
       <div
         className={`${styles.appointment} ${isDragging ? styles.dragging : ''} ${isHighlighted ? styles.appointmentHighlighted : ''}`}
         style={containerStyle}
-        draggable={enableDragDrop && appointment.status === 'scheduled'}
+        draggable={canDrag}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onClick={(e) => {
@@ -82,7 +82,12 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
             aria-label={statusCfg.label}
           />
         </div>
-        {!compact && <div className={styles.appointmentService}>{appointment.service_name}</div>}
+        {!compact && (
+          <div className={styles.appointmentService}>
+            {appointment.service_name}
+            {appointment.dentist_display_name ? ` · ${appointment.dentist_display_name}` : ''}
+          </div>
+        )}
       </div>
     );
   },
@@ -95,6 +100,10 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
     prev.appointment.end_time === next.appointment.end_time &&
     prev.appointment.category === next.appointment.category &&
     prev.appointment.color === next.appointment.color &&
+    prev.appointment.calendar_color === next.appointment.calendar_color &&
+    prev.appointment.calendar_is_default === next.appointment.calendar_is_default &&
+    prev.appointment.dentist_color === next.appointment.dentist_color &&
+    prev.appointment.calendar_settings?.color_mode === next.appointment.calendar_settings?.color_mode &&
     prev.style.top === next.style.top &&
     prev.style.left === next.style.left &&
     prev.style.width === next.style.width &&

@@ -1,0 +1,196 @@
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.noticeCard,
+.colorInfoCard,
+.loadingCard {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  padding: var(--space-5);
+}
+
+.noticeCard {
+  margin-bottom: var(--space-5);
+  color: var(--color-text-soft);
+  line-height: 1.6;
+}
+
+.colorInfoCard {
+  margin-bottom: var(--space-5);
+}
+
+.colorInfoCard h2,
+.sectionHeader h2,
+.resourceCard h3,
+.calendarCardCopy h3 {
+  margin: 0;
+  color: var(--color-text);
+}
+
+.colorInfoCard p,
+.sectionHeader p,
+.calendarCardCopy p,
+.resourceCard p {
+  margin: 0;
+  color: var(--color-text-soft);
+  line-height: 1.55;
+}
+
+.errorStack {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.section {
+  display: grid;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.sectionHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.sectionCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  font-weight: 650;
+  font-size: 0.92rem;
+}
+
+.cardList,
+.resourceList {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.calendarCard,
+.resourceCard {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  padding: var(--space-4);
+}
+
+.calendarCardMain {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.calendarCardCopy {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.calendarTitleRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.badgeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.badge,
+.badgeMuted {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.6rem;
+  padding: 0 0.6rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.badge {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  color: var(--color-accent);
+}
+
+.badgeMuted {
+  background: var(--color-surface-muted);
+  color: var(--color-text-soft);
+}
+
+.colorSwatch {
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, black 12%, transparent);
+  margin-top: 0.35rem;
+  flex-shrink: 0;
+}
+
+.cardActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.permissionsText {
+  font-size: 0.86rem;
+}
+
+@media (max-width: 840px) {
+  .sectionHeader,
+  .calendarCard,
+  .resourceCard {
+    flex-direction: column;
+  }
+
+  .sectionCount {
+    align-self: flex-start;
+  }
+}
+
+@media (max-width: 640px) {
+  .headerActions,
+  .cardActions,
+  .sectionHeaderActions {
+    width: 100%;
+  }
+
+  .headerActions :global(button),
+  .cardActions :global(button),
+  .sectionHeaderActions :global(button) {
+    width: 100%;
+    justify-content: center;
+  }
+}

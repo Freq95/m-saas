@@ -23,6 +23,8 @@
     "db:normalize:blocked-times": "node scripts/migrations/normalize-blocked-times-dates.js",
     "db:backfill:clients-deleted-at": "node scripts/migrations/backfill-clients-deleted-at.js",
     "db:cleanup:clients-legacy-fields": "node scripts/migrations/cleanup-clients-legacy-fields.js",
+    "db:calendar:rollout": "node scripts/migrations/backup-and-run-calendar-rollout.js",
+    "db:calendar:drop-backup": "node scripts/migrations/drop-calendar-rollout-backup.js",
     "db:validate:mongo": "tsx scripts/validate-mongo-data.ts",
     "bench:baseline": "tsx scripts/benchmark/run.ts --config scripts/benchmark/config.baseline.json",
     "bench:compare": "tsx scripts/benchmark/run.ts --config scripts/benchmark/config.baseline.json",

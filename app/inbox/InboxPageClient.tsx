@@ -76,37 +76,44 @@ function EmailHtmlContent({ html }: { html: string }) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     @font-face {
-      font-family: 'Chillax';
-      src: url('/fonts/chillax/Chillax-Light.woff2') format('woff2');
+      font-family: 'Satoshi';
+      src: url('/fonts/satoshi/Satoshi-Light.woff2') format('woff2');
       font-weight: 300;
       font-style: normal;
       font-display: swap;
     }
     @font-face {
-      font-family: 'Chillax';
-      src: url('/fonts/chillax/Chillax-Regular.woff2') format('woff2');
+      font-family: 'Satoshi';
+      src: url('/fonts/satoshi/Satoshi-Regular.woff2') format('woff2');
       font-weight: 400;
       font-style: normal;
       font-display: swap;
     }
     @font-face {
-      font-family: 'Chillax';
-      src: url('/fonts/chillax/Chillax-Medium.woff2') format('woff2');
+      font-family: 'Satoshi';
+      src: url('/fonts/satoshi/Satoshi-Medium.woff2') format('woff2');
       font-weight: 500;
       font-style: normal;
       font-display: swap;
     }
     @font-face {
-      font-family: 'Chillax';
-      src: url('/fonts/chillax/Chillax-Semibold.woff2') format('woff2');
+      font-family: 'Satoshi';
+      src: url('/fonts/satoshi/Satoshi-Bold.woff2') format('woff2');
       font-weight: 600;
       font-style: normal;
       font-display: swap;
     }
     @font-face {
-      font-family: 'Chillax';
-      src: url('/fonts/chillax/Chillax-Bold.woff2') format('woff2');
+      font-family: 'Satoshi';
+      src: url('/fonts/satoshi/Satoshi-Bold.woff2') format('woff2');
       font-weight: 700;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'Satoshi';
+      src: url('/fonts/satoshi/Satoshi-Black.woff2') format('woff2');
+      font-weight: 900;
       font-style: normal;
       font-display: swap;
     }
@@ -122,7 +129,7 @@ function EmailHtmlContent({ html }: { html: string }) {
       color: #000000;
     }
     body {
-      font-family: 'Chillax', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       line-height: 1.6;
     }
     img {

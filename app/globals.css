@@ -1,5 +1,5 @@
 /* densa — Global Styles & Component System
-   Font: Chillax loaded from Fontshare in app/layout.tsx. */
+   Font: Satoshi for UI, Chillax for densa wordmarks. */
 
 /* ── Reset ───────────────────────────────────────────────────── */
 *,
@@ -27,6 +27,16 @@ body {
   line-height: var(--lh-base);
   font-weight: var(--fw-regular);
   text-rendering: optimizeLegibility;
+}
+
+.brand-wordmark,
+.brand-wordmark-inline {
+  font-family: var(--font-brand);
+  letter-spacing: -0.03em;
+}
+
+.brand-wordmark-inline {
+  display: inline-block;
 }
 
 a {

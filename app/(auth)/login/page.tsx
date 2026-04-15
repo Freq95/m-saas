@@ -3,6 +3,7 @@ import LoginForm from './LoginForm';
 type LoginPageProps = {
   searchParams?: Promise<{
     success?: string;
+    redirect?: string;
   }>;
 };
 
@@ -13,5 +14,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     : resolvedSearchParams?.success === 'password-reset'
       ? 'Parola a fost resetata. Te poti autentifica.'
       : undefined;
-  return <LoginForm successMessage={successMessage} />;
+  const redirectPath = typeof resolvedSearchParams?.redirect === 'string'
+    ? resolvedSearchParams.redirect
+    : undefined;
+  return <LoginForm successMessage={successMessage} redirectPath={redirectPath} />;
 }

@@ -2,23 +2,17 @@
 
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import {
-  addMonths,
   addWeeks,
   eachDayOfInterval,
   endOfMonth,
   endOfWeek,
   format,
-  getISOWeek,
   getMonth,
   getYear,
   isSameDay,
-  isSameMonth,
   isToday,
-  setMonth,
-  setYear,
   startOfMonth,
   startOfWeek,
-  subMonths,
   subWeeks,
 } from 'date-fns';
 import { ro } from 'date-fns/locale';
@@ -31,21 +25,25 @@ import { ToastContainer } from '@/components/Toast';
 import {
   useCalendar,
   useAppointmentsSWR as useAppointments,
-  useProviders,
-  useResources,
-  useBlockedTimes,
+  useCalendarList,
+  useCalendarScopeSelection,
   parseSessionUserId,
+  parseSessionDbUserId,
   type Appointment,
+  type CalendarListItem,
 } from './hooks';
 import { useDragAndDrop } from './hooks/useDragAndDrop';
 import {
+  CalendarDatePickerDropdown,
   WeekView,
   DayPanel,
   CreateAppointmentModal,
   DeleteConfirmModal,
   ConflictWarningModal,
 } from './components';
+import { AppointmentCard, CalendarScopeDropdown } from './components/DayPanel/DayPanel';
 import { useCalendarNavigation } from './hooks/useCalendarNavigation';
+import { canCreateOnCalendar, decorateAppointmentWithCalendarAccess } from './lib/appointment-access';
 
 interface Service {
   id: number;
@@ -74,6 +72,34 @@ interface ConflictSuggestion {
 
 type AppointmentModalMode = 'create' | 'edit' | 'view';
 
+type AppointmentModalData = {
+  clientName: string;
+  clientEmail: string;
+  clientPhone: string;
+  forceNewClient?: boolean;
+  calendarId?: number;
+  calendarName?: string;
+  dentistUserId?: number;
+  dentistDisplayName?: string;
+  serviceName?: string;
+  serviceId: string;
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+  notes: string;
+  category?: string;
+  color?: string;
+  status?: string;
+  isRecurring?: boolean;
+  recurrence?: {
+    frequency: 'daily' | 'weekly' | 'monthly';
+    interval: number;
+    endType: 'date' | 'count';
+    endDate?: string;
+    count?: number;
+  };
+};
+
 export default function CalendarPageClient({
   initialAppointments,
   initialServices,
@@ -81,6 +107,7 @@ export default function CalendarPageClient({
   initialViewType = 'week',
 }: CalendarPageClientProps) {
   const toast = useToast();
+  const showErrorToast = toast.error;
   const isMobile = useIsMobile();
   const searchParams = useSearchParams();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -90,7 +117,88 @@ export default function CalendarPageClient({
   const [hasFinishedInitialLoad, setHasFinishedInitialLoad] = useState(initialAppointments.length > 0);
   const { data: session } = useSession();
   const sessionUserId = parseSessionUserId(session) ?? undefined;
+  const sessionDbUserId = parseSessionDbUserId(session) ?? undefined;
   const { state, actions } = useCalendar(initialDate, initialViewType);
+  const {
+    ownCalendars,
+    sharedCalendars,
+    calendars,
+    loading: calendarsLoading,
+  } = useCalendarList();
+  const calendarScopeStorageKey = useMemo(
+    () => `calendar:selectedScope:${session?.user?.dbUserId || String(sessionUserId || 'anonymous')}`,
+    [session?.user?.dbUserId, sessionUserId]
+  );
+  const calendarMap = useMemo(
+    () => new Map<number, CalendarListItem>(calendars.map((calendar) => [calendar.id, calendar])),
+    [calendars]
+  );
+  const allCalendarIds = useMemo(
+    () => calendars.map((calendar) => calendar.id),
+    [calendars]
+  );
+  const {
+    selectedCalendarScope,
+    setSelectedCalendarScope,
+  } = useCalendarScopeSelection({
+    storageKey: calendarScopeStorageKey,
+    calendarsLoading,
+    validCalendarIds: allCalendarIds,
+  });
+  const writableCalendars = useMemo(
+    () => calendars.filter((calendar) => canCreateOnCalendar(calendar)),
+    [calendars]
+  );
+  const selectedCalendar = useMemo(
+    () => (
+      selectedCalendarScope === 'all'
+        ? null
+        : calendarMap.get(selectedCalendarScope) || null
+    ),
+    [calendarMap, selectedCalendarScope]
+  );
+  const defaultCreateCalendar = useMemo(() => {
+    if (selectedCalendar) {
+      return canCreateOnCalendar(selectedCalendar) ? selectedCalendar : null;
+    }
+    return writableCalendars[0] || null;
+  }, [selectedCalendar, writableCalendars]);
+  const calendarOptions = useMemo(
+    () => {
+      if (selectedCalendar && canCreateOnCalendar(selectedCalendar)) {
+      return [{
+          id: selectedCalendar.id,
+          name: selectedCalendar.name,
+          color: selectedCalendar.color,
+          description: selectedCalendar.isOwner
+            ? 'Calendar propriu'
+            : selectedCalendar.sharedByName
+              ? `Partajat de ${selectedCalendar.sharedByName}`
+              : 'Calendar partajat',
+        }];
+      }
+
+      return writableCalendars.map((calendar) => ({
+        id: calendar.id,
+        name: calendar.name,
+        color: calendar.color,
+        description: calendar.isOwner
+          ? 'Calendar propriu'
+          : calendar.sharedByName
+            ? `Partajat de ${calendar.sharedByName}`
+            : 'Calendar partajat',
+      }));
+    },
+    [selectedCalendar, writableCalendars]
+  );
+  const canCreateAppointments = selectedCalendar
+    ? canCreateOnCalendar(selectedCalendar)
+    : writableCalendars.length > 0;
+  const appointmentsFetchCalendarIds = calendarsLoading
+    ? undefined
+    : selectedCalendar
+      ? [selectedCalendar.id]
+      : allCalendarIds;
   const { weekDays, hours } = useCalendarNavigation({
     currentDate: state.currentDate,
     viewType: 'week',
@@ -125,11 +233,14 @@ export default function CalendarPageClient({
       currentDate: state.currentDate,
       viewType: 'week',
       userId: sessionUserId,
-      providerId: state.selectedProvider?.id,
-      resourceId: state.selectedResource?.id,
+      calendarIds: appointmentsFetchCalendarIds,
       search: debouncedSearchQuery,
       initialAppointments,
     });
+  const decoratedAppointments = useMemo(
+    () => appointments.map((appointment) => decorateAppointmentWithCalendarAccess(appointment, calendarMap, sessionDbUserId)),
+    [appointments, calendarMap, sessionDbUserId]
+  );
 
   useEffect(() => {
     if (!loading) {
@@ -137,19 +248,7 @@ export default function CalendarPageClient({
     }
   }, [loading]);
 
-  const { providers } = useProviders(sessionUserId);
-  const { resources } = useResources(sessionUserId);
-
   const visibleDays = weekDays;
-  const viewStart = visibleDays[0];
-  const viewEnd = visibleDays[visibleDays.length - 1];
-  const { blockedTimes } = useBlockedTimes(
-    sessionUserId,
-    state.selectedProvider?.id,
-    state.selectedResource?.id,
-    viewStart,
-    viewEnd
-  );
 
   const [selectedDay, setSelectedDay]               = useState<Date>(() => new Date());
   const [pendingCancelAppointment, setPendingCancelAppointment] = useState<Appointment | null>(null);
@@ -159,27 +258,7 @@ export default function CalendarPageClient({
   const hasRequestedServicesRef = useRef(false);
   const [showCreateModal, setShowCreateModal]       = useState(false);
   const [appointmentModalMode, setAppointmentModalMode] = useState<AppointmentModalMode>('create');
-  const [editInitialData, setEditInitialData] = useState<{
-    clientName: string;
-    clientEmail: string;
-    clientPhone: string;
-    serviceId: string;
-    startTime: string;
-    endTime: string;
-    durationMinutes: number;
-    notes: string;
-    category?: string;
-    color?: string;
-    status?: string;
-    isRecurring?: boolean;
-    recurrence?: {
-      frequency: 'daily' | 'weekly' | 'monthly';
-      interval: number;
-      endType: 'date' | 'count';
-      endDate?: string;
-      count?: number;
-    };
-  } | null>(null);
+  const [editInitialData, setEditInitialData] = useState<AppointmentModalData | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm]   = useState(false);
   const [showConflictModal, setShowConflictModal]   = useState(false);
   const [conflictData, setConflictData] = useState<{ conflicts: ConflictItem[]; suggestions: ConflictSuggestion[] }>({
@@ -193,6 +272,64 @@ export default function CalendarPageClient({
   const justDroppedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handledContactPrefillRef = useRef<number | null>(null);
   const pendingRescheduleIdRef = useRef<number | null>(null);
+
+  // Mobile-specific state
+  const [mobileView, setMobileView] = useState<'day' | 'week'>('day');
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [mobileSearchQuery, setMobileSearchQuery] = useState('');
+  const mobileViewContainerRef = useRef<HTMLDivElement>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
+
+  // Mobile day appointments (filtered + sorted for the selected day)
+  const mobileDayAppointments = useMemo(() => {
+    if (!isMobile) return [];
+    return [...decoratedAppointments]
+      .filter((apt) => isSameDay(new Date(apt.start_time), selectedDay))
+      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+  }, [isMobile, decoratedAppointments, selectedDay]);
+
+  // Mobile search results
+  const mobileSearchResults = useMemo(() => {
+    if (!isMobile || !mobileSearchQuery.trim()) return [];
+    const q = mobileSearchQuery.toLowerCase();
+    return [...decoratedAppointments]
+      .filter(
+        (apt) =>
+          apt.client_name.toLowerCase().includes(q) ||
+          apt.service_name.toLowerCase().includes(q)
+      )
+      .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+  }, [isMobile, mobileSearchQuery, decoratedAppointments]);
+
+  // Sync scroll-snap position with mobileView state
+  useEffect(() => {
+    const el = mobileViewContainerRef.current;
+    if (!el || !isMobile) return;
+
+    let rafId: number;
+    const handleScroll = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        const scrollLeft = el.scrollLeft;
+        const width = el.clientWidth;
+        const newView = scrollLeft > width * 0.5 ? 'week' : 'day';
+        setMobileView((prev) => (prev !== newView ? newView : prev));
+      });
+    };
+
+    el.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', handleScroll);
+      cancelAnimationFrame(rafId);
+    };
+  }, [isMobile]);
+
+  // Focus search input when search overlay opens
+  useEffect(() => {
+    if (mobileSearchOpen && mobileSearchInputRef.current) {
+      mobileSearchInputRef.current.focus();
+    }
+  }, [mobileSearchOpen]);
 
   const weekStart = useMemo(() => startOfWeek(state.currentDate, { weekStartsOn: 1 }), [state.currentDate]);
   const weekEnd = useMemo(() => endOfWeek(state.currentDate, { weekStartsOn: 1 }), [state.currentDate]);
@@ -257,6 +394,11 @@ export default function CalendarPageClient({
       ? new Date(state.selectedSlot.end)
       : new Date(defaultStart.getTime() + 30 * 60_000);
 
+    if (!defaultCreateCalendar) {
+      showErrorToast('Selecteaza un calendar pe care poti crea programari.');
+      return;
+    }
+
     void (async () => {
       try {
         const response = await fetch(`/api/clients/${contactId}`, { cache: 'no-store' });
@@ -276,19 +418,23 @@ export default function CalendarPageClient({
         setEditInitialData({
           clientName: client.name || '',
           clientEmail: client.email || '',
-          clientPhone: client.phone || '',
-          serviceId: '',
-          startTime: slot.start.toISOString(),
+      clientPhone: client.phone || '',
+      calendarId: defaultCreateCalendar?.id,
+      calendarName: defaultCreateCalendar?.name,
+      dentistUserId: undefined,
+      dentistDisplayName: undefined,
+      serviceId: '',
+      startTime: slot.start.toISOString(),
           endTime: slot.end.toISOString(),
           durationMinutes: Math.max(15, Math.round((slot.end.getTime() - slot.start.getTime()) / 60_000)),
           notes: '',
         });
         setShowCreateModal(true);
       } catch {
-        toast.error('Nu am putut preincarca datele clientului pentru programare.');
+        showErrorToast('Nu am putut preincarca datele clientului pentru programare.');
       }
     })();
-  }, [actions.selectSlot, searchParams, state.selectedSlot, toast]);
+  }, [actions.selectSlot, defaultCreateCalendar?.id, defaultCreateCalendar?.name, searchParams, showErrorToast, state.selectedSlot]);
 
   // Drag-and-drop
   const { draggedAppointment, handleDragStart, handleDragEnd, handleDrop } = useDragAndDrop(
@@ -333,8 +479,8 @@ export default function CalendarPageClient({
     fetch('/api/services')
       .then((r) => r.json())
       .then((d) => setServices(d.services || []))
-      .catch(() => toast.error('Eroare la incarcarea serviciilor.'));
-  }, [initialServices.length, toast]);
+      .catch(() => showErrorToast('Eroare la incarcarea serviciilor.'));
+  }, [initialServices.length, showErrorToast]);
 
   const seedDemoDentalServices = async () => {
     if (seedingDemoServices) return;
@@ -430,6 +576,10 @@ export default function CalendarPageClient({
     if (justDroppedRef.current) {
       return;
     }
+    if (!defaultCreateCalendar) {
+      toast.warning('Selecteaza un calendar pe care poti crea programari.');
+      return;
+    }
     setSelectedDay(day);
     const start = new Date(day);
     start.setHours(hour ?? 9, minute, 0, 0);
@@ -437,7 +587,20 @@ export default function CalendarPageClient({
     const end = new Date(start.getTime() + duration * 60_000);
     actions.selectSlot({ start, end });
     setAppointmentModalMode('create');
-    setEditInitialData(null);
+    setEditInitialData({
+      clientName: '',
+      clientEmail: '',
+      clientPhone: '',
+      calendarId: defaultCreateCalendar.id,
+      calendarName: defaultCreateCalendar.name,
+      dentistUserId: undefined,
+      dentistDisplayName: undefined,
+      serviceId: '',
+      startTime: start.toISOString(),
+      endTime: end.toISOString(),
+      durationMinutes: duration,
+      notes: '',
+    });
     setShowCreateModal(true);
   };
 
@@ -452,6 +615,11 @@ export default function CalendarPageClient({
       clientName: appointment.client_name || '',
       clientEmail: appointment.client_email || '',
       clientPhone: appointment.client_phone || '',
+      calendarId: appointment.calendar_id ?? undefined,
+      calendarName: appointment.calendar_name || calendarMap.get(appointment.calendar_id || -1)?.name || undefined,
+      dentistUserId: appointment.service_owner_user_id,
+      dentistDisplayName: appointment.dentist_display_name || undefined,
+      serviceName: appointment.service_name || '',
       serviceId: appointment.service_id ? String(appointment.service_id) : '',
       startTime: start.toISOString(),
       endTime: end.toISOString(),
@@ -479,7 +647,7 @@ export default function CalendarPageClient({
       const res = await fetch(`/api/appointments/${appointment.id}`);
       const result = await res.json();
       if (res.ok && result?.appointment) {
-        nextAppointment = result.appointment;
+        nextAppointment = decorateAppointmentWithCalendarAccess(result.appointment, calendarMap, sessionDbUserId);
       }
     } catch {
       // Keep current appointment snapshot if details fetch fails.
@@ -536,9 +704,13 @@ export default function CalendarPageClient({
   };
 
   const handlePanelStatusChange = async (appointmentId: number, status: string) => {
-    const appointment = appointments.find((item) => item.id === appointmentId);
+    const appointment = decoratedAppointments.find((item) => item.id === appointmentId);
     if (!appointment) {
       toast.error('Programarea nu a fost gasita.');
+      return;
+    }
+    if (appointment.can_change_status === false) {
+      toast.warning('Nu ai permisiunea sa modifici aceasta programare.');
       return;
     }
 
@@ -553,31 +725,17 @@ export default function CalendarPageClient({
     }
   };
 
-  const handleCreateAppointment = async (formData: {
-    clientName: string;
-    clientEmail: string;
-    clientPhone: string;
-    forceNewClient?: boolean;
-    serviceId: string;
-    startTime: string;
-    endTime: string;
-    durationMinutes: number;
-    notes: string;
-    category?: string;
-    color?: string;
-    isRecurring?: boolean;
-    recurrence?: {
-      frequency: 'daily' | 'weekly' | 'monthly';
-      interval: number;
-      endType: 'date' | 'count';
-      endDate?: string;
-      count?: number;
-    };
-  }) => {
+  const handleCreateAppointment = async (formData: AppointmentModalData) => {
     if (!formData.clientName.trim() || !formData.serviceId || !formData.startTime || !formData.endTime) {
       toast.warning('Completeaza toate campurile obligatorii (nume client si serviciu).');
       return;
     }
+    const targetCalendarId = formData.calendarId || defaultCreateCalendar?.id;
+    if (!targetCalendarId) {
+      toast.warning('Selecteaza un calendar pe care poti crea programari.');
+      return;
+    }
+    void calendarMap.get(targetCalendarId);
 
     if (formData.isRecurring && formData.recurrence) {
       try {
@@ -585,14 +743,14 @@ export default function CalendarPageClient({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            calendarId: targetCalendarId,
+            dentistUserId: formData.dentistUserId,
             serviceId: parseInt(formData.serviceId),
             clientName: formData.clientName.trim(),
             clientEmail: formData.clientEmail || undefined,
             clientPhone: formData.clientPhone || undefined,
             startTime: formData.startTime,
             endTime: formData.endTime,
-            providerId: state.selectedProvider?.id,
-            resourceId: state.selectedResource?.id,
             notes: formData.notes,
             category: formData.category,
             color: formData.color,
@@ -603,6 +761,7 @@ export default function CalendarPageClient({
                 ? { count: formData.recurrence.count }
                 : { end_date: formData.recurrence.endDate }),
             },
+            forceNewClient: formData.forceNewClient,
           }),
         });
         const result = await res.json();
@@ -621,6 +780,8 @@ export default function CalendarPageClient({
       }
     } else {
       const ok = await createAppointment({
+        calendarId: targetCalendarId,
+        dentistUserId: formData.dentistUserId,
         serviceId: parseInt(formData.serviceId),
         clientName: formData.clientName.trim(),
         clientEmail: formData.clientEmail || undefined,
@@ -644,13 +805,17 @@ export default function CalendarPageClient({
 
   const handleEditClick = async () => {
     if (!state.selectedAppointment) return;
+    if (state.selectedAppointment.can_edit === false) {
+      toast.warning('Nu ai permisiunea sa editezi aceasta programare.');
+      return;
+    }
     let appointment = state.selectedAppointment;
     try {
       const res = await fetch(`/api/appointments/${state.selectedAppointment.id}`);
       const result = await res.json();
       if (res.ok && result?.appointment) {
-        appointment = result.appointment;
-        actions.selectAppointment(result.appointment);
+        appointment = decorateAppointmentWithCalendarAccess(result.appointment, calendarMap, sessionDbUserId);
+        actions.selectAppointment(appointment);
       }
     } catch {
       // proceed with existing data
@@ -663,31 +828,19 @@ export default function CalendarPageClient({
     setShowCreateModal(true);
   };
 
-  const handleEditAppointment = async (formData: {
-    clientName: string;
-    clientEmail: string;
-    clientPhone: string;
-    serviceId: string;
-    startTime: string;
-    endTime: string;
-    durationMinutes: number;
-    notes: string;
-    category?: string;
-    color?: string;
-    status?: string;
-    isRecurring?: boolean;
-    recurrence?: {
-      frequency: 'daily' | 'weekly' | 'monthly';
-      interval: number;
-      endType: 'date' | 'count';
-      endDate?: string;
-      count?: number;
-    };
-  }) => {
+  const handleEditAppointment = async (formData: AppointmentModalData) => {
     if (!state.selectedAppointment || !formData.startTime || !formData.endTime) return;
+    if (state.selectedAppointment.can_edit === false) {
+      toast.warning('Nu ai permisiunea sa editezi aceasta programare.');
+      return;
+    }
 
     const newStart = new Date(formData.startTime);
     const newEnd = new Date(formData.endTime);
+    const selectedServiceId = state.selectedAppointment.service_id
+      ? String(state.selectedAppointment.service_id)
+      : '';
+    const didChangeService = Boolean(formData.serviceId) && formData.serviceId !== selectedServiceId;
 
     try {
       const res = await fetch(`/api/appointments/${state.selectedAppointment.id}`, {
@@ -696,7 +849,7 @@ export default function CalendarPageClient({
         body: JSON.stringify({
           startTime: newStart.toISOString(),
           endTime: newEnd.toISOString(),
-          serviceId: parseInt(formData.serviceId, 10),
+          ...(didChangeService ? { serviceId: parseInt(formData.serviceId, 10) } : {}),
           clientName: formData.clientName.trim(),
           clientEmail: formData.clientEmail || undefined,
           clientPhone: formData.clientPhone || undefined,
@@ -714,8 +867,6 @@ export default function CalendarPageClient({
                 : { end_date: formData.recurrence.endDate }),
             }
             : null,
-          providerId: state.selectedProvider?.id,
-          resourceId: state.selectedResource?.id,
         }),
       });
       const result = await res.json();
@@ -752,14 +903,18 @@ export default function CalendarPageClient({
 
   const handleConfirmDelete = async () => {
     if (!state.selectedAppointment) return;
-    const ok = await deleteAppointment(state.selectedAppointment.id);
-    if (ok) {
+    if (state.selectedAppointment.can_delete === false) {
+      toast.warning('Nu ai permisiunea sa stergi aceasta programare.');
+      return;
+    }
+    const result = await deleteAppointment(state.selectedAppointment.id);
+    if (result.ok) {
       setShowCreateModal(false);
       setShowDeleteConfirm(false);
       actions.clearSelection();
       toast.success('Programarea a fost stearsa.');
     } else {
-      toast.error('Nu s-a putut sterge programarea.');
+      toast.error(result.error || 'Nu s-a putut sterge programarea.');
     }
   };
 
@@ -788,6 +943,70 @@ export default function CalendarPageClient({
     navigateToDate(date);
     setShowDateDropdown(false);
   };
+
+  const calendarScopeValue = selectedCalendarScope === 'all'
+    ? 'all'
+    : String(selectedCalendarScope);
+
+  const handleCalendarScopeChange = (value: string) => {
+    if (value === 'all') {
+      setSelectedCalendarScope('all');
+      return;
+    }
+
+    const nextCalendarId = Number.parseInt(value, 10);
+    if (Number.isInteger(nextCalendarId) && nextCalendarId > 0 && calendarMap.has(nextCalendarId)) {
+      setSelectedCalendarScope(nextCalendarId);
+    }
+  };
+
+  const calendarScopeOptions = useMemo(
+    () => [
+      {
+        value: 'all',
+        label: 'Toate calendarele',
+        color: 'var(--color-accent)',
+        group: 'all' as const,
+      },
+      ...ownCalendars.map((calendar) => ({
+        value: String(calendar.id),
+        label: calendar.name,
+        color: calendar.color,
+        group: 'own' as const,
+      })),
+      ...sharedCalendars.map((calendar) => ({
+        value: String(calendar.id),
+        label: calendar.sharedByName
+          ? `${calendar.name} - ${calendar.sharedByName}`
+          : calendar.name,
+        color: calendar.color,
+        group: 'shared' as const,
+      })),
+    ],
+    [ownCalendars, sharedCalendars]
+  );
+
+  const renderDateDropdown = ({
+    className,
+    hideSidePanel = false,
+  }: {
+    className?: string;
+    hideSidePanel?: boolean;
+  } = {}) => (
+    <CalendarDatePickerDropdown
+      className={className}
+      hideSidePanel={hideSidePanel}
+      pickerDate={pickerDate}
+      currentDate={state.currentDate}
+      pickerMonthStart={pickerMonthStart}
+      pickerWeeks={pickerWeeks}
+      months={months}
+      years={years}
+      onPickerDateChange={setPickerDate}
+      onDaySelect={handlePickerDaySelect}
+      onTodayClick={handleTodayClick}
+    />
+  );
 
   const weekToolbarControls = (
     <div className={styles.weekToolbar} ref={dateDropdownRef}>
@@ -820,98 +1039,7 @@ export default function CalendarPageClient({
         <span className={styles.rangeChevron}>{showDateDropdown ? '\u25b2' : '\u25bc'}</span>
       </button>
 
-      {showDateDropdown && (
-        <div className={styles.dateDropdown} role="dialog" aria-label="Selecteaza data">
-          <div className={styles.dateDropdownCalendar}>
-            <div className={styles.dropdownMonthHeader}>
-              <button type="button" className={styles.dropdownArrow} onClick={() => setPickerDate(subMonths(pickerDate, 1))} aria-label="Luna anterioara">
-                {'<'}
-              </button>
-              <span>{format(pickerDate, 'MMMM yyyy', { locale: ro })}</span>
-              <button type="button" className={styles.dropdownArrow} onClick={() => setPickerDate(addMonths(pickerDate, 1))} aria-label="Luna urmatoare">
-                {'>'}
-              </button>
-            </div>
-
-            <div className={styles.dropdownWeekLabels}>
-              <span>S</span>
-              {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((label, index) => (
-                <span key={`${label}-${index}`}>{label}</span>
-              ))}
-            </div>
-
-            <div className={styles.dropdownWeeks}>
-              {pickerWeeks.map((week) => (
-                <div key={week[0].toISOString()} className={styles.dropdownWeekRow}>
-                  <span className={styles.dropdownWeekNumber}>{getISOWeek(week[0])}</span>
-                  {week.map((day) => {
-                    const outsideMonth = !isSameMonth(day, pickerMonthStart);
-                    const selected = isSameDay(day, state.currentDate);
-                    const todayFlag = isToday(day);
-                    return (
-                      <button
-                        key={day.toISOString()}
-                        type="button"
-                        className={[
-                          styles.dropdownDay,
-                          outsideMonth ? styles.dropdownDayMuted : '',
-                          selected ? styles.dropdownDaySelected : '',
-                          todayFlag ? styles.dropdownDayToday : '',
-                        ].filter(Boolean).join(' ')}
-                        onClick={() => handlePickerDaySelect(day)}
-                      >
-                        {format(day, 'd')}
-                      </button>
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className={styles.dateDropdownSide}>
-            <div className={styles.yearSelector}>
-              <button type="button" className={styles.dropdownArrow} onClick={() => setPickerDate(setYear(pickerDate, getYear(pickerDate) - 1))} aria-label="An precedent">
-                {'<'}
-              </button>
-              <span>{getYear(pickerDate)}</span>
-              <button type="button" className={styles.dropdownArrow} onClick={() => setPickerDate(setYear(pickerDate, getYear(pickerDate) + 1))} aria-label="An urmator">
-                {'>'}
-              </button>
-            </div>
-
-            <div className={styles.monthSelectorGrid}>
-              {months.map((monthLabel, index) => (
-                <button
-                  key={`${monthLabel}-${index}`}
-                  type="button"
-                  className={`${styles.monthSelectorButton}${getMonth(pickerDate) === index ? ` ${styles.monthSelectorButtonActive}` : ''}`}
-                  onClick={() => setPickerDate(setMonth(pickerDate, index))}
-                >
-                  {monthLabel}
-                </button>
-              ))}
-            </div>
-
-            <div className={styles.yearList}>
-              {years.map((year) => (
-                <button
-                  key={year}
-                  type="button"
-                  className={`${styles.yearListButton}${getYear(pickerDate) === year ? ` ${styles.yearListButtonActive}` : ''}`}
-                  onClick={() => setPickerDate(setYear(pickerDate, year))}
-                >
-                  {year}
-                </button>
-              ))}
-            </div>
-
-            <button type="button" className={styles.dropdownTodayLink} onClick={handleTodayClick}>
-              Astazi
-            </button>
-          </div>
-        </div>
-      )}
+      {showDateDropdown && renderDateDropdown()}
     </div>
   );
 
@@ -921,8 +1049,7 @@ export default function CalendarPageClient({
       <WeekView
         weekDays={weekDays}
         hours={hours}
-        appointments={appointments}
-        blockedTimes={blockedTimes}
+        appointments={decoratedAppointments}
         selectedDay={selectedDay}
         onSlotClick={handleSlotClick}
         onDayHeaderClick={handleDayHeaderClick}
@@ -933,43 +1060,98 @@ export default function CalendarPageClient({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onDrop={async (day, hour, minute) => { await handleDrop(day, hour, minute); }}
-        providers={providers}
       />
 
       <DayPanel
         topControls={weekToolbarControls}
         selectedDay={selectedDay}
-        appointments={appointments}
+        appointments={decoratedAppointments}
         onAppointmentClick={handleAppointmentClick}
         onQuickStatusChange={handlePanelStatusChange}
         onCreateClick={() => handleSlotClick(selectedDay, 9)}
+        canCreate={canCreateAppointments}
         onNavigate={(date) => {
           navigateToDate(date);
         }}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         onHoverAppointment={setHoveredAppointmentId}
+        calendarScopeValue={calendarScopeValue}
+        calendarScopeOptions={calendarScopeOptions}
+        onCalendarScopeChange={handleCalendarScopeChange}
       />
     </div>
   );
 
+  const desktopCalendarView = calendarWithPanel;
+
   const mobileCalendarView = (
     <div className={styles.mobileCalendar}>
-      <div className={styles.mobileToolbar}>
-        <button type="button" className={styles.mobileTodayBtn} onClick={handleTodayClick}>
-          Astazi
+      {/* Layer 1: Compact header — date nav + search icon + scope chip */}
+      <div className={styles.mobileHeader} ref={dateDropdownRef}>
+        <button
+          type="button"
+          className={styles.mobileNavArrow}
+          onClick={handlePrevWeek}
+          aria-label="Saptamana anterioara"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="15 18 9 12 15 6" />
+          </svg>
         </button>
-        <button type="button" className={styles.mobileNavArrow} onClick={handlePrevWeek} aria-label="Saptamana anterioara">
-          {'<'}
+
+        <button
+          type="button"
+          className={styles.mobileHeaderDateBtn}
+          onClick={() => setShowDateDropdown((prev) => !prev)}
+          aria-expanded={showDateDropdown}
+        >
+          {mobileView === 'week'
+            ? weekRangeLabel.replace(/\s*\d{4}$/, '')
+            : format(selectedDay, 'd MMMM', { locale: ro })}
         </button>
-        <span className={styles.mobileDateLabel}>
-          {format(selectedDay, 'd MMMM yyyy', { locale: ro })}
-        </span>
-        <button type="button" className={styles.mobileNavArrow} onClick={handleNextWeek} aria-label="Saptamana urmatoare">
-          {'>'}
+
+        <button
+          type="button"
+          className={styles.mobileNavArrow}
+          onClick={handleNextWeek}
+          aria-label="Saptamana urmatoare"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
         </button>
+
+        <button
+          type="button"
+          className={styles.mobileHeaderIcon}
+          onClick={() => setMobileSearchOpen(true)}
+          aria-label="Cauta programari"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </button>
+
+        {calendarScopeOptions.length > 1 && (
+          <CalendarScopeDropdown
+            value={calendarScopeValue}
+            options={calendarScopeOptions}
+            onChange={handleCalendarScopeChange}
+            className={styles.mobileScopePicker}
+            triggerClassName={styles.mobileScopeTrigger}
+            menuClassName={styles.mobileScopeMenu}
+          />
+        )}
+
+        {showDateDropdown && renderDateDropdown({
+          className: styles.mobileHeaderDateDropdown,
+          hideSidePanel: true,
+        })}
       </div>
 
+      {/* Layer 2: Day strip */}
       <div className={styles.mobileDayStrip}>
         {weekDays.map((day) => {
           const isActive = isSameDay(day, selectedDay);
@@ -995,45 +1177,161 @@ export default function CalendarPageClient({
         })}
       </div>
 
-      <div className={styles.mobilePanelWrapper}>
-        <DayPanel
-          topControls={null}
-          selectedDay={selectedDay}
-          appointments={appointments}
-          onAppointmentClick={handleAppointmentClick}
-          onQuickStatusChange={handlePanelStatusChange}
-          onCreateClick={() => handleSlotClick(selectedDay, 9)}
-          onNavigate={(date) => {
-            navigateToDate(date);
-          }}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          onHoverAppointment={setHoveredAppointmentId}
-        />
+      {/* Layer 3: Swipeable content — day list (left) + week grid (right) */}
+      <div className={styles.mobileViewContainer} ref={mobileViewContainerRef}>
+        {/* Day view panel */}
+        <div className={styles.mobileViewPanel}>
+          {mobileDayAppointments.length === 0 ? (
+            <div className={styles.mobileEmptyDay}>
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ opacity: 0.3, marginBottom: '0.75rem' }}>
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+              <span>Nicio programare</span>
+              <span className={styles.mobileEmptyDaySub}>
+                {isToday(selectedDay) ? 'Astazi' : format(selectedDay, 'EEEE, d MMMM', { locale: ro })}
+              </span>
+            </div>
+          ) : (
+            <div className={styles.mobileAppointmentList}>
+              {mobileDayAppointments.map((apt) => (
+                <AppointmentCard
+                  key={apt.id}
+                  appointment={apt}
+                  onClick={handleAppointmentClick}
+                  onStatusChange={handlePanelStatusChange}
+                  onHoverAppointment={setHoveredAppointmentId}
+                />
+              ))}
+            </div>
+          )}
+        </div>
 
-        <button
-          type="button"
-          className={styles.mobileFab}
-          aria-label="Adauga programare"
-          onClick={() => handleSlotClick(selectedDay, 9, 0)}
-        >
-          <svg
-            className={styles.mobileFabIcon}
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-        </button>
+        {/* Week view panel */}
+        <div className={styles.mobileViewPanel}>
+          <WeekView
+            weekDays={weekDays}
+            hours={hours}
+            appointments={decoratedAppointments}
+                selectedDay={selectedDay}
+            onSlotClick={handleSlotClick}
+            onDayHeaderClick={(day) => {
+              navigateToDate(day);
+              // Scroll back to day view
+              mobileViewContainerRef.current?.scrollTo({ left: 0, behavior: 'smooth' });
+            }}
+            onAppointmentClick={handleAppointmentClick}
+            enableDragDrop={false}
+            hoveredAppointmentId={null}
+            compact
+          />
+        </div>
       </div>
+
+      {/* Layer 4: FAB */}
+      <button
+        type="button"
+        className={styles.mobileFab}
+        aria-label="Adauga programare"
+        onClick={() => handleSlotClick(selectedDay, 9, 0)}
+        disabled={!canCreateAppointments}
+      >
+        <svg
+          className={styles.mobileFabIcon}
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+      </button>
+
+      {/* Search overlay */}
+      {mobileSearchOpen && (
+        <div className={styles.mobileSearchOverlay}>
+          <div className={styles.mobileSearchHeader}>
+            <button
+              type="button"
+              className={styles.mobileHeaderIcon}
+              onClick={() => {
+                setMobileSearchOpen(false);
+                setMobileSearchQuery('');
+              }}
+              aria-label="Inchide cautarea"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+            <div className={styles.mobileSearchInputWrapper}>
+              <input
+                ref={mobileSearchInputRef}
+                type="text"
+                className={styles.mobileSearchInput}
+                placeholder="Cauta programari..."
+                value={mobileSearchQuery}
+                onChange={(e) => setMobileSearchQuery(e.target.value)}
+                autoComplete="off"
+              />
+              {mobileSearchQuery && (
+                <button
+                  type="button"
+                  className={styles.mobileSearchClear}
+                  onClick={() => setMobileSearchQuery('')}
+                  aria-label="Sterge cautarea"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
+          <div className={styles.mobileSearchResults}>
+            {mobileSearchQuery.trim() === '' ? (
+              <div className={styles.mobileEmptyDay}>
+                <span style={{ opacity: 0.5 }}>Scrie pentru a cauta...</span>
+              </div>
+            ) : mobileSearchResults.length === 0 ? (
+              <div className={styles.mobileEmptyDay}>
+                <span>Niciun rezultat pentru &ldquo;{mobileSearchQuery}&rdquo;</span>
+              </div>
+            ) : (
+              <div className={styles.mobileAppointmentList}>
+                {mobileSearchResults.map((apt) => {
+                  const aptDate = new Date(apt.start_time);
+                  const dateLabel = isToday(aptDate)
+                    ? 'Astazi'
+                    : format(aptDate, 'EEEE, d MMM', { locale: ro });
+                  return (
+                    <AppointmentCard
+                      key={apt.id}
+                      appointment={apt}
+                      onClick={(a) => {
+                        handleAppointmentClick(a);
+                        setMobileSearchOpen(false);
+                        setMobileSearchQuery('');
+                      }}
+                      onStatusChange={handlePanelStatusChange}
+                      dateLabel={dateLabel}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 
@@ -1067,13 +1365,18 @@ export default function CalendarPageClient({
       style={availableHeight ? { height: `${availableHeight}px` } : undefined}
     >
       <main className={styles.main}>
-        {isMobile ? mobileCalendarView : calendarWithPanel}
+        {isMobile ? mobileCalendarView : desktopCalendarView}
       </main>
 
       <CreateAppointmentModal
         isOpen={showCreateModal}
         selectedSlot={state.selectedSlot}
         services={services}
+        calendarOptions={calendarOptions}
+        activeCalendarId={editInitialData?.calendarId || selectedCalendar?.id || defaultCreateCalendar?.id || null}
+        lockCalendarSelection={selectedCalendarScope !== 'all'}
+        currentUserId={sessionUserId}
+        currentUserDbUserId={sessionDbUserId || null}
         onSeedDemoServices={seedDemoDentalServices}
         isSeedingDemoServices={seedingDemoServices}
         mode={appointmentModalMode}
@@ -1089,6 +1392,8 @@ export default function CalendarPageClient({
         initialData={editInitialData}
         onModeChange={setAppointmentModalMode}
         appointmentStatus={editInitialData?.status || state.selectedAppointment?.status}
+        canEdit={state.selectedAppointment?.can_edit !== false}
+        canDelete={state.selectedAppointment?.can_delete !== false}
         onDelete={appointmentModalMode === 'view' ? () => {
           setShowCreateModal(false);
           setShowDeleteConfirm(true);

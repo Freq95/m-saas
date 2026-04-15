@@ -4,25 +4,13 @@ import { useState, useEffect, useRef } from 'react';
 import { format, isSameDay, isToday } from 'date-fns';
 import { ro } from 'date-fns/locale';
 import styles from '../../page.module.css';
-import type { Appointment, Provider } from '../../hooks/useCalendar';
+import type { Appointment } from '../../hooks/useCalendar';
 import { AppointmentBlock } from './AppointmentBlock';
-import { BlockedTimeBlock } from './BlockedTimeBlock';
-
-interface BlockedTime {
-  id: number;
-  provider_id?: number;
-  resource_id?: number;
-  start_time: string;
-  end_time: string;
-  reason: string;
-  is_recurring: boolean;
-}
 
 interface WeekViewProps {
   weekDays: Date[];
   hours: number[];
   appointments: Appointment[];
-  blockedTimes?: BlockedTime[];
   selectedDay?: Date | null;
   onSlotClick: (day: Date, hour: number, minute?: 0 | 15 | 30 | 45) => void;
   onDayHeaderClick?: (day: Date) => void;
@@ -33,7 +21,7 @@ interface WeekViewProps {
   onDrop?: (day: Date, hour: number, minute?: 0 | 15 | 30 | 45) => void;
   enableDragDrop?: boolean;
   hoveredAppointmentId?: number | null;
-  providers?: Provider[];
+  compact?: boolean;
 }
 
 function calculateAppointmentPositions(dayAppointments: Appointment[]) {
@@ -117,7 +105,6 @@ export function WeekView({
   weekDays,
   hours,
   appointments,
-  blockedTimes = [],
   selectedDay = null,
   onSlotClick,
   onDayHeaderClick,
@@ -128,9 +115,9 @@ export function WeekView({
   onDrop,
   enableDragDrop = false,
   hoveredAppointmentId = null,
-  providers = [],
+  compact = false,
 }: WeekViewProps) {
-  const SLOT_HEIGHT = 96;
+  const SLOT_HEIGHT = compact ? 60 : 96;
   const columnHeightPx = hours.length * SLOT_HEIGHT;
   const quarterHourSlots = hours.flatMap((hour) => [
     { hour, minute: 0 as 0 | 15 | 30 | 45 },
@@ -138,8 +125,9 @@ export function WeekView({
     { hour, minute: 30 as 0 | 15 | 30 | 45 },
     { hour, minute: 45 as 0 | 15 | 30 | 45 },
   ]);
-  const CURRENT_TIME_EDGE_PADDING = 18;
-  const gridTemplateColumns = `56px repeat(${weekDays.length}, minmax(0, 1fr))`;
+  const CURRENT_TIME_EDGE_PADDING = compact ? 10 : 18;
+  const gutterWidth = compact ? '36px' : '56px';
+  const gridTemplateColumns = `${gutterWidth} repeat(${weekDays.length}, minmax(0, 1fr))`;
 
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
   const [currentTimeTopPx, setCurrentTimeTopPx] = useState<number | null>(null);
@@ -226,9 +214,6 @@ export function WeekView({
 
   const getAppointmentsForDay = (day: Date) =>
     appointments.filter((apt) => isSameDay(new Date(apt.start_time), day));
-
-  const getBlockedTimesForDay = (day: Date) =>
-    blockedTimes.filter((bt) => isSameDay(new Date(bt.start_time), day));
 
   const showCurrentTimeLine = currentTimeTopPx !== null;
   const showCurrentTimeGutter = todayIsVisible && currentTimeTopPx !== null;
@@ -379,22 +364,6 @@ export function WeekView({
                     onDragEnd={onDragEnd}
                     isDragging={draggedAppointment?.id === apt.id}
                     isHighlighted={hoveredAppointmentId === apt.id}
-                    providers={providers}
-                  />
-                );
-              })}
-
-              {getBlockedTimesForDay(day).map((bt) => {
-                const btStart = new Date(bt.start_time).getTime();
-                const btEnd = new Date(bt.end_time).getTime();
-                const topPercent = ((btStart - dayStart.getTime()) / dayDuration) * 100;
-                const heightPercent = ((btEnd - btStart) / dayDuration) * 100;
-
-                return (
-                  <BlockedTimeBlock
-                    key={bt.id}
-                    blockedTime={bt}
-                    style={{ top: `${topPercent}%`, left: '0%', width: '100%', height: `${heightPercent}%` }}
                   />
                 );
               })}
@@ -415,4 +384,3 @@ export function WeekView({
     </div>
   );
 }
-

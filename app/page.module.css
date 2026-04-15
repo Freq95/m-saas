@@ -77,6 +77,7 @@
 
 /* densa wordmark */
 .wordmark {
+  font-family: var(--font-brand);
   font-size: clamp(3rem, 10vw, 6rem);
   font-weight: 800;
   letter-spacing: -0.03em;

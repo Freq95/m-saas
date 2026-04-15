@@ -4,6 +4,16 @@ Multi-tenant SaaS platform for managing appointments, clients, email inbox, and 
 
 ---
 
+## Recent Updates (2026-04-05)
+
+- Improved confirmation modal accessibility across logout, email disconnect, and service delete flows with dialog semantics, `Escape` dismissal, and initial focus on open.
+- Added explicit accessible labels to the clients page search and filter controls.
+- Tightened inbox email HTML sanitization to block interactive form controls inside rendered email content.
+- Fixed stale hook dependency patterns in email settings and client profile loaders.
+- Removed a few dead/redundant UI bits and documented that remote email images remain blocked by CSP intentionally for privacy/safety.
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -113,5 +123,5 @@ tests/               # Vitest test files
 
 **Private project — Not open source**
 
-**Last updated:** 2026-04-01
+**Last updated:** 2026-04-05
 

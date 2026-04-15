@@ -7,9 +7,18 @@ import { useRouter } from 'next/navigation';
 
 type LoginFormProps = {
   successMessage?: string;
+  redirectPath?: string;
 };
 
-export default function LoginForm({ successMessage }: LoginFormProps) {
+function normalizeRedirectPath(value?: string): string | null {
+  if (!value) return null;
+  if (!value.startsWith('/') || value.startsWith('//')) {
+    return null;
+  }
+  return value;
+}
+
+export default function LoginForm({ successMessage, redirectPath }: LoginFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -49,7 +58,7 @@ export default function LoginForm({ successMessage }: LoginFormProps) {
       router.replace('/admin');
       return;
     }
-    router.replace('/dashboard');
+    router.replace(normalizeRedirectPath(redirectPath) || '/dashboard');
   }
 
   return (

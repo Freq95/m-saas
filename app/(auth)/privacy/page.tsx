@@ -14,7 +14,7 @@ export default function PrivacyPage() {
         <section>
           <h2>1. Cine suntem</h2>
           <p>
-            densa este o platforma SaaS de management pentru cabinete stomatologice,
+            <span className="brand-wordmark-inline">densa</span> este o platforma SaaS de management pentru cabinete stomatologice,
             operata de [NUMELE COMPANIEI], cu sediul in Romania. In calitate de operator
             al platformei, prelucram date cu caracter personal in conformitate cu
             Regulamentul General privind Protectia Datelor (GDPR - Regulamentul UE 2016/679).

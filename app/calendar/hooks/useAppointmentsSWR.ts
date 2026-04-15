@@ -5,12 +5,12 @@ import { useSession } from 'next-auth/react';
 import type { Appointment, CalendarViewType } from './useCalendar';
 import { logger } from '@/lib/logger';
 import { parseSessionUserId } from './sessionUser';
-import { authFetcher } from '@/lib/fetcher';
 
 interface UseAppointmentsOptions {
   currentDate: Date;
   viewType: CalendarViewType;
   userId?: number;
+  calendarIds?: number[];
   providerId?: number;
   resourceId?: number;
   search?: string;
@@ -24,10 +24,11 @@ interface UseAppointmentsResult {
   refetch: () => Promise<void>;
   createAppointment: (data: CreateAppointmentInput) => Promise<{ ok: boolean; error?: string }>;
   updateAppointment: (id: number, data: UpdateAppointmentInput) => Promise<UpdateAppointmentResult>;
-  deleteAppointment: (id: number) => Promise<boolean>;
+  deleteAppointment: (id: number) => Promise<DeleteAppointmentResult>;
 }
 
 interface CreateAppointmentInput {
+  dentistUserId?: number;
   serviceId: number;
   clientName: string;
   clientEmail?: string;
@@ -40,6 +41,7 @@ interface CreateAppointmentInput {
   resourceId?: number;
   category?: string;
   color?: string;
+  calendarId?: number;
 }
 
 interface UpdateAppointmentInput {
@@ -69,10 +71,32 @@ interface UpdateAppointmentResult {
   warning?: string | null;
 }
 
-// SWR fetcher function
+interface DeleteAppointmentResult {
+  ok: boolean;
+  status: number;
+  error?: string;
+}
+
 const fetcher = async (url: string) => {
-  const result = await authFetcher<{ appointments?: Appointment[] }>(url);
-  return result.appointments || [];
+  const response = await fetch(url, { cache: 'no-store' });
+
+  if (response.status === 401) {
+    window.location.href = '/login';
+    throw new Error('Sesiune expirata.');
+  }
+
+  let payload: { appointments?: Appointment[]; error?: string; details?: unknown } | null = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+
+  if (!response.ok) {
+    throw new Error(extractApiError(payload, `Request failed: ${response.status}`));
+  }
+
+  return payload?.appointments || [];
 };
 
 function extractApiError(payload: any, fallback: string): string {
@@ -95,20 +119,24 @@ function extractApiError(payload: any, fallback: string): string {
   return fallback;
 }
 
+function normalizeCalendarIds(calendarIds?: number[]): number[] | undefined {
+  if (!Array.isArray(calendarIds)) {
+    return undefined;
+  }
+
+  return Array.from(
+    new Set(calendarIds.filter((id): id is number => Number.isInteger(id) && id > 0))
+  ).sort((a, b) => a - b);
+}
+
 /**
- * Hook for managing appointments with SWR caching
- *
- * Benefits of SWR:
- * - Automatic revalidation on focus
- * - Deduplication of requests
- * - Optimistic UI updates
- * - Cache persistence
- * - Background revalidation
+ * Hook for managing appointments with SWR caching.
  */
 export function useAppointmentsSWR({
   currentDate,
   viewType,
   userId,
+  calendarIds,
   providerId,
   resourceId,
   search,
@@ -117,8 +145,9 @@ export function useAppointmentsSWR({
   const { data: session, status } = useSession();
   const sessionUserId = parseSessionUserId(session);
   const effectiveUserId = userId ?? sessionUserId;
+  const normalizedCalendarIds = normalizeCalendarIds(calendarIds);
+  const skipFetchBecauseNoVisibleCalendars = Array.isArray(calendarIds) && (normalizedCalendarIds?.length || 0) === 0;
 
-  // Calculate date range
   let startDate: Date;
   let endDate: Date;
   const trimmedSearch = search?.trim();
@@ -136,14 +165,15 @@ export function useAppointmentsSWR({
     endDate = endOfDay(endOfMonth(currentDate));
   }
 
-  // Build query string
-  const queryParams = new URLSearchParams({
-    userId: String(effectiveUserId || ''),
-  });
+  const queryParams = new URLSearchParams();
 
   if (!isGlobalSearch) {
     queryParams.set('startDate', startDate.toISOString());
     queryParams.set('endDate', endDate.toISOString());
+  }
+
+  if (normalizedCalendarIds && normalizedCalendarIds.length > 0) {
+    queryParams.set('calendarIds', normalizedCalendarIds.join(','));
   }
 
   if (providerId) {
@@ -158,21 +188,29 @@ export function useAppointmentsSWR({
     queryParams.append('search', trimmedSearch);
   }
 
-  const url = effectiveUserId ? `/api/appointments?${queryParams.toString()}` : null;
+  const isReady = status !== 'loading' && Boolean(effectiveUserId);
+  const url = isReady && !skipFetchBecauseNoVisibleCalendars
+    ? `/api/appointments?${queryParams.toString()}`
+    : null;
+  const refreshInterval = !isReady || isGlobalSearch || skipFetchBecauseNoVisibleCalendars
+    ? 0
+    : 20_000;
 
-  // Use SWR with caching configuration
   const {
     data: appointments = [],
     error,
     isLoading,
     mutate,
   } = useSWR<Appointment[]>(url, fetcher, {
-    fallbackData: isGlobalSearch ? [] : initialAppointments,
+    fallbackData: isGlobalSearch || skipFetchBecauseNoVisibleCalendars ? [] : initialAppointments,
     keepPreviousData: true,
-    revalidateOnFocus: false, // Don't refetch when window regains focus
-    dedupingInterval: 10000, // 10 seconds deduplication
-    revalidateOnReconnect: true, // Refetch when reconnecting
-    refreshInterval: 0, // No polling (use manual refetch)
+    revalidateOnFocus: true,
+    focusThrottleInterval: 10_000,
+    dedupingInterval: 10_000,
+    revalidateOnReconnect: true,
+    refreshWhenHidden: false,
+    refreshWhenOffline: false,
+    refreshInterval,
   });
 
   const refetch = useCallback(async () => {
@@ -189,18 +227,22 @@ export function useAppointmentsSWR({
         const response = await fetch('/api/appointments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: effectiveUserId,
-            ...data,
-          }),
+          body: JSON.stringify(data),
         });
 
-        if (response.status === 401 || response.status === 403) {
+        if (response.status === 401) {
           window.location.href = '/login';
           return { ok: false, error: 'Sesiune expirata.' };
         }
+
         if (!response.ok) {
-          const errorData = await response.json();
+          let errorData: any = null;
+          try {
+            errorData = await response.json();
+          } catch {
+            errorData = null;
+          }
+
           const isAvailabilityError =
             response.status === 400 &&
             typeof errorData?.error === 'string' &&
@@ -209,11 +251,13 @@ export function useAppointmentsSWR({
             status: response.status,
             errorData,
           };
+
           if (isAvailabilityError) {
             logger.warn('Calendar hook: create appointment slot unavailable', logPayload);
           } else {
             logger.error('Calendar hook: create appointment API error', logPayload);
           }
+
           return {
             ok: false,
             error: isAvailabilityError
@@ -222,7 +266,6 @@ export function useAppointmentsSWR({
           };
         }
 
-        // Optimistically update cache
         await mutate();
         return { ok: true };
       } catch (err) {
@@ -256,11 +299,14 @@ export function useAppointmentsSWR({
         });
 
         let errorData: any = null;
-        if (response.status === 401 || response.status === 403) {
-          if (snapshot) mutate(snapshot, { revalidate: false });
+        if (response.status === 401) {
+          if (snapshot) {
+            mutate(snapshot, { revalidate: false });
+          }
           window.location.href = '/login';
           return { ok: false, status: response.status, error: 'Sesiune expirata.' };
         }
+
         if (!response.ok) {
           try {
             errorData = await response.json();
@@ -271,7 +317,9 @@ export function useAppointmentsSWR({
 
         if (!response.ok) {
           if (response.status === 409) {
-            if (snapshot) mutate(snapshot, { revalidate: false });
+            if (snapshot) {
+              mutate(snapshot, { revalidate: false });
+            }
             const conflicts = errorData?.conflicts || [];
             const suggestions = errorData?.suggestions || [];
             logger.warn('Calendar hook: update appointment conflict', {
@@ -308,22 +356,27 @@ export function useAppointmentsSWR({
           resultData = null;
         }
 
-        // Optimistically update cache
         await mutate();
-        return { ok: true, status: response.status, warning: typeof resultData?.warning === 'string' ? resultData.warning : null };
+        return {
+          ok: true,
+          status: response.status,
+          warning: typeof resultData?.warning === 'string' ? resultData.warning : null,
+        };
       } catch (err) {
-        if (snapshot) mutate(snapshot, { revalidate: false });
+        if (snapshot) {
+          mutate(snapshot, { revalidate: false });
+        }
         logger.error('Calendar hook: failed to update appointment', err instanceof Error ? err : new Error(String(err)), {
           appointmentId: id,
         });
         return { ok: false, status: 0, error: 'Eroare de retea la actualizarea programarii.' };
       }
     },
-    [mutate, appointments]
+    [appointments, mutate]
   );
 
   const deleteAppointment = useCallback(
-    async (id: number): Promise<boolean> => {
+    async (id: number): Promise<DeleteAppointmentResult> => {
       const snapshot = appointments;
       mutate(
         appointments.filter((apt) => apt.id !== id),
@@ -335,34 +388,44 @@ export function useAppointmentsSWR({
           method: 'DELETE',
         });
 
-        if (response.status === 401 || response.status === 403) {
+        if (response.status === 401) {
           mutate(snapshot, { revalidate: false });
           window.location.href = '/login';
-          return false;
+          return { ok: false, status: response.status, error: 'Sesiune expirata.' };
         }
+
         if (!response.ok) {
-          const errorData = await response.json();
+          let errorData: any = null;
+          try {
+            errorData = await response.json();
+          } catch {
+            errorData = null;
+          }
+
           mutate(snapshot, { revalidate: false });
           logger.error('Calendar hook: delete appointment API error', {
             status: response.status,
             appointmentId: id,
             errorData,
           });
-          return false;
+          return {
+            ok: false,
+            status: response.status,
+            error: extractApiError(errorData, 'Nu s-a putut sterge programarea.'),
+          };
         }
 
-        // Optimistically update cache
         await mutate();
-        return true;
+        return { ok: true, status: response.status };
       } catch (err) {
         mutate(snapshot, { revalidate: false });
         logger.error('Calendar hook: failed to delete appointment', err instanceof Error ? err : new Error(String(err)), {
           appointmentId: id,
         });
-        return false;
+        return { ok: false, status: 0, error: 'Eroare de retea la stergerea programarii.' };
       }
     },
-    [mutate, appointments]
+    [appointments, mutate]
   );
 
   return {

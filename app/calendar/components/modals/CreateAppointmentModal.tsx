@@ -26,50 +26,31 @@ import {
   STATUS_CONFIG,
   getCategoryColor,
   normalizeCategoryToKey,
-} from '@/lib/appointment-colors';
-
-interface Service {
-  id: number;
-  name: string;
-  duration_minutes: number;
-  price: number;
-}
-
-type AppointmentFormPayload = {
-  clientName: string;
-  clientEmail: string;
-  clientPhone: string;
-  forceNewClient?: boolean;
-  serviceId: string;
-  startTime: string;
-  endTime: string;
-  durationMinutes: number;
-  notes: string;
-  category?: string;
-  color?: string;
-  status?: string;
-  isRecurring?: boolean;
-  recurrence?: {
-    frequency: 'daily' | 'weekly' | 'monthly';
-    interval: number;
-    endType: 'date' | 'count';
-    endDate?: string;
-    count?: number;
-  };
-};
-
-type RecurrenceForm = {
-  frequency: 'daily' | 'weekly' | 'monthly';
-  interval: number;
-  endType: 'date' | 'count';
-  endDate: string;
-  count: number;
-};
+} from '@/lib/calendar-color-policy';
+import { useAppointmentDentistServices } from './hooks/useAppointmentDentistServices';
+import type {
+  AppointmentFormPayload,
+  AppointmentService as Service,
+  RecurrenceForm,
+} from './appointment-modal.types';
 
 interface CreateAppointmentModalProps {
   isOpen: boolean;
   selectedSlot: { start: Date; end: Date } | null;
   services: Service[];
+  calendarOptions?: Array<{
+    id: number;
+    name: string;
+    color: string;
+    type?: 'personal' | 'resource';
+    resourceId?: number | null;
+    disabled?: boolean;
+    description?: string;
+  }>;
+  activeCalendarId?: number | null;
+  lockCalendarSelection?: boolean;
+  currentUserId?: number;
+  currentUserDbUserId?: string | null;
   onSeedDemoServices?: () => Promise<void>;
   isSeedingDemoServices?: boolean;
   onClose: () => void;
@@ -82,6 +63,8 @@ interface CreateAppointmentModalProps {
   onModeChange?: (mode: 'create' | 'edit' | 'view') => void;
   appointmentStatus?: string;
   onDelete?: () => void;
+  canEdit?: boolean;
+  canDelete?: boolean;
 }
 
 type ClientSuggestion = {
@@ -136,6 +119,11 @@ export function CreateAppointmentModal({
   isOpen,
   selectedSlot,
   services,
+  calendarOptions = [],
+  activeCalendarId = null,
+  lockCalendarSelection = false,
+  currentUserId,
+  currentUserDbUserId = null,
   onSeedDemoServices,
   isSeedingDemoServices = false,
   onClose,
@@ -148,6 +136,8 @@ export function CreateAppointmentModal({
   onModeChange,
   appointmentStatus,
   onDelete,
+  canEdit = true,
+  canDelete = true,
 }: CreateAppointmentModalProps) {
   const toast = useToast();
   const backdropPressStartedRef = useRef(false);
@@ -170,20 +160,16 @@ export function CreateAppointmentModal({
     backdropPressStartedRef.current = false;
   };
 
-  const defaultServiceId = useMemo(
-    () => (services[0]?.id ? services[0].id.toString() : ''),
-    [services]
-  );
-
   const [formData, setFormData] = useState({
     clientName: '',
     clientEmail: '',
     clientPhone: '',
-    serviceId: defaultServiceId,
+    serviceId: '',
     notes: '',
   });
 
   const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedCalendarId, setSelectedCalendarId] = useState('');
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrence, setRecurrence] = useState<RecurrenceForm>(DEFAULT_RECURRENCE);
   const [selectedDate, setSelectedDate] = useState('');
@@ -282,9 +268,52 @@ export function CreateAppointmentModal({
     return parseDateInput(selectedDate) || selectedStartDateTime;
   }, [selectedDate, selectedStartDateTime]);
 
+  const firstWritableCalendarId = useMemo(
+    () => calendarOptions.find((calendar) => !calendar.disabled)?.id ?? null,
+    [calendarOptions]
+  );
+  const selectedCalendarOption = useMemo(() => {
+    const selectedId = Number.parseInt(selectedCalendarId, 10);
+    if (Number.isInteger(selectedId) && selectedId > 0) {
+      return calendarOptions.find((calendar) => calendar.id === selectedId) || null;
+    }
+    if (initialData?.calendarName) {
+      return {
+        id: 0,
+        name: initialData.calendarName,
+        color: '#94a3b8',
+      };
+    }
+    return null;
+  }, [calendarOptions, initialData?.calendarName, selectedCalendarId]);
+  const {
+    dentistOptions,
+    selectedDentist,
+    selectedDentistUserId,
+    setSelectedDentistUserId,
+    loadingDentists,
+    dentistError,
+    effectiveServices,
+    loadingServices,
+    servicesError,
+  } = useAppointmentDentistServices({
+    isOpen,
+    mode,
+    selectedCalendarId,
+    currentUserId,
+    currentUserDbUserId,
+    initialDentistUserId: initialData?.dentistUserId,
+    initialDentistDisplayName: initialData?.dentistDisplayName,
+    selectedCalendarColor: selectedCalendarOption?.color,
+    services,
+  });
+  const defaultServiceId = useMemo(
+    () => (effectiveServices[0]?.id ? effectiveServices[0].id.toString() : ''),
+    [effectiveServices]
+  );
   const selectedService = useMemo(
-    () => services.find((service) => String(service.id) === formData.serviceId) || null,
-    [services, formData.serviceId]
+    () => effectiveServices.find((service) => String(service.id) === formData.serviceId) || null,
+    [effectiveServices, formData.serviceId]
   );
 
   const exactNameSuggestion = useMemo(() => {
@@ -372,13 +401,22 @@ export function CreateAppointmentModal({
     setPendingSubmitPayload(null);
     setPhoneError('');
     setSelectedCategory(normalizeCategoryToKey(initialData?.category) || '');
+    setSelectedCalendarId(
+      initialData?.calendarId
+        ? String(initialData.calendarId)
+        : activeCalendarId
+          ? String(activeCalendarId)
+          : firstWritableCalendarId
+            ? String(firstWritableCalendarId)
+            : ''
+    );
     setSelectedStatus(initialData?.status || appointmentStatus || 'scheduled');
     setIsRecurring(Boolean(initialData?.isRecurring) && allowRecurring);
     setRecurrence({
       ...DEFAULT_RECURRENCE,
       ...(initialData?.recurrence || {}),
     });
-  }, [isOpen, initialData, defaultServiceId, allowRecurring, appointmentStatus]);
+  }, [isOpen, initialData, defaultServiceId, allowRecurring, appointmentStatus, activeCalendarId, firstWritableCalendarId]);
 
   useEffect(() => {
     if (mode === 'view' && appointmentStatus) {
@@ -414,13 +452,27 @@ export function CreateAppointmentModal({
 
   useEffect(() => {
     if (!isOpen) return;
+    if (mode !== 'create') return;
     if (!formData.serviceId && defaultServiceId) {
       setFormData((prev) => ({
         ...prev,
         serviceId: defaultServiceId,
       }));
     }
-  }, [isOpen, formData.serviceId, defaultServiceId, services]);
+  }, [defaultServiceId, formData.serviceId, isOpen, mode]);
+
+  useEffect(() => {
+    if (!isOpen || mode !== 'create') return;
+    if (!formData.serviceId) return;
+    if (effectiveServices.some((service) => String(service.id) === formData.serviceId)) {
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      serviceId: defaultServiceId,
+    }));
+  }, [defaultServiceId, effectiveServices, formData.serviceId, isOpen, mode]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -585,6 +637,7 @@ export function CreateAppointmentModal({
       formData.clientPhone !== (initialData?.clientPhone ?? '') ||
       formData.notes !== (initialData?.notes ?? '') ||
       formData.serviceId !== (initialData?.serviceId ?? defaultServiceId) ||
+      (mode === 'create' && selectedCalendarId !== String(initialData?.calendarId ?? activeCalendarId ?? firstWritableCalendarId ?? '')) ||
       selectedDate !== initialDateValue ||
       selectedTime !== initialStartTimeValue ||
       selectedEndTime !== initialEndTimeValue ||
@@ -605,10 +658,13 @@ export function CreateAppointmentModal({
     mode,
     recurrence,
     selectedCategory,
+    selectedCalendarId,
     selectedDate,
     selectedEndTime,
     selectedStatus,
     selectedTime,
+    activeCalendarId,
+    firstWritableCalendarId,
   ]);
 
   const requestClose = () => {
@@ -647,6 +703,8 @@ export function CreateAppointmentModal({
     setPendingSubmitPayload(null);
     setPhoneError('');
     setSelectedCategory('');
+    setSelectedCalendarId(activeCalendarId ? String(activeCalendarId) : firstWritableCalendarId ? String(firstWritableCalendarId) : '');
+    setSelectedDentistUserId(currentUserId ? String(currentUserId) : '');
     setSelectedStatus('scheduled');
     setIsRecurring(false);
     setRecurrence(DEFAULT_RECURRENCE);
@@ -680,8 +738,16 @@ export function CreateAppointmentModal({
   const modalSubmitLabel = submitLabel || (mode === 'edit' ? 'Salveaza modificarile' : 'Salveaza');
   const handleSubmit = async () => {
     if (isSubmitting) return;
+    if (loadingDentists || loadingServices) {
+      toast.error('Asteapta sa se incarce dentistul si serviciile.');
+      return;
+    }
     if (!formData.clientName.trim()) {
       toast.error('Introduceti numele clientului.');
+      return;
+    }
+    if (!selectedDentist) {
+      toast.error('Selecteaza dentistul pentru aceasta programare.');
       return;
     }
     if (!formData.serviceId) {
@@ -707,6 +773,10 @@ export function CreateAppointmentModal({
       ...formData,
       clientName: formData.clientName.trim(),
       forceNewClient,
+      calendarId: selectedCalendarId ? Number.parseInt(selectedCalendarId, 10) : undefined,
+      calendarName: selectedCalendarOption?.name,
+      dentistUserId: selectedDentist.userId,
+      dentistDisplayName: selectedDentist.displayName,
       startTime: selectedStartDateTime.toISOString(),
       endTime: selectedEndDateTime.toISOString(),
       durationMinutes,
@@ -769,19 +839,21 @@ export function CreateAppointmentModal({
           <h3>{modalTitle}</h3>
           {mode === 'view' && (
             <div className={styles.modalHeaderActions}>
-              <button
-                type="button"
-                onClick={() => onModeChange?.('edit')}
-                className={styles.modalIconButton}
-                aria-label="Editeaza programarea"
-                title="Editeaza"
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                  <path d="M12 20h9" />
-                  <path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4Z" />
-                </svg>
-              </button>
-              {onDelete && (
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={() => onModeChange?.('edit')}
+                  className={styles.modalIconButton}
+                  aria-label="Editeaza programarea"
+                  title="Editeaza"
+                >
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                </button>
+              )}
+              {onDelete && canDelete && (
                 <button
                   type="button"
                   onClick={onDelete}
@@ -815,6 +887,31 @@ export function CreateAppointmentModal({
         </div>
         <fieldset className={styles.modalFieldset} disabled={isViewMode}>
         <div className={styles.modalContent}>
+          {(calendarOptions.length > 0 || Boolean(initialData?.calendarName)) && (
+            <div className={styles.modalField}>
+              <label>Calendar</label>
+              {mode !== 'create' || lockCalendarSelection
+                ? renderReadOnlyValue(selectedCalendarOption?.name || 'Calendar implicit', !selectedCalendarOption)
+                : (
+                  <select
+                    value={selectedCalendarId}
+                    onChange={(event) => setSelectedCalendarId(event.target.value)}
+                  >
+                    {calendarOptions.map((calendar) => (
+                      <option
+                        key={calendar.id}
+                        value={String(calendar.id)}
+                        disabled={calendar.disabled}
+                      >
+                        {calendar.name}
+                        {calendar.description ? ` - ${calendar.description}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+            </div>
+          )}
+
           <div className={styles.modalField}>
             <label>Data si ora</label>
             {renderReadOnlyValue(
@@ -1169,36 +1266,77 @@ export function CreateAppointmentModal({
                       </option>
                     ))}
                   </select>
-                )}
+              )}
             </div>
           )}
+
+          <div className={styles.modalField}>
+            <label>Programare pentru</label>
+            {mode !== 'create' || loadingDentists || dentistOptions.length <= 1
+              ? renderReadOnlyValue(
+                  loadingDentists
+                    ? 'Se incarca dentistii...'
+                    : selectedDentist?.displayName || initialData?.dentistDisplayName || 'Dentist neasignat',
+                  !selectedDentist && !initialData?.dentistDisplayName
+                )
+              : (
+                <select
+                  value={selectedDentistUserId}
+                  onChange={(event) => setSelectedDentistUserId(event.target.value)}
+                >
+                  {dentistOptions.map((dentist) => (
+                    <option key={dentist.userId} value={String(dentist.userId)}>
+                      {dentist.displayName}
+                    </option>
+                  ))}
+                </select>
+              )}
+            {dentistError && (
+              <div className={styles.clientSuggestionError}>{dentistError}</div>
+            )}
+            {!loadingDentists && selectedDentist && (
+              <div className={styles.fieldHint}>
+                Serviciile se incarca pentru {selectedDentist.displayName}.
+              </div>
+            )}
+          </div>
 
           <div className={styles.modalField}>
             <label>Serviciu *</label>
             {isViewMode ? renderReadOnlyValue(
               selectedService
                 ? `${selectedService.name} (${selectedService.duration_minutes} min) - ${selectedService.price} lei`
-                : 'Fara serviciu',
-              !selectedService
-            ) : services.length === 0 ? (
+                : initialData?.serviceName || 'Fara serviciu',
+              !selectedService && !initialData?.serviceName
+            ) : loadingServices ? (
+              renderReadOnlyValue('Se incarca serviciile...', true)
+            ) : mode === 'create' && effectiveServices.length === 0 ? (
               <div className={styles.serviceSeedBox}>
                 <p className={styles.clientSuggestionMuted}>
-                  Nu exista servicii definite pentru cabinetul curent.
+                  {selectedDentist?.isCurrentUser
+                    ? 'Nu exista servicii definite pentru profilul tau de dentist.'
+                    : `Nu exista servicii definite pentru ${selectedDentist?.displayName || 'dentistul selectat'}.`}
                 </p>
-                <button
-                  type="button"
-                  className={styles.saveButton}
-                  onClick={() => onSeedDemoServices?.()}
-                  disabled={!onSeedDemoServices || isSeedingDemoServices}
-                >
-                  {isSeedingDemoServices ? 'Se adauga servicii demo...' : 'Adauga servicii demo (stomatologie)'}
-                </button>
+                {servicesError && (
+                  <p className={styles.clientSuggestionError}>{servicesError}</p>
+                )}
+                {onSeedDemoServices && selectedDentist?.isCurrentUser && (
+                  <button
+                    type="button"
+                    className={styles.saveButton}
+                    onClick={() => onSeedDemoServices?.()}
+                    disabled={isSeedingDemoServices}
+                  >
+                    {isSeedingDemoServices ? 'Se adauga servicii demo...' : 'Adauga servicii demo (stomatologie)'}
+                  </button>
+                )}
               </div>
             ) : (
               <div className={styles.modalServicePicker} ref={servicePickerRef}>
                 <button
                   type="button"
                   className={styles.modalServiceButton}
+                  disabled={effectiveServices.length === 0}
                   onClick={() => setIsServicePickerOpen((prev) => !prev)}
                   aria-haspopup="dialog"
                   aria-expanded={isServicePickerOpen}
@@ -1206,15 +1344,15 @@ export function CreateAppointmentModal({
                   <span>
                     {selectedService
                       ? `${selectedService.name} (${selectedService.duration_minutes} min) - ${selectedService.price} lei`
-                      : 'Selecteaza serviciul'}
+                      : initialData?.serviceName || 'Selecteaza serviciul'}
                   </span>
                   <span className={styles.modalServiceButtonIcon}>▾</span>
                 </button>
 
-                {isServicePickerOpen && (
+                {isServicePickerOpen && effectiveServices.length > 0 && (
                   <div className={`${styles.clientSuggestions} ${styles.modalServicePopover}`} role="dialog" aria-label="Selecteaza serviciul">
                     <div className={styles.modalServiceList}>
-                      {services.map((service) => (
+                      {effectiveServices.map((service) => (
                         <button
                           key={service.id}
                           type="button"
@@ -1379,7 +1517,7 @@ export function CreateAppointmentModal({
             <button
               onClick={handleSubmit}
               className={styles.saveButton}
-              disabled={services.length === 0 || isSubmitting || showNewClientConfirm}
+              disabled={((mode === 'create') && services.length === 0) || isSubmitting || showNewClientConfirm}
             >
               {isSubmitting ? 'Se salveaza...' : modalSubmitLabel}
             </button>

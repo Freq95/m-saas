@@ -1,6 +1,7 @@
 import { getMongoDbOrThrow } from './db/mongo-utils';
 import type { ConflictCheck } from './types/calendar';
 import { ObjectId, type Document, type Filter } from 'mongodb';
+import { DEFAULT_TIME_ZONE } from './timezone';
 
 type BusyInterval = Document & {
   start_time: string | Date;
@@ -21,251 +22,69 @@ function doTimeSlotsOverlap(
   const s2 = start2.getTime();
   const e2 = end2.getTime();
 
-  // Validate times
   if (s1 >= e1 || s2 >= e2) {
     return false;
   }
 
-  // Standard overlap formula
   return s1 < e2 && e1 > s2;
-}
-
-function toDate(value: unknown): Date | null {
-  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
-  if (typeof value === 'string' || typeof value === 'number') {
-    const parsed = new Date(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-  return null;
 }
 
 /**
  * Comprehensive conflict detection for appointments
- * Checks:
- * 1. Provider availability (other appointments + blocked times)
- * 2. Resource availability (if resource provided)
- * 3. Provider working hours
- * 4. Suggests alternative slots if conflict found
+ * Checks overlapping appointments and suggests alternative slots if conflict found
  */
 export async function checkAppointmentConflict(
   userId: number,
   tenantId: ObjectId,
-  providerId: number | undefined,
-  resourceId: number | undefined,
   startTime: Date,
   endTime: Date,
   excludeAppointmentId?: number,
-  includeSuggestions: boolean = true
+  includeSuggestions: boolean = true,
+  options: {
+    calendarId?: number;
+    timeZone?: string;
+  } = {}
 ): Promise<ConflictCheck> {
   const db = await getMongoDbOrThrow();
   const conflicts: any[] = [];
+  const appointmentScope = options.calendarId
+    ? { calendar_id: options.calendarId, tenant_id: tenantId }
+    : { user_id: userId, tenant_id: tenantId };
 
-  // Base check for non-provider/resource appointments (single-calendar mode)
-  if (!providerId && !resourceId) {
-    const appointments = await db
-      .collection('appointments')
-      .find({
-        user_id: userId,
-        tenant_id: tenantId,
-        deleted_at: { $exists: false },
-        status: 'scheduled',
-        start_time: { $lt: endTime.toISOString() },
-        end_time: { $gt: startTime.toISOString() },
-      })
-      .toArray();
+  const appointments = await db
+    .collection('appointments')
+    .find({
+      ...appointmentScope,
+      deleted_at: { $exists: false },
+      status: 'scheduled',
+      start_time: { $lt: endTime.toISOString() },
+      end_time: { $gt: startTime.toISOString() },
+    })
+    .toArray();
 
-    for (const apt of appointments) {
-      if (excludeAppointmentId && apt.id === excludeAppointmentId) continue;
-      if (doTimeSlotsOverlap(startTime, endTime, new Date(apt.start_time), new Date(apt.end_time))) {
-        conflicts.push({
-          type: 'provider_appointment',
-          appointment: apt,
-        });
-      }
-    }
-
-    const blockedTimes = await db
-      .collection('blocked_times')
-      .find({
-        user_id: userId,
-        tenant_id: tenantId,
-        deleted_at: { $exists: false },
-        $and: [
-          { $or: [{ provider_id: { $exists: false } }, { provider_id: null }] },
-          { $or: [{ resource_id: { $exists: false } }, { resource_id: null }] },
-        ],
-      })
-      .toArray();
-
-    for (const blocked of blockedTimes) {
-      const blockedStart = toDate(blocked.start_time);
-      const blockedEnd = toDate(blocked.end_time);
-      if (!blockedStart || !blockedEnd) continue;
-      if (doTimeSlotsOverlap(startTime, endTime, blockedStart, blockedEnd)) {
-        conflicts.push({
-          type: 'blocked_time',
-          blockedTime: blocked,
-        });
-      }
+  for (const apt of appointments) {
+    if (excludeAppointmentId && apt.id === excludeAppointmentId) continue;
+    if (doTimeSlotsOverlap(startTime, endTime, new Date(apt.start_time), new Date(apt.end_time))) {
+      conflicts.push({
+        type: 'calendar_appointment',
+        appointment: apt,
+      });
     }
   }
 
-  // 1. Check provider appointments
-  if (providerId) {
-    const providerAppointments = await db
-      .collection('appointments')
-      .find({
-        user_id: userId,
-        tenant_id: tenantId,
-        provider_id: providerId,
-        deleted_at: { $exists: false },
-        status: 'scheduled',
-        start_time: {
-          $lt: endTime.toISOString(),
-        },
-        end_time: {
-          $gt: startTime.toISOString(),
-        },
-      })
-      .toArray();
-
-    for (const apt of providerAppointments) {
-      if (excludeAppointmentId && apt.id === excludeAppointmentId) continue;
-
-      if (doTimeSlotsOverlap(startTime, endTime, new Date(apt.start_time), new Date(apt.end_time))) {
-        conflicts.push({
-          type: 'provider_appointment',
-          appointment: apt,
-        });
-      }
-    }
-
-    // Check blocked times for provider
-    const blockedTimes = await db
-      .collection('blocked_times')
-      .find({
-        user_id: userId,
-        tenant_id: tenantId,
-        deleted_at: { $exists: false },
-        $or: [
-          { provider_id: providerId },
-          { provider_id: { $exists: false } }, // All-provider blocks
-        ],
-      })
-      .toArray();
-
-    for (const blocked of blockedTimes) {
-      const blockedStart = toDate(blocked.start_time);
-      const blockedEnd = toDate(blocked.end_time);
-      if (!blockedStart || !blockedEnd) continue;
-      if (doTimeSlotsOverlap(startTime, endTime, blockedStart, blockedEnd)) {
-        conflicts.push({
-          type: 'blocked_time',
-          blockedTime: blocked,
-        });
-      }
-    }
-
-    // Check provider working hours
-    const provider = await db.collection('providers').findOne({ id: providerId, user_id: userId, tenant_id: tenantId });
-    if (provider) {
-      const dayOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][
-        startTime.getDay()
-      ];
-      const workingHours = provider.working_hours?.[dayOfWeek];
-
-      if (workingHours) {
-        const [startHour, startMinute] = workingHours.start.split(':').map(Number);
-        const [endHour, endMinute] = workingHours.end.split(':').map(Number);
-
-        const dayStart = new Date(startTime);
-        dayStart.setHours(startHour, startMinute, 0, 0);
-        const dayEnd = new Date(startTime);
-        dayEnd.setHours(endHour, endMinute, 0, 0);
-
-        if (startTime < dayStart || endTime > dayEnd) {
-          conflicts.push({
-            type: 'outside_working_hours',
-            workingHours,
-          });
-        }
-      }
-    }
-  }
-
-  // 2. Check resource availability
-  if (resourceId) {
-    const resourceAppointments = await db
-      .collection('appointments')
-      .find({
-        user_id: userId,
-        tenant_id: tenantId,
-        resource_id: resourceId,
-        deleted_at: { $exists: false },
-        status: 'scheduled',
-        start_time: {
-          $lt: endTime.toISOString(),
-        },
-        end_time: {
-          $gt: startTime.toISOString(),
-        },
-      })
-      .toArray();
-
-    for (const apt of resourceAppointments) {
-      if (excludeAppointmentId && apt.id === excludeAppointmentId) continue;
-
-      if (doTimeSlotsOverlap(startTime, endTime, new Date(apt.start_time), new Date(apt.end_time))) {
-        conflicts.push({
-          type: 'resource_appointment',
-          appointment: apt,
-        });
-      }
-    }
-
-    // Check blocked times for resource
-    const blockedTimes = await db
-      .collection('blocked_times')
-      .find({
-        user_id: userId,
-        tenant_id: tenantId,
-        deleted_at: { $exists: false },
-        $or: [
-          { resource_id: resourceId },
-          { resource_id: { $exists: false } }, // All-resource blocks
-        ],
-      })
-      .toArray();
-
-    for (const blocked of blockedTimes) {
-      const blockedStart = toDate(blocked.start_time);
-      const blockedEnd = toDate(blocked.end_time);
-      if (!blockedStart || !blockedEnd) continue;
-      if (doTimeSlotsOverlap(startTime, endTime, blockedStart, blockedEnd)) {
-        conflicts.push({
-          type: 'blocked_time',
-          blockedTime: blocked,
-        });
-      }
-    }
-  }
-
-  // 3. Generate suggestions if conflicts found
+  // Generate suggestions if conflicts found
   const suggestions: Array<{ start: Date; end: Date }> = [];
   if (includeSuggestions && conflicts.length > 0) {
     const duration = endTime.getTime() - startTime.getTime();
     const searchWindowEnd = new Date(endTime.getTime() + 48 * 60 * 60 * 1000);
 
     const busyQuery: Filter<BusyInterval> = {
-      user_id: userId,
-      tenant_id: tenantId,
+      ...appointmentScope,
       deleted_at: { $exists: false },
       status: { $ne: 'cancelled' },
       start_time: { $lt: searchWindowEnd.toISOString() },
       end_time: { $gt: endTime.toISOString() },
       ...(excludeAppointmentId ? { id: { $ne: excludeAppointmentId } } : {}),
-      ...(providerId ? { provider_id: providerId } : {}),
-      ...(resourceId ? { resource_id: resourceId } : {}),
     };
 
     const busyIntervals = (await db.collection('appointments').find(busyQuery as any).toArray()) as unknown as BusyInterval[];
@@ -286,6 +105,9 @@ export async function checkAppointmentConflict(
       searchStart = new Date(searchStart.getTime() + 15 * 60 * 1000);
     }
   }
+
+  // Keep timeZone var referenced so options parity is maintained
+  void (options.timeZone || DEFAULT_TIME_ZONE);
 
   return {
     hasConflict: conflicts.length > 0,

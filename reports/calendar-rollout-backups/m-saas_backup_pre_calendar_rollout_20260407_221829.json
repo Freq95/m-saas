@@ -1,0 +1,9 @@
+{
+  "kind": "calendar-rollout-backup",
+  "createdAt": "2026-04-07T19:18:29.538Z",
+  "sourceDbName": "m-saas",
+  "backupDbName": "m-saas_backup_pre_calendar_rollout_20260407_221829",
+  "status": "failed",
+  "error": "Database name m-saas_backup_pre_calendar_rollout_20260407_221829 is too long.  Max database name length is 38 bytes.",
+  "failedAt": "2026-04-07T19:18:29.976Z"
+}
