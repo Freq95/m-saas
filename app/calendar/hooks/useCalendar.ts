@@ -1,6 +1,5 @@
 import { useReducer, useCallback, useEffect, useMemo } from 'react';
 import { addWeeks, subWeeks, addMonths, subMonths, addDays, subDays } from 'date-fns';
-import type { CalendarColorMode } from '@/lib/calendar-color-policy';
 
 export type CalendarViewType = 'week' | 'workweek' | 'month' | 'day';
 
@@ -11,10 +10,6 @@ export interface CalendarPermissions {
   can_edit_all: boolean;
   can_delete_own: boolean;
   can_delete_all: boolean;
-}
-
-export interface AppointmentCalendarSettings {
-  color_mode?: CalendarColorMode;
 }
 
 interface Appointment {
@@ -43,12 +38,11 @@ interface Appointment {
   calendar_id?: number | null;
   created_by_user_id?: string | null;
   dentist_db_user_id?: string | null;
+  dentist_id?: number | null;
   dentist_display_name?: string | null;
   calendar_name?: string | null;
-  calendar_color?: string | null;
-  calendar_is_default?: boolean | null;
-  calendar_settings?: AppointmentCalendarSettings | null;
-  dentist_color?: string | null;
+  color_mine?: string | null;
+  color_others?: string | null;
   can_edit?: boolean;
   can_delete?: boolean;
   can_drag?: boolean;

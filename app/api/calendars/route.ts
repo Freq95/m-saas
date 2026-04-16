@@ -49,6 +49,10 @@ export async function GET(_request: NextRequest) {
         }).toArray(),
       ]);
 
+      const ownCalendarIds = ownCalendarDocs
+        .map((c: any) => c.id)
+        .filter((id: unknown): id is number => typeof id === 'number');
+
       const sharedCalendarIds = acceptedShares
         .map((share: any) => share.calendar_id)
         .filter((id: unknown): id is number => typeof id === 'number');
@@ -72,7 +76,6 @@ export async function GET(_request: NextRequest) {
           isOwner: true,
           permissions: OWNER_CALENDAR_PERMISSIONS,
           shareId: null,
-          dentistColor: null,
         }))
       );
 
@@ -87,7 +90,6 @@ export async function GET(_request: NextRequest) {
             isOwner: false,
             permissions: normalizeCalendarPermissions(share.permissions),
             shareId: typeof share.id === 'number' ? share.id : null,
-            dentistColor: typeof share.dentist_color === 'string' ? share.dentist_color : null,
             sharedByName: typeof share.shared_by_name === 'string' ? share.shared_by_name : null,
             dentistDisplayName: typeof share.dentist_display_name === 'string' ? share.dentist_display_name : null,
           };
@@ -95,9 +97,25 @@ export async function GET(_request: NextRequest) {
         .filter(Boolean)
         .sort((a: any, b: any) => String(a.name || '').localeCompare(String(b.name || ''), 'ro'));
 
+      const sentPendingShareDocs = ownCalendarIds.length > 0
+        ? await db.collection('calendar_shares').find({
+            calendar_id: { $in: ownCalendarIds },
+            status: 'pending',
+          }).sort({ created_at: -1 }).toArray()
+        : [];
+
+      const sentPendingShares = sentPendingShareDocs.map((share: any) => ({
+        id: typeof share.id === 'number' ? share.id : 0,
+        calendar_id: share.calendar_id,
+        shared_with_email: share.shared_with_email || '',
+        dentist_display_name: typeof share.dentist_display_name === 'string' ? share.dentist_display_name : null,
+        created_at: share.created_at || null,
+      }));
+
       return {
         ownCalendars,
         sharedCalendars,
+        sentPendingShares,
       };
     });
 
@@ -125,7 +143,7 @@ export async function POST(request: NextRequest) {
       return createErrorResponse(validationResult.error.errors[0]?.message || 'Invalid input', 400);
     }
 
-    const { name, color } = validationResult.data;
+    const { name, color_mine, color_others } = validationResult.data;
     await getOrCreateDefaultCalendar(auth);
 
     const db = await getMongoDbOrThrow();
@@ -139,12 +157,10 @@ export async function POST(request: NextRequest) {
       owner_user_id: userId,
       owner_db_user_id: dbUserId,
       name,
-      color: color || '#2563eb',
+      color_mine: color_mine || '#2563EB',
+      color_others: color_others || '#64748B',
       is_default: false,
       is_active: true,
-      settings: {
-        color_mode: 'category',
-      },
       created_at: now,
       updated_at: now,
     };

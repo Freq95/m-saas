@@ -1,141 +1,128 @@
-.headerActions {
+.tabRow {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-3);
+  margin-bottom: var(--space-5);
   flex-wrap: wrap;
 }
 
-.noticeCard,
-.colorInfoCard,
-.loadingCard {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  padding: var(--space-5);
+.tabRowRight {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
 }
 
-.noticeCard {
-  margin-bottom: var(--space-5);
-  color: var(--color-text-soft);
-  line-height: 1.6;
-}
-
-.colorInfoCard {
-  margin-bottom: var(--space-5);
-}
-
-.colorInfoCard h2,
-.sectionHeader h2,
-.resourceCard h3,
-.calendarCardCopy h3 {
-  margin: 0;
-  color: var(--color-text);
-}
-
-.colorInfoCard p,
-.sectionHeader p,
-.calendarCardCopy p,
-.resourceCard p {
-  margin: 0;
-  color: var(--color-text-soft);
-  line-height: 1.55;
+.pendingNote {
+  font-size: 0.8rem;
+  color: color-mix(in srgb, #d97706 90%, var(--color-text));
+  white-space: nowrap;
 }
 
 .errorStack {
   display: grid;
   gap: var(--space-2);
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-4);
 }
 
-.section {
-  display: grid;
-  gap: var(--space-4);
-  margin-bottom: var(--space-6);
-}
-
-.sectionHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.sectionHeaderActions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.sectionCount {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 2rem;
-  min-height: 2rem;
-  padding: 0 0.65rem;
-  border-radius: 999px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-muted);
-  color: var(--color-text);
-  font-weight: 650;
-  font-size: 0.92rem;
-}
-
-.cardList,
-.resourceList {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.calendarCard,
-.resourceCard {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
+/* Table */
+.tableWrap {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
+  overflow: hidden;
+  margin-bottom: var(--space-5);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  text-align: left;
   padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  vertical-align: middle;
 }
 
-.calendarCardMain {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  min-width: 0;
+.table th {
+  color: var(--color-text-soft);
+  font-size: 0.88rem;
+  font-weight: 600;
 }
 
-.calendarCardCopy {
-  display: grid;
-  gap: 0.35rem;
-  min-width: 0;
+.row:hover {
+  background: var(--color-surface-muted);
 }
 
-.calendarTitleRow {
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.sectionRow td {
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-surface-muted);
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--color-text-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.colType {
+  width: 110px;
+  white-space: nowrap;
+}
+
+.colInfo {
+  width: 240px;
+}
+
+.colActions {
+  text-align: right;
+  width: 1%;
+  white-space: nowrap;
+}
+
+/* Calendar name cell */
+.calNameCell {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
 }
 
-.badgeRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
+.colorDot {
+  flex-shrink: 0;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, black 10%, transparent);
 }
 
+.calName {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+/* Badges */
 .badge,
-.badgeMuted {
+.badgeMuted,
+.badgePending,
+.tag {
   display: inline-flex;
   align-items: center;
-  min-height: 1.6rem;
-  padding: 0 0.6rem;
+  min-height: 1.5rem;
+  padding: 0 0.55rem;
   border-radius: 999px;
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   font-weight: 650;
+  white-space: nowrap;
 }
 
 .badge {
@@ -146,51 +133,154 @@
 .badgeMuted {
   background: var(--color-surface-muted);
   color: var(--color-text-soft);
+  border: 1px solid var(--color-border);
 }
 
-.colorSwatch {
-  width: 0.95rem;
-  height: 0.95rem;
-  border-radius: 999px;
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, black 12%, transparent);
-  margin-top: 0.35rem;
-  flex-shrink: 0;
+.badgePending {
+  background: color-mix(in srgb, #d97706 12%, transparent);
+  color: color-mix(in srgb, #d97706 90%, var(--color-text));
 }
 
-.cardActions {
+.badgeSent {
+  background: color-mix(in srgb, var(--color-text-soft) 10%, transparent);
+  color: var(--color-text-soft);
+  border: 1px solid var(--color-border);
+}
+
+.tag {
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+/* Cell text */
+.cellMuted {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.cellEmpty {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  opacity: 0.45;
+}
+
+/* Action group */
+.actionGroup {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
 }
 
-.permissionsText {
-  font-size: 0.86rem;
+/* Icon buttons */
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-soft);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
 }
 
-@media (max-width: 840px) {
-  .sectionHeader,
-  .calendarCard,
-  .resourceCard {
-    flex-direction: column;
-  }
+.iconButton:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+}
 
-  .sectionCount {
-    align-self: flex-start;
+.iconButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.iconButtonDanger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--color-danger);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.iconButtonDanger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-danger) 30%, transparent);
+}
+
+.iconButtonDanger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Connect-style button (used for Accept) */
+.connectBtn {
+  min-height: 30px;
+  padding: 0.3rem 0.75rem;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-soft);
+  font-size: 0.83rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.connectBtn:hover:not(:disabled) {
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+  border-color: var(--color-border-strong);
+}
+
+.connectBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Empty / loading states */
+.stateRow {
+  text-align: center;
+  padding: var(--space-7) var(--space-4) !important;
+  color: var(--color-text-soft);
+  font-size: 0.9rem;
+}
+
+.inlineLink {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-accent);
+  font-size: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.inlineLink:hover {
+  opacity: 0.8;
+}
+
+@media (max-width: 768px) {
+  .colInfo {
+    display: none;
   }
 }
 
-@media (max-width: 640px) {
-  .headerActions,
-  .cardActions,
-  .sectionHeaderActions {
-    width: 100%;
-  }
-
-  .headerActions :global(button),
-  .cardActions :global(button),
-  .sectionHeaderActions :global(button) {
-    width: 100%;
-    justify-content: center;
+@media (max-width: 480px) {
+  .colType {
+    display: none;
   }
 }

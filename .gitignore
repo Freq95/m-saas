@@ -51,7 +51,11 @@ ARCHITECTURE.md
 CODE-HEALTH.md
 PRODUCT.md
 SMS-FEATURE-PLAN.md
+CALENDAR-SHARING-PLAN.md
 templates/GDPR-ROPA.md
+
+# Calendar rollout backups (pre-rewrite snapshots, history preserved in git)
+reports/calendar-rollout-backups/
 
 # ui-review
 app/ui-review/*

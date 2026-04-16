@@ -82,5 +82,6 @@ export function buildAppointmentDentistFields(assignment: AppointmentDentistAssi
   return {
     ...buildServiceOwnerFields(assignment),
     dentist_db_user_id: assignment.dentistDbUserId,
+    dentist_id: assignment.serviceOwnerUserId,
   };
 }

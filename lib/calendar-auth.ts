@@ -18,12 +18,10 @@ export interface CalendarDoc {
   owner_user_id: number;
   owner_db_user_id: ObjectId;
   name: string;
-  color: string;
+  color_mine: string;
+  color_others: string;
   is_default: boolean;
   is_active: boolean;
-  settings?: {
-    color_mode?: 'category' | 'dentist';
-  };
   deleted_at?: string | null;
   created_at: string;
   updated_at: string;
@@ -39,7 +37,6 @@ export interface CalendarShareDoc {
   shared_with_email: string;
   shared_with_tenant_id: ObjectId | null;
   permissions?: Partial<CalendarPermissions> | null;
-  dentist_color?: string | null;
   dentist_display_name?: string | null;
   status: 'pending' | 'accepted' | 'declined' | 'revoked';
   invite_token_hash?: string | null;
@@ -59,11 +56,11 @@ export interface CalendarAuthContext {
   isOwner: boolean;
   permissions: CalendarPermissions;
   shareId: number | null;
-  dentistColor: string | null;
 }
 
 const DEFAULT_PERSONAL_CALENDAR_NAME = 'Calendarul meu';
-const DEFAULT_PERSONAL_CALENDAR_COLOR = '#2563eb';
+const DEFAULT_PERSONAL_CALENDAR_COLOR_MINE = '#2563EB';
+const DEFAULT_PERSONAL_CALENDAR_COLOR_OTHERS = '#64748B';
 
 export const OWNER_CALENDAR_PERMISSIONS: CalendarPermissions = {
   can_view: true,
@@ -139,12 +136,10 @@ export async function getOrCreateDefaultCalendar(authContext: AuthContext): Prom
     owner_user_id: authContext.userId,
     owner_db_user_id: authContext.dbUserId,
     name: DEFAULT_PERSONAL_CALENDAR_NAME,
-    color: DEFAULT_PERSONAL_CALENDAR_COLOR,
+    color_mine: DEFAULT_PERSONAL_CALENDAR_COLOR_MINE,
+    color_others: DEFAULT_PERSONAL_CALENDAR_COLOR_OTHERS,
     is_default: true,
     is_active: true,
-    settings: {
-      color_mode: 'category',
-    },
     created_at: now,
     updated_at: now,
   };
@@ -189,7 +184,6 @@ export async function getCalendarAuth(authContext: AuthContext, calendarId: numb
       isOwner: true,
       permissions: OWNER_CALENDAR_PERMISSIONS,
       shareId: null,
-      dentistColor: null,
     };
   }
 
@@ -217,7 +211,6 @@ export async function getCalendarAuth(authContext: AuthContext, calendarId: numb
     isOwner: false,
     permissions: normalizeCalendarPermissions(share.permissions),
     shareId: typeof share.id === 'number' ? share.id : null,
-    dentistColor: typeof share.dentist_color === 'string' ? share.dentist_color : null,
   };
 }
 

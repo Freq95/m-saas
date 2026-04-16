@@ -17,6 +17,7 @@ import { appointmentsListCacheKey, invalidateReadCaches } from '@/lib/cache-keys
 import { checkWriteRateLimit } from '@/lib/rate-limit';
 import { logDataAccess } from '@/lib/audit';
 import { getTenantTimeZone } from '@/lib/timezone';
+import { ExplicitClientSelectionError, resolveAppointmentClientLink } from './client-linking';
 
 // GET /api/appointments - Get appointments
 export async function GET(request: NextRequest) {
@@ -130,6 +131,7 @@ export async function POST(request: NextRequest) {
       calendarId,
       dentistUserId,
       serviceId,
+      clientId,
       clientName,
       clientEmail,
       clientPhone,
@@ -195,7 +197,7 @@ export async function POST(request: NextRequest) {
     }
 
     const tenantTimeZone = await getTenantTimeZone(appointmentTenantId);
-    const { findOrCreateClient, linkAppointmentToClient } = await import('@/lib/client-matching');
+    const { linkAppointmentToClient } = await import('@/lib/client-matching');
 
     const creationResult = await withAppointmentWriteLocks(
       {
@@ -220,14 +222,16 @@ export async function POST(request: NextRequest) {
           return null;
         }
 
-        const client = await findOrCreateClient(
-          appointmentUserId,
-          appointmentTenantId,
-          clientName,
-          clientEmail,
-          clientPhone,
-          forceNewClient ?? false
-        );
+        const client = await resolveAppointmentClientLink({
+          db,
+          userId: appointmentUserId,
+          tenantId: appointmentTenantId,
+          clientId,
+          name: clientName,
+          email: clientEmail || null,
+          phone: clientPhone || null,
+          forceNewClient: forceNewClient ?? false,
+        });
 
         const now = new Date().toISOString();
         const appointmentId = await getNextNumericId('appointments');
@@ -306,6 +310,12 @@ export async function POST(request: NextRequest) {
     }
     return createSuccessResponse({ appointment }, 201);
   } catch (error) {
+    if (error instanceof ExplicitClientSelectionError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 409 }
+      );
+    }
     if (error instanceof AppointmentWriteBusyError) {
       return NextResponse.json(
         { error: 'Another booking is being created for this slot. Please try again.' },

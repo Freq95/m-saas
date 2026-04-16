@@ -45,9 +45,8 @@ export function decorateAppointmentWithCalendarAccess(
   return {
     ...appointment,
     calendar_name: appointment.calendar_name || calendar.name,
-    calendar_color: appointment.calendar_color || calendar.color,
-    calendar_settings: appointment.calendar_settings || calendar.settings || null,
-    dentist_color: appointment.dentist_color || calendar.dentistColor,
+    color_mine: appointment.color_mine || calendar.color_mine,
+    color_others: appointment.color_others || calendar.color_others,
     can_edit: canEdit,
     can_delete: canDelete,
     can_change_status: canEdit,

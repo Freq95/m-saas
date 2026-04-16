@@ -15,6 +15,7 @@ import { logger } from '@/lib/logger';
 import { generateRecurringInstances } from '@/lib/recurring-utils';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
 import { getTenantTimeZone } from '@/lib/timezone';
+import { ExplicitClientSelectionError, resolveAppointmentClientLink } from '../client-linking';
 
 interface RecurringConflict {
   start: Date;
@@ -43,6 +44,7 @@ export async function POST(request: NextRequest) {
       calendarId,
       dentistUserId,
       serviceId,
+      clientId,
       clientName,
       clientEmail,
       clientPhone,
@@ -81,15 +83,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid numeric fields' }, { status: 400 });
     }
 
-    const { findOrCreateClient, updateClientStats } = await import('@/lib/client-matching');
-    const client = await findOrCreateClient(
-      appointmentUserId,
-      appointmentTenantId,
-      clientName,
-      clientEmail || undefined,
-      clientPhone || undefined,
-      forceNewClient
-    );
+    const { updateClientStats } = await import('@/lib/client-matching');
+    const client = await resolveAppointmentClientLink({
+      db,
+      userId: appointmentUserId,
+      tenantId: appointmentTenantId,
+      clientId,
+      name: clientName,
+      email: clientEmail || null,
+      phone: clientPhone || null,
+      forceNewClient,
+    });
 
     const recurrenceRule: RecurrenceRule = {
       frequency: recurrence.frequency,
@@ -243,6 +247,12 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    if (error instanceof ExplicitClientSelectionError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 409 }
+      );
+    }
     if (error instanceof AppointmentWriteBusyError) {
       return NextResponse.json(
         { error: 'Another booking is being created for this slot. Please try again.' },

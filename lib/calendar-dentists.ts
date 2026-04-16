@@ -4,36 +4,17 @@ import {
   getCalendarAuth,
   getCalendarById,
   normalizeCalendarPermissions,
-  type CalendarDoc,
   type CalendarShareDoc,
 } from '@/lib/calendar-auth';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
-import {
-  buildDentistPaletteState,
-  isDentistPaletteColor,
-  normalizeDentistColor,
-  normalizeCalendarColorMode,
-} from '@/lib/calendar-color-policy';
 
 export interface BookableCalendarDentist {
   userId: number;
   dbUserId: ObjectId;
   tenantId: ObjectId;
   displayName: string;
-  dentistColor: string;
   isOwner: boolean;
   isCurrentUser: boolean;
-}
-
-export interface CalendarDentistColorState {
-  calendar: CalendarDoc;
-  reservedColors: string[];
-  reservedPaletteColors: string[];
-  ownerNeedsPaletteNormalization: boolean;
-}
-
-function buildScopeKey(userId: number, tenantId: ObjectId | string): string {
-  return `${tenantId.toString()}:${userId}`;
 }
 
 function toObjectId(value: unknown): ObjectId | null {
@@ -93,7 +74,6 @@ export async function getBookableDentistsForCalendar(
         shared_with_tenant_id: 1,
         shared_with_email: 1,
         permissions: 1,
-        dentist_color: 1,
         dentist_display_name: 1,
       },
     }
@@ -109,19 +89,14 @@ export async function getBookableDentistsForCalendar(
     );
   });
 
-  const userDocs = uniqueObjectIds([
+  const userIds = uniqueObjectIds([
     toObjectId(calendar.owner_db_user_id),
     ...eligibleShares.map((share) => share.shared_with_user_id),
-  ]).length > 0
+  ]);
+
+  const userDocs = userIds.length > 0
     ? await db.collection('users').find(
-        {
-          _id: {
-            $in: uniqueObjectIds([
-              toObjectId(calendar.owner_db_user_id),
-              ...eligibleShares.map((share) => share.shared_with_user_id),
-            ]),
-          },
-        },
+        { _id: { $in: userIds } },
         {
           projection: {
             _id: 1,
@@ -153,7 +128,6 @@ export async function getBookableDentistsForCalendar(
       dbUserId: ownerDbUserId,
       tenantId: calendar.tenant_id,
       displayName: ownerDisplayName,
-      dentistColor: normalizeDentistColor(calendar.color) || calendar.color,
       isOwner: true,
       isCurrentUser: ownerDbUserId.equals(authContext.dbUserId),
     },
@@ -175,10 +149,6 @@ export async function getBookableDentistsForCalendar(
         (typeof share.dentist_display_name === 'string' ? share.dentist_display_name.trim() : '') ||
         (typeof share.shared_with_email === 'string' ? share.shared_with_email : '') ||
         'Medic',
-      dentistColor:
-        normalizeDentistColor(share.dentist_color) ||
-        normalizeDentistColor(calendar.color) ||
-        calendar.color,
       isOwner: false,
       isCurrentUser: sharedDbUserId.equals(authContext.dbUserId),
     });
@@ -203,47 +173,4 @@ export async function resolveBookableDentistForCalendar(
   }
 
   return dentist;
-}
-
-export async function getCalendarDentistColorState(
-  calendarId: number,
-  options: {
-    excludeShareId?: number | null;
-  } = {}
-): Promise<CalendarDentistColorState> {
-  const calendar = await getCalendarById(calendarId);
-  if (!calendar) {
-    throw new AuthError('Calendar not found', 404);
-  }
-
-  const db = await getMongoDbOrThrow();
-  const shareDocs = await db.collection<CalendarShareDoc>('calendar_shares').find(
-    {
-      calendar_id: calendarId,
-      ...(typeof options.excludeShareId === 'number' ? { id: { $ne: options.excludeShareId } } : {}),
-    },
-    {
-      projection: {
-        id: 1,
-        status: 1,
-        dentist_color: 1,
-      },
-    }
-  ).toArray();
-  const colorState = buildDentistPaletteState({
-    ownerColor: calendar.color,
-    colorMode: normalizeCalendarColorMode(calendar.settings?.color_mode),
-    shares: shareDocs.map((share) => ({
-      id: share.id,
-      status: share.status,
-      dentistColor: share.dentist_color,
-    })),
-  });
-
-  return {
-    calendar,
-    reservedColors: colorState.reservedColors,
-    reservedPaletteColors: colorState.reservedPaletteColors.filter((value) => isDentistPaletteColor(value)),
-    ownerNeedsPaletteNormalization: colorState.ownerNeedsPaletteNormalization,
-  };
 }

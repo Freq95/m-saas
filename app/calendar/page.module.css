@@ -1129,6 +1129,133 @@
   line-height: 1.45;
 }
 
+/* ─────────────────────────────────────────────────────────
+   APPOINTMENT MODAL — landscape (wide-screen) layout
+───────────────────────────────────────────────────────── */
+.modalWide {
+  max-width: 860px;
+}
+.modalGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+.modalGridCol {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+@media (min-width: 900px) and (min-height: 560px) {
+  .modalGrid { grid-template-columns: 1fr 1fr; column-gap: 1.6rem; }
+}
+
+/* ─────────────────────────────────────────────────────────
+   APPOINTMENT MODAL — client autocomplete
+───────────────────────────────────────────────────────── */
+.clientAutocomplete {
+  position: relative;
+}
+.clientSuggestionsDropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 20;
+}
+.clientSuggestionItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.8rem;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  color: var(--color-text);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+  transition:
+    background var(--transition-fast),
+    box-shadow var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+.clientSuggestionItem:last-child { border-bottom: none; }
+.clientSuggestionItem:hover,
+.clientSuggestionItem:focus {
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface-strong));
+  outline: none;
+}
+.clientSuggestionItemActive,
+.clientSuggestionItemActive:hover,
+.clientSuggestionItemActive:focus {
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-accent) 18%, transparent) 0%,
+      color-mix(in srgb, var(--color-accent) 9%, var(--color-surface-strong)) 100%
+    );
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb, var(--color-accent) 86%, white 14%),
+    inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 24%, transparent),
+    var(--shadow-sm);
+  color: var(--color-text);
+}
+.clientSuggestionItemActive .clientSuggestionName {
+  color: color-mix(in srgb, var(--color-accent-strong) 78%, var(--color-text));
+}
+.clientSuggestionItemActive .clientSuggestionMeta {
+  color: color-mix(in srgb, var(--color-accent-strong) 54%, var(--color-text-soft));
+}
+.clientSuggestionName { font-size: 0.9rem; font-weight: 550; }
+.clientSuggestionMeta { font-size: 0.76rem; color: var(--color-text-soft); }
+.clientSuggestionEmpty {
+  padding: 0.6rem 0.8rem;
+  font-size: 0.8rem;
+  color: var(--color-text-soft);
+}
+
+.clientStatusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.6rem;
+  margin-top: 0.35rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  max-width: 100%;
+}
+.clientStatusBadgeExists {
+  background: color-mix(in srgb, var(--color-success, #16a34a) 14%, transparent);
+  border-color: color-mix(in srgb, var(--color-success, #16a34a) 40%, transparent);
+  color: color-mix(in srgb, var(--color-success, #16a34a) 82%, var(--color-text));
+}
+.clientStatusBadgeNew {
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 14%, transparent);
+  border-color: color-mix(in srgb, var(--color-warning, #f59e0b) 40%, transparent);
+  color: color-mix(in srgb, var(--color-warning, #f59e0b) 82%, var(--color-text));
+}
+.clientStatusBadgeClear {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0 0.1rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  min-height: unset;
+}
+.clientStatusBadgeClear:hover { opacity: 0.7; }
+
 .segmentedControl {
   display: inline-flex;
   align-items: center;
@@ -1481,6 +1608,89 @@
   color: var(--color-text-soft);
   font-size: 0.82rem;
   line-height: 1.45;
+}
+
+/* ─────────────────────────────────────────────────────────
+   SHARE MODAL — compact table
+───────────────────────────────────────────────────────── */
+.shareTableWrap {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.shareTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.shareTable th,
+.shareTable td {
+  text-align: left;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.shareTable th {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-soft);
+  background: var(--color-surface-muted);
+}
+
+.shareTableRow:last-child td {
+  border-bottom: none;
+}
+
+.shareTableRow:hover {
+  background: var(--color-surface-muted);
+}
+
+.shareTableColStatus {
+  width: 100px;
+  white-space: nowrap;
+}
+
+.shareTableColPerms {
+  width: 200px;
+}
+
+.shareTableColActions {
+  text-align: right;
+  width: 1%;
+  white-space: nowrap;
+}
+
+.shareTableActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+.shareRecipientCell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.shareRecipientName {
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shareRecipientEmail {
+  font-size: 0.75rem;
+  color: var(--color-text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .readOnlyValue {

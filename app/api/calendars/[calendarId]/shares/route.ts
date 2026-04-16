@@ -4,7 +4,6 @@ import {
   getCalendarById,
   normalizeCalendarPermissions,
 } from '@/lib/calendar-auth';
-import { getCalendarDentistColorState } from '@/lib/calendar-dentists';
 import { createCalendarShareInviteToken, sendCalendarShareInviteEmail } from '@/lib/calendar-share-invite';
 import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from '@/lib/db/mongo-utils';
 import { getAuthUser } from '@/lib/auth-helpers';
@@ -88,25 +87,13 @@ export async function POST(request: NextRequest, props: { params: Promise<{ cale
       return createErrorResponse(validationResult.error.errors[0]?.message || 'Invalid input', 400);
     }
 
-    const { email: sharedEmail, permissions, dentistColor } = validationResult.data;
+    const { email: sharedEmail, permissions } = validationResult.data;
     if (sharedEmail === email.toLowerCase().trim()) {
       return createErrorResponse('Nu poti partaja calendarul cu tine insuti', 400);
     }
 
     const calendar = await requireOwnerCalendar(auth, calendarId);
     const db = await getMongoDbOrThrow();
-    const colorState = await getCalendarDentistColorState(calendarId);
-
-    if (colorState.ownerNeedsPaletteNormalization) {
-      return createErrorResponse(
-        'Alege mai intai o culoare presetata pentru owner in modul Dentisti.',
-        409
-      );
-    }
-
-    if (colorState.reservedPaletteColors.includes(dentistColor)) {
-      return createErrorResponse('Aceasta culoare este deja folosita pe acest calendar', 409);
-    }
 
     const duplicateShare = await db.collection('calendar_shares').findOne({
       calendar_id: calendarId,
@@ -140,7 +127,6 @@ export async function POST(request: NextRequest, props: { params: Promise<{ cale
       shared_with_email: sharedEmail,
       shared_with_tenant_id: existingUser?.tenant_id || null,
       permissions: normalizeCalendarPermissions(permissions),
-      dentist_color: dentistColor,
       dentist_display_name: typeof existingUser?.name === 'string' && existingUser.name.trim()
         ? existingUser.name.trim()
         : sharedEmail,

@@ -6,7 +6,7 @@ async function createTenantIndexes() {
 
   await db.collection('appointments').createIndex({ tenant_id: 1, start_time: -1 });
   await db.collection('appointments').createIndex({ tenant_id: 1, client_id: 1 });
-  await db.collection('appointments').createIndex({ tenant_id: 1, provider_id: 1, start_time: 1 });
+  await db.collection('appointments').createIndex({ tenant_id: 1, calendar_id: 1, start_time: 1 });
   await db.collection('appointments').createIndex({ tenant_id: 1, status: 1 });
 
   await db.collection('clients').createIndex({ tenant_id: 1, status: 1 });
@@ -41,9 +41,6 @@ async function createTenantIndexes() {
   }
 
   await db.collection('client_files').createIndex({ tenant_id: 1, client_id: 1 });
-  await db.collection('providers').createIndex({ tenant_id: 1, is_active: 1 });
-  await db.collection('resources').createIndex({ tenant_id: 1, type: 1, is_active: 1 });
-  await db.collection('blocked_times').createIndex({ tenant_id: 1, start_time: 1 });
 
   console.log('Tenant indexes created.');
 }

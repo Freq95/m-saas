@@ -154,7 +154,6 @@ describe('POST /api/calendars/[calendarId]/shares', () => {
           can_delete_own: true,
           can_delete_all: false,
         },
-        dentistColor: '#10b981',
       }),
     });
 

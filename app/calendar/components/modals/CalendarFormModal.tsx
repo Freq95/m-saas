@@ -1,21 +1,19 @@
 'use client';
 
-import { type CSSProperties, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import styles from '../../page.module.css';
 import type { CalendarListItem } from '../../hooks';
 import {
-  DENTIST_COLOR_PALETTE,
-  isDentistPaletteColor,
-  normalizeDentistColor,
-  requiresDentistPaletteNormalization,
+  DEFAULT_COLOR_MINE,
+  DEFAULT_COLOR_OTHERS,
 } from '@/lib/calendar-color-policy';
 
 type CalendarFormMode = 'create' | 'edit';
 
 export interface CalendarFormValues {
   name: string;
-  color: string;
-  colorMode?: 'category' | 'dentist';
+  color_mine: string;
+  color_others: string;
 }
 
 interface CalendarFormModalProps {
@@ -27,7 +25,12 @@ interface CalendarFormModalProps {
   onDelete?: () => Promise<void>;
 }
 
-const DEFAULT_COLOR = '#2563eb';
+const IconX = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
 
 export function CalendarFormModal({
   isOpen,
@@ -39,51 +42,35 @@ export function CalendarFormModal({
 }: CalendarFormModalProps) {
   const backdropPressStartedRef = useRef(false);
   const [name, setName] = useState('');
-  const [color, setColor] = useState(DEFAULT_COLOR);
-  const [colorMode, setColorMode] = useState<'category' | 'dentist'>('category');
+  const [colorMine, setColorMine] = useState(DEFAULT_COLOR_MINE);
+  const [colorOthers, setColorOthers] = useState(DEFAULT_COLOR_OTHERS);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   const isEditMode = mode === 'edit';
-  const usesDentistPalette = isEditMode && colorMode === 'dentist';
-  const ownerNeedsPaletteNormalization = requiresDentistPaletteNormalization(
-    usesDentistPalette ? 'dentist' : undefined,
-    color
-  );
 
   useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
+    if (!isOpen) return;
     setName(calendar?.name || '');
-    setColor(calendar?.color || DEFAULT_COLOR);
-    setColorMode(calendar?.settings?.color_mode || 'category');
+    setColorMine(calendar?.color_mine || DEFAULT_COLOR_MINE);
+    setColorOthers(calendar?.color_others || DEFAULT_COLOR_OTHERS);
     setError(null);
     setIsSubmitting(false);
     setIsDeleting(false);
   }, [calendar, isOpen]);
 
   useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
+    if (!isOpen) return;
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !isSubmitting && !isDeleting) {
-        onClose();
-      }
+      if (event.key === 'Escape' && !isSubmitting && !isDeleting) onClose();
     };
-
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
   }, [isDeleting, isOpen, isSubmitting, onClose]);
 
   const requestClose = () => {
-    if (isSubmitting || isDeleting) {
-      return;
-    }
+    if (isSubmitting || isDeleting) return;
     onClose();
   };
 
@@ -93,33 +80,20 @@ export function CalendarFormModal({
 
   const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
     const endedOnBackdrop = event.target === event.currentTarget;
-    if (backdropPressStartedRef.current && endedOnBackdrop) {
-      requestClose();
-    }
+    if (backdropPressStartedRef.current && endedOnBackdrop) requestClose();
     backdropPressStartedRef.current = false;
   };
 
   const handleSubmit = async () => {
     const trimmedName = name.trim();
-
     if (!trimmedName) {
       setError('Completeaza numele calendarului.');
       return;
     }
-
-    if (usesDentistPalette && !isDentistPaletteColor(color)) {
-      setError('In modul Dentisti, alege o culoare din paleta presetata.');
-      return;
-    }
-
     setError(null);
     setIsSubmitting(true);
     try {
-      await onSubmit({
-        name: trimmedName,
-        color,
-        colorMode: isEditMode ? colorMode : undefined,
-      });
+      await onSubmit({ name: trimmedName, color_mine: colorMine, color_others: colorOthers });
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Nu am putut salva calendarul.');
     } finally {
@@ -128,15 +102,9 @@ export function CalendarFormModal({
   };
 
   const handleDelete = async () => {
-    if (!onDelete || !calendar || calendar.is_default || isSubmitting || isDeleting) {
-      return;
-    }
-
+    if (!onDelete || !calendar || calendar.is_default || isSubmitting || isDeleting) return;
     const confirmed = window.confirm(`Stergi calendarul "${calendar.name}"?`);
-    if (!confirmed) {
-      return;
-    }
-
+    if (!confirmed) return;
     setError(null);
     setIsDeleting(true);
     try {
@@ -148,15 +116,10 @@ export function CalendarFormModal({
     }
   };
 
-  if (!isOpen) {
-    return null;
-  }
+  if (!isOpen) return null;
 
-  const saveLabel = isSubmitting
-    ? 'Se salveaza...'
-    : isEditMode
-      ? 'Salveaza modificarile'
-      : 'Creeaza calendarul';
+  const busy = isSubmitting || isDeleting;
+  const saveLabel = isSubmitting ? 'Se salveaza...' : isEditMode ? 'Salveaza' : 'Creeaza';
 
   return (
     <div
@@ -166,104 +129,85 @@ export function CalendarFormModal({
     >
       <div
         className={`${styles.modal} ${styles.createSheet}`}
-        onClick={(event) => event.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label={isEditMode ? 'Editeaza calendarul' : 'Creeaza calendar'}
+        aria-label={isEditMode ? 'Editeaza calendarul' : 'Calendar nou'}
       >
         <div className={styles.modalHeader}>
-          <div>
-            <h3>{isEditMode ? 'Setari calendar' : 'Calendar nou'}</h3>
-            <p className={styles.modalSubcopy}>
-              {isEditMode
-                ? 'Actualizezi culoarea, numele si modul de afisare pentru calendar.'
-                : 'Creezi un calendar nou pentru programul tau.'}
-            </p>
-          </div>
-
-          <button type="button" className={styles.modalIconButton} onClick={requestClose} aria-label="Inchide">
-            x
+          <h3>{isEditMode ? 'Setari calendar' : 'Calendar nou'}</h3>
+          <button
+            type="button"
+            className={styles.modalIconButton}
+            onClick={requestClose}
+            aria-label="Inchide"
+            disabled={busy}
+          >
+            <IconX />
           </button>
         </div>
 
         <div className={styles.modalContent}>
-          {error && <div className={`${styles.feedbackBanner} ${styles.feedbackBannerError}`}>{error}</div>}
+          {error && (
+            <div className={`${styles.feedbackBanner} ${styles.feedbackBannerError}`}>
+              {error}
+            </div>
+          )}
 
           <div className={styles.modalField}>
-            <label htmlFor="calendar-name">Nume calendar *</label>
+            <label htmlFor="cal-name">Nume</label>
             <input
-              id="calendar-name"
+              id="cal-name"
               type="text"
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(e) => setName(e.target.value)}
               placeholder="Cabinet 1"
-              disabled={isSubmitting || isDeleting}
+              disabled={busy}
+              maxLength={100}
             />
           </div>
 
-          <div className={styles.modalField}>
-            <label htmlFor="calendar-color">Culoare</label>
-            {usesDentistPalette ? (
-              <div className={styles.paletteGrid} role="listbox" aria-label="Paleta owner dentist">
-                {DENTIST_COLOR_PALETTE.map((paletteColor) => {
-                  const isSelected = paletteColor === normalizeDentistColor(color);
-                  return (
-                    <button
-                      key={paletteColor}
-                      type="button"
-                      className={`${styles.paletteColorButton}${isSelected ? ` ${styles.paletteColorButtonActive}` : ''}`}
-                      style={{ '--palette-color': paletteColor } as CSSProperties}
-                      onClick={() => setColor(paletteColor)}
-                      disabled={isSubmitting || isDeleting}
-                      aria-pressed={isSelected}
-                    >
-                      <span className={styles.paletteColorSwatch} aria-hidden="true" />
-                      <span>{paletteColor}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
+          <div className={styles.modalFieldRow}>
+            <div className={styles.modalField}>
+              <label htmlFor="cal-color-mine">Programarile mele</label>
               <div className={styles.colorFieldRow}>
-                <span className={styles.colorPreview} style={{ backgroundColor: color }} aria-hidden="true" />
+                <span
+                  className={styles.colorPreview}
+                  style={{ backgroundColor: colorMine }}
+                  aria-hidden="true"
+                />
                 <input
-                  id="calendar-color"
+                  id="cal-color-mine"
                   className={styles.colorInput}
                   type="color"
-                  value={color}
-                  onChange={(event) => setColor(event.target.value)}
-                  disabled={isSubmitting || isDeleting}
+                  value={colorMine}
+                  onChange={(e) => setColorMine(e.target.value.toUpperCase())}
+                  disabled={busy}
                 />
-                <span className={styles.colorValue}>{color.toUpperCase()}</span>
+                <span className={styles.colorValue}>{colorMine.toUpperCase()}</span>
               </div>
-            )}
-            <p className={styles.fieldHint}>
-              Pentru calendarele non-implicite, aceasta culoare se foloseste direct pe programari. In modul "Dentisti", ownerul si dentistii partajati folosesc culori unice.
-            </p>
-            {ownerNeedsPaletteNormalization && (
-              <div className={styles.clientSuggestionError}>
-                Acest calendar foloseste o culoare veche. Alege una din paleta presetata pentru modul Dentisti.
-              </div>
-            )}
-          </div>
-
-          {isEditMode && (
-            <div className={styles.modalField}>
-              <label htmlFor="calendar-color-mode">Mod de colorare</label>
-              <select
-                id="calendar-color-mode"
-                value={colorMode}
-                onChange={(event) => setColorMode(event.target.value as 'category' | 'dentist')}
-                disabled={isSubmitting || isDeleting}
-              >
-                <option value="category">Categorii</option>
-                <option value="dentist">Dentisti</option>
-              </select>
-              <p className={styles.fieldHint}>
-                Pentru calendarul implicit, "Categorii" pastreaza culorile pe categorii. Pentru calendarele non-implicite, programarile folosesc culoarea calendarului. "Dentisti" coloreaza dupa dentistul asignat, iar ownerul foloseste culoarea calendarului.
-              </p>
             </div>
-          )}
+
+            <div className={styles.modalField}>
+              <label htmlFor="cal-color-others">Alti dentisti</label>
+              <div className={styles.colorFieldRow}>
+                <span
+                  className={styles.colorPreview}
+                  style={{ backgroundColor: colorOthers }}
+                  aria-hidden="true"
+                />
+                <input
+                  id="cal-color-others"
+                  className={styles.colorInput}
+                  type="color"
+                  value={colorOthers}
+                  onChange={(e) => setColorOthers(e.target.value.toUpperCase())}
+                  disabled={busy}
+                />
+                <span className={styles.colorValue}>{colorOthers.toUpperCase()}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className={styles.modalActions}>
@@ -272,19 +216,24 @@ export function CalendarFormModal({
               type="button"
               onClick={handleDelete}
               className={styles.deleteButton}
-              disabled={isSubmitting || isDeleting}
+              disabled={busy}
             >
-              {isDeleting ? 'Se sterge...' : 'Sterge calendarul'}
+              {isDeleting ? 'Se sterge...' : 'Sterge'}
             </button>
           )}
-          <button type="button" onClick={requestClose} className={styles.cancelButton} disabled={isSubmitting || isDeleting}>
+          <button
+            type="button"
+            onClick={requestClose}
+            className={styles.cancelButton}
+            disabled={busy}
+          >
             Renunta
           </button>
           <button
             type="button"
             onClick={handleSubmit}
             className={styles.saveButton}
-            disabled={isSubmitting || isDeleting}
+            disabled={busy}
           >
             {saveLabel}
           </button>

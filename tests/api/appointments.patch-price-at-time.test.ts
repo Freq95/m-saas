@@ -83,6 +83,7 @@ describe('PATCH /api/appointments/[id] price_at_time behavior', () => {
   const userId = 7;
   let appointments: Array<Doc>;
   let services: Array<Doc>;
+  let clients: Array<Doc>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -93,6 +94,10 @@ describe('PATCH /api/appointments/[id] price_at_time behavior', () => {
     services = [
       { id: 1, user_id: userId, tenant_id: tenantId, name: 'Basic', price: 100 },
       { id: 2, user_id: userId, tenant_id: tenantId, name: 'Premium', price: 250 },
+    ];
+    clients = [
+      { id: 123, user_id: userId, tenant_id: tenantId, name: 'Existing Client' },
+      { id: 456, user_id: userId, tenant_id: tenantId, name: 'Selected Client' },
     ];
 
     appointments = [
@@ -110,7 +115,7 @@ describe('PATCH /api/appointments/[id] price_at_time behavior', () => {
     ];
 
     const db = {
-      collection(name: 'appointments' | 'services') {
+      collection(name: 'appointments' | 'services' | 'clients') {
         if (name === 'appointments') {
           return {
             findOne: vi.fn(async (filter: Doc) => appointments.find((doc) => matchesFilter(doc, filter)) ?? null),
@@ -120,6 +125,11 @@ describe('PATCH /api/appointments/[id] price_at_time behavior', () => {
               if (isObject(update.$set)) Object.assign(item, update.$set);
               return { matchedCount: 1 };
             }),
+          };
+        }
+        if (name === 'clients') {
+          return {
+            findOne: vi.fn(async (filter: Doc) => clients.find((doc) => matchesFilter(doc, filter)) ?? null),
           };
         }
         return {
@@ -162,5 +172,44 @@ describe('PATCH /api/appointments/[id] price_at_time behavior', () => {
     expect(json.appointment.service_id).toBe(1);
     expect(json.appointment.price_at_time).toBe(100);
     expect(appointments[0]?.price_at_time).toBe(100);
+  });
+
+  it('honors an explicitly selected clientId during patch', async () => {
+    const req = new NextRequest('http://localhost/api/appointments/10', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        clientId: 456,
+        clientName: 'Selected Client',
+      }),
+    });
+
+    const res = await PATCH(req, { params: Promise.resolve({ id: '10' }) });
+    expect(res.status).toBe(200);
+    const json = await res.json();
+
+    expect(json.appointment.client_id).toBe(456);
+    expect(appointments[0]?.client_id).toBe(456);
+    expect(appointments[0]?.client_name).toBe('Selected Client');
+  });
+
+  it('returns 409 when an explicitly selected clientId is stale', async () => {
+    clients = clients.filter((client) => client.id !== 456);
+
+    const req = new NextRequest('http://localhost/api/appointments/10', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        clientId: 456,
+        clientName: 'Selected Client',
+      }),
+    });
+
+    const res = await PATCH(req, { params: Promise.resolve({ id: '10' }) });
+    expect(res.status).toBe(409);
+    const json = await res.json();
+
+    expect(json.error).toContain('Clientul selectat nu mai exista');
+    expect(appointments[0]?.client_id).toBe(123);
   });
 });

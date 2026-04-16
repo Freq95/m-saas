@@ -22,9 +22,9 @@ export async function GET(request: NextRequest) {
       ? (rawConsentFilter as 'all' | 'consented' | 'not_consented' | 'withdrawn')
       : 'all';
 
-    // Pagination parameters
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
+    // Pagination parameters — clamp to prevent full-table-scan DoS.
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1') || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20') || 20));
     const cacheKey = clientsListCacheKey(
       { tenantId, userId },
       { search, sortBy, sortOrder, page, limit, consentFilter }

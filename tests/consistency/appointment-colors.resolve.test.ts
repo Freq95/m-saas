@@ -2,42 +2,55 @@ import { describe, expect, it } from 'vitest';
 import { resolveAppointmentColor } from '@/lib/calendar-color-policy';
 
 describe('resolveAppointmentColor', () => {
-  it('uses dentist color for shared appointments in dentist mode', () => {
-    expect(resolveAppointmentColor({
-      category: 'consultatie',
-      calendar_color: '#2563eb',
-      dentist_color: '#ef4444',
-      calendar_settings: { color_mode: 'dentist' },
-    })).toBe('#ef4444');
+  it("uses color_mine when viewer is the appointment's dentist", () => {
+    expect(
+      resolveAppointmentColor(
+        {
+          dentist_id: 42,
+          color_mine: '#2563EB',
+          color_others: '#F59E0B',
+          category: 'consultatie',
+        },
+        42
+      )
+    ).toBe('#2563EB');
   });
 
-  it('falls back to calendar color for owner appointments in dentist mode', () => {
-    expect(resolveAppointmentColor({
-      category: 'consultatie',
-      calendar_color: '#2563eb',
-      dentist_color: null,
-      calendar_settings: { color_mode: 'dentist' },
-    })).toBe('#2563eb');
+  it('uses color_others when viewer is a different dentist', () => {
+    expect(
+      resolveAppointmentColor(
+        {
+          dentist_id: 42,
+          color_mine: '#2563EB',
+          color_others: '#F59E0B',
+          category: 'consultatie',
+        },
+        7
+      )
+    ).toBe('#F59E0B');
   });
 
-  it('uses category-derived color in category mode', () => {
-    expect(resolveAppointmentColor({
-      category: 'tratament',
-      calendar_color: '#2563eb',
-      calendar_is_default: true,
-      dentist_color: '#ef4444',
-      calendar_settings: { color_mode: 'category' },
-    })).toBe('#10b981');
+  it('falls back to plain color when per-calendar colors are missing', () => {
+    expect(
+      resolveAppointmentColor(
+        {
+          dentist_id: 42,
+          color: '#10B981',
+          category: 'consultatie',
+        },
+        42
+      )
+    ).toBe('#10B981');
   });
 
-  it('uses calendar color for non-default calendars in category mode', () => {
-    expect(resolveAppointmentColor({
-      category: 'tratament',
-      color: '#10b981',
-      calendar_color: '#ec4899',
-      calendar_is_default: false,
-      dentist_color: '#ef4444',
-      calendar_settings: { color_mode: 'category' },
-    })).toBe('#ec4899');
+  it('derives from category when no color is available', () => {
+    expect(
+      resolveAppointmentColor(
+        {
+          category: 'tratament',
+        },
+        null
+      )
+    ).toBe('#10b981');
   });
 });

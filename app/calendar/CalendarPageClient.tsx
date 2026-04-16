@@ -37,7 +37,7 @@ import {
   CalendarDatePickerDropdown,
   WeekView,
   DayPanel,
-  CreateAppointmentModal,
+  AppointmentModal,
   DeleteConfirmModal,
   ConflictWarningModal,
 } from './components';
@@ -73,6 +73,7 @@ interface ConflictSuggestion {
 type AppointmentModalMode = 'create' | 'edit' | 'view';
 
 type AppointmentModalData = {
+  clientId?: number | null;
   clientName: string;
   clientEmail: string;
   clientPhone: string;
@@ -87,7 +88,7 @@ type AppointmentModalData = {
   endTime: string;
   durationMinutes: number;
   notes: string;
-  category?: string;
+  category?: string | null;
   color?: string;
   status?: string;
   isRecurring?: boolean;
@@ -169,7 +170,8 @@ export default function CalendarPageClient({
       return [{
           id: selectedCalendar.id,
           name: selectedCalendar.name,
-          color: selectedCalendar.color,
+          color: selectedCalendar.color_mine,
+          isOwn: selectedCalendar.isOwner,
           description: selectedCalendar.isOwner
             ? 'Calendar propriu'
             : selectedCalendar.sharedByName
@@ -181,7 +183,8 @@ export default function CalendarPageClient({
       return writableCalendars.map((calendar) => ({
         id: calendar.id,
         name: calendar.name,
-        color: calendar.color,
+        color: calendar.color_mine,
+        isOwn: calendar.isOwner,
         description: calendar.isOwner
           ? 'Calendar propriu'
           : calendar.sharedByName
@@ -248,13 +251,10 @@ export default function CalendarPageClient({
     }
   }, [loading]);
 
-  const visibleDays = weekDays;
-
   const [selectedDay, setSelectedDay]               = useState<Date>(() => new Date());
   const [pendingCancelAppointment, setPendingCancelAppointment] = useState<Appointment | null>(null);
   const [hoveredAppointmentId, setHoveredAppointmentId] = useState<number | null>(null);
   const [services, setServices]                     = useState<Service[]>(initialServices);
-  const [seedingDemoServices, setSeedingDemoServices] = useState(false);
   const hasRequestedServicesRef = useRef(false);
   const [showCreateModal, setShowCreateModal]       = useState(false);
   const [appointmentModalMode, setAppointmentModalMode] = useState<AppointmentModalMode>('create');
@@ -416,6 +416,7 @@ export default function CalendarPageClient({
         setSelectedDay(slot.start);
         setAppointmentModalMode('create');
         setEditInitialData({
+          clientId: client.id,
           clientName: client.name || '',
           clientEmail: client.email || '',
       clientPhone: client.phone || '',
@@ -482,46 +483,6 @@ export default function CalendarPageClient({
       .catch(() => showErrorToast('Eroare la incarcarea serviciilor.'));
   }, [initialServices.length, showErrorToast]);
 
-  const seedDemoDentalServices = async () => {
-    if (seedingDemoServices) return;
-    setSeedingDemoServices(true);
-    const demoServices = [
-      { name: 'Consultatie initiala', durationMinutes: 30, price: 150, description: 'Evaluare clinica initiala' },
-      { name: 'Detartraj + periaj profesional', durationMinutes: 60, price: 320, description: 'Igienizare profesionala completa' },
-      { name: 'Tratament carie simpla', durationMinutes: 45, price: 280, description: 'Tratament restaurativ carie simpla' },
-      { name: 'Obturatie compozit', durationMinutes: 45, price: 350, description: 'Plomba compozit fotopolimerizabil' },
-      { name: 'Extractie dentara', durationMinutes: 45, price: 420, description: 'Extractie simpla, fara complicatii' },
-      { name: 'Control periodic', durationMinutes: 15, price: 90, description: 'Control de rutina' },
-    ];
-
-    try {
-      const results = await Promise.all(
-        demoServices.map((service) =>
-          fetch('/api/services', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(service),
-          })
-        )
-      );
-      const created = results.filter((res) => res.ok).length;
-      const refreshed = await fetch('/api/services', { cache: 'no-store' });
-      if (refreshed.ok) {
-        const payload = await refreshed.json();
-        setServices(payload.services || []);
-      }
-      if (created > 0) {
-        toast.success(`Servicii demo adaugate: ${created}`);
-      } else {
-        toast.warning('Nu am adaugat servicii noi (posibil sa existe deja).');
-      }
-    } catch {
-      toast.error('Nu am putut adauga serviciile demo.');
-    } finally {
-      setSeedingDemoServices(false);
-    }
-  };
-
   // ESC to close all modals
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -538,11 +499,10 @@ export default function CalendarPageClient({
         setShowConflictModal(false);
         return;
       }
-      // Let CreateAppointmentModal handle its own ESC (isDirty guard lives there)
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [showConflictModal, showCreateModal, showDateDropdown, showDeleteConfirm]);
+  }, [showConflictModal, showDateDropdown, showDeleteConfirm]);
 
   useEffect(() => {
     return () => {
@@ -612,6 +572,7 @@ export default function CalendarPageClient({
     const recurrenceEndType: 'date' | 'count' = recurrenceCount ? 'count' : 'date';
 
     return {
+      clientId: appointment.client_id ?? null,
       clientName: appointment.client_name || '',
       clientEmail: appointment.client_email || '',
       clientPhone: appointment.client_phone || '',
@@ -735,8 +696,6 @@ export default function CalendarPageClient({
       toast.warning('Selecteaza un calendar pe care poti crea programari.');
       return;
     }
-    void calendarMap.get(targetCalendarId);
-
     if (formData.isRecurring && formData.recurrence) {
       try {
         const res = await fetch('/api/appointments/recurring', {
@@ -747,6 +706,7 @@ export default function CalendarPageClient({
             dentistUserId: formData.dentistUserId,
             serviceId: parseInt(formData.serviceId),
             clientName: formData.clientName.trim(),
+            clientId: formData.clientId,
             clientEmail: formData.clientEmail || undefined,
             clientPhone: formData.clientPhone || undefined,
             startTime: formData.startTime,
@@ -784,13 +744,14 @@ export default function CalendarPageClient({
         dentistUserId: formData.dentistUserId,
         serviceId: parseInt(formData.serviceId),
         clientName: formData.clientName.trim(),
+        clientId: formData.clientId,
         clientEmail: formData.clientEmail || undefined,
         clientPhone: formData.clientPhone || undefined,
         forceNewClient: formData.forceNewClient,
         startTime: formData.startTime,
         endTime: formData.endTime,
         notes: formData.notes,
-        category: formData.category,
+        category: formData.category ?? undefined,
         color: formData.color,
       });
       if (ok.ok) {
@@ -850,9 +811,11 @@ export default function CalendarPageClient({
           startTime: newStart.toISOString(),
           endTime: newEnd.toISOString(),
           ...(didChangeService ? { serviceId: parseInt(formData.serviceId, 10) } : {}),
+          clientId: formData.clientId,
           clientName: formData.clientName.trim(),
           clientEmail: formData.clientEmail || undefined,
           clientPhone: formData.clientPhone || undefined,
+          forceNewClient: formData.forceNewClient,
           notes: formData.notes,
           category: formData.category,
           color: formData.color,
@@ -890,9 +853,13 @@ export default function CalendarPageClient({
             // Ignore invalid details format
           }
         }
-        setConflictData({ conflicts, suggestions });
-        setShowCreateModal(false);
-        setShowConflictModal(true);
+        if (conflicts.length > 0 || suggestions.length > 0) {
+          setConflictData({ conflicts, suggestions });
+          setShowCreateModal(false);
+          setShowConflictModal(true);
+        } else {
+          toast.error(result.error || 'Nu s-a putut actualiza programarea.');
+        }
       } else {
         toast.error(result.error || 'Nu s-a putut actualiza programarea.');
       }
@@ -971,7 +938,7 @@ export default function CalendarPageClient({
       ...ownCalendars.map((calendar) => ({
         value: String(calendar.id),
         label: calendar.name,
-        color: calendar.color,
+        color: calendar.color_mine,
         group: 'own' as const,
       })),
       ...sharedCalendars.map((calendar) => ({
@@ -979,7 +946,7 @@ export default function CalendarPageClient({
         label: calendar.sharedByName
           ? `${calendar.name} - ${calendar.sharedByName}`
           : calendar.name,
-        color: calendar.color,
+        color: calendar.color_others,
         group: 'shared' as const,
       })),
     ],
@@ -1050,6 +1017,7 @@ export default function CalendarPageClient({
         weekDays={weekDays}
         hours={hours}
         appointments={decoratedAppointments}
+        viewerUserId={sessionUserId ?? null}
         selectedDay={selectedDay}
         onSlotClick={handleSlotClick}
         onDayHeaderClick={handleDayHeaderClick}
@@ -1066,6 +1034,7 @@ export default function CalendarPageClient({
         topControls={weekToolbarControls}
         selectedDay={selectedDay}
         appointments={decoratedAppointments}
+        viewerUserId={sessionUserId ?? null}
         onAppointmentClick={handleAppointmentClick}
         onQuickStatusChange={handlePanelStatusChange}
         onCreateClick={() => handleSlotClick(selectedDay, 9)}
@@ -1200,6 +1169,7 @@ export default function CalendarPageClient({
                 <AppointmentCard
                   key={apt.id}
                   appointment={apt}
+                  viewerUserId={sessionUserId ?? null}
                   onClick={handleAppointmentClick}
                   onStatusChange={handlePanelStatusChange}
                   onHoverAppointment={setHoveredAppointmentId}
@@ -1215,6 +1185,7 @@ export default function CalendarPageClient({
             weekDays={weekDays}
             hours={hours}
             appointments={decoratedAppointments}
+            viewerUserId={sessionUserId ?? null}
                 selectedDay={selectedDay}
             onSlotClick={handleSlotClick}
             onDayHeaderClick={(day) => {
@@ -1317,6 +1288,7 @@ export default function CalendarPageClient({
                     <AppointmentCard
                       key={apt.id}
                       appointment={apt}
+                      viewerUserId={sessionUserId ?? null}
                       onClick={(a) => {
                         handleAppointmentClick(a);
                         setMobileSearchOpen(false);
@@ -1368,7 +1340,7 @@ export default function CalendarPageClient({
         {isMobile ? mobileCalendarView : desktopCalendarView}
       </main>
 
-      <CreateAppointmentModal
+      <AppointmentModal
         isOpen={showCreateModal}
         selectedSlot={state.selectedSlot}
         services={services}
@@ -1377,8 +1349,6 @@ export default function CalendarPageClient({
         lockCalendarSelection={selectedCalendarScope !== 'all'}
         currentUserId={sessionUserId}
         currentUserDbUserId={sessionDbUserId || null}
-        onSeedDemoServices={seedDemoDentalServices}
-        isSeedingDemoServices={seedingDemoServices}
         mode={appointmentModalMode}
         title={
           appointmentModalMode === 'view'

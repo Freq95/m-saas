@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { getCalendarAuth, normalizeCalendarPermissions } from '@/lib/calendar-auth';
-import { getCalendarDentistColorState } from '@/lib/calendar-dentists';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { invalidateReadCaches } from '@/lib/cache-keys';
@@ -67,19 +66,6 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ cal
     const updates: Record<string, unknown> = {};
     if (validationResult.data.permissions !== undefined) {
       updates.permissions = normalizeCalendarPermissions(validationResult.data.permissions);
-    }
-    if (validationResult.data.dentistColor !== undefined) {
-      const colorState = await getCalendarDentistColorState(calendarId, { excludeShareId: shareId });
-      if (colorState.ownerNeedsPaletteNormalization) {
-        return createErrorResponse(
-          'Alege mai intai o culoare presetata pentru owner in modul Dentisti.',
-          409
-        );
-      }
-      if (colorState.reservedPaletteColors.includes(validationResult.data.dentistColor)) {
-        return createErrorResponse('Aceasta culoare este deja folosita pe acest calendar', 409);
-      }
-      updates.dentist_color = validationResult.data.dentistColor;
     }
     if (Object.keys(updates).length === 0) {
       return createErrorResponse('No fields to update', 400);

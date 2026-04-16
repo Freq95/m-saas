@@ -4,17 +4,13 @@
  */
 
 import { z } from 'zod';
-import { isDentistPaletteColor, normalizeDentistColor } from './calendar-color-policy';
 
 // Common validation patterns
 export const emailSchema = z.string().email('Invalid email format').toLowerCase().trim();
 const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Invalid color format');
-const dentistPaletteColorSchema = z
-  .string()
-  .transform((value) => normalizeDentistColor(value))
-  .refine((value): value is string => Boolean(value) && isDentistPaletteColor(value), {
-    message: 'Selecteaza o culoare valida din paleta presetata',
-  });
+// Known appointment category keys — must stay in sync with CATEGORY_CONFIG in lib/calendar-color-policy.ts
+const APPOINTMENT_CATEGORY_KEYS = ['consultatie', 'tratament', 'control', 'urgenta', 'altele'] as const;
+const appointmentCategorySchema = z.enum(APPOINTMENT_CATEGORY_KEYS);
 const phoneSchema = z.string()
   .regex(/^[\d\s\+\-\(\)]+$/, 'Invalid phone format')
   .refine((value) => {
@@ -56,14 +52,15 @@ export const createAppointmentSchema = z.object({
   calendarId: z.number().int().positive().optional(),
   dentistUserId: z.number().int().positive().optional(),
   serviceId: z.number().int().positive(),
+  clientId: z.number().int().positive().nullable().optional(),
   clientName: z.string().min(1, 'Client name is required').max(255),
   clientEmail: emailSchema.optional(),
   clientPhone: phoneSchema,
   forceNewClient: z.boolean().optional(),
   startTime: dateTimeSchema,
   endTime: dateTimeSchema.optional(), // Will be calculated if not provided
-  category: z.string().max(120).optional(),
-  color: z.string().max(120).optional(),
+  category: appointmentCategorySchema.optional(),
+  color: hexColorSchema.optional(),
   notes: z.string().max(2000).optional(),
   exportToGoogle: z.boolean().optional().default(false),
   googleAccessToken: z.string().optional(),
@@ -73,11 +70,13 @@ export const updateAppointmentSchema = z.object({
   startTime: dateTimeSchema.optional(),
   endTime: dateTimeSchema.optional(),
   serviceId: z.number().int().positive().optional(),
+  clientId: z.number().int().positive().nullable().optional(),
   clientName: z.string().min(1).max(255).optional(),
   clientEmail: emailSchema.optional(),
   clientPhone: phoneSchema,
-  category: z.string().max(120).optional().nullable(),
-  color: z.string().max(120).optional().nullable(),
+  forceNewClient: z.boolean().optional(),
+  category: appointmentCategorySchema.optional().nullable(),
+  color: hexColorSchema.optional().nullable(),
   isRecurring: z.boolean().optional(),
   recurrence: z.object({
     frequency: z.enum(['daily', 'weekly', 'monthly']),
@@ -108,24 +107,23 @@ const calendarPermissionsSchema = z
 
 export const createCalendarSchema = z.object({
   name: z.string().min(1, 'Calendar name is required').max(255),
-  color: hexColorSchema.optional(),
+  color_mine: hexColorSchema.optional(),
+  color_others: hexColorSchema.optional(),
 });
 
 export const updateCalendarSchema = z.object({
   name: z.string().min(1).max(255).optional(),
-  color: hexColorSchema.optional(),
-  colorMode: z.enum(['category', 'dentist']).optional(),
+  color_mine: hexColorSchema.optional(),
+  color_others: hexColorSchema.optional(),
 });
 
 export const createCalendarShareSchema = z.object({
   email: emailSchema,
   permissions: calendarPermissionsSchema,
-  dentistColor: dentistPaletteColorSchema,
 });
 
 export const updateCalendarShareSchema = z.object({
   permissions: calendarPermissionsSchema.optional(),
-  dentistColor: dentistPaletteColorSchema.optional(),
 });
 
 const recurrenceSchema = z
@@ -144,14 +142,15 @@ export const createRecurringAppointmentSchema = z
     calendarId: z.number().int().positive().optional(),
     dentistUserId: z.number().int().positive().optional(),
     serviceId: z.number().int().positive(),
+    clientId: z.number().int().positive().nullable().optional(),
     clientName: z.string().min(1, 'Client name is required').max(255),
     clientEmail: emailSchema.optional(),
     clientPhone: phoneSchema,
     startTime: dateTimeSchema,
     endTime: dateTimeSchema,
     notes: z.string().max(2000).optional(),
-    category: z.string().max(120).optional(),
-    color: z.string().max(120).optional(),
+    category: appointmentCategorySchema.optional(),
+    color: hexColorSchema.optional(),
     recurrence: recurrenceSchema,
     forceNewClient: z.boolean().optional(),
   })
@@ -266,4 +265,3 @@ export const createYahooIntegrationSchema = z.object({
 export const integrationIdParamSchema = z.object({
   id: z.string().regex(/^\d+$/, 'Integration ID must be a number').transform((val) => parseInt(val, 10)),
 });
-

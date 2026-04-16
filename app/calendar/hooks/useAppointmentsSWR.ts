@@ -11,8 +11,6 @@ interface UseAppointmentsOptions {
   viewType: CalendarViewType;
   userId?: number;
   calendarIds?: number[];
-  providerId?: number;
-  resourceId?: number;
   search?: string;
   initialAppointments?: Appointment[];
 }
@@ -30,6 +28,7 @@ interface UseAppointmentsResult {
 interface CreateAppointmentInput {
   dentistUserId?: number;
   serviceId: number;
+  clientId?: number | null;
   clientName: string;
   clientEmail?: string;
   clientPhone?: string;
@@ -37,8 +36,6 @@ interface CreateAppointmentInput {
   startTime: string;
   endTime: string;
   notes?: string;
-  providerId?: number;
-  resourceId?: number;
   category?: string;
   color?: string;
   calendarId?: number;
@@ -47,6 +44,7 @@ interface CreateAppointmentInput {
 interface UpdateAppointmentInput {
   startTime?: string;
   endTime?: string;
+  clientId?: number | null;
   status?: string;
   notes?: string;
 }
@@ -100,6 +98,15 @@ const fetcher = async (url: string) => {
 };
 
 function extractApiError(payload: any, fallback: string): string {
+  if (
+    payload?.error === 'Invalid input' &&
+    Array.isArray(payload?.details) &&
+    payload.details.length > 0 &&
+    typeof payload.details[0]?.message === 'string'
+  ) {
+    return payload.details[0].message;
+  }
+
   if (payload?.error && typeof payload.error === 'string') {
     return payload.error;
   }
@@ -137,8 +144,6 @@ export function useAppointmentsSWR({
   viewType,
   userId,
   calendarIds,
-  providerId,
-  resourceId,
   search,
   initialAppointments = [],
 }: UseAppointmentsOptions): UseAppointmentsResult {
@@ -174,14 +179,6 @@ export function useAppointmentsSWR({
 
   if (normalizedCalendarIds && normalizedCalendarIds.length > 0) {
     queryParams.set('calendarIds', normalizedCalendarIds.join(','));
-  }
-
-  if (providerId) {
-    queryParams.append('providerId', providerId.toString());
-  }
-
-  if (resourceId) {
-    queryParams.append('resourceId', resourceId.toString());
   }
 
   if (trimmedSearch) {

@@ -11,6 +11,7 @@ interface WeekViewProps {
   weekDays: Date[];
   hours: number[];
   appointments: Appointment[];
+  viewerUserId: number | null;
   selectedDay?: Date | null;
   onSlotClick: (day: Date, hour: number, minute?: 0 | 15 | 30 | 45) => void;
   onDayHeaderClick?: (day: Date) => void;
@@ -105,6 +106,7 @@ export function WeekView({
   weekDays,
   hours,
   appointments,
+  viewerUserId,
   selectedDay = null,
   onSlotClick,
   onDayHeaderClick,
@@ -351,6 +353,7 @@ export function WeekView({
                   <AppointmentBlock
                     key={apt.id}
                     appointment={apt}
+                    viewerUserId={viewerUserId}
                     style={{
                       top: `calc(${topPercent}% + 2px)`,
                       left: `${left}%`,

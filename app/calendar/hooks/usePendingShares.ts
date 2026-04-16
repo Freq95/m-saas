@@ -5,7 +5,8 @@ import { authFetcher } from '@/lib/fetcher';
 export interface PendingShareCalendar {
   id: number;
   name: string;
-  color: string;
+  color_mine: string;
+  color_others: string;
 }
 
 export interface PendingCalendarShare {

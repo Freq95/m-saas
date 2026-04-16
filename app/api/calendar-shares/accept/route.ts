@@ -121,29 +121,6 @@ async function cleanupRecipientAccount(db: any, account: {
   ]);
 }
 
-async function enableDentistColorModeOnFirstAcceptedShare(db: any, calendarId: number) {
-  const acceptedShares = await db.collection('calendar_shares').countDocuments({
-    calendar_id: calendarId,
-    status: 'accepted',
-  });
-
-  if (acceptedShares === 1) {
-    await db.collection('calendars').updateOne(
-      {
-        id: calendarId,
-        is_active: true,
-        deleted_at: { $exists: false },
-      },
-      {
-        $set: {
-          'settings.color_mode': 'dentist',
-          updated_at: new Date().toISOString(),
-        },
-      }
-    );
-  }
-}
-
 function shareMatchesAuthUser(share: any, authUser: Awaited<ReturnType<typeof getOptionalAuthUser>>) {
   if (!authUser) return false;
   return (
@@ -263,7 +240,15 @@ export async function POST(request: NextRequest) {
     const nowIso = new Date().toISOString();
 
     if (action === 'decline') {
-      if (authUser && !shareMatchesAuthUser(share, authUser)) {
+      // Without a token the caller must be the authenticated recipient.
+      // Allowing unauthenticated shareId-based declines would let anyone
+      // enumerate sequential IDs and torch all pending invites.
+      if (!token) {
+        if (!authUser || !shareMatchesAuthUser(share, authUser)) {
+          return createErrorResponse('Autentificare necesara pentru a refuza invitatia.', 401);
+        }
+      } else if (authUser && !shareMatchesAuthUser(share, authUser)) {
+        // Token present but authenticated user is the wrong recipient.
         return createErrorResponse('Invitatia apartine altui utilizator', 403);
       }
 
@@ -325,7 +310,6 @@ export async function POST(request: NextRequest) {
         return createErrorResponse('Invitatie deja procesata', 409);
       }
 
-      await enableDentistColorModeOnFirstAcceptedShare(db, calendar.id);
       await invalidateReadCaches({
         tenantId: calendar.tenant_id,
         userId: calendar.owner_user_id,
@@ -386,7 +370,6 @@ export async function POST(request: NextRequest) {
         throw new Error('Invite already processed');
       }
 
-      await enableDentistColorModeOnFirstAcceptedShare(db, calendar.id);
       await invalidateReadCaches({
         tenantId: calendar.tenant_id,
         userId: calendar.owner_user_id,

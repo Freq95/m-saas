@@ -15,6 +15,7 @@ interface DayPanelProps {
   topControls?: ReactNode;
   selectedDay: Date | null;
   appointments: Appointment[];
+  viewerUserId: number | null;
   searchQuery?: string;
   onAppointmentClick: (appointment: Appointment) => void;
   onQuickStatusChange: (id: number, status: string) => void;
@@ -212,12 +213,14 @@ export function CalendarScopeDropdown({
 // Appointment card
 export function AppointmentCard({
   appointment: apt,
+  viewerUserId,
   onClick,
   onStatusChange,
   onHoverAppointment,
   dateLabel,
 }: {
   appointment: Appointment;
+  viewerUserId: number | null;
   onClick: (a: Appointment) => void;
   onStatusChange: (id: number, status: string) => void;
   onHoverAppointment?: (id: number | null) => void;
@@ -230,7 +233,7 @@ export function AppointmentCard({
   const isPast        = end.getTime() < Date.now();
   const status        = normalizeStatus(apt.status);
   const statusCfg     = getStatusConfig(status);
-  const resolvedColor = resolveAppointmentColor(apt);
+  const resolvedColor = resolveAppointmentColor(apt, viewerUserId);
   const durationMin   = Math.round((end.getTime() - start.getTime()) / 60_000);
   const canChangeStatus = apt.can_change_status !== false;
 
@@ -365,6 +368,7 @@ export function DayPanel({
   topControls,
   selectedDay,
   appointments,
+  viewerUserId,
   searchQuery = '',
   onAppointmentClick,
   onQuickStatusChange,
@@ -538,6 +542,7 @@ export function DayPanel({
                     <AppointmentCard
                       key={apt.id}
                       appointment={apt}
+                      viewerUserId={viewerUserId}
                       onClick={(a) => {
                         onNavigate(new Date(a.start_time));
                         onAppointmentClick(a);
@@ -655,6 +660,7 @@ export function DayPanel({
                     <AppointmentCard
                       key={apt.id}
                       appointment={apt}
+                      viewerUserId={viewerUserId}
                       onClick={onAppointmentClick}
                       onStatusChange={onQuickStatusChange}
                       onHoverAppointment={onHoverAppointment}

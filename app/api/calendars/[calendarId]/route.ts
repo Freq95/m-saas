@@ -5,12 +5,6 @@ import {
   normalizeCalendarPermissions,
   OWNER_CALENDAR_PERMISSIONS,
 } from '@/lib/calendar-auth';
-import { getCalendarDentistColorState } from '@/lib/calendar-dentists';
-import {
-  normalizeCalendarColorMode,
-  normalizeDentistColor,
-  requiresDentistPaletteNormalization,
-} from '@/lib/calendar-color-policy';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { invalidateReadCaches } from '@/lib/cache-keys';
@@ -109,32 +103,13 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ cal
       return createErrorResponse(validationResult.error.errors[0]?.message || 'Invalid input', 400);
     }
 
-    const { calendar } = await requireCalendarOwner(auth, calendarId);
-    const { name, color, colorMode } = validationResult.data;
+    await requireCalendarOwner(auth, calendarId);
+    const { name, color_mine, color_others } = validationResult.data;
     const updates: Record<string, unknown> = {};
-    const nextColor = color ?? calendar.color;
-    const nextColorMode = colorMode ?? calendar.settings?.color_mode ?? 'category';
-    const colorState = await getCalendarDentistColorState(calendarId);
-    const normalizedCurrentOwnerColor = normalizeDentistColor(calendar.color);
-    const normalizedNextColor = normalizeDentistColor(nextColor);
-    const reservedShareColors = colorState.reservedPaletteColors.filter(
-      (reservedColor) => reservedColor !== normalizedCurrentOwnerColor
-    );
-
-    if (requiresDentistPaletteNormalization(normalizeCalendarColorMode(nextColorMode), nextColor)) {
-      return createErrorResponse(
-        'In modul Dentisti, culoarea ownerului trebuie aleasa din paleta presetata.',
-        400
-      );
-    }
-
-    if (normalizedNextColor && reservedShareColors.includes(normalizedNextColor)) {
-      return createErrorResponse('Aceasta culoare este deja folosita de alt dentist din calendar', 409);
-    }
 
     if (name !== undefined) updates.name = name;
-    if (color !== undefined) updates.color = color;
-    if (colorMode !== undefined) updates['settings.color_mode'] = colorMode;
+    if (color_mine !== undefined) updates.color_mine = color_mine;
+    if (color_others !== undefined) updates.color_others = color_others;
 
     if (Object.keys(updates).length === 0) {
       return createErrorResponse('No fields to update', 400);

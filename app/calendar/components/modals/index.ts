@@ -1,4 +1,4 @@
-export { CreateAppointmentModal } from './CreateAppointmentModal';
+export { AppointmentModal } from './AppointmentModal/AppointmentModal';
 export { AppointmentPreviewModal } from './AppointmentPreviewModal';
 export { DeleteConfirmModal } from './DeleteConfirmModal';
 export { ConflictWarningModal } from './ConflictWarningModal';

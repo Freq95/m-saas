@@ -1,8 +1,6 @@
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { ObjectId } from 'mongodb';
 import { getServiceOwnerScopeFromAppointment } from '@/lib/appointment-service';
-import type { CalendarColorMode } from '@/lib/calendar-color-policy';
-import { normalizeCalendarColorSettings } from '@/lib/calendar-color-policy';
 
 type AppointmentQuery = {
   userId?: number;
@@ -79,44 +77,31 @@ type CalendarDisplayAppointment = {
   created_by_user_id?: ObjectId | string | null;
   dentist_db_user_id?: ObjectId | string | null;
   calendar_name?: string | null;
-  calendar_color?: string | null;
-  calendar_is_default?: boolean | null;
-  calendar_settings?: { color_mode?: CalendarColorMode } | null;
-  dentist_color?: string | null;
+  color_mine?: string | null;
+  color_others?: string | null;
   dentist_display_name?: string | null;
   [key: string]: unknown;
 };
 
 type CalendarDisplayMeta = {
   name: string | null;
-  color: string | null;
-  isDefault: boolean;
-  settings: { color_mode?: CalendarColorMode } | null;
+  color_mine: string | null;
+  color_others: string | null;
   ownerDbUserId: string | null;
-  ownerDisplayName: string | null;
 };
-
-type DentistDisplayMeta = {
-  color: string | null;
-  displayName: string | null;
-};
-
-function buildDentistMetaKey(calendarId: number, dbUserId: string) {
-  return `${calendarId}:${dbUserId}`;
-}
 
 async function loadCalendarDisplayMaps(
   db: Awaited<ReturnType<typeof getMongoDbOrThrow>>,
   calendarIds: number[]
 ): Promise<{
   calendarById: Map<number, CalendarDisplayMeta>;
-  dentistMetaByKey: Map<string, DentistDisplayMeta>;
+  dentistNameByDbUserId: Map<string, string | null>;
 }> {
   const normalizedCalendarIds = Array.from(new Set(calendarIds.filter((id): id is number => Number.isInteger(id) && id > 0)));
   if (normalizedCalendarIds.length === 0) {
     return {
       calendarById: new Map<number, CalendarDisplayMeta>(),
-      dentistMetaByKey: new Map<string, DentistDisplayMeta>(),
+      dentistNameByDbUserId: new Map<string, string | null>(),
     };
   }
 
@@ -130,10 +115,9 @@ async function loadCalendarDisplayMaps(
         projection: {
           id: 1,
           name: 1,
-          color: 1,
-          is_default: 1,
+          color_mine: 1,
+          color_others: 1,
           owner_db_user_id: 1,
-          settings: 1,
         },
       }
     ).toArray(),
@@ -147,7 +131,6 @@ async function loadCalendarDisplayMaps(
         projection: {
           calendar_id: 1,
           shared_with_user_id: 1,
-          dentist_color: 1,
           dentist_display_name: 1,
         },
       }
@@ -201,63 +184,39 @@ async function loadCalendarDisplayMaps(
 
     calendarById.set(calendar.id, {
       name: typeof calendar.name === 'string' ? calendar.name : null,
-      color: typeof calendar.color === 'string' ? calendar.color : null,
-      isDefault: Boolean(calendar.is_default),
+      color_mine: typeof calendar.color_mine === 'string' ? calendar.color_mine : null,
+      color_others: typeof calendar.color_others === 'string' ? calendar.color_others : null,
       ownerDbUserId:
         calendar.owner_db_user_id instanceof ObjectId
           ? calendar.owner_db_user_id.toString()
           : typeof calendar.owner_db_user_id === 'string'
             ? calendar.owner_db_user_id
             : null,
-      ownerDisplayName:
-        (calendar.owner_db_user_id instanceof ObjectId
-          ? userById.get(calendar.owner_db_user_id.toString())?.name
-          : typeof calendar.owner_db_user_id === 'string'
-            ? userById.get(calendar.owner_db_user_id)?.name
-            : null) || null,
-      settings: normalizeCalendarColorSettings(calendar.settings),
     });
   }
 
-  const dentistMetaByKey = new Map<string, DentistDisplayMeta>();
-  for (const [calendarId, calendar] of calendarById.entries()) {
-    if (!calendar.ownerDbUserId) {
-      continue;
-    }
-
-    dentistMetaByKey.set(buildDentistMetaKey(calendarId, calendar.ownerDbUserId), {
-      color: calendar.color,
-      displayName: calendar.ownerDisplayName,
-    });
-  }
-
+  const dentistNameByDbUserId = new Map<string, string | null>();
   for (const share of shareDocs) {
-    if (typeof share.calendar_id !== 'number') {
-      continue;
-    }
-
     const creatorId = share.shared_with_user_id instanceof ObjectId
       ? share.shared_with_user_id.toString()
       : typeof share.shared_with_user_id === 'string'
         ? share.shared_with_user_id
         : null;
-
-    if (!creatorId) {
-      continue;
+    if (!creatorId) continue;
+    const fromShare = typeof share.dentist_display_name === 'string' && share.dentist_display_name.trim()
+      ? share.dentist_display_name.trim()
+      : null;
+    dentistNameByDbUserId.set(creatorId, fromShare || userById.get(creatorId)?.name || null);
+  }
+  for (const [, calendar] of calendarById.entries()) {
+    if (calendar.ownerDbUserId && !dentistNameByDbUserId.has(calendar.ownerDbUserId)) {
+      dentistNameByDbUserId.set(calendar.ownerDbUserId, userById.get(calendar.ownerDbUserId)?.name || null);
     }
-
-    dentistMetaByKey.set(buildDentistMetaKey(share.calendar_id, creatorId), {
-      color: typeof share.dentist_color === 'string' ? share.dentist_color : null,
-      displayName:
-        (typeof share.dentist_display_name === 'string' && share.dentist_display_name.trim()
-          ? share.dentist_display_name.trim()
-          : userById.get(creatorId)?.name) || null,
-    });
   }
 
   return {
     calendarById,
-    dentistMetaByKey,
+    dentistNameByDbUserId,
   };
 }
 
@@ -273,7 +232,7 @@ export async function attachCalendarDisplayData<T extends CalendarDisplayAppoint
     .map((appointment) => appointment.calendar_id)
     .filter((id): id is number => typeof id === 'number' && id > 0);
 
-  const { calendarById, dentistMetaByKey } = await loadCalendarDisplayMaps(db, calendarIds);
+  const { calendarById, dentistNameByDbUserId } = await loadCalendarDisplayMaps(db, calendarIds);
 
   return appointments.map((appointment) => {
     if (typeof appointment.calendar_id !== 'number') {
@@ -296,26 +255,18 @@ export async function attachCalendarDisplayData<T extends CalendarDisplayAppoint
         ? appointment.dentist_db_user_id
         : null;
     const effectiveDentistDbUserId = dentistDbUserId || createdByUserId || calendar.ownerDbUserId || null;
-    const dentistMeta = effectiveDentistDbUserId
-      ? dentistMetaByKey.get(buildDentistMetaKey(appointment.calendar_id, effectiveDentistDbUserId)) || null
+    const displayName = effectiveDentistDbUserId
+      ? dentistNameByDbUserId.get(effectiveDentistDbUserId) || null
       : null;
-
-    const resolvedDentistColor = calendar.settings?.color_mode === 'dentist'
-      ? dentistMeta?.color || appointment.dentist_color || calendar.color
-      : appointment.dentist_color || null;
 
     return {
       ...appointment,
       created_by_user_id: createdByUserId,
       dentist_db_user_id: effectiveDentistDbUserId,
       calendar_name: appointment.calendar_name || calendar.name,
-      calendar_color: appointment.calendar_color || calendar.color,
-      calendar_is_default: typeof appointment.calendar_is_default === 'boolean'
-        ? appointment.calendar_is_default
-        : calendar.isDefault,
-      calendar_settings: appointment.calendar_settings || calendar.settings,
-      dentist_color: resolvedDentistColor,
-      dentist_display_name: appointment.dentist_display_name || dentistMeta?.displayName || null,
+      color_mine: appointment.color_mine || calendar.color_mine,
+      color_others: appointment.color_others || calendar.color_others,
+      dentist_display_name: appointment.dentist_display_name || displayName,
     };
   });
 }
@@ -390,6 +341,7 @@ export async function getAppointmentsData(query: AppointmentQuery) {
       service_owner_user_id: 1,
       service_owner_tenant_id: 1,
       dentist_db_user_id: 1,
+      dentist_id: 1,
       client_id: 1,
       client_name: 1,
       client_email: 1,

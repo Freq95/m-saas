@@ -11,6 +11,7 @@ interface MonthViewProps {
   currentDate: Date;
   appointments: Appointment[];
   selectedDay?: Date | null;
+  viewerUserId: number | null;
   onDayClick: (day: Date) => void;
   onAppointmentClick: (appointment: Appointment) => void;
 }
@@ -20,6 +21,7 @@ export function MonthView({
   currentDate,
   appointments,
   selectedDay = null,
+  viewerUserId,
   onDayClick,
   onAppointmentClick,
 }: MonthViewProps) {
@@ -67,7 +69,7 @@ export function MonthView({
               <div className={styles.monthDayAppointments}>
                 {dayAppointments.slice(0, 3).map((apt) => {
                   const statusCfg = getStatusConfig(apt.status);
-                  const resolvedColor = resolveAppointmentColor(apt);
+                  const resolvedColor = resolveAppointmentColor(apt, viewerUserId);
                   const isPast = new Date(apt.end_time).getTime() < Date.now();
                   return (
                     <div

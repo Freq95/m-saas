@@ -63,7 +63,7 @@ vi.mock('@/lib/appointment-service', () => ({
     service_owner_user_id: assignment.serviceOwnerUserId,
     service_owner_tenant_id: assignment.serviceOwnerTenantId,
     dentist_db_user_id: assignment.dentistDbUserId,
-    provider_id: assignment.providerId,
+    dentist_id: assignment.serviceOwnerUserId,
   })),
 }));
 
@@ -106,12 +106,15 @@ describe('POST /api/appointments service validation', () => {
   const tenantId = new ObjectId('65f9a0e8f5f89f73d18b0011');
   const viewerDbUserId = new ObjectId('65f9a0e8f5f89f73d18b0012');
   const ownerDbUserId = new ObjectId('65f9a0e8f5f89f73d18b0013');
+  const clientId = 301;
   const serviceFindOne = vi.fn();
+  const clientFindOne = vi.fn();
   const insertOne = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
     serviceFindOne.mockReset();
+    clientFindOne.mockReset();
     insertOne.mockReset();
 
     mockGetAuthUser.mockResolvedValue({
@@ -136,7 +139,6 @@ describe('POST /api/appointments service validation', () => {
         can_delete_all: true,
       },
       shareId: 77,
-      dentistColor: null,
     });
     mockCheckWriteRateLimit.mockResolvedValue(null);
     mockIsSlotAvailable.mockResolvedValue(true);
@@ -147,11 +149,10 @@ describe('POST /api/appointments service validation', () => {
       serviceOwnerTenantId: tenantId,
       dentistDbUserId: viewerDbUserId,
       dentistDisplayName: 'Viewer',
-      providerId: 901,
       isOwner: false,
       isCurrentUser: true,
     });
-    mockFindOrCreateClient.mockResolvedValue({ id: 301 });
+    mockFindOrCreateClient.mockResolvedValue({ id: clientId });
     mockLinkAppointmentToClient.mockResolvedValue(undefined);
     mockGetTenantTimeZone.mockResolvedValue('Europe/Bucharest');
 
@@ -166,6 +167,12 @@ describe('POST /api/appointments service validation', () => {
         if (name === 'appointments') {
           return {
             insertOne,
+          };
+        }
+
+        if (name === 'clients') {
+          return {
+            findOne: clientFindOne,
           };
         }
 
@@ -239,7 +246,7 @@ describe('POST /api/appointments service validation', () => {
       tenantId,
       expect.any(Date),
       expect.any(Date),
-      expect.objectContaining({ calendarId: 11, providerId: 901 })
+      expect.objectContaining({ calendarId: 11 })
     );
     expect(insertOne).toHaveBeenCalledTimes(1);
     expect(insertOne.mock.calls[0][0]).toMatchObject({
@@ -253,8 +260,7 @@ describe('POST /api/appointments service validation', () => {
       service_name: 'Consultatie initiala',
       service_owner_user_id: 13,
       service_owner_tenant_id: tenantId,
-      provider_id: 901,
-      client_id: 301,
+      client_id: clientId,
       client_name: 'Alice Example',
       client_email: 'alice@example.com',
       price_at_time: 150,
@@ -268,7 +274,6 @@ describe('POST /api/appointments service validation', () => {
       serviceOwnerTenantId: tenantId,
       dentistDbUserId: assignedDentistDbUserId,
       dentistDisplayName: 'Dr. Partner',
-      providerId: 777,
       isOwner: false,
       isCurrentUser: false,
     });
@@ -306,8 +311,81 @@ describe('POST /api/appointments service validation', () => {
       created_by_user_id: viewerDbUserId,
       dentist_db_user_id: assignedDentistDbUserId,
       service_owner_user_id: 99,
-      provider_id: 777,
       service_id: 333,
     }));
+  });
+
+  it('links the explicitly selected client when clientId is provided', async () => {
+    serviceFindOne.mockResolvedValue({
+      id: 222,
+      name: 'Consultatie initiala',
+      duration_minutes: 30,
+      price: 150,
+    });
+    clientFindOne.mockResolvedValue({
+      id: clientId,
+      user_id: 42,
+      tenant_id: tenantId,
+      name: 'Alice Example',
+    });
+
+    const req = new NextRequest('http://localhost/api/appointments', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        calendarId: 11,
+        serviceId: 222,
+        clientId,
+        clientName: 'Alice Example',
+        startTime: '2026-04-09T09:00:00.000Z',
+        endTime: '2026-04-09T09:30:00.000Z',
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(201);
+    expect(clientFindOne).toHaveBeenCalledWith({
+      id: clientId,
+      user_id: 42,
+      tenant_id: tenantId,
+      deleted_at: { $exists: false },
+    });
+    expect(mockFindOrCreateClient).not.toHaveBeenCalled();
+    expect(insertOne).toHaveBeenCalledWith(expect.objectContaining({
+      client_id: clientId,
+      client_name: 'Alice Example',
+    }));
+  });
+
+  it('returns 409 when the explicitly selected client no longer exists', async () => {
+    serviceFindOne.mockResolvedValue({
+      id: 222,
+      name: 'Consultatie initiala',
+      duration_minutes: 30,
+      price: 150,
+    });
+    clientFindOne.mockResolvedValue(null);
+
+    const req = new NextRequest('http://localhost/api/appointments', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        calendarId: 11,
+        serviceId: 222,
+        clientId,
+        clientName: 'Alice Example',
+        startTime: '2026-04-09T09:00:00.000Z',
+        endTime: '2026-04-09T09:30:00.000Z',
+      }),
+    });
+
+    const res = await POST(req);
+    const json = await res.json() as Doc;
+
+    expect(res.status).toBe(409);
+    expect(json.error).toContain('Clientul selectat nu mai exista');
+    expect(mockFindOrCreateClient).not.toHaveBeenCalled();
+    expect(insertOne).not.toHaveBeenCalled();
   });
 });

@@ -12,6 +12,7 @@ import {
   usePendingShares,
   type CalendarListItem,
   type CalendarPermissions,
+  type SentPendingShare,
 } from '../../calendar/hooks';
 import {
   CalendarFormModal,
@@ -26,38 +27,45 @@ interface CalendarsSettingsPageClientProps {
 
 function formatPermissionsSummary(permissions: CalendarPermissions): string {
   const parts = ['vizualizare'];
-
-  if (permissions.can_create) {
-    parts.push('creare');
-  }
-
-  if (permissions.can_edit_all) {
-    parts.push('editare toate');
-  } else if (permissions.can_edit_own) {
-    parts.push('editare proprii');
-  }
-
-  if (permissions.can_delete_all) {
-    parts.push('stergere toate');
-  } else if (permissions.can_delete_own) {
-    parts.push('stergere proprii');
-  }
-
+  if (permissions.can_create) parts.push('creare');
+  if (permissions.can_edit_all) parts.push('editare');
+  else if (permissions.can_edit_own) parts.push('editare proprii');
+  if (permissions.can_delete_all) parts.push('stergere');
+  else if (permissions.can_delete_own) parts.push('stergere proprii');
   return parts.join(', ');
 }
 
-function buildCalendarDescription(calendar: CalendarListItem): string {
-  const typeLabel = 'Calendar personal';
-  if (calendar.isOwner) {
-    return typeLabel;
-  }
+const IconEdit = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+  </svg>
+);
 
-  if (calendar.sharedByName) {
-    return `${typeLabel} - Partajat de ${calendar.sharedByName}`;
-  }
+const IconShare = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="18" cy="5" r="3" />
+    <circle cx="6" cy="12" r="3" />
+    <circle cx="18" cy="19" r="3" />
+    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+  </svg>
+);
 
-  return typeLabel;
-}
+const IconLeave = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <polyline points="16 17 21 12 16 7" />
+    <line x1="21" y1="12" x2="9" y2="12" />
+  </svg>
+);
+
+const IconX = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
 
 export default function CalendarsSettingsPageClient({
   initialRole,
@@ -69,6 +77,7 @@ export default function CalendarsSettingsPageClient({
     ownCalendars,
     sharedCalendars,
     calendars,
+    sentShares,
     loading: calendarsLoading,
     error: calendarsError,
     refetch: refetchCalendars,
@@ -84,7 +93,7 @@ export default function CalendarsSettingsPageClient({
   } = usePendingShares();
 
   const calendarMap = useMemo(
-    () => new Map<number, CalendarListItem>(calendars.map((calendar) => [calendar.id, calendar])),
+    () => new Map<number, CalendarListItem>(calendars.map((c) => [c.id, c])),
     [calendars]
   );
 
@@ -94,13 +103,13 @@ export default function CalendarsSettingsPageClient({
   const [showShareCalendarModal, setShowShareCalendarModal] = useState(false);
   const [shareCalendarTarget, setShareCalendarTarget] = useState<CalendarListItem | null>(null);
   const [removingShareId, setRemovingShareId] = useState<number | null>(null);
+  const [revokingShareId, setRevokingShareId] = useState<number | null>(null);
 
   const openCreateCalendarModal = () => {
     if (!canManageCalendars) {
       toast.warning('Doar ownerul clinicii poate crea calendare noi.');
       return;
     }
-
     setCalendarFormMode('create');
     setCalendarFormTarget(null);
     setShowCalendarFormModal(true);
@@ -109,10 +118,9 @@ export default function CalendarsSettingsPageClient({
   const openEditCalendarModal = (calendarId: number) => {
     const calendar = calendarMap.get(calendarId) || null;
     if (!calendar || !calendar.isOwner) {
-      toast.warning('Doar ownerul calendarului poate edita acest calendar.');
+      toast.warning('Doar ownerul calendarului poate edita.');
       return;
     }
-
     setCalendarFormMode('edit');
     setCalendarFormTarget(calendar);
     setShowCalendarFormModal(true);
@@ -124,7 +132,6 @@ export default function CalendarsSettingsPageClient({
       toast.warning('Doar ownerul calendarului poate gestiona partajarile.');
       return;
     }
-
     setShareCalendarTarget(calendar);
     setShowShareCalendarModal(true);
   };
@@ -135,7 +142,6 @@ export default function CalendarsSettingsPageClient({
       toast.error(result.error || 'Nu am putut accepta invitatia.');
       return;
     }
-
     await Promise.all([refetchCalendars(), refetchPendingShares()]);
     toast.success('Calendarul partajat a fost adaugat.');
   };
@@ -146,7 +152,6 @@ export default function CalendarsSettingsPageClient({
       toast.error(result.error || 'Nu am putut refuza invitatia.');
       return;
     }
-
     await refetchPendingShares();
     toast.info('Invitatia a fost refuzata.');
   };
@@ -159,22 +164,13 @@ export default function CalendarsSettingsPageClient({
       {
         method: calendarFormMode === 'edit' ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          calendarFormMode === 'edit'
-            ? {
-                name: payload.name,
-                color: payload.color,
-                colorMode: payload.colorMode,
-              }
-            : payload
-        ),
+        body: JSON.stringify(payload),
       }
     );
     const result = await response.json().catch(() => null);
     if (!response.ok) {
       throw new Error(result?.error || 'Nu am putut salva calendarul.');
     }
-
     await refetchCalendars();
     setShowCalendarFormModal(false);
     setCalendarFormTarget(null);
@@ -182,10 +178,7 @@ export default function CalendarsSettingsPageClient({
   };
 
   const handleCalendarDelete = async () => {
-    if (!calendarFormTarget) {
-      return;
-    }
-
+    if (!calendarFormTarget) return;
     const response = await fetch(`/api/calendars/${calendarFormTarget.id}`, {
       method: 'DELETE',
     });
@@ -193,24 +186,41 @@ export default function CalendarsSettingsPageClient({
     if (!response.ok) {
       throw new Error(result?.error || 'Nu am putut sterge calendarul.');
     }
-
     await refetchCalendars();
     setShowCalendarFormModal(false);
     setCalendarFormTarget(null);
     toast.success('Calendar sters.');
   };
 
+  const handleRevokeSentShare = async (share: SentPendingShare) => {
+    const calendar = calendarMap.get(share.calendar_id);
+    const label = share.dentist_display_name || share.shared_with_email;
+    const confirmed = window.confirm(`Revoci invitatia trimisa catre ${label}?`);
+    if (!confirmed) return;
+    setRevokingShareId(share.id);
+    try {
+      const response = await fetch(
+        `/api/calendars/${share.calendar_id}/shares/${share.id}`,
+        { method: 'DELETE' }
+      );
+      if (!response.ok && response.status !== 204) {
+        const result = await response.json().catch(() => null);
+        throw new Error(result?.error || 'Nu am putut revoca invitatia.');
+      }
+      await refetchCalendars();
+      toast.success('Invitatia a fost revocata.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Nu am putut revoca invitatia.');
+    } finally {
+      setRevokingShareId(null);
+    }
+  };
+
   const handleLeaveCalendar = async (calendarId: number, shareId: number) => {
     const calendar = calendarMap.get(calendarId);
-    if (!calendar?.shareId) {
-      return;
-    }
-
+    if (!calendar?.shareId) return;
     const confirmed = window.confirm(`Parasesti calendarul partajat "${calendar.name}"?`);
-    if (!confirmed) {
-      return;
-    }
-
+    if (!confirmed) return;
     setRemovingShareId(shareId);
     try {
       const response = await fetch(`/api/calendars/${calendarId}/shares/${shareId}`, {
@@ -220,7 +230,6 @@ export default function CalendarsSettingsPageClient({
         const result = await response.json().catch(() => null);
         throw new Error(result?.error || 'Nu am putut parasi calendarul.');
       }
-
       await refetchCalendars();
       toast.success('Ai parasit calendarul partajat.');
     } catch (error) {
@@ -230,45 +239,32 @@ export default function CalendarsSettingsPageClient({
     }
   };
 
-  const showLoadingState = calendarsLoading && calendars.length === 0;
+  const isLoading = calendarsLoading && calendars.length === 0;
+  const isEmpty = !isLoading && ownCalendars.length === 0 && sharedCalendars.length === 0 && pendingShares.length === 0 && sentShares.length === 0;
+  const pendingCount = pendingShares.length;
+  const sentCount = sentShares.length;
 
   return (
     <div className={navStyles.container}>
       <div className={sharedStyles.container}>
-        <div className={sharedStyles.tabRow}>
+        <div className={styles.tabRow}>
           <SettingsTabs activeTab="calendars" />
-          <div className={styles.headerActions}>
+          <div className={styles.tabRowRight}>
+            {pendingCount > 0 && (
+              <span className={styles.pendingNote}>
+                {pendingCount} invitatie{pendingCount !== 1 ? 'i' : ''} in asteptare
+              </span>
+            )}
             <button
               type="button"
               className={sharedStyles.primaryButton}
               onClick={openCreateCalendarModal}
               disabled={!canManageCalendars}
+              title={canManageCalendars ? undefined : 'Doar ownerul poate crea calendare'}
             >
               + Calendar
             </button>
           </div>
-        </div>
-
-        <p className={sharedStyles.description}>
-          Gestionezi aici toate calendarele si invitatiile. Pagina de calendar ramane
-          concentrata doar pe programari si selectie rapida.
-        </p>
-
-        {!canManageCalendars && (
-          <div className={styles.noticeCard}>
-            Poti vedea calendarele partajate cu tine, poti accepta invitatii si poti parasi un
-            calendar partajat. Crearea si editarea calendarelor raman disponibile doar ownerului.
-          </div>
-        )}
-
-        <div className={styles.colorInfoCard}>
-          <h2>Despre culori</h2>
-          <p>
-            Calendarul implicit poate pastra culorile pe categorii. Pentru calendarele
-            non-implicite, programarile folosesc culoarea calendarului ales in setari. In modul
-            <strong> Dentisti</strong>, ownerul si dentistii partajati folosesc culori unice dintr-o
-            paleta presetata, iar programarile se coloreaza dupa dentistul asignat.
-          </p>
         </div>
 
         {(calendarsError || pendingSharesError) && (
@@ -278,199 +274,251 @@ export default function CalendarsSettingsPageClient({
           </div>
         )}
 
-        {showLoadingState ? (
-          <div className={styles.loadingCard}>Se incarca calendarele...</div>
-        ) : (
-          <>
-            <section className={styles.section}>
-              <div className={styles.sectionHeader}>
-                <div>
-                  <h2>Calendarele mele</h2>
-                  <p>Calendarele pe care le detii si pe care le poti configura.</p>
-                </div>
-                <span className={styles.sectionCount}>{ownCalendars.length}</span>
-              </div>
-
-              {ownCalendars.length === 0 ? (
-                <div className={sharedStyles.emptyState}>
-                  <p>Niciun calendar propriu creat inca.</p>
-                  {canManageCalendars && (
-                    <button
-                      type="button"
-                      className={sharedStyles.primaryButton}
-                      onClick={openCreateCalendarModal}
-                    >
-                      + Creeaza primul calendar
-                    </button>
-                  )}
-                </div>
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Calendar</th>
+                <th className={styles.colType}>Tip</th>
+                <th className={styles.colInfo}>Detalii</th>
+                <th className={styles.colActions} />
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={4} className={styles.stateRow}>Se incarca...</td>
+                </tr>
+              ) : isEmpty ? (
+                <tr>
+                  <td colSpan={4} className={styles.stateRow}>
+                    Niciun calendar.{' '}
+                    {canManageCalendars && (
+                      <button type="button" className={styles.inlineLink} onClick={openCreateCalendarModal}>
+                        Creeaza primul calendar
+                      </button>
+                    )}
+                  </td>
+                </tr>
               ) : (
-                <div className={styles.cardList}>
-                  {ownCalendars.map((calendar) => (
-                    <article key={calendar.id} className={styles.calendarCard}>
-                      <div className={styles.calendarCardMain}>
-                        <span
-                          className={styles.colorSwatch}
-                          style={{ backgroundColor: calendar.color }}
-                          aria-hidden="true"
-                        />
-                        <div className={styles.calendarCardCopy}>
-                          <div className={styles.calendarTitleRow}>
-                            <h3>{calendar.name}</h3>
-                            <div className={styles.badgeRow}>
-                              <span className={styles.badge}>Propriu</span>
+                <>
+                  {ownCalendars.length > 0 && (
+                    <>
+                      <tr className={styles.sectionRow}>
+                        <td colSpan={4}>Calendarele mele</td>
+                      </tr>
+                      {ownCalendars.map((calendar) => (
+                        <tr key={calendar.id} className={styles.row}>
+                          <td>
+                            <div className={styles.calNameCell}>
+                              <span
+                                className={styles.colorDot}
+                                style={{ background: `linear-gradient(135deg, ${calendar.color_mine} 50%, ${calendar.color_others} 50%)` }}
+                                aria-hidden="true"
+                              />
+                              <span className={styles.calName}>{calendar.name}</span>
                               {calendar.is_default && (
-                                <span className={styles.badgeMuted}>Implicit</span>
-                              )}
-                              {calendar.settings?.color_mode === 'dentist' && (
-                                <span className={styles.badgeMuted}>Dentisti</span>
+                                <span className={styles.tag}>Implicit</span>
                               )}
                             </div>
-                          </div>
-                          <p>{buildCalendarDescription(calendar)}</p>
-                        </div>
-                      </div>
+                          </td>
+                          <td className={styles.colType}>
+                            <span className={styles.badge}>Propriu</span>
+                          </td>
+                          <td className={styles.colInfo}>
+                            <span className={styles.cellEmpty}>—</span>
+                          </td>
+                          <td>
+                            <div className={styles.actionGroup}>
+                              <button
+                                type="button"
+                                className={styles.iconButton}
+                                onClick={() => openEditCalendarModal(calendar.id)}
+                                title="Setari"
+                                aria-label={`Editeaza ${calendar.name}`}
+                              >
+                                <IconEdit />
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.iconButton}
+                                onClick={() => openShareCalendarModal(calendar.id)}
+                                title="Partajare"
+                                aria-label={`Partajeaza ${calendar.name}`}
+                              >
+                                <IconShare />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </>
+                  )}
 
-                      <div className={styles.cardActions}>
-                        <button
-                          type="button"
-                          className={sharedStyles.secondaryButton}
-                          onClick={() => openEditCalendarModal(calendar.id)}
-                        >
-                          Setari
-                        </button>
-                        <button
-                          type="button"
-                          className={sharedStyles.secondaryButton}
-                          onClick={() => openShareCalendarModal(calendar.id)}
-                        >
-                          Partajare
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
+                  {sharedCalendars.length > 0 && (
+                    <>
+                      <tr className={styles.sectionRow}>
+                        <td colSpan={4}>Partajate cu mine</td>
+                      </tr>
+                      {sharedCalendars.map((calendar) => (
+                        <tr key={calendar.id} className={styles.row}>
+                          <td>
+                            <div className={styles.calNameCell}>
+                              <span
+                                className={styles.colorDot}
+                                style={{ background: `linear-gradient(135deg, ${calendar.color_mine} 50%, ${calendar.color_others} 50%)` }}
+                                aria-hidden="true"
+                              />
+                              <span className={styles.calName}>{calendar.name}</span>
+                            </div>
+                          </td>
+                          <td className={styles.colType}>
+                            <span className={styles.badgeMuted}>Partajat</span>
+                          </td>
+                          <td className={styles.colInfo}>
+                            <span className={styles.cellMuted}>
+                              {calendar.sharedByName ? `${calendar.sharedByName} · ` : ''}
+                              {formatPermissionsSummary(calendar.permissions)}
+                            </span>
+                          </td>
+                          <td>
+                            <div className={styles.actionGroup}>
+                              <button
+                                type="button"
+                                className={styles.iconButtonDanger}
+                                onClick={() => {
+                                  if (calendar.shareId) {
+                                    void handleLeaveCalendar(calendar.id, calendar.shareId);
+                                  }
+                                }}
+                                disabled={!calendar.shareId || removingShareId === calendar.shareId}
+                                title="Paraseste calendarul"
+                                aria-label={`Paraseste ${calendar.name}`}
+                              >
+                                <IconLeave />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </>
+                  )}
+
+                  {sentCount > 0 && (
+                    <>
+                      <tr className={styles.sectionRow}>
+                        <td colSpan={4}>Invitatii trimise</td>
+                      </tr>
+                      {sentShares.map((share) => {
+                        const cal = calendarMap.get(share.calendar_id);
+                        return (
+                          <tr key={share.id} className={styles.row}>
+                            <td>
+                              <div className={styles.calNameCell}>
+                                {cal && (
+                                  <span
+                                    className={styles.colorDot}
+                                    style={{ background: `linear-gradient(135deg, ${cal.color_mine} 50%, ${cal.color_others} 50%)` }}
+                                    aria-hidden="true"
+                                  />
+                                )}
+                                <span className={styles.calName}>{cal?.name ?? `Calendar #${share.calendar_id}`}</span>
+                              </div>
+                            </td>
+                            <td className={styles.colType}>
+                              <span className={styles.badgeSent}>Trimis</span>
+                            </td>
+                            <td className={styles.colInfo}>
+                              <span className={styles.cellMuted}>
+                                {share.dentist_display_name && share.dentist_display_name !== share.shared_with_email
+                                  ? `${share.dentist_display_name} · ${share.shared_with_email}`
+                                  : share.shared_with_email}
+                              </span>
+                            </td>
+                            <td>
+                              <div className={styles.actionGroup}>
+                                <button
+                                  type="button"
+                                  className={styles.iconButtonDanger}
+                                  onClick={() => void handleRevokeSentShare(share)}
+                                  disabled={revokingShareId === share.id}
+                                  title="Revoca invitatia"
+                                  aria-label={`Revoca invitatia pentru ${share.shared_with_email}`}
+                                >
+                                  <IconX />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </>
+                  )}
+
+                  {pendingCount > 0 && (
+                    <>
+                      <tr className={styles.sectionRow}>
+                        <td colSpan={4}>Invitatii primite</td>
+                      </tr>
+                      {pendingSharesLoading && pendingShares.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className={styles.stateRow}>Se incarca...</td>
+                        </tr>
+                      ) : (
+                        pendingShares.map((share) => (
+                          <tr key={share.id} className={styles.row}>
+                            <td>
+                              <div className={styles.calNameCell}>
+                                <span
+                                  className={styles.colorDot}
+                                  style={{ background: `linear-gradient(135deg, ${share.calendar.color_mine} 50%, ${share.calendar.color_others} 50%)` }}
+                                  aria-hidden="true"
+                                />
+                                <span className={styles.calName}>{share.calendar.name}</span>
+                              </div>
+                            </td>
+                            <td className={styles.colType}>
+                              <span className={styles.badgePending}>Invitatie</span>
+                            </td>
+                            <td className={styles.colInfo}>
+                              {share.shared_by_name
+                                ? <span className={styles.cellMuted}>{share.shared_by_name}</span>
+                                : <span className={styles.cellEmpty}>—</span>
+                              }
+                            </td>
+                            <td>
+                              <div className={styles.actionGroup}>
+                                <button
+                                  type="button"
+                                  className={styles.iconButtonDanger}
+                                  onClick={() => handleDeclinePendingShare(share.id)}
+                                  disabled={actionShareId === share.id}
+                                  title="Refuza"
+                                  aria-label={`Refuza invitatia la ${share.calendar.name}`}
+                                >
+                                  <IconX />
+                                </button>
+                                <button
+                                  type="button"
+                                  className={styles.connectBtn}
+                                  onClick={() => handleAcceptPendingShare(share.id)}
+                                  disabled={actionShareId === share.id}
+                                  aria-label={`Accepta invitatia la ${share.calendar.name}`}
+                                >
+                                  {actionShareId === share.id ? '...' : 'Accepta'}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </>
+                  )}
+                </>
               )}
-            </section>
-
-            <section className={styles.section}>
-              <div className={styles.sectionHeader}>
-                <div>
-                  <h2>Invitatii in asteptare</h2>
-                  <p>Accepti sau refuzi calendarele partajate cu tine.</p>
-                </div>
-                <span className={styles.sectionCount}>{pendingShares.length}</span>
-              </div>
-
-              {pendingSharesLoading && pendingShares.length === 0 ? (
-                <div className={styles.loadingCard}>Se incarca invitatiile...</div>
-              ) : pendingShares.length === 0 ? (
-                <div className={sharedStyles.emptyState}>
-                  <p>Nu ai invitatii in asteptare.</p>
-                </div>
-              ) : (
-                <div className={styles.cardList}>
-                  {pendingShares.map((share) => (
-                    <article key={share.id} className={styles.calendarCard}>
-                      <div className={styles.calendarCardMain}>
-                        <span
-                          className={styles.colorSwatch}
-                          style={{ backgroundColor: share.calendar.color }}
-                          aria-hidden="true"
-                        />
-                        <div className={styles.calendarCardCopy}>
-                          <div className={styles.calendarTitleRow}>
-                            <h3>{share.calendar.name}</h3>
-                            <span className={styles.badgeMuted}>In asteptare</span>
-                          </div>
-                          <p>
-                            {share.shared_by_name
-                              ? `Invitatie trimisa de ${share.shared_by_name}`
-                              : 'Calendar partajat cu tine'}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className={styles.cardActions}>
-                        <button
-                          type="button"
-                          className={sharedStyles.secondaryButton}
-                          onClick={() => handleDeclinePendingShare(share.id)}
-                          disabled={actionShareId === share.id}
-                        >
-                          Refuza
-                        </button>
-                        <button
-                          type="button"
-                          className={sharedStyles.primaryButton}
-                          onClick={() => handleAcceptPendingShare(share.id)}
-                          disabled={actionShareId === share.id}
-                        >
-                          {actionShareId === share.id ? 'Se proceseaza...' : 'Accepta'}
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
-
-            <section className={styles.section}>
-              <div className={styles.sectionHeader}>
-                <div>
-                  <h2>Calendare partajate cu mine</h2>
-                  <p>Calendare primite de la alti membri ai clinicii.</p>
-                </div>
-                <span className={styles.sectionCount}>{sharedCalendars.length}</span>
-              </div>
-
-              {sharedCalendars.length === 0 ? (
-                <div className={sharedStyles.emptyState}>
-                  <p>Nu ai calendare partajate active.</p>
-                </div>
-              ) : (
-                <div className={styles.cardList}>
-                  {sharedCalendars.map((calendar) => (
-                    <article key={calendar.id} className={styles.calendarCard}>
-                      <div className={styles.calendarCardMain}>
-                        <span
-                          className={styles.colorSwatch}
-                          style={{ backgroundColor: calendar.color }}
-                          aria-hidden="true"
-                        />
-                        <div className={styles.calendarCardCopy}>
-                          <div className={styles.calendarTitleRow}>
-                            <h3>{calendar.name}</h3>
-                            <span className={styles.badge}>Partajat</span>
-                          </div>
-                          <p>{buildCalendarDescription(calendar)}</p>
-                          <p className={styles.permissionsText}>
-                            Permisiuni: {formatPermissionsSummary(calendar.permissions)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className={styles.cardActions}>
-                        <button
-                          type="button"
-                          className={sharedStyles.secondaryButton}
-                          onClick={() => {
-                            if (calendar.shareId) {
-                              void handleLeaveCalendar(calendar.id, calendar.shareId);
-                            }
-                          }}
-                          disabled={!calendar.shareId || removingShareId === calendar.shareId}
-                        >
-                          {removingShareId === calendar.shareId ? 'Se paraseste...' : 'Paraseste'}
-                        </button>
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>
-          </>
-        )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <CalendarFormModal

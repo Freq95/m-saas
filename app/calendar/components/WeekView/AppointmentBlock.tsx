@@ -10,6 +10,7 @@ interface AppointmentBlockProps {
   appointment: Appointment;
   style: React.CSSProperties;
   compact?: boolean;
+  viewerUserId: number | null;
   onClick: (appointment: Appointment) => void;
   onDragStart?: (appointment: Appointment) => void;
   onDragEnd?: () => void;
@@ -19,9 +20,9 @@ interface AppointmentBlockProps {
 }
 
 export const AppointmentBlock = React.memo<AppointmentBlockProps>(
-  ({ appointment, style, compact = false, onClick, onDragStart, onDragEnd, isDragging = false, isHighlighted = false, enableDragDrop = false }) => {
+  ({ appointment, style, compact = false, viewerUserId, onClick, onDragStart, onDragEnd, isDragging = false, isHighlighted = false, enableDragDrop = false }) => {
     const statusCfg = getStatusConfig(appointment.status);
-    const resolvedColor = resolveAppointmentColor(appointment);
+    const resolvedColor = resolveAppointmentColor(appointment, viewerUserId);
     const isPast = new Date(appointment.end_time).getTime() < Date.now();
     const startLabel = format(new Date(appointment.start_time), 'HH:mm');
     const endLabel = format(new Date(appointment.end_time), 'HH:mm');
@@ -100,10 +101,10 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
     prev.appointment.end_time === next.appointment.end_time &&
     prev.appointment.category === next.appointment.category &&
     prev.appointment.color === next.appointment.color &&
-    prev.appointment.calendar_color === next.appointment.calendar_color &&
-    prev.appointment.calendar_is_default === next.appointment.calendar_is_default &&
-    prev.appointment.dentist_color === next.appointment.dentist_color &&
-    prev.appointment.calendar_settings?.color_mode === next.appointment.calendar_settings?.color_mode &&
+    prev.appointment.color_mine === next.appointment.color_mine &&
+    prev.appointment.color_others === next.appointment.color_others &&
+    prev.appointment.dentist_id === next.appointment.dentist_id &&
+    prev.viewerUserId === next.viewerUserId &&
     prev.style.top === next.style.top &&
     prev.style.left === next.style.left &&
     prev.style.width === next.style.width &&

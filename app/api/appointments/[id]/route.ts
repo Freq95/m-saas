@@ -14,6 +14,7 @@ import { checkUpdateRateLimit } from '@/lib/rate-limit';
 import { generateRecurringInstances } from '@/lib/recurring-utils';
 import { attachCalendarDisplayData } from '@/lib/server/calendar';
 import { getTenantTimeZone } from '@/lib/timezone';
+import { ExplicitClientSelectionError, resolveAppointmentClientLink } from '../client-linking';
 
 const CONFLICT_MESSAGE_BY_TYPE: Record<string, string> = {
   calendar_appointment: 'Exista deja o alta programare in acest interval.',
@@ -136,9 +137,11 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       endTime,
       notes,
       serviceId,
+      clientId,
       clientName,
       clientEmail,
       clientPhone,
+      forceNewClient,
       category,
       color,
       isRecurring,
@@ -296,16 +299,17 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         ? (clientPhone || null)
         : (existingAppointment.client_phone || null);
 
-      const { findOrCreateClient } = await import('@/lib/client-matching');
-      const linkedClient = await findOrCreateClient(
-        appointmentUserId,
-        appointmentTenantId,
-        normalizedName,
-        normalizedEmail || undefined,
-        normalizedPhone || undefined,
-        false,
-        true
-      );
+      const linkedClient = await resolveAppointmentClientLink({
+        db,
+        userId: appointmentUserId,
+        tenantId: appointmentTenantId,
+        clientId,
+        name: normalizedName,
+        email: normalizedEmail,
+        phone: normalizedPhone,
+        forceNewClient: forceNewClient ?? false,
+        overwriteContactFields: true,
+      });
 
       updates.client_id = linkedClient.id;
       updates.client_name = normalizedName;
@@ -467,6 +471,9 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     });
     return createSuccessResponse({ appointment: stripMongoId(appointmentDoc), warning });
   } catch (error) {
+    if (error instanceof ExplicitClientSelectionError) {
+      return createErrorResponse(error.message, 409);
+    }
     return handleApiError(error, 'Failed to update appointment');
   }
 }

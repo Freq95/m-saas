@@ -25,7 +25,6 @@ export async function GET(_request: NextRequest, props: { params: Promise<{ cale
         userId: dentist.userId,
         dbUserId: dentist.dbUserId.toString(),
         displayName: dentist.displayName,
-        dentistColor: dentist.dentistColor,
         isOwner: dentist.isOwner,
         isCurrentUser: dentist.isCurrentUser,
       })),
