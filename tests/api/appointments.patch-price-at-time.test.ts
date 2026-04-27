@@ -32,10 +32,19 @@ function matchesFilter(doc: Doc, filter: Doc): boolean {
   });
 }
 
-const { mockGetMongoDbOrThrow, mockGetAuthUser, mockCheckAppointmentConflict, mockUpdateClientStats } = vi.hoisted(
+const {
+  mockGetMongoDbOrThrow,
+  mockGetAuthUser,
+  mockGetCalendarAuth,
+  mockResolveAppointmentDentistAssignment,
+  mockCheckAppointmentConflict,
+  mockUpdateClientStats,
+} = vi.hoisted(
   () => ({
     mockGetMongoDbOrThrow: vi.fn(),
     mockGetAuthUser: vi.fn(),
+    mockGetCalendarAuth: vi.fn(),
+    mockResolveAppointmentDentistAssignment: vi.fn(),
     mockCheckAppointmentConflict: vi.fn(),
     mockUpdateClientStats: vi.fn(),
   })
@@ -60,6 +69,22 @@ vi.mock('@/lib/auth-helpers', () => {
   return { AuthError, getAuthUser: mockGetAuthUser };
 });
 
+vi.mock('@/lib/calendar-auth', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/calendar-auth')>('@/lib/calendar-auth');
+  return {
+    ...actual,
+    getCalendarAuth: mockGetCalendarAuth,
+  };
+});
+
+vi.mock('@/lib/appointment-service', async () => {
+  const actual = await vi.importActual<typeof import('@/lib/appointment-service')>('@/lib/appointment-service');
+  return {
+    ...actual,
+    resolveAppointmentDentistAssignment: mockResolveAppointmentDentistAssignment,
+  };
+});
+
 vi.mock('@/lib/calendar-conflicts', () => ({
   checkAppointmentConflict: mockCheckAppointmentConflict,
 }));
@@ -80,6 +105,7 @@ import { PATCH } from '@/app/api/appointments/[id]/route';
 
 describe('PATCH /api/appointments/[id] price_at_time behavior', () => {
   const tenantId = new ObjectId('65f9a0e8f5f89f73d18b0001');
+  const ownerDbUserId = new ObjectId('65f9a0e8f5f89f73d18b0002');
   const userId = 7;
   let appointments: Array<Doc>;
   let services: Array<Doc>;
@@ -87,17 +113,43 @@ describe('PATCH /api/appointments/[id] price_at_time behavior', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetAuthUser.mockResolvedValue({ userId, tenantId });
+    mockGetAuthUser.mockResolvedValue({ userId, tenantId, dbUserId: ownerDbUserId, email: 'owner@example.com' });
+    mockGetCalendarAuth.mockResolvedValue({
+      calendarId: 44,
+      calendarTenantId: tenantId,
+      calendarOwnerId: userId,
+      calendarOwnerDbUserId: ownerDbUserId,
+      isOwner: true,
+      permissions: {
+        can_view: true,
+        can_create: true,
+        can_edit_own: true,
+        can_edit_all: true,
+        can_delete_own: true,
+        can_delete_all: true,
+      },
+      shareId: null,
+    });
+    mockResolveAppointmentDentistAssignment.mockResolvedValue({
+      assignedDentistUserId: userId,
+      assignedDentistTenantId: tenantId,
+      dentistDbUserId: ownerDbUserId,
+      dentistDisplayName: 'Owner',
+      isOwner: true,
+      isCurrentUser: true,
+    });
     mockCheckAppointmentConflict.mockResolvedValue({ hasConflict: false, conflicts: [], suggestions: [] });
     mockUpdateClientStats.mockResolvedValue(undefined);
 
     services = [
       { id: 1, user_id: userId, tenant_id: tenantId, name: 'Basic', price: 100 },
       { id: 2, user_id: userId, tenant_id: tenantId, name: 'Premium', price: 250 },
+      { id: 3, user_id: 99, tenant_id: tenantId, name: 'Partner Service', price: 300 },
     ];
     clients = [
       { id: 123, user_id: userId, tenant_id: tenantId, name: 'Existing Client' },
       { id: 456, user_id: userId, tenant_id: tenantId, name: 'Selected Client' },
+      { id: 789, user_id: 99, tenant_id: tenantId, name: 'Partner Client' },
     ];
 
     appointments = [
@@ -124,6 +176,12 @@ describe('PATCH /api/appointments/[id] price_at_time behavior', () => {
               if (!item) return { matchedCount: 0 };
               if (isObject(update.$set)) Object.assign(item, update.$set);
               return { matchedCount: 1 };
+            }),
+            findOneAndUpdate: vi.fn(async (filter: Doc, update: Doc) => {
+              const item = appointments.find((doc) => matchesFilter(doc, filter));
+              if (!item) return null;
+              if (isObject(update.$set)) Object.assign(item, update.$set);
+              return item;
             }),
           };
         }
@@ -211,5 +269,117 @@ describe('PATCH /api/appointments/[id] price_at_time behavior', () => {
 
     expect(json.error).toContain('Clientul selectat nu mai exista');
     expect(appointments[0]?.client_id).toBe(123);
+  });
+
+  it('updates the assigned dentist and moves the service owner scope', async () => {
+    const assignedDentistDbUserId = new ObjectId('65f9a0e8f5f89f73d18b0003');
+    appointments[0] = {
+      ...appointments[0],
+      calendar_id: 44,
+      created_by_user_id: ownerDbUserId,
+      dentist_db_user_id: ownerDbUserId,
+      dentist_id: userId,
+      service_owner_user_id: userId,
+      service_owner_tenant_id: tenantId,
+    };
+    mockResolveAppointmentDentistAssignment.mockResolvedValueOnce({
+      assignedDentistUserId: 99,
+      assignedDentistTenantId: tenantId,
+      dentistDbUserId: assignedDentistDbUserId,
+      dentistDisplayName: 'Dr. Partner',
+      isOwner: false,
+      isCurrentUser: false,
+    });
+
+    const req = new NextRequest('http://localhost/api/appointments/10', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ dentistUserId: 99 }),
+    });
+
+    const res = await PATCH(req, { params: Promise.resolve({ id: '10' }) });
+    expect(res.status).toBe(200);
+
+    expect(mockResolveAppointmentDentistAssignment).toHaveBeenCalledWith(
+      expect.objectContaining({ userId }),
+      44,
+      99
+    );
+    expect(appointments[0]?.dentist_id).toBe(99);
+    expect(String(appointments[0]?.dentist_db_user_id)).toBe(String(assignedDentistDbUserId));
+    expect(appointments[0]?.service_owner_user_id).toBe(99);
+    expect(String(appointments[0]?.service_owner_tenant_id)).toBe(String(tenantId));
+  });
+
+  it('validates a changed service against the newly selected dentist', async () => {
+    const assignedDentistDbUserId = new ObjectId('65f9a0e8f5f89f73d18b0003');
+    appointments[0] = {
+      ...appointments[0],
+      calendar_id: 44,
+      dentist_db_user_id: ownerDbUserId,
+      dentist_id: userId,
+      service_owner_user_id: userId,
+      service_owner_tenant_id: tenantId,
+    };
+    mockResolveAppointmentDentistAssignment.mockResolvedValueOnce({
+      assignedDentistUserId: 99,
+      assignedDentistTenantId: tenantId,
+      dentistDbUserId: assignedDentistDbUserId,
+      dentistDisplayName: 'Dr. Partner',
+      isOwner: false,
+      isCurrentUser: false,
+    });
+
+    const req = new NextRequest('http://localhost/api/appointments/10', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ dentistUserId: 99, serviceId: 3 }),
+    });
+
+    const res = await PATCH(req, { params: Promise.resolve({ id: '10' }) });
+    expect(res.status).toBe(200);
+
+    expect(appointments[0]?.dentist_id).toBe(99);
+    expect(appointments[0]?.service_owner_user_id).toBe(99);
+    expect(appointments[0]?.service_id).toBe(3);
+    expect(appointments[0]?.price_at_time).toBe(300);
+  });
+
+  it('validates a changed client against the newly selected dentist', async () => {
+    const assignedDentistDbUserId = new ObjectId('65f9a0e8f5f89f73d18b0003');
+    appointments[0] = {
+      ...appointments[0],
+      calendar_id: 44,
+      dentist_db_user_id: ownerDbUserId,
+      dentist_id: userId,
+      service_owner_user_id: userId,
+      service_owner_tenant_id: tenantId,
+    };
+    mockResolveAppointmentDentistAssignment.mockResolvedValueOnce({
+      assignedDentistUserId: 99,
+      assignedDentistTenantId: tenantId,
+      dentistDbUserId: assignedDentistDbUserId,
+      dentistDisplayName: 'Dr. Partner',
+      isOwner: false,
+      isCurrentUser: false,
+    });
+
+    const req = new NextRequest('http://localhost/api/appointments/10', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        dentistUserId: 99,
+        clientId: 789,
+        clientName: 'Partner Client',
+      }),
+    });
+
+    const res = await PATCH(req, { params: Promise.resolve({ id: '10' }) });
+    expect(res.status).toBe(200);
+
+    expect(appointments[0]?.dentist_id).toBe(99);
+    expect(appointments[0]?.service_owner_user_id).toBe(99);
+    expect(appointments[0]?.client_id).toBe(789);
+    expect(appointments[0]?.client_name).toBe('Partner Client');
   });
 });

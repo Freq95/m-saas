@@ -1129,6 +1129,16 @@
   line-height: 1.45;
 }
 
+.fieldHintLink {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.fieldHintLink:hover {
+  text-decoration: underline;
+}
+
 /* ─────────────────────────────────────────────────────────
    APPOINTMENT MODAL — landscape (wide-screen) layout
 ───────────────────────────────────────────────────────── */

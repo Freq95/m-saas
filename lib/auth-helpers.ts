@@ -1,15 +1,26 @@
 import { auth } from '@/lib/auth';
+import { redirect } from 'next/navigation';
 import { ObjectId } from 'mongodb';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 
 export class AuthError extends Error {
   public status: number;
+  public code?: string;
 
-  constructor(message: string, status: number = 401) {
+  constructor(message: string, status: number = 401, code?: string) {
     super(message);
     this.name = 'AuthError';
     this.status = status;
+    this.code = code;
   }
+}
+
+/** Call from server page catch blocks instead of bare redirect('/login'). */
+export function redirectToLogin(err?: unknown): never {
+  if (err instanceof AuthError && err.code === 'SESSION_EXPIRED') {
+    redirect('/login?forced=1');
+  }
+  redirect('/login');
 }
 
 // MVP roles: super_admin (platform), owner (clinic), staff (clinic).
@@ -28,8 +39,6 @@ export interface AuthContext {
   tenantStatus: string;
   membershipStatus: string;
 }
-
-const ROLE_HIERARCHY: UserRole[] = ['staff', 'owner', 'super_admin'];
 
 function parseSessionVersion(rawValue: unknown): number {
   const parsed =
@@ -87,7 +96,7 @@ export async function getAuthUser(): Promise<AuthContext> {
 
   const dbSessionVersion = parseSessionVersion(dbUser.session_version ?? 0);
   if (dbSessionVersion !== sessionVersion) {
-    throw new AuthError('Session expired. Please sign in again.', 401);
+    throw new AuthError('Session expired. Please sign in again.', 401, 'SESSION_EXPIRED');
   }
 
   if (dbUser.status !== 'active') {
@@ -151,10 +160,4 @@ export async function getSuperAdmin(): Promise<{ userId: ObjectId; userIdRaw: st
     userIdRaw,
     email: superAdmin.email || session.user.email || '',
   };
-}
-
-export function requireRole(userRole: UserRole, minimumRole: UserRole) {
-  if (ROLE_HIERARCHY.indexOf(userRole) < ROLE_HIERARCHY.indexOf(minimumRole)) {
-    throw new AuthError(`Requires at least ${minimumRole} role`, 403);
-  }
 }

@@ -5,7 +5,16 @@ import { usePathname } from 'next/navigation';
 import RouteTransition from '@/components/RouteTransition';
 import AppTopNav from '@/components/AppTopNav';
 
-const HIDDEN_NAV_PREFIXES = ['/login', '/invite', '/admin', '/privacy', '/terms'];
+const HIDDEN_NAV_PREFIXES = [
+  '/login',
+  '/forgot-password',
+  '/reset-password',
+  '/invite',
+  '/calendar-invite',
+  '/admin',
+  '/privacy',
+  '/terms',
+];
 
 export default function AppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

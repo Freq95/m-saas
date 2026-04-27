@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { startOfWeek, startOfDay, endOfDay, addDays } from 'date-fns';
 import CalendarPageClient from './CalendarPageClient';
-import { getAuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, redirectToLogin } from '@/lib/auth-helpers';
 import { getAppointmentsData, getServicesData } from '@/lib/server/calendar';
 
 export const revalidate = 0;
@@ -11,8 +11,8 @@ export default async function CalendarPage() {
   let auth;
   try {
     auth = await getAuthUser();
-  } catch {
-    redirect('/login');
+  } catch (err) {
+    redirectToLogin(err);
   }
 
   const now = new Date();

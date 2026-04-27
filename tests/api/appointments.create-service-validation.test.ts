@@ -59,11 +59,11 @@ vi.mock('@/lib/calendar-auth', () => ({
 
 vi.mock('@/lib/appointment-service', () => ({
   resolveAppointmentDentistAssignment: mockResolveAppointmentDentistAssignment,
-  buildAppointmentDentistFields: vi.fn((assignment: any) => ({
-    service_owner_user_id: assignment.serviceOwnerUserId,
-    service_owner_tenant_id: assignment.serviceOwnerTenantId,
+  buildAppointmentDentistFields: vi.fn((assignment: any, serviceOwner?: any) => ({
+    service_owner_user_id: serviceOwner?.serviceOwnerUserId ?? assignment.assignedDentistUserId,
+    service_owner_tenant_id: serviceOwner?.serviceOwnerTenantId ?? assignment.assignedDentistTenantId,
     dentist_db_user_id: assignment.dentistDbUserId,
-    dentist_id: assignment.serviceOwnerUserId,
+    dentist_id: assignment.assignedDentistUserId,
   })),
 }));
 
@@ -145,8 +145,8 @@ describe('POST /api/appointments service validation', () => {
     mockWithAppointmentWriteLocks.mockImplementation(async (_context: unknown, callback: () => Promise<unknown>) => callback());
     mockGetNextNumericId.mockResolvedValue(7001);
     mockResolveAppointmentDentistAssignment.mockResolvedValue({
-      serviceOwnerUserId: 13,
-      serviceOwnerTenantId: tenantId,
+      assignedDentistUserId: 13,
+      assignedDentistTenantId: tenantId,
       dentistDbUserId: viewerDbUserId,
       dentistDisplayName: 'Viewer',
       isOwner: false,
@@ -181,8 +181,9 @@ describe('POST /api/appointments service validation', () => {
     });
   });
 
-  it('returns 400 when the selected service does not belong to the current dentist', async () => {
+  it('returns 400 when the selected service does not exist in the selected dentist\'s catalog', async () => {
     serviceFindOne.mockResolvedValue(null);
+    clientFindOne.mockResolvedValue({ id: clientId, user_id: 13, tenant_id: tenantId, name: 'Alice Example' });
 
     const req = new NextRequest('http://localhost/api/appointments', {
       method: 'POST',
@@ -190,6 +191,7 @@ describe('POST /api/appointments service validation', () => {
       body: JSON.stringify({
         calendarId: 11,
         serviceId: 999,
+        clientId,
         clientName: 'Alice Example',
         startTime: '2026-04-09T09:00:00.000Z',
         endTime: '2026-04-09T09:30:00.000Z',
@@ -211,13 +213,14 @@ describe('POST /api/appointments service validation', () => {
     expect(insertOne).not.toHaveBeenCalled();
   });
 
-  it('creates a shared-calendar appointment using the authenticated dentist service scope', async () => {
+  it('creates a shared-calendar appointment scoped to the selected dentist\'s service catalog', async () => {
     serviceFindOne.mockResolvedValue({
       id: 222,
       name: 'Consultatie initiala',
       duration_minutes: 30,
       price: 150,
     });
+    clientFindOne.mockResolvedValue({ id: clientId, user_id: 13, tenant_id: tenantId, name: 'Alice Example' });
 
     const req = new NextRequest('http://localhost/api/appointments', {
       method: 'POST',
@@ -225,6 +228,7 @@ describe('POST /api/appointments service validation', () => {
       body: JSON.stringify({
         calendarId: 11,
         serviceId: 222,
+        clientId,
         clientName: 'Alice Example',
         clientEmail: 'alice@example.com',
         startTime: '2026-04-09T09:00:00.000Z',
@@ -256,6 +260,7 @@ describe('POST /api/appointments service validation', () => {
       calendar_id: 11,
       created_by_user_id: viewerDbUserId,
       dentist_db_user_id: viewerDbUserId,
+      dentist_id: 13,
       service_id: 222,
       service_name: 'Consultatie initiala',
       service_owner_user_id: 13,
@@ -267,11 +272,11 @@ describe('POST /api/appointments service validation', () => {
     });
   });
 
-  it('creates a shared-calendar appointment for another selected dentist', async () => {
+  it('creates a shared-calendar appointment for another selected dentist scoped to that dentist\'s services', async () => {
     const assignedDentistDbUserId = new ObjectId('65f9a0e8f5f89f73d18b0019');
     mockResolveAppointmentDentistAssignment.mockResolvedValueOnce({
-      serviceOwnerUserId: 99,
-      serviceOwnerTenantId: tenantId,
+      assignedDentistUserId: 99,
+      assignedDentistTenantId: tenantId,
       dentistDbUserId: assignedDentistDbUserId,
       dentistDisplayName: 'Dr. Partner',
       isOwner: false,
@@ -283,6 +288,7 @@ describe('POST /api/appointments service validation', () => {
       duration_minutes: 60,
       price: 450,
     });
+    clientFindOne.mockResolvedValue({ id: clientId, user_id: 99, tenant_id: tenantId, name: 'Bob Example' });
 
     const req = new NextRequest('http://localhost/api/appointments', {
       method: 'POST',
@@ -291,6 +297,7 @@ describe('POST /api/appointments service validation', () => {
         calendarId: 11,
         dentistUserId: 99,
         serviceId: 333,
+        clientId,
         clientName: 'Bob Example',
         startTime: '2026-04-09T10:00:00.000Z',
         endTime: '2026-04-09T11:00:00.000Z',
@@ -310,7 +317,9 @@ describe('POST /api/appointments service validation', () => {
       user_id: 42,
       created_by_user_id: viewerDbUserId,
       dentist_db_user_id: assignedDentistDbUserId,
+      dentist_id: 99,
       service_owner_user_id: 99,
+      service_owner_tenant_id: tenantId,
       service_id: 333,
     }));
   });
@@ -324,7 +333,7 @@ describe('POST /api/appointments service validation', () => {
     });
     clientFindOne.mockResolvedValue({
       id: clientId,
-      user_id: 42,
+      user_id: 13,
       tenant_id: tenantId,
       name: 'Alice Example',
     });
@@ -347,7 +356,7 @@ describe('POST /api/appointments service validation', () => {
     expect(res.status).toBe(201);
     expect(clientFindOne).toHaveBeenCalledWith({
       id: clientId,
-      user_id: 42,
+      user_id: 13,
       tenant_id: tenantId,
       deleted_at: { $exists: false },
     });

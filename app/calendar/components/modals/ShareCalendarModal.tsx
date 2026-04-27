@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import styles from '../../page.module.css';
 import type { CalendarListItem, CalendarPermissions } from '../../hooks';
+import { ConfirmModal } from './ConfirmModal';
 
 interface CalendarShareItem {
   id: number;
@@ -128,6 +129,7 @@ export function ShareCalendarModal({
   const [email, setEmail] = useState('');
   const [permissions, setPermissions] = useState<CalendarPermissions>(DEFAULT_PERMISSIONS);
   const [notice, setNotice] = useState<ShareNotice>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CalendarShareItem | null>(null);
 
   const isEditing = editingShareId !== null;
 
@@ -248,14 +250,8 @@ export function ShareCalendarModal({
     setNotice(null);
   };
 
-  const handleDeleteShare = async (share: CalendarShareItem) => {
-    if (!calendar || processingShareId !== null) return;
-    const confirmed = window.confirm(
-      share.status === 'accepted'
-        ? `Revoci accesul pentru ${share.shared_with_email}?`
-        : `Stergi invitatia pentru ${share.shared_with_email}?`
-    );
-    if (!confirmed) return;
+  const executeDeleteShare = async (share: CalendarShareItem) => {
+    if (!calendar) return;
     setProcessingShareId(share.id);
     setNotice(null);
     try {
@@ -268,11 +264,14 @@ export function ShareCalendarModal({
       await loadShares();
       await onChanged?.();
       setNotice({ kind: 'success', text: share.status === 'accepted' ? 'Accesul a fost revocat.' : 'Invitatia a fost eliminata.' });
-    } catch (deleteError) {
-      setNotice({ kind: 'error', text: deleteError instanceof Error ? deleteError.message : 'Nu am putut elimina partajarea.' });
     } finally {
       setProcessingShareId(null);
     }
+  };
+
+  const handleDeleteShare = (share: CalendarShareItem) => {
+    if (!calendar || processingShareId !== null) return;
+    setDeleteTarget(share);
   };
 
   if (!isOpen || !calendar) return null;
@@ -452,7 +451,7 @@ export function ShareCalendarModal({
                             <button
                               type="button"
                               className={styles.dangerInlineAction}
-                              onClick={() => void handleDeleteShare(share)}
+                              onClick={() => handleDeleteShare(share)}
                               disabled={processingShareId === share.id || isSubmitting}
                               title={share.status === 'accepted' ? 'Revoca accesul' : 'Sterge invitatia'}
                               aria-label={share.status === 'accepted' ? `Revoca ${share.shared_with_email}` : `Sterge invitatia pentru ${share.shared_with_email}`}
@@ -470,6 +469,23 @@ export function ShareCalendarModal({
           </section>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={deleteTarget !== null}
+        title={deleteTarget?.status === 'accepted' ? 'Revoca accesul' : 'Sterge invitatia'}
+        message={
+          deleteTarget?.status === 'accepted'
+            ? `Revoci accesul pentru ${deleteTarget?.shared_with_email}?`
+            : `Stergi invitatia pentru ${deleteTarget?.shared_with_email}?`
+        }
+        confirmLabel={deleteTarget?.status === 'accepted' ? 'Revoca' : 'Sterge'}
+        tone="danger"
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={async () => {
+          if (deleteTarget) await executeDeleteShare(deleteTarget);
+          setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 }

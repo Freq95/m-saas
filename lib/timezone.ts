@@ -66,7 +66,7 @@ export async function getTenantTimeZone(tenantId: ObjectId): Promise<string> {
   return candidate && isValidTimeZone(candidate) ? candidate : DEFAULT_TIME_ZONE;
 }
 
-export function getTimeZoneDateParts(date: Date, timeZone: string): TimeZoneDateParts {
+function getTimeZoneDateParts(date: Date, timeZone: string): TimeZoneDateParts {
   const parts = getFormatter(timeZone).formatToParts(date);
   const values = new Map<string, string>();
   for (const part of parts) {
@@ -89,15 +89,6 @@ export function getTimeZoneDateParts(date: Date, timeZone: string): TimeZoneDate
 
 export function getTimeZoneDateKey(date: Date, timeZone: string): string {
   return getTimeZoneDateParts(date, timeZone).dateKey;
-}
-
-export function getWeekdayKeyInTimeZone(date: Date, timeZone: string): WeekdayKey {
-  return getTimeZoneDateParts(date, timeZone).weekday;
-}
-
-export function getMinutesSinceMidnightInTimeZone(date: Date, timeZone: string): number {
-  const parts = getTimeZoneDateParts(date, timeZone);
-  return (parts.hour * 60) + parts.minute;
 }
 
 export function addDaysToDateKey(dateKey: string, days: number): string {

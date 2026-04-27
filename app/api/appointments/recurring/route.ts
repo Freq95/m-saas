@@ -15,6 +15,8 @@ import { logger } from '@/lib/logger';
 import { generateRecurringInstances } from '@/lib/recurring-utils';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
 import { getTenantTimeZone } from '@/lib/timezone';
+import { createRecurringAppointmentSchema } from '@/lib/validation';
+import { updateClientStats } from '@/lib/client-matching';
 import { ExplicitClientSelectionError, resolveAppointmentClientLink } from '../client-linking';
 
 interface RecurringConflict {
@@ -32,7 +34,6 @@ export async function POST(request: NextRequest) {
     const limited = await checkWriteRateLimit(userId);
     if (limited) return limited;
     const body = await request.json();
-    const { createRecurringAppointmentSchema } = await import('@/lib/validation');
     const validationResult = createRecurringAppointmentSchema.safeParse(body);
     if (!validationResult.success) {
       return NextResponse.json(
@@ -64,6 +65,7 @@ export async function POST(request: NextRequest) {
     let appointmentTenantId = tenantId;
     let targetCalendarId: number;
     let createdByUserId = dbUserId;
+    let isSharedCalendar = false;
 
     if (typeof calendarId === 'number') {
       const calendarAuth = await getCalendarAuth(auth, calendarId);
@@ -71,6 +73,7 @@ export async function POST(request: NextRequest) {
       appointmentUserId = calendarAuth.calendarOwnerId;
       appointmentTenantId = calendarAuth.calendarTenantId;
       targetCalendarId = calendarAuth.calendarId;
+      isSharedCalendar = !calendarAuth.isOwner;
     } else {
       const defaultCalendar = await getOrCreateDefaultCalendar(auth);
       appointmentUserId = userId;
@@ -83,11 +86,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid numeric fields' }, { status: 400 });
     }
 
-    const { updateClientStats } = await import('@/lib/client-matching');
+    // Only the dentist themselves can create new patients in their own account.
+    if (!dentistAssignment.isCurrentUser && (typeof clientId !== 'number' || forceNewClient)) {
+      return NextResponse.json(
+        { error: 'Selecteaza un pacient existent. Pacientii pot fi adaugati doar de medicul selectat.' },
+        { status: 403 }
+      );
+    }
+
     const client = await resolveAppointmentClientLink({
       db,
-      userId: appointmentUserId,
-      tenantId: appointmentTenantId,
+      userId: dentistAssignment.assignedDentistUserId,
+      tenantId: dentistAssignment.assignedDentistTenantId,
       clientId,
       name: clientName,
       email: clientEmail || null,
@@ -98,7 +108,7 @@ export async function POST(request: NextRequest) {
     const recurrenceRule: RecurrenceRule = {
       frequency: recurrence.frequency,
       interval: Math.max(1, Number(recurrence.interval) || 1),
-      end_date: recurrence.end_date || recurrence.endDate,
+      end_date: recurrence.endDate,
       count: recurrence.count,
     };
 
@@ -128,11 +138,11 @@ export async function POST(request: NextRequest) {
     const conflicts: RecurringConflict[] = [];
     const tenantTimeZone = await getTenantTimeZone(appointmentTenantId);
 
-    // Get service details
+    // Get service details — services belong to the assigned dentist's catalog.
     const service = await db.collection('services').findOne({
       id: normalizedServiceId,
-      user_id: dentistAssignment.serviceOwnerUserId,
-      tenant_id: dentistAssignment.serviceOwnerTenantId,
+      user_id: dentistAssignment.assignedDentistUserId,
+      tenant_id: dentistAssignment.assignedDentistTenantId,
       deleted_at: { $exists: false },
     });
     if (!service) {
@@ -164,7 +174,6 @@ export async function POST(request: NextRequest) {
             true,
             {
               calendarId: targetCalendarId,
-              timeZone: tenantTimeZone,
             }
           );
 
@@ -226,7 +235,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (createdAppointments.length > 0) {
-      await updateClientStats(client.id, appointmentTenantId);
+      await updateClientStats(client.id, dentistAssignment.assignedDentistTenantId);
     }
 
     await invalidateReadCaches({

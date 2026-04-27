@@ -431,6 +431,7 @@ export default function InboxPageClient({
   const [syncError, setSyncError] = useState<string | null>(null);
   const [syncPartiallyFailed, setSyncPartiallyFailed] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [hasIntegrations, setHasIntegrations] = useState<boolean | null>(null);
   const [attachmentsOnly, setAttachmentsOnly] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [clientSearch, setClientSearch] = useState('');
@@ -685,6 +686,7 @@ export default function InboxPageClient({
       }
       const payload = await response.json();
       const integrations = Array.isArray(payload?.integrations) ? payload.integrations : [];
+      setHasIntegrations(integrations.length > 0);
       const syncDates = integrations
         .map((integration: any) =>
           typeof integration?.last_sync_at === 'string' ? new Date(integration.last_sync_at) : null
@@ -1740,7 +1742,18 @@ export default function InboxPageClient({
           <div className={styles.conversationListContent}>
             {conversations.length === 0 ? (
               <div className={styles.emptyConversations}>
-                {searchQuery ? 'Nu s-au găsit conversații' : 'Nu există conversații'}
+                {searchQuery ? (
+                  'Nu s-au găsit conversații'
+                ) : hasIntegrations === false ? (
+                  <div className={styles.noIntegrationCta}>
+                    <p>Nicio cutie de email conectată.</p>
+                    <a href="/settings/email" className={styles.noIntegrationLink}>
+                      Conectează un cont de email →
+                    </a>
+                  </div>
+                ) : (
+                  'Nu există conversații'
+                )}
               </div>
             ) : (
               conversations.map((conv) => (

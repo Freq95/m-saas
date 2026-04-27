@@ -3,17 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import styles from '../../page.module.css';
 import type { CalendarListItem } from '../../hooks';
-import {
-  DEFAULT_COLOR_MINE,
-  DEFAULT_COLOR_OTHERS,
-} from '@/lib/calendar-color-policy';
+import { ConfirmModal } from './ConfirmModal';
 
 type CalendarFormMode = 'create' | 'edit';
 
 export interface CalendarFormValues {
   name: string;
-  color_mine: string;
-  color_others: string;
 }
 
 interface CalendarFormModalProps {
@@ -42,22 +37,20 @@ export function CalendarFormModal({
 }: CalendarFormModalProps) {
   const backdropPressStartedRef = useRef(false);
   const [name, setName] = useState('');
-  const [colorMine, setColorMine] = useState(DEFAULT_COLOR_MINE);
-  const [colorOthers, setColorOthers] = useState(DEFAULT_COLOR_OTHERS);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const isEditMode = mode === 'edit';
 
   useEffect(() => {
     if (!isOpen) return;
     setName(calendar?.name || '');
-    setColorMine(calendar?.color_mine || DEFAULT_COLOR_MINE);
-    setColorOthers(calendar?.color_others || DEFAULT_COLOR_OTHERS);
     setError(null);
     setIsSubmitting(false);
     setIsDeleting(false);
+    setShowDeleteConfirm(false);
   }, [calendar, isOpen]);
 
   useEffect(() => {
@@ -93,7 +86,7 @@ export function CalendarFormModal({
     setError(null);
     setIsSubmitting(true);
     try {
-      await onSubmit({ name: trimmedName, color_mine: colorMine, color_others: colorOthers });
+      await onSubmit({ name: trimmedName });
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Nu am putut salva calendarul.');
     } finally {
@@ -101,16 +94,17 @@ export function CalendarFormModal({
     }
   };
 
-  const handleDelete = async () => {
+  const handleDeleteClick = () => {
     if (!onDelete || !calendar || calendar.is_default || isSubmitting || isDeleting) return;
-    const confirmed = window.confirm(`Stergi calendarul "${calendar.name}"?`);
-    if (!confirmed) return;
-    setError(null);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!onDelete || !calendar) return;
     setIsDeleting(true);
     try {
       await onDelete();
-    } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : 'Nu am putut sterge calendarul.');
+      setShowDeleteConfirm(false);
     } finally {
       setIsDeleting(false);
     }
@@ -132,10 +126,10 @@ export function CalendarFormModal({
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label={isEditMode ? 'Editeaza calendarul' : 'Calendar nou'}
+        aria-label={isEditMode ? 'Redenumeste calendarul' : 'Calendar nou'}
       >
         <div className={styles.modalHeader}>
-          <h3>{isEditMode ? 'Setari calendar' : 'Calendar nou'}</h3>
+          <h3>{isEditMode ? 'Redenumeste calendarul' : 'Calendar nou'}</h3>
           <button
             type="button"
             className={styles.modalIconButton}
@@ -166,55 +160,13 @@ export function CalendarFormModal({
               maxLength={100}
             />
           </div>
-
-          <div className={styles.modalFieldRow}>
-            <div className={styles.modalField}>
-              <label htmlFor="cal-color-mine">Programarile mele</label>
-              <div className={styles.colorFieldRow}>
-                <span
-                  className={styles.colorPreview}
-                  style={{ backgroundColor: colorMine }}
-                  aria-hidden="true"
-                />
-                <input
-                  id="cal-color-mine"
-                  className={styles.colorInput}
-                  type="color"
-                  value={colorMine}
-                  onChange={(e) => setColorMine(e.target.value.toUpperCase())}
-                  disabled={busy}
-                />
-                <span className={styles.colorValue}>{colorMine.toUpperCase()}</span>
-              </div>
-            </div>
-
-            <div className={styles.modalField}>
-              <label htmlFor="cal-color-others">Alti dentisti</label>
-              <div className={styles.colorFieldRow}>
-                <span
-                  className={styles.colorPreview}
-                  style={{ backgroundColor: colorOthers }}
-                  aria-hidden="true"
-                />
-                <input
-                  id="cal-color-others"
-                  className={styles.colorInput}
-                  type="color"
-                  value={colorOthers}
-                  onChange={(e) => setColorOthers(e.target.value.toUpperCase())}
-                  disabled={busy}
-                />
-                <span className={styles.colorValue}>{colorOthers.toUpperCase()}</span>
-              </div>
-            </div>
-          </div>
         </div>
 
         <div className={styles.modalActions}>
           {isEditMode && calendar && !calendar.is_default && onDelete && (
             <button
               type="button"
-              onClick={handleDelete}
+              onClick={handleDeleteClick}
               className={styles.deleteButton}
               disabled={busy}
             >
@@ -239,6 +191,15 @@ export function CalendarFormModal({
           </button>
         </div>
       </div>
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        title="Stergere calendar"
+        message={calendar ? `Stergi calendarul "${calendar.name}"?` : ''}
+        confirmLabel="Sterge"
+        tone="danger"
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDeleteConfirm}
+      />
     </div>
   );
 }

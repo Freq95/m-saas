@@ -7,6 +7,7 @@ import { getAuthUser } from '@/lib/auth-helpers';
 import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from '@/lib/db/mongo-utils';
 import { invalidateReadCaches } from '@/lib/cache-keys';
 import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
+import { DENTIST_COLOR_PALETTE, isDentistColorId } from '@/lib/calendar-color-policy';
 
 function slugify(name: string): string {
   return name
@@ -133,6 +134,46 @@ async function resolveShareByToken(db: any, token: string) {
   return db.collection('calendar_shares').findOne({
     invite_token_hash: hashCalendarShareToken(token),
   });
+}
+
+/**
+ * Auto-assigns palette colors when a share is accepted:
+ * - If the calendar owner has no palette color yet, assign the first available one (preferring 'blue').
+ * - Assign the first available color (preferring 'pink') to the new recipient.
+ * Returns `{ dentistColor }` — the color to store on the share doc.
+ */
+async function autoAssignColors(
+  db: any,
+  calendarId: number,
+  calendarColorMine: unknown
+): Promise<{ dentistColor: string | null; calendarColorUpdate: string | null }> {
+  const acceptedShares = await db.collection('calendar_shares').find(
+    { calendar_id: calendarId, status: 'accepted' },
+    { projection: { dentist_color: 1 } }
+  ).toArray();
+
+  const taken = new Set<string>();
+  if (isDentistColorId(calendarColorMine)) taken.add(calendarColorMine as string);
+  for (const s of acceptedShares) {
+    if (isDentistColorId(s.dentist_color)) taken.add(s.dentist_color);
+  }
+
+  // Owner color — assign 'blue' if not set to a palette ID
+  let calendarColorUpdate: string | null = null;
+  if (!isDentistColorId(calendarColorMine)) {
+    const ownerColor = DENTIST_COLOR_PALETTE.find((c) => !taken.has(c.id));
+    if (ownerColor) {
+      calendarColorUpdate = ownerColor.id;
+      taken.add(ownerColor.id);
+    }
+  }
+
+  // Recipient color — prefer 'pink', then next available
+  const preferredRecipient = ['pink', ...DENTIST_COLOR_PALETTE.map((c) => c.id)];
+  const uniquePreferred = [...new Set(preferredRecipient)];
+  const dentistColor = uniquePreferred.find((id) => !taken.has(id)) ?? null;
+
+  return { dentistColor, calendarColorUpdate };
 }
 
 async function resolveShareByPayload(db: any, payload: { token?: string; shareId?: number }) {
@@ -289,6 +330,8 @@ export async function POST(request: NextRequest) {
         return createErrorResponse('Invitatia apartine altui utilizator', 403);
       }
 
+      const { dentistColor, calendarColorUpdate } = await autoAssignColors(db, calendar.id, calendar.color_mine);
+
       const acceptResult = await db.collection('calendar_shares').updateOne(
         { id: share.id, status: 'pending' },
         {
@@ -298,6 +341,7 @@ export async function POST(request: NextRequest) {
             shared_with_numeric_user_id: authUser.userId,
             shared_with_tenant_id: authUser.tenantId,
             dentist_display_name: authUser.name || share.dentist_display_name || authUser.email,
+            dentist_color: dentistColor,
             accepted_at: nowIso,
             updated_at: nowIso,
             expires_at: null,
@@ -308,6 +352,13 @@ export async function POST(request: NextRequest) {
 
       if (acceptResult.matchedCount === 0) {
         return createErrorResponse('Invitatie deja procesata', 409);
+      }
+
+      if (calendarColorUpdate) {
+        await db.collection('calendars').updateOne(
+          { id: calendar.id },
+          { $set: { color_mine: calendarColorUpdate, updated_at: nowIso } }
+        );
       }
 
       await invalidateReadCaches({
@@ -349,6 +400,8 @@ export async function POST(request: NextRequest) {
     });
 
     try {
+      const { dentistColor, calendarColorUpdate } = await autoAssignColors(db, calendar.id, calendar.color_mine);
+
       const acceptResult = await db.collection('calendar_shares').updateOne(
         { id: share.id, status: 'pending' },
         {
@@ -358,6 +411,7 @@ export async function POST(request: NextRequest) {
             shared_with_numeric_user_id: createdAccount.userNumericId,
             shared_with_tenant_id: createdAccount.tenantId,
             dentist_display_name: createdAccount.userName,
+            dentist_color: dentistColor,
             accepted_at: nowIso,
             updated_at: nowIso,
             expires_at: null,
@@ -368,6 +422,13 @@ export async function POST(request: NextRequest) {
 
       if (acceptResult.matchedCount === 0) {
         throw new Error('Invite already processed');
+      }
+
+      if (calendarColorUpdate) {
+        await db.collection('calendars').updateOne(
+          { id: calendar.id },
+          { $set: { color_mine: calendarColorUpdate, updated_at: nowIso } }
+        );
       }
 
       await invalidateReadCaches({

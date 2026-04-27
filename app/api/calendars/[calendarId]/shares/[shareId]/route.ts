@@ -6,8 +6,9 @@ import { getAuthUser } from '@/lib/auth-helpers';
 import { invalidateReadCaches } from '@/lib/cache-keys';
 import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { checkUpdateRateLimit } from '@/lib/rate-limit';
+import { updateCalendarShareSchema } from '@/lib/validation';
 
-function parseId(raw: string, label: string): number | null {
+function parseId(raw: string): number | null {
   const parsed = Number.parseInt(raw, 10);
   if (!Number.isInteger(parsed) || parsed <= 0) {
     return null;
@@ -31,7 +32,9 @@ async function loadCalendarShare(calendarId: number, shareId: number) {
   return { db, share };
 }
 
-// PATCH /api/calendars/[calendarId]/shares/[shareId] - Update share permissions/color
+// PATCH /api/calendars/[calendarId]/shares/[shareId]
+// Owner: can update permissions (and dentist_color)
+// Recipient: can update their own dentist_color only
 export async function PATCH(request: NextRequest, props: { params: Promise<{ calendarId: string; shareId: string }> }) {
   const params = await props.params;
   try {
@@ -40,48 +43,54 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ cal
     const limited = await checkUpdateRateLimit(userId);
     if (limited) return limited;
 
-    const calendarId = parseId(params.calendarId, 'calendar');
-    const shareId = parseId(params.shareId, 'share');
+    const calendarId = parseId(params.calendarId);
+    const shareId = parseId(params.shareId);
     if (!calendarId || !shareId) {
       return createErrorResponse('Invalid share reference', 400);
     }
 
-    const calendarAuth = await getCalendarAuth(auth, calendarId);
-    if (!calendarAuth.isOwner) {
-      return createErrorResponse('Only the calendar owner can manage shares', 403);
-    }
-
     const body = await request.json();
-    const { updateCalendarShareSchema } = await import('@/lib/validation');
     const validationResult = updateCalendarShareSchema.safeParse(body);
     if (!validationResult.success) {
       return createErrorResponse(validationResult.error.errors[0]?.message || 'Invalid input', 400);
     }
 
+    const calendarAuth = await getCalendarAuth(auth, calendarId);
     const { db, share } = await loadCalendarShare(calendarId, shareId);
     if (!share) {
       return createErrorResponse('Share not found', 404);
     }
 
+    const isOwner = calendarAuth.isOwner;
+    const isRecipient = shareBelongsToCurrentUser(share, auth);
+
+    if (!isOwner && !isRecipient) {
+      return createErrorResponse('Only the calendar owner or the share recipient can update this share', 403);
+    }
+
     const updates: Record<string, unknown> = {};
-    if (validationResult.data.permissions !== undefined) {
+
+    // Only the owner can change permissions
+    if (isOwner && validationResult.data.permissions !== undefined) {
       updates.permissions = normalizeCalendarPermissions(validationResult.data.permissions);
     }
+
+    // Both owner and recipient can update dentist_color
+    if ('dentist_color' in validationResult.data) {
+      updates.dentist_color = validationResult.data.dentist_color ?? null;
+    }
+
     if (Object.keys(updates).length === 0) {
       return createErrorResponse('No fields to update', 400);
     }
 
     updates.updated_at = new Date().toISOString();
 
-    await db.collection('calendar_shares').updateOne(
+    const updatedShare = await db.collection('calendar_shares').findOneAndUpdate(
       { id: shareId, calendar_id: calendarId },
-      { $set: updates }
+      { $set: updates },
+      { returnDocument: 'after' }
     );
-
-    const updatedShare = await db.collection('calendar_shares').findOne({
-      id: shareId,
-      calendar_id: calendarId,
-    });
 
     await invalidateReadCaches({
       tenantId,
@@ -105,8 +114,8 @@ export async function DELETE(_request: NextRequest, props: { params: Promise<{ c
     const limited = await checkUpdateRateLimit(userId);
     if (limited) return limited;
 
-    const calendarId = parseId(params.calendarId, 'calendar');
-    const shareId = parseId(params.shareId, 'share');
+    const calendarId = parseId(params.calendarId);
+    const shareId = parseId(params.shareId);
     if (!calendarId || !shareId) {
       return createErrorResponse('Invalid share reference', 400);
     }

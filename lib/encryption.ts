@@ -31,7 +31,7 @@ function getKeyHexForVersion(version: string): string {
  * Keys must be 32-byte hex strings (64 characters).
  * Supports ENCRYPTION_KEY (legacy v1 default) and ENCRYPTION_KEY_<VERSION>.
  */
-export function getEncryptionKey(version: string = DEFAULT_KEY_VERSION): Buffer {
+function getEncryptionKey(version: string = DEFAULT_KEY_VERSION): Buffer {
   const keyHex = getKeyHexForVersion(version);
   if (!/^[0-9a-f]{64}$/i.test(keyHex)) {
     throw new Error(

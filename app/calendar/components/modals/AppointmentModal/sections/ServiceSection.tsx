@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import styles from '../../../../page.module.css';
 import type { AppointmentService } from '../types';
 
@@ -60,6 +61,14 @@ export function ServiceSection({
           </option>
         ))}
       </select>
+      {!loading && services.length === 0 && (
+        <p className={styles.fieldHint}>
+          Nu ai servicii definite.{' '}
+          <Link href="/settings/services" className={styles.fieldHintLink}>
+            Adaugă primul serviciu →
+          </Link>
+        </p>
+      )}
       {error && <p className={styles.fieldHint}>{error}</p>}
     </div>
   );

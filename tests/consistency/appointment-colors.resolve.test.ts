@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveAppointmentColor } from '@/lib/calendar-color-policy';
+import { getAppointmentBlockStyle, resolveAppointmentColor } from '@/lib/calendar-color-policy';
 
 describe('resolveAppointmentColor', () => {
   it("uses color_mine when viewer is the appointment's dentist", () => {
@@ -52,5 +52,22 @@ describe('resolveAppointmentColor', () => {
         null
       )
     ).toBe('#10b981');
+  });
+});
+
+describe('getAppointmentBlockStyle', () => {
+  it('keeps the default style pastel with a darker edge', () => {
+    expect(getAppointmentBlockStyle('#3b82f6', 'light')).toMatchObject({
+      borderColor: 'color-mix(in srgb, #3b82f6 85%, black 15%)',
+      bodyColor: 'color-mix(in srgb, #3b82f6 15%, var(--color-bg) 85%)',
+    });
+  });
+
+  it('uses solid body and pastel edge for shared appointments', () => {
+    expect(getAppointmentBlockStyle('#3b82f6', 'light', 'shared')).toMatchObject({
+      borderColor: 'color-mix(in srgb, #3b82f6 80%, black 20%)',
+      bodyColor: '#3b82f6',
+      textColor: '#ffffff',
+    });
   });
 });

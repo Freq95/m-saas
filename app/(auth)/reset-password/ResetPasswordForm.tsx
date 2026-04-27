@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import styles from '../auth.module.css';
 
 export function ResetPasswordForm() {
   const router = useRouter();
@@ -86,28 +87,54 @@ export function ResetPasswordForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
-      <h2>Seteaza parola noua</h2>
-      {checking ? <p>Se valideaza linkul...</p> : null}
-      {error && <p style={{ color: 'var(--color-danger)' }}>{error}</p>}
-      {!checking && validToken ? (
-        <>
-          <label style={{ display: 'grid', gap: 6 }}>
-            <span>Parola noua</span>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          </label>
-          <label style={{ display: 'grid', gap: 6 }}>
-            <span>Confirma parola</span>
-            <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required />
-          </label>
-          <button type="submit" disabled={submitting}>
+    <section className={styles.card} aria-labelledby="auth-reset-title">
+      <header className={styles.header}>
+        <h1 id="auth-reset-title" className={styles.title}>Seteaza parola noua</h1>
+        <p className={styles.subtitle}>Alege o parola pe care o poti tine minte si care are minimum 8 caractere.</p>
+      </header>
+
+      {checking && <p className={styles.loadingText}>Se valideaza linkul...</p>}
+      {error && (
+        <p className={`${styles.message} ${styles.messageError}`} role="alert">{error}</p>
+      )}
+
+      {!checking && validToken && (
+        <form onSubmit={handleSubmit} className={styles.form}>
+          <div className={styles.field}>
+            <label htmlFor="auth-new-password" className={styles.label}>Parola noua</label>
+            <input
+              id="auth-new-password"
+              type="password"
+              className={styles.input}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Minim 8 caractere"
+              autoComplete="new-password"
+              required
+            />
+          </div>
+
+          <div className={styles.field}>
+            <label htmlFor="auth-confirm-password" className={styles.label}>Confirma parola</label>
+            <input
+              id="auth-confirm-password"
+              type="password"
+              className={styles.input}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Reintrodu parola"
+              autoComplete="new-password"
+              required
+            />
+          </div>
+
+          <button type="submit" className={styles.primaryButton} disabled={submitting}>
             {submitting ? 'Se actualizeaza...' : 'Reseteaza parola'}
           </button>
-        </>
-      ) : null}
-      <Link href="/login" style={{ color: 'var(--color-info)', fontSize: 14 }}>
-        Inapoi la login
-      </Link>
-    </form>
+        </form>
+      )}
+
+      <Link href="/login" className={styles.backLink}>Inapoi la autentificare</Link>
+    </section>
   );
 }

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { signIn, useSession } from 'next-auth/react';
 import { useParams, useRouter } from 'next/navigation';
+import styles from '../../auth.module.css';
 
 type InvitePreview = {
   email: string;
@@ -122,11 +123,22 @@ export default function CalendarInvitePage() {
   }
 
   if (loading) {
-    return <p>Se incarca invitatia...</p>;
+    return (
+      <section className={styles.card}>
+        <p className={styles.loadingText}>Se incarca invitatia...</p>
+      </section>
+    );
   }
 
   if (!invite) {
-    return <p style={{ color: 'var(--color-danger)' }}>{error || 'Invitatie invalida.'}</p>;
+    return (
+      <section className={styles.card}>
+        <p className={`${styles.message} ${styles.messageError}`} role="alert">
+          {error || 'Invitatie invalida.'}
+        </p>
+        <Link href="/login" className={styles.backLink}>Inapoi la autentificare</Link>
+      </section>
+    );
   }
 
   const noSession = status === 'unauthenticated';
@@ -136,87 +148,139 @@ export default function CalendarInvitePage() {
   const canAcceptLoggedIn = status === 'authenticated' && invite.emailMatchesSession;
 
   return (
-    <div style={{ display: 'grid', gap: 14 }}>
-      <h2>Invitatie calendar</h2>
-      <p>
-        <strong>{invite.sharedByName || 'Un coleg'}</strong> ti-a partajat calendarul{' '}
-        <strong>{invite.calendarName}</strong>.
-      </p>
-      <p style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <section className={styles.card} aria-labelledby="auth-cal-invite-title">
+      <header className={styles.header}>
+        <h1 id="auth-cal-invite-title" className={styles.title}>Invitatie calendar</h1>
+        <p className={styles.subtitle}>
+          <strong style={{ color: 'var(--color-text)' }}>{invite.sharedByName || 'Un coleg'}</strong>{' '}
+          ti-a partajat calendarul{' '}
+          <strong style={{ color: 'var(--color-text)' }}>{invite.calendarName}</strong>.
+        </p>
+      </header>
+
+      <div className={styles.inviteSummary}>
         <span
-          aria-hidden
-          style={{
-            width: 12,
-            height: 12,
-            borderRadius: 999,
-            background: invite.calendarColor || '#2563eb',
-            display: 'inline-block',
-          }}
+          aria-hidden="true"
+          className={styles.inviteDot}
+          style={{ background: invite.calendarColor || 'var(--color-accent)' }}
         />
         <span>{invite.email}</span>
-      </p>
-      {error && <p style={{ color: 'var(--color-danger)' }}>{error}</p>}
+      </div>
+
+      {error && (
+        <p className={`${styles.message} ${styles.messageError}`} role="alert">{error}</p>
+      )}
 
       {loggedInWrongAccount && (
-        <div style={{ display: 'grid', gap: 10 }}>
-          <p>Esti autentificat cu alt cont. Te rugam sa folosesti contul asociat cu {invite.email}.</p>
-          <Link href={loginRedirect} style={{ color: 'var(--color-info)' }}>
+        <div className={styles.buttonRow}>
+          <p className={styles.inviteMeta}>
+            Esti autentificat cu alt cont. Te rugam sa folosesti contul asociat cu {invite.email}.
+          </p>
+          <Link href={loginRedirect} className={styles.primaryButton} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
             Mergi la autentificare
           </Link>
         </div>
       )}
 
       {canAcceptLoggedIn && (
-        <div style={{ display: 'grid', gap: 10 }}>
-          <button type="button" onClick={handleAcceptLoggedIn} disabled={submitting}>
+        <div className={styles.buttonRow}>
+          <button
+            type="button"
+            className={styles.primaryButton}
+            onClick={handleAcceptLoggedIn}
+            disabled={submitting}
+          >
             {submitting ? 'Se accepta...' : 'Accepta invitatia'}
           </button>
-          <button type="button" onClick={handleDecline} disabled={submitting}>
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={handleDecline}
+            disabled={submitting}
+          >
             Refuza invitatia
           </button>
         </div>
       )}
 
       {mustLogin && (
-        <div style={{ display: 'grid', gap: 10 }}>
-          <p>Acest email are deja cont. Autentifica-te pentru a accepta invitatia.</p>
-          <Link href={loginRedirect} style={{ color: 'var(--color-info)' }}>
+        <div className={styles.buttonRow}>
+          <p className={styles.inviteMeta}>
+            Acest email are deja cont. Autentifica-te pentru a accepta invitatia.
+          </p>
+          <Link href={loginRedirect} className={styles.primaryButton} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
             Mergi la autentificare
           </Link>
-          <button type="button" onClick={handleDecline} disabled={submitting}>
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={handleDecline}
+            disabled={submitting}
+          >
             Refuza invitatia
           </button>
         </div>
       )}
 
       {canRegister && (
-        <form onSubmit={handleRegister} style={{ display: 'grid', gap: 12 }}>
-          <p>Creeaza-ti contul pentru a accepta invitatia.</p>
-          <label style={{ display: 'grid', gap: 6 }}>
-            <span>Nume</span>
-            <input type="text" value={name} onChange={(e) => setName(e.target.value)} required />
-          </label>
-          <label style={{ display: 'grid', gap: 6 }}>
-            <span>Parola</span>
-            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          </label>
-          <label style={{ display: 'grid', gap: 6 }}>
-            <span>Confirma parola</span>
+        <form onSubmit={handleRegister} className={styles.form}>
+          <p className={styles.inviteMeta}>Creeaza-ti contul pentru a accepta invitatia.</p>
+
+          <div className={styles.field}>
+            <label htmlFor="cal-invite-name" className={styles.label}>Nume</label>
             <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              id="cal-invite-name"
+              type="text"
+              className={styles.input}
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Numele tau"
+              autoComplete="name"
               required
             />
-          </label>
-          <button type="submit" disabled={submitting}>
+          </div>
+
+          <div className={styles.field}>
+            <label htmlFor="cal-invite-password" className={styles.label}>Parola</label>
+            <input
+              id="cal-invite-password"
+              type="password"
+              className={styles.input}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Minim 8 caractere"
+              autoComplete="new-password"
+              required
+            />
+          </div>
+
+          <div className={styles.field}>
+            <label htmlFor="cal-invite-confirm" className={styles.label}>Confirma parola</label>
+            <input
+              id="cal-invite-confirm"
+              type="password"
+              className={styles.input}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="Reintrodu parola"
+              autoComplete="new-password"
+              required
+            />
+          </div>
+
+          <button type="submit" className={styles.primaryButton} disabled={submitting}>
             {submitting ? 'Se creeaza contul...' : 'Creeaza cont si accepta'}
           </button>
-          <button type="button" onClick={handleDecline} disabled={submitting}>
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={handleDecline}
+            disabled={submitting}
+          >
             Refuza invitatia
           </button>
         </form>
       )}
-    </div>
+    </section>
   );
 }

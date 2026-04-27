@@ -39,8 +39,26 @@
   box-shadow: var(--shadow-sm);
 }
 
+.mobileTitle {
+  display: none;
+}
+
 @media (max-width: 640px) {
   .tabs {
     width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-wrap: nowrap;
+  }
+
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab {
+    flex-shrink: 0;
+    white-space: nowrap;
   }
 }

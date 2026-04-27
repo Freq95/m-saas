@@ -4,22 +4,21 @@ import type { AppointmentService, DentistOption } from './types';
 interface UseDentistServicesOptions {
   isOpen: boolean;
   calendarId: string;
+  dentistUserId: string;
   ownServices: AppointmentService[];
   currentUserId?: number;
   currentUserDbUserId?: string | null;
 }
 
 /**
- * For the selected calendar, loads the bookable dentists and (if a non-self
- * dentist is selected) the services available from that dentist.
- *
- * Services flow:
- * - selected dentist is current user (or none selected) → use `ownServices` (props).
- * - selected dentist is someone else → fetch that dentist's services by calendar.
+ * Loads the bookable dentists for the selected calendar and the service catalog
+ * for the selected dentist. When no dentist is selected, falls back to the
+ * calendar owner's services.
  */
 export function useDentistServices({
   isOpen,
   calendarId,
+  dentistUserId,
   ownServices,
   currentUserId,
   currentUserDbUserId,
@@ -31,8 +30,6 @@ export function useDentistServices({
   const [externalServices, setExternalServices] = useState<AppointmentService[]>([]);
   const [loadingServices, setLoadingServices] = useState(false);
   const [servicesError, setServicesError] = useState<string | null>(null);
-
-  const [selectedDentistUserId, setSelectedDentistUserId] = useState<string>('');
 
   const fallbackSelfDentist: DentistOption | null = useMemo(() => {
     if (!currentUserId || !currentUserDbUserId) return null;
@@ -49,6 +46,11 @@ export function useDentistServices({
     const n = Number.parseInt(calendarId, 10);
     return Number.isInteger(n) && n > 0 ? n : null;
   }, [calendarId]);
+
+  const dentistUserIdNum = useMemo(() => {
+    const n = Number.parseInt(dentistUserId, 10);
+    return Number.isInteger(n) && n > 0 ? n : null;
+  }, [dentistUserId]);
 
   // Load dentists when calendar changes
   useEffect(() => {
@@ -91,14 +93,15 @@ export function useDentistServices({
   }, [isOpen, calendarIdNum, fallbackSelfDentist]);
 
   const selectedDentist = useMemo<DentistOption | null>(() => {
-    const n = Number.parseInt(selectedDentistUserId, 10);
+    const n = Number.parseInt(dentistUserId, 10);
     if (!Number.isInteger(n) || n <= 0) return null;
     return dentists.find((d) => d.userId === n) || null;
-  }, [dentists, selectedDentistUserId]);
+  }, [dentists, dentistUserId]);
 
-  // Load external services when a non-self dentist is selected
+  // Load services for the selected dentist. Falls back to the calendar owner
+  // when no dentist is explicitly chosen.
   useEffect(() => {
-    if (!isOpen || !calendarIdNum || !selectedDentist || selectedDentist.isCurrentUser) {
+    if (!isOpen || !calendarIdNum) {
       setExternalServices([]);
       setLoadingServices(false);
       setServicesError(null);
@@ -111,10 +114,10 @@ export function useDentistServices({
 
     (async () => {
       try {
-        const params = new URLSearchParams({
-          calendarId: String(calendarIdNum),
-          dentistUserId: String(selectedDentist.userId),
-        });
+        const params = new URLSearchParams({ calendarId: String(calendarIdNum) });
+        if (dentistUserIdNum) {
+          params.set('dentistUserId', String(dentistUserIdNum));
+        }
         const res = await fetch(`/api/services?${params.toString()}`, {
           cache: 'no-store',
           signal: controller.signal,
@@ -136,18 +139,16 @@ export function useDentistServices({
     })();
 
     return () => controller.abort();
-  }, [isOpen, calendarIdNum, selectedDentist]);
+  }, [isOpen, calendarIdNum, dentistUserIdNum]);
 
   const effectiveServices = useMemo(
-    () => (!selectedDentist || selectedDentist.isCurrentUser ? ownServices : externalServices),
-    [ownServices, externalServices, selectedDentist]
+    () => (calendarIdNum ? externalServices : ownServices),
+    [calendarIdNum, externalServices, ownServices]
   );
 
   return {
     dentists,
     selectedDentist,
-    selectedDentistUserId,
-    setSelectedDentistUserId,
     loadingDentists,
     dentistError,
     effectiveServices,

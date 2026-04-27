@@ -4,16 +4,48 @@ import { getClientsData } from '@/lib/server/clients';
 import { findOrCreateClient } from '@/lib/client-matching';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { resolveCalendarOwnerScope } from '@/lib/calendar-owner-scope';
+import { resolveBookableDentistForCalendar } from '@/lib/calendar-dentists';
 import { getCached } from '@/lib/redis';
 import { clientsListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
 import { logDataAccess } from '@/lib/audit';
+import { createClientSchema } from '@/lib/validation';
+import { logger } from '@/lib/logger';
 
-// GET /api/clients - Get all clients with filtering and sorting
+// GET /api/clients
+// ?calendarId=N               → scope to calendar owner's clients
+// ?calendarId=N&dentistUserId=M → scope to dentist M's clients (must be bookable on calendar N)
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
-    const { userId, dbUserId, tenantId, email, role } = await getAuthUser();
+    const auth = await getAuthUser();
+    const { dbUserId, email, role } = auth;
+    let { userId, tenantId } = auth;
+
+    const rawCalendarId = searchParams.get('calendarId');
+    const rawDentistUserId = searchParams.get('dentistUserId');
+
+    if (rawCalendarId) {
+      const calendarId = Number.parseInt(rawCalendarId, 10);
+      if (!Number.isInteger(calendarId) || calendarId <= 0) {
+        return NextResponse.json({ error: 'Invalid calendarId' }, { status: 400 });
+      }
+
+      if (rawDentistUserId) {
+        const dentistUserId = Number.parseInt(rawDentistUserId, 10);
+        if (!Number.isInteger(dentistUserId) || dentistUserId <= 0) {
+          return NextResponse.json({ error: 'Invalid dentistUserId' }, { status: 400 });
+        }
+        const dentist = await resolveBookableDentistForCalendar(auth, calendarId, dentistUserId);
+        userId = dentist.userId;
+        tenantId = dentist.tenantId;
+      } else {
+        const ownerScope = await resolveCalendarOwnerScope(auth, calendarId);
+        userId = ownerScope.userId;
+        tenantId = ownerScope.tenantId;
+      }
+    }
     const search = searchParams.get('search') || '';
     const sortBy = searchParams.get('sortBy') || 'last_appointment_date';
     const sortOrder = searchParams.get('sortOrder') || 'DESC';
@@ -66,7 +98,9 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/clients - Create a new client
+// POST /api/clients - Create a new client (always in caller's own tenant)
+// Share recipients cannot create clients in the calendar owner's tenant via
+// this endpoint — patient creation in shared calendars must be done by the owner.
 export async function POST(request: NextRequest) {
   try {
     const { userId, tenantId } = await getAuthUser();
@@ -76,7 +110,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // Validate input
-    const { createClientSchema } = await import('@/lib/validation');
     const validationResult = createClientSchema.safeParse(body);
     if (!validationResult.success) {
       return NextResponse.json(
@@ -100,7 +133,6 @@ export async function POST(request: NextRequest) {
         phone
       );
     } catch (error: any) {
-      const { logger } = await import('@/lib/logger');
       logger.error('Error in findOrCreateClient', error instanceof Error ? error : new Error(String(error)), { name, email, phone });
       return handleApiError(error, 'Failed to create client');
     }

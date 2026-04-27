@@ -10,6 +10,7 @@ import { getAuthUser } from '@/lib/auth-helpers';
 import { invalidateReadCaches } from '@/lib/cache-keys';
 import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { checkUpdateRateLimit } from '@/lib/rate-limit';
+import { updateCalendarSchema } from '@/lib/validation';
 
 function parseCalendarId(raw: string): number | null {
   const parsed = Number.parseInt(raw, 10);
@@ -97,19 +98,17 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ cal
     }
 
     const body = await request.json();
-    const { updateCalendarSchema } = await import('@/lib/validation');
     const validationResult = updateCalendarSchema.safeParse(body);
     if (!validationResult.success) {
       return createErrorResponse(validationResult.error.errors[0]?.message || 'Invalid input', 400);
     }
 
     await requireCalendarOwner(auth, calendarId);
-    const { name, color_mine, color_others } = validationResult.data;
+    const { name, color_mine } = validationResult.data;
     const updates: Record<string, unknown> = {};
 
     if (name !== undefined) updates.name = name;
     if (color_mine !== undefined) updates.color_mine = color_mine;
-    if (color_others !== undefined) updates.color_others = color_others;
 
     if (Object.keys(updates).length === 0) {
       return createErrorResponse('No fields to update', 400);

@@ -25,7 +25,7 @@ interface UseAppointmentsResult {
   deleteAppointment: (id: number) => Promise<DeleteAppointmentResult>;
 }
 
-interface CreateAppointmentInput {
+export interface CreateAppointmentInput {
   dentistUserId?: number;
   serviceId: number;
   clientId?: number | null;
@@ -41,12 +41,20 @@ interface CreateAppointmentInput {
   calendarId?: number;
 }
 
-interface UpdateAppointmentInput {
+export interface UpdateAppointmentInput {
   startTime?: string;
   endTime?: string;
+  dentistUserId?: number;
+  serviceId?: number;
   clientId?: number | null;
+  clientName?: string;
+  clientEmail?: string;
+  clientPhone?: string;
+  forceNewClient?: boolean;
   status?: string;
   notes?: string;
+  category?: string | null;
+  color?: string | null;
 }
 
 interface ConflictItem {
@@ -435,5 +443,3 @@ export function useAppointmentsSWR({
     deleteAppointment,
   };
 }
-
-export type { CreateAppointmentInput, UpdateAppointmentInput };

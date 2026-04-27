@@ -3,44 +3,44 @@ import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from 
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { getServicesData } from '@/lib/server/calendar';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { resolveCalendarOwnerScope } from '@/lib/calendar-owner-scope';
+import { resolveBookableDentistForCalendar } from '@/lib/calendar-dentists';
 import { getCached } from '@/lib/redis';
 import { servicesListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
-import { resolveAppointmentDentistAssignment } from '@/lib/appointment-service';
 
-// GET /api/services - Get services
+// GET /api/services
+// ?calendarId=N               → returns the calendar owner's services
+// ?calendarId=N&dentistUserId=M → returns dentist M's services (must be bookable on calendar N)
 export async function GET(request: NextRequest) {
   try {
     const auth = await getAuthUser();
     const searchParams = request.nextUrl.searchParams;
     const rawCalendarId = searchParams.get('calendarId');
     const rawDentistUserId = searchParams.get('dentistUserId');
-    const hasSharedBookingParams = Boolean(rawCalendarId || rawDentistUserId);
-
-    if (hasSharedBookingParams && (!rawCalendarId || !rawDentistUserId)) {
-      return NextResponse.json(
-        { error: 'calendarId and dentistUserId must be provided together' },
-        { status: 400 }
-      );
-    }
 
     let targetUserId = auth.userId;
     let targetTenantId = auth.tenantId;
 
-    if (rawCalendarId && rawDentistUserId) {
+    if (rawCalendarId) {
       const calendarId = Number.parseInt(rawCalendarId, 10);
-      const dentistUserId = Number.parseInt(rawDentistUserId, 10);
-
-      if (!Number.isInteger(calendarId) || calendarId <= 0 || !Number.isInteger(dentistUserId) || dentistUserId <= 0) {
-        return NextResponse.json(
-          { error: 'Invalid calendarId or dentistUserId' },
-          { status: 400 }
-        );
+      if (!Number.isInteger(calendarId) || calendarId <= 0) {
+        return NextResponse.json({ error: 'Invalid calendarId' }, { status: 400 });
       }
 
-      const dentistAssignment = await resolveAppointmentDentistAssignment(auth, calendarId, dentistUserId);
-      targetUserId = dentistAssignment.serviceOwnerUserId;
-      targetTenantId = dentistAssignment.serviceOwnerTenantId;
+      if (rawDentistUserId) {
+        const dentistUserId = Number.parseInt(rawDentistUserId, 10);
+        if (!Number.isInteger(dentistUserId) || dentistUserId <= 0) {
+          return NextResponse.json({ error: 'Invalid dentistUserId' }, { status: 400 });
+        }
+        const dentist = await resolveBookableDentistForCalendar(auth, calendarId, dentistUserId);
+        targetUserId = dentist.userId;
+        targetTenantId = dentist.tenantId;
+      } else {
+        const ownerScope = await resolveCalendarOwnerScope(auth, calendarId);
+        targetUserId = ownerScope.userId;
+        targetTenantId = ownerScope.tenantId;
+      }
     }
 
     const cacheKey = servicesListCacheKey({ tenantId: targetTenantId, userId: targetUserId });

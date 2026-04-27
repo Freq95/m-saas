@@ -119,11 +119,27 @@ export function AppointmentModal({
     }
   }, [isOpen, state.calendarId, calendarOptions]);
 
+  // True when the currently selected calendar is owned by someone else
+  // (i.e. the user is acting as a share recipient).
+  const numericCalendarId = useMemo(() => {
+    const n = Number.parseInt(state.calendarId, 10);
+    return Number.isInteger(n) && n > 0 ? n : null;
+  }, [state.calendarId]);
+
+  const numericDentistUserId = useMemo(() => {
+    const n = Number.parseInt(state.dentistUserId, 10);
+    return Number.isInteger(n) && n > 0 ? n : null;
+  }, [state.dentistUserId]);
+
+  const isSharedCalendar = useMemo(() => {
+    if (!numericCalendarId) return false;
+    const opt = calendarOptions.find((c) => c.id === numericCalendarId);
+    return opt ? opt.isOwn === false : false;
+  }, [numericCalendarId, calendarOptions]);
+
   const {
     dentists,
     selectedDentist,
-    selectedDentistUserId,
-    setSelectedDentistUserId,
     loadingDentists,
     dentistError,
     effectiveServices,
@@ -132,15 +148,14 @@ export function AppointmentModal({
   } = useDentistServices({
     isOpen,
     calendarId: state.calendarId,
+    dentistUserId: state.dentistUserId,
     ownServices: services,
     currentUserId,
     currentUserDbUserId,
   });
 
-  // Sync reducer's dentistUserId with the dentist hook's own state.
-  useEffect(() => {
-    setSelectedDentistUserId(state.dentistUserId);
-  }, [state.dentistUserId, setSelectedDentistUserId]);
+  // True when creating for the current user — only then can a new patient be created.
+  const isOwnDentist = selectedDentist ? selectedDentist.isCurrentUser : !isSharedCalendar;
 
   // When calendar changes, drop any previously selected service — it belonged to
   // a different dentist/calendar context.
@@ -411,6 +426,9 @@ export function AppointmentModal({
                     clientPhone={state.clientPhone}
                     notes={state.notes}
                     selectedClientId={state.selectedClientId}
+                    calendarId={numericCalendarId}
+                    dentistUserId={numericDentistUserId}
+                    isOwnDentist={isOwnDentist}
                     onNameChange={(value) =>
                       dispatch({ type: 'SET_CLIENT_NAME', value })
                     }

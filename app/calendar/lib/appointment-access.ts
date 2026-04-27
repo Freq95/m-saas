@@ -30,17 +30,20 @@ export function decorateAppointmentWithCalendarAccess(
     };
   }
 
-  const isCreator = Boolean(
+  const isAssignedDentist = Boolean(
     sessionDbUserId &&
-    appointment.created_by_user_id &&
-    appointment.created_by_user_id === sessionDbUserId
+    (
+      appointment.dentist_db_user_id
+        ? appointment.dentist_db_user_id === sessionDbUserId
+        : appointment.created_by_user_id === sessionDbUserId
+    )
   );
   const canEdit = calendar.isOwner
     || calendar.permissions.can_edit_all
-    || (calendar.permissions.can_edit_own && isCreator);
+    || (calendar.permissions.can_edit_own && isAssignedDentist);
   const canDelete = calendar.isOwner
     || calendar.permissions.can_delete_all
-    || (calendar.permissions.can_delete_own && isCreator);
+    || (calendar.permissions.can_delete_own && isAssignedDentist);
 
   return {
     ...appointment,

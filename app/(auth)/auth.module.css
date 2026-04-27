@@ -1,0 +1,331 @@
+/* ────────────────────────────────────────────────────────────
+   Auth pages — login / forgot-password / reset-password / invite
+   Shared styles. Uses theme tokens so the design survives light
+   mode, but visually calibrated for the dark theme screenshots.
+   ──────────────────────────────────────────────────────────── */
+
+.page {
+  min-height: 100vh;
+  background: var(--gradient-app);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-9) var(--space-4);
+}
+
+.brand {
+  position: fixed;
+  top: var(--space-6);
+  left: var(--space-7);
+  font-family: var(--font-brand);
+  font-weight: var(--fw-medium);
+  font-size: var(--text-2xl);
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  line-height: 1;
+  z-index: 10;
+  user-select: none;
+}
+
+.card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(var(--blur-md));
+  -webkit-backdrop-filter: blur(var(--blur-md));
+  padding: var(--space-7) var(--space-7) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-heading);
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  color: var(--color-text-muted);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.label {
+  font-size: var(--text-sm);
+  font-weight: var(--fw-medium);
+  color: var(--color-text);
+  line-height: 1;
+}
+
+.input {
+  width: 100%;
+  height: var(--height-btn-lg);
+  padding: 0 var(--space-4);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--text-base);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background var(--transition-fast);
+  outline: none;
+  -webkit-appearance: none;
+          appearance: none;
+}
+
+.input::placeholder {
+  color: var(--color-text-soft);
+}
+
+.input:hover:not(:disabled):not([readonly]) {
+  border-color: var(--color-border-strong);
+}
+
+.input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-subtle);
+}
+
+.input[readonly] {
+  color: var(--color-text-muted);
+  cursor: default;
+}
+
+.input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Inline link (e.g. "Forgot password?") ─────────────────── */
+.inlineLink {
+  display: inline-flex;
+  align-self: flex-start;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-medium);
+  color: var(--color-accent);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.inlineLink:hover {
+  color: var(--color-accent-strong);
+  text-decoration: underline;
+}
+
+/* ── Primary button ────────────────────────────────────────── */
+.primaryButton {
+  width: 100%;
+  height: var(--height-btn-lg);
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: var(--text-base);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background var(--transition-fast), transform 80ms ease-out, box-shadow var(--transition-fast);
+  box-shadow: 0 8px 20px rgba(45, 136, 255, 0.35);
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: var(--color-accent-strong);
+}
+
+.primaryButton:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 4px 12px rgba(45, 136, 255, 0.28);
+}
+
+.primaryButton:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ── Secondary button (e.g. "Decline invite") ──────────────── */
+.secondaryButton {
+  width: 100%;
+  height: var(--height-btn-lg);
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: var(--text-base);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.secondaryButton:hover:not(:disabled) {
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
+}
+
+.secondaryButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Messages (error / success / info) ─────────────────────── */
+.message {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  line-height: var(--lh-sm);
+  border: 1px solid transparent;
+}
+
+.messageError {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  border-color: var(--color-danger-border);
+}
+
+.messageSuccess {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+  border-color: var(--color-success-border);
+}
+
+.messageInfo {
+  background: var(--color-info-bg);
+  color: var(--color-info-text);
+  border-color: var(--color-info-border);
+}
+
+.loadingText {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+/* ── Footer (legal / back links) ───────────────────────────── */
+.footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-5);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  margin-top: var(--space-2);
+}
+
+.footerLink {
+  font-size: var(--text-xs);
+  color: var(--color-text-soft);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.footerLink:hover {
+  color: var(--color-text-muted);
+}
+
+.backLink {
+  align-self: center;
+  font-size: var(--text-sm);
+  font-weight: var(--fw-medium);
+  color: var(--color-accent);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.backLink:hover {
+  color: var(--color-accent-strong);
+  text-decoration: underline;
+}
+
+/* ── Invite summary row (calendar share invite) ────────────── */
+.inviteSummary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.inviteDot {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  flex: 0 0 auto;
+}
+
+.inviteMeta {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: var(--lh-sm);
+}
+
+.inviteMeta strong {
+  color: var(--color-text);
+  font-weight: var(--fw-semibold);
+}
+
+.buttonRow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* ── Responsive tweaks ─────────────────────────────────────── */
+@media (max-width: 520px) {
+  .page {
+    padding: var(--space-9) var(--space-4) var(--space-6);
+  }
+
+  .brand {
+    top: var(--space-5);
+    left: var(--space-5);
+    font-size: var(--text-xl);
+  }
+
+  .card {
+    padding: var(--space-6) var(--space-5);
+  }
+
+  .footer {
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+}

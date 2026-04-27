@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getAuthUser } from '@/lib/auth-helpers';
+import {
+  buildClientAppointmentFilter,
+  buildServiceScopeFilter,
+  collectServiceScopesFromAppointments,
+} from '@/lib/client-appointment-scope';
 
 // GET /api/clients/[id]/history - Get unified timeline of all client activities
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
@@ -25,14 +30,15 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
 
     const timeline: any[] = [];
 
-    const [appointments, services] = await Promise.all([
-      db.collection('appointments').find({
-        client_id: clientId,
-        tenant_id: tenantId,
-        deleted_at: { $exists: false },
-      }).sort({ start_time: -1 }).toArray(),
-      db.collection('services').find({ tenant_id: tenantId }).toArray(),
-    ]);
+    const appointments = await db.collection('appointments').find(
+      buildClientAppointmentFilter(clientId, { tenantId, userId })
+    ).sort({ start_time: -1 }).toArray();
+    const serviceScopeFilter = buildServiceScopeFilter(
+      collectServiceScopesFromAppointments(appointments, { tenantId, userId })
+    );
+    const services = serviceScopeFilter
+      ? await db.collection('services').find(serviceScopeFilter).toArray()
+      : [];
 
     const serviceById = new Map<number, any>(
       services.map((service: any) => [service.id, service])
@@ -48,7 +54,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         title: service?.name || (apt.service_name as string | undefined) || 'Appointment',
         description: apt.notes,
         status: apt.status,
-        amount: service?.price,
+        amount: typeof apt.price_at_time === 'number' ? apt.price_at_time : service?.price,
         service_id: apt.service_id,
       });
     });

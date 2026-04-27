@@ -56,18 +56,6 @@ export function calendarListCacheKey(dbUserId: ObjectId | string): string {
   return `${viewerPrefix(dbUserId)}:calendars:list`;
 }
 
-export function calendarAppointmentsCacheKey(
-  calendarId: number,
-  params: {
-    startDate?: string;
-    endDate?: string;
-    status?: string;
-    search?: string;
-  }
-): string {
-  return withRedisPrefix(`${CACHE_PREFIX}:calendar:${calendarId}:appointments:${serializeQuery(params)}`);
-}
-
 export function clientsListCacheKey(
   scope: Scope,
   params: {

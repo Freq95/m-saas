@@ -1,6 +1,5 @@
 import ClientsPageClient from './ClientsPageClient';
-import { redirect } from 'next/navigation';
-import { getAuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, redirectToLogin } from '@/lib/auth-helpers';
 import { getClientsData } from '@/lib/server/clients';
 
 export const dynamic = 'force-dynamic';
@@ -9,8 +8,8 @@ export default async function ClientsPage() {
   let auth;
   try {
     auth = await getAuthUser();
-  } catch {
-    redirect('/login');
+  } catch (err) {
+    redirectToLogin(err);
   }
 
   const data = await getClientsData({

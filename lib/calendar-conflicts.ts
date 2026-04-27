@@ -1,7 +1,6 @@
 import { getMongoDbOrThrow } from './db/mongo-utils';
 import type { ConflictCheck } from './types/calendar';
 import { ObjectId, type Document, type Filter } from 'mongodb';
-import { DEFAULT_TIME_ZONE } from './timezone';
 
 type BusyInterval = Document & {
   start_time: string | Date;
@@ -42,7 +41,6 @@ export async function checkAppointmentConflict(
   includeSuggestions: boolean = true,
   options: {
     calendarId?: number;
-    timeZone?: string;
   } = {}
 ): Promise<ConflictCheck> {
   const db = await getMongoDbOrThrow();
@@ -81,7 +79,7 @@ export async function checkAppointmentConflict(
     const busyQuery: Filter<BusyInterval> = {
       ...appointmentScope,
       deleted_at: { $exists: false },
-      status: { $ne: 'cancelled' },
+      status: 'scheduled',
       start_time: { $lt: searchWindowEnd.toISOString() },
       end_time: { $gt: endTime.toISOString() },
       ...(excludeAppointmentId ? { id: { $ne: excludeAppointmentId } } : {}),
@@ -105,9 +103,6 @@ export async function checkAppointmentConflict(
       searchStart = new Date(searchStart.getTime() + 15 * 60 * 1000);
     }
   }
-
-  // Keep timeZone var referenced so options parity is maintained
-  void (options.timeZone || DEFAULT_TIME_ZONE);
 
   return {
     hasConflict: conflicts.length > 0,

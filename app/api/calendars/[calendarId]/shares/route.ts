@@ -10,6 +10,7 @@ import { getAuthUser } from '@/lib/auth-helpers';
 import { invalidateReadCaches } from '@/lib/cache-keys';
 import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
+import { createCalendarShareSchema } from '@/lib/validation';
 
 function parseCalendarId(raw: string): number | null {
   const parsed = Number.parseInt(raw, 10);
@@ -81,7 +82,6 @@ export async function POST(request: NextRequest, props: { params: Promise<{ cale
     }
 
     const body = await request.json();
-    const { createCalendarShareSchema } = await import('@/lib/validation');
     const validationResult = createCalendarShareSchema.safeParse(body);
     if (!validationResult.success) {
       return createErrorResponse(validationResult.error.errors[0]?.message || 'Invalid input', 400);
@@ -93,6 +93,9 @@ export async function POST(request: NextRequest, props: { params: Promise<{ cale
     }
 
     const calendar = await requireOwnerCalendar(auth, calendarId);
+    if (calendar.is_default) {
+      return createErrorResponse('Calendarul implicit nu poate fi partajat', 400);
+    }
     const db = await getMongoDbOrThrow();
 
     const duplicateShare = await db.collection('calendar_shares').findOne({
@@ -108,10 +111,6 @@ export async function POST(request: NextRequest, props: { params: Promise<{ cale
       email: sharedEmail,
       status: { $ne: 'deleted' },
     });
-
-    if (existingUser?._id && String(existingUser._id) === String(dbUserId)) {
-      return createErrorResponse('Nu poti partaja calendarul cu tine insuti', 400);
-    }
 
     const nowIso = new Date().toISOString();
     const shareId = await getNextNumericId('calendar_shares');

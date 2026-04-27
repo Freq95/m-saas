@@ -17,6 +17,9 @@ import { appointmentsListCacheKey, invalidateReadCaches } from '@/lib/cache-keys
 import { checkWriteRateLimit } from '@/lib/rate-limit';
 import { logDataAccess } from '@/lib/audit';
 import { getTenantTimeZone } from '@/lib/timezone';
+import { appointmentsQuerySchema, createAppointmentSchema } from '@/lib/validation';
+import { linkAppointmentToClient } from '@/lib/client-matching';
+import { logger } from '@/lib/logger';
 import { ExplicitClientSelectionError, resolveAppointmentClientLink } from './client-linking';
 
 // GET /api/appointments - Get appointments
@@ -27,7 +30,6 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
 
     // Validate query parameters
-    const { appointmentsQuerySchema } = await import('@/lib/validation');
     const queryParams = {
       startDate: searchParams.get('startDate') || undefined,
       endDate: searchParams.get('endDate') || undefined,
@@ -114,7 +116,6 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // Validate input
-    const { createAppointmentSchema } = await import('@/lib/validation');
     const validationResult = createAppointmentSchema.safeParse(body);
     if (!validationResult.success) {
       return NextResponse.json(
@@ -148,7 +149,8 @@ export async function POST(request: NextRequest) {
     let targetCalendarId: number;
     let appointmentUserId: number;
     let appointmentTenantId = tenantId;
-    let createdByUserId = dbUserId;
+    const createdByUserId = dbUserId;
+    let isSharedCalendar = false;
 
     if (typeof calendarId === 'number') {
       const calendarAuth = await getCalendarAuth(auth, calendarId);
@@ -156,6 +158,7 @@ export async function POST(request: NextRequest) {
       targetCalendarId = calendarAuth.calendarId;
       appointmentUserId = calendarAuth.calendarOwnerId;
       appointmentTenantId = calendarAuth.calendarTenantId;
+      isSharedCalendar = !calendarAuth.isOwner;
     } else {
       const defaultCalendar = await getOrCreateDefaultCalendar(auth);
       targetCalendarId = defaultCalendar.id;
@@ -164,16 +167,25 @@ export async function POST(request: NextRequest) {
 
     const dentistAssignment = await resolveAppointmentDentistAssignment(auth, targetCalendarId, dentistUserId);
 
+    // Services belong to the assigned dentist's catalog.
     const serviceDoc = await db.collection('services').findOne({
       id: serviceId,
-      user_id: dentistAssignment.serviceOwnerUserId,
-      tenant_id: dentistAssignment.serviceOwnerTenantId,
+      user_id: dentistAssignment.assignedDentistUserId,
+      tenant_id: dentistAssignment.assignedDentistTenantId,
       deleted_at: { $exists: false },
     });
     if (!serviceDoc) {
       return NextResponse.json(
         { error: 'Selected service was not found for the chosen dentist' },
         { status: 400 }
+      );
+    }
+
+    // Only the dentist themselves can create new patients in their own account.
+    if (!dentistAssignment.isCurrentUser && (typeof clientId !== 'number' || forceNewClient)) {
+      return NextResponse.json(
+        { error: 'Selecteaza un pacient existent. Pacientii pot fi adaugati doar de medicul selectat.' },
+        { status: 403 }
       );
     }
 
@@ -197,7 +209,6 @@ export async function POST(request: NextRequest) {
     }
 
     const tenantTimeZone = await getTenantTimeZone(appointmentTenantId);
-    const { linkAppointmentToClient } = await import('@/lib/client-matching');
 
     const creationResult = await withAppointmentWriteLocks(
       {
@@ -224,8 +235,8 @@ export async function POST(request: NextRequest) {
 
         const client = await resolveAppointmentClientLink({
           db,
-          userId: appointmentUserId,
-          tenantId: appointmentTenantId,
+          userId: dentistAssignment.assignedDentistUserId,
+          tenantId: dentistAssignment.assignedDentistTenantId,
           clientId,
           name: clientName,
           email: clientEmail || null,
@@ -279,7 +290,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Link appointment to client and update stats
-    await linkAppointmentToClient(creationResult.appointmentDoc.id, creationResult.clientId, appointmentTenantId);
+    await linkAppointmentToClient(
+      creationResult.appointmentDoc.id,
+      creationResult.clientId,
+      appointmentTenantId,
+      dentistAssignment.assignedDentistTenantId
+    );
     await invalidateReadCaches({
       tenantId: appointmentTenantId,
       userId: appointmentUserId,
@@ -300,7 +316,6 @@ export async function POST(request: NextRequest) {
           appointment.googleCalendarEventId = eventId;
         }
       } catch (error) {
-        const { logger } = await import('@/lib/logger');
         logger.warn('Failed to export to Google Calendar', {
           error: error instanceof Error ? error.message : String(error),
           appointmentId: appointment.id,

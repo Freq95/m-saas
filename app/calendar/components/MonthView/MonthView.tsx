@@ -4,7 +4,8 @@ import { format, isSameDay, isSameMonth } from 'date-fns';
 import { ro } from 'date-fns/locale';
 import styles from '../../page.module.css';
 import type { Appointment } from '../../hooks/useCalendar';
-import { getStatusConfig, resolveAppointmentColor } from '@/lib/calendar-color-policy';
+import { getAppointmentBlockStyle, getStatusConfig, resolveAppointmentColor } from '@/lib/calendar-color-policy';
+import { useTheme } from '@/components/ThemeProvider';
 
 interface MonthViewProps {
   monthDays: Date[];
@@ -25,6 +26,7 @@ export function MonthView({
   onDayClick,
   onAppointmentClick,
 }: MonthViewProps) {
+  const { theme } = useTheme();
   const getAppointmentsForDay = (day: Date) =>
     appointments.filter((apt) => isSameDay(new Date(apt.start_time), day));
 
@@ -70,6 +72,11 @@ export function MonthView({
                 {dayAppointments.slice(0, 3).map((apt) => {
                   const statusCfg = getStatusConfig(apt.status);
                   const resolvedColor = resolveAppointmentColor(apt, viewerUserId);
+                  const blockStyle = getAppointmentBlockStyle(
+                    resolvedColor,
+                    theme,
+                    apt.is_shared_calendar ? 'shared' : 'default'
+                  );
                   const isPast = new Date(apt.end_time).getTime() < Date.now();
                   return (
                     <div
@@ -77,8 +84,9 @@ export function MonthView({
                       className={`${styles.monthAppointment} ${isPast ? styles.isPast : ''}`}
                       style={{
                         opacity: isPast ? Math.min(statusCfg.opacity, 0.55) : statusCfg.opacity,
-                        borderLeft: `3px solid ${resolvedColor}`,
-                        background: `color-mix(in srgb, ${resolvedColor} 12%, var(--color-surface))`,
+                        borderLeft: `3px solid ${blockStyle.borderColor}`,
+                        background: blockStyle.bodyColor,
+                        color: blockStyle.textColor,
                       }}
                       onClick={(e) => {
                         e.stopPropagation();

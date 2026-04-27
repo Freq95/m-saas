@@ -160,27 +160,13 @@ export default function CalendarPageClient({
   );
   const defaultCreateCalendar = useMemo(() => {
     if (selectedCalendar) {
-      return canCreateOnCalendar(selectedCalendar) ? selectedCalendar : null;
+      return canCreateOnCalendar(selectedCalendar) ? selectedCalendar : (writableCalendars[0] || null);
     }
     return writableCalendars[0] || null;
   }, [selectedCalendar, writableCalendars]);
   const calendarOptions = useMemo(
-    () => {
-      if (selectedCalendar && canCreateOnCalendar(selectedCalendar)) {
-      return [{
-          id: selectedCalendar.id,
-          name: selectedCalendar.name,
-          color: selectedCalendar.color_mine,
-          isOwn: selectedCalendar.isOwner,
-          description: selectedCalendar.isOwner
-            ? 'Calendar propriu'
-            : selectedCalendar.sharedByName
-              ? `Partajat de ${selectedCalendar.sharedByName}`
-              : 'Calendar partajat',
-        }];
-      }
-
-      return writableCalendars.map((calendar) => ({
+    () =>
+      writableCalendars.map((calendar) => ({
         id: calendar.id,
         name: calendar.name,
         color: calendar.color_mine,
@@ -190,13 +176,10 @@ export default function CalendarPageClient({
           : calendar.sharedByName
             ? `Partajat de ${calendar.sharedByName}`
             : 'Calendar partajat',
-      }));
-    },
-    [selectedCalendar, writableCalendars]
+      })),
+    [writableCalendars]
   );
-  const canCreateAppointments = selectedCalendar
-    ? canCreateOnCalendar(selectedCalendar)
-    : writableCalendars.length > 0;
+  const canCreateAppointments = writableCalendars.length > 0;
   const appointmentsFetchCalendarIds = calendarsLoading
     ? undefined
     : selectedCalendar
@@ -578,7 +561,7 @@ export default function CalendarPageClient({
       clientPhone: appointment.client_phone || '',
       calendarId: appointment.calendar_id ?? undefined,
       calendarName: appointment.calendar_name || calendarMap.get(appointment.calendar_id || -1)?.name || undefined,
-      dentistUserId: appointment.service_owner_user_id,
+      dentistUserId: appointment.dentist_id ?? appointment.service_owner_user_id,
       dentistDisplayName: appointment.dentist_display_name || undefined,
       serviceName: appointment.service_name || '',
       serviceId: appointment.service_id ? String(appointment.service_id) : '',
@@ -719,7 +702,7 @@ export default function CalendarPageClient({
               interval: formData.recurrence.interval,
               ...(formData.recurrence.endType === 'count'
                 ? { count: formData.recurrence.count }
-                : { end_date: formData.recurrence.endDate }),
+                : { endDate: formData.recurrence.endDate }),
             },
             forceNewClient: formData.forceNewClient,
           }),
@@ -810,6 +793,7 @@ export default function CalendarPageClient({
         body: JSON.stringify({
           startTime: newStart.toISOString(),
           endTime: newEnd.toISOString(),
+          dentistUserId: formData.dentistUserId,
           ...(didChangeService ? { serviceId: parseInt(formData.serviceId, 10) } : {}),
           clientId: formData.clientId,
           clientName: formData.clientName.trim(),
@@ -827,7 +811,7 @@ export default function CalendarPageClient({
               interval: formData.recurrence.interval,
               ...(formData.recurrence.endType === 'count'
                 ? { count: formData.recurrence.count }
-                : { end_date: formData.recurrence.endDate }),
+                : { endDate: formData.recurrence.endDate }),
             }
             : null,
         }),
@@ -1346,7 +1330,7 @@ export default function CalendarPageClient({
         services={services}
         calendarOptions={calendarOptions}
         activeCalendarId={editInitialData?.calendarId || selectedCalendar?.id || defaultCreateCalendar?.id || null}
-        lockCalendarSelection={selectedCalendarScope !== 'all'}
+        lockCalendarSelection={appointmentModalMode !== 'create'}
         currentUserId={sessionUserId}
         currentUserDbUserId={sessionDbUserId || null}
         mode={appointmentModalMode}

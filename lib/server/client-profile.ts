@@ -1,5 +1,10 @@
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { ObjectId } from 'mongodb';
+import {
+  buildClientAppointmentFilter,
+  buildServiceScopeFilter,
+  collectServiceScopesFromAppointments,
+} from '@/lib/client-appointment-scope';
 
 type ProfileClient = {
   id: number;
@@ -55,13 +60,19 @@ export async function getClientProfileData(clientId: number, tenantId: ObjectId,
 
   const client = stripMongoId(clientDoc) as ProfileClient;
 
-  const [appointments, services, conversations] = await Promise.all([
-    db
-      .collection('appointments')
-      .find({ client_id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } })
-      .sort({ start_time: -1 })
-      .toArray(),
-    db.collection('services').find({ user_id: userId, tenant_id: tenantId }).toArray(),
+  const appointments = await db
+    .collection('appointments')
+    .find(buildClientAppointmentFilter(clientId, { tenantId, userId }))
+    .sort({ start_time: -1 })
+    .toArray();
+  const serviceScopeFilter = buildServiceScopeFilter(
+    collectServiceScopesFromAppointments(appointments, { tenantId, userId })
+  );
+
+  const [services, conversations] = await Promise.all([
+    serviceScopeFilter
+      ? db.collection('services').find({ ...serviceScopeFilter }).toArray()
+      : Promise.resolve([]),
     db
       .collection('conversations')
       .find({ client_id: clientId, user_id: userId, tenant_id: tenantId })
@@ -115,13 +126,16 @@ export async function getClientStatsData(clientId: number, tenantId: ObjectId, u
   const clientDoc = await db.collection('clients').findOne({ id: clientId, tenant_id: tenantId, user_id: userId, deleted_at: { $exists: false } });
   if (!clientDoc) return null;
 
-  const [appointments, services] = await Promise.all([
-    db
-      .collection('appointments')
-      .find({ client_id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } })
-      .toArray(),
-    db.collection('services').find({ user_id: userId, tenant_id: tenantId }).toArray(),
-  ]);
+  const appointments = await db
+    .collection('appointments')
+    .find(buildClientAppointmentFilter(clientId, { tenantId, userId }))
+    .toArray();
+  const serviceScopeFilter = buildServiceScopeFilter(
+    collectServiceScopesFromAppointments(appointments, { tenantId, userId })
+  );
+  const services = serviceScopeFilter
+    ? await db.collection('services').find(serviceScopeFilter).toArray()
+    : [];
 
   const serviceById = new Map<number, any>(
     services.map((service: any) => [service.id, service])

@@ -5,14 +5,6 @@
 
 // import { Client } from '@upstash/qstash';
 
-export function getAppBaseUrl(): string {
-  const baseUrl = process.env.NEXTAUTH_URL || process.env.APP_BASE_URL;
-  if (!baseUrl) {
-    throw new Error('NEXTAUTH_URL or APP_BASE_URL is required for background job callbacks.');
-  }
-  return baseUrl.replace(/\/+$/, '');
-}
-
 export async function enqueueYahooSyncJob(
   _integrationId: number,
   _tenantId?: string

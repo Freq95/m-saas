@@ -22,7 +22,7 @@ export interface AppointmentFormState {
   error: string | null;
 }
 
-export const DEFAULT_RECURRENCE: RecurrenceForm = {
+const DEFAULT_RECURRENCE: RecurrenceForm = {
   frequency: 'weekly',
   interval: 1,
   endType: 'count',
@@ -30,27 +30,7 @@ export const DEFAULT_RECURRENCE: RecurrenceForm = {
   count: 4,
 };
 
-export const DEFAULT_DURATION_MINUTES = 30;
-
-export const INITIAL_STATE: AppointmentFormState = {
-  calendarId: '',
-  dentistUserId: '',
-  clientName: '',
-  clientEmail: '',
-  clientPhone: '',
-  selectedClientId: null,
-  forceNewClient: false,
-  serviceId: '',
-  category: '',
-  date: '',
-  startTime: '',
-  endTime: '',
-  notes: '',
-  status: 'scheduled',
-  isRecurring: false,
-  recurrence: DEFAULT_RECURRENCE,
-  error: null,
-};
+const DEFAULT_DURATION_MINUTES = 30;
 
 export type AppointmentFormAction =
   | { type: 'RESET'; payload: AppointmentFormState }
@@ -91,20 +71,30 @@ export function appointmentFormReducer(
       return { ...state, [action.field]: action.value };
 
     case 'SET_CALENDAR':
-      // Changing calendar resets the dentist and service (they depend on calendar)
+      // Dentist, service, and linked client all belong to the selected calendar scope.
       return {
         ...state,
         calendarId: action.calendarId,
         dentistUserId: '',
         serviceId: '',
+        clientName: '',
+        clientEmail: '',
+        clientPhone: '',
+        selectedClientId: null,
+        forceNewClient: false,
       };
 
     case 'SET_DENTIST':
-      // Changing dentist resets service (services are dentist-scoped)
+      // Changing dentist resets service and client — both are dentist-scoped
       return {
         ...state,
         dentistUserId: action.dentistUserId,
         serviceId: '',
+        clientName: '',
+        clientEmail: '',
+        clientPhone: '',
+        selectedClientId: null,
+        forceNewClient: false,
       };
 
     case 'RESET_SERVICE':

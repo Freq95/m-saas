@@ -1,6 +1,7 @@
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { ObjectId } from 'mongodb';
 import { getServiceOwnerScopeFromAppointment } from '@/lib/appointment-service';
+import { getDentistColorHex, isDentistColorId } from '@/lib/calendar-color-policy';
 
 type AppointmentQuery = {
   userId?: number;
@@ -74,12 +75,16 @@ function buildServiceScopesFromAppointments(appointments: any[]) {
 
 type CalendarDisplayAppointment = {
   calendar_id?: number | null;
+  user_id?: number | null;
   created_by_user_id?: ObjectId | string | null;
   dentist_db_user_id?: ObjectId | string | null;
   calendar_name?: string | null;
   color_mine?: string | null;
   color_others?: string | null;
+  dentist_color?: string | null;
   dentist_display_name?: string | null;
+  is_default_calendar?: boolean | null;
+  is_shared_calendar?: boolean | null;
   [key: string]: unknown;
 };
 
@@ -88,6 +93,8 @@ type CalendarDisplayMeta = {
   color_mine: string | null;
   color_others: string | null;
   ownerDbUserId: string | null;
+  isDefault: boolean;
+  isShared: boolean;
 };
 
 async function loadCalendarDisplayMaps(
@@ -96,12 +103,14 @@ async function loadCalendarDisplayMaps(
 ): Promise<{
   calendarById: Map<number, CalendarDisplayMeta>;
   dentistNameByDbUserId: Map<string, string | null>;
+  dentistColorByCalendarAndUser: Map<string, string | null>;
 }> {
   const normalizedCalendarIds = Array.from(new Set(calendarIds.filter((id): id is number => Number.isInteger(id) && id > 0)));
   if (normalizedCalendarIds.length === 0) {
     return {
       calendarById: new Map<number, CalendarDisplayMeta>(),
       dentistNameByDbUserId: new Map<string, string | null>(),
+      dentistColorByCalendarAndUser: new Map<string, string | null>(),
     };
   }
 
@@ -118,6 +127,7 @@ async function loadCalendarDisplayMaps(
           color_mine: 1,
           color_others: 1,
           owner_db_user_id: 1,
+          is_default: 1,
         },
       }
     ).toArray(),
@@ -132,6 +142,7 @@ async function loadCalendarDisplayMaps(
           calendar_id: 1,
           shared_with_user_id: 1,
           dentist_display_name: 1,
+          dentist_color: 1,
         },
       }
     ).toArray(),
@@ -168,12 +179,18 @@ async function loadCalendarDisplayMaps(
             _id: 1,
             name: 1,
             email: 1,
+            color: 1,
           },
         }
       ).toArray()
     : [];
-  const userById = new Map<string, { name?: string; email?: string }>(
-    users.map((user: any) => [String(user._id), { name: user.name, email: user.email }])
+  const userById = new Map<string, { name?: string; email?: string; color?: string }>(
+    users.map((user: any) => [String(user._id), { name: user.name, email: user.email, color: user.color }])
+  );
+  const sharedCalendarIds = new Set(
+    shareDocs
+      .map((share) => share.calendar_id)
+      .filter((calendarId): calendarId is number => typeof calendarId === 'number')
   );
 
   const calendarById = new Map<number, CalendarDisplayMeta>();
@@ -192,6 +209,8 @@ async function loadCalendarDisplayMaps(
           : typeof calendar.owner_db_user_id === 'string'
             ? calendar.owner_db_user_id
             : null,
+      isDefault: Boolean(calendar.is_default),
+      isShared: sharedCalendarIds.has(calendar.id),
     });
   }
 
@@ -214,14 +233,50 @@ async function loadCalendarDisplayMaps(
     }
   }
 
+  // Map `${calendarId}:${dentistDbUserId}` → resolved hex (per-calendar color model).
+  // Priority: per-calendar color (calendar.color_mine for owner, share.dentist_color for recipient)
+  // Fallback: global users.color for legacy appointments.
+  const dentistColorByCalendarAndUser = new Map<string, string | null>();
+
+  for (const [calId, calendar] of calendarById.entries()) {
+    if (!calendar.ownerDbUserId) continue;
+    const calHex = isDentistColorId(calendar.color_mine)
+      ? getDentistColorHex(calendar.color_mine)
+      : null;
+    const fallbackHex = (() => {
+      const info = userById.get(calendar.ownerDbUserId);
+      return info?.color && isDentistColorId(info.color) ? getDentistColorHex(info.color) : null;
+    })();
+    dentistColorByCalendarAndUser.set(`${calId}:${calendar.ownerDbUserId}`, calHex ?? fallbackHex ?? null);
+  }
+
+  for (const share of shareDocs) {
+    const recipientId = share.shared_with_user_id instanceof ObjectId
+      ? share.shared_with_user_id.toString()
+      : typeof share.shared_with_user_id === 'string'
+        ? share.shared_with_user_id
+        : null;
+    if (!recipientId || typeof share.calendar_id !== 'number') continue;
+    const shareHex = isDentistColorId(share.dentist_color)
+      ? getDentistColorHex(share.dentist_color)
+      : null;
+    const fallbackHex = (() => {
+      const info = userById.get(recipientId);
+      return info?.color && isDentistColorId(info.color) ? getDentistColorHex(info.color) : null;
+    })();
+    dentistColorByCalendarAndUser.set(`${share.calendar_id}:${recipientId}`, shareHex ?? fallbackHex ?? null);
+  }
+
   return {
     calendarById,
     dentistNameByDbUserId,
+    dentistColorByCalendarAndUser,
   };
 }
 
 export async function attachCalendarDisplayData<T extends CalendarDisplayAppointment>(
-  appointments: T[]
+  appointments: T[],
+  _viewerUserId?: number | null
 ): Promise<T[]> {
   if (appointments.length === 0) {
     return appointments;
@@ -232,7 +287,7 @@ export async function attachCalendarDisplayData<T extends CalendarDisplayAppoint
     .map((appointment) => appointment.calendar_id)
     .filter((id): id is number => typeof id === 'number' && id > 0);
 
-  const { calendarById, dentistNameByDbUserId } = await loadCalendarDisplayMaps(db, calendarIds);
+  const { calendarById, dentistNameByDbUserId, dentistColorByCalendarAndUser } = await loadCalendarDisplayMaps(db, calendarIds);
 
   return appointments.map((appointment) => {
     if (typeof appointment.calendar_id !== 'number') {
@@ -258,6 +313,9 @@ export async function attachCalendarDisplayData<T extends CalendarDisplayAppoint
     const displayName = effectiveDentistDbUserId
       ? dentistNameByDbUserId.get(effectiveDentistDbUserId) || null
       : null;
+    const dentistColor = effectiveDentistDbUserId
+      ? dentistColorByCalendarAndUser.get(`${appointment.calendar_id}:${effectiveDentistDbUserId}`) ?? null
+      : null;
 
     return {
       ...appointment,
@@ -266,7 +324,10 @@ export async function attachCalendarDisplayData<T extends CalendarDisplayAppoint
       calendar_name: appointment.calendar_name || calendar.name,
       color_mine: appointment.color_mine || calendar.color_mine,
       color_others: appointment.color_others || calendar.color_others,
+      dentist_color: appointment.dentist_color || dentistColor,
       dentist_display_name: appointment.dentist_display_name || displayName,
+      is_default_calendar: calendar.isDefault,
+      is_shared_calendar: calendar.isShared,
     };
   });
 }
@@ -394,7 +455,7 @@ export async function getAppointmentsData(query: AppointmentQuery) {
     };
   });
 
-  return attachCalendarDisplayData(hydratedAppointments);
+  return attachCalendarDisplayData(hydratedAppointments, userId);
 }
 
 export async function getServicesData(userId: number, tenantId: ObjectId) {

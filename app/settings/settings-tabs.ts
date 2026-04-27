@@ -1,12 +1,14 @@
-export type SettingsTabKey = 'calendars' | 'email' | 'services' | 'gdpr';
+export type SettingsTabKey = 'account' | 'calendars' | 'email' | 'services' | 'gdpr' | 'team';
 
 export const SETTINGS_TAB_STORAGE_KEY = 'settings:last-tab';
 
-export const SETTINGS_TABS: Array<{ key: SettingsTabKey; href: string; label: string }> = [
+export const SETTINGS_TABS: Array<{ key: SettingsTabKey; href: string; label: string; ownerOnly?: boolean }> = [
+  { key: 'services', href: '/settings/services', label: 'Servicii' },
   { key: 'calendars', href: '/settings/calendars', label: 'Calendare' },
   { key: 'email', href: '/settings/email', label: 'Email' },
-  { key: 'services', href: '/settings/services', label: 'Servicii Medicale' },
-  { key: 'gdpr', href: '/settings/gdpr', label: 'GDPR' },
+  { key: 'team', href: '/settings/team', label: 'Echipă', ownerOnly: true },
+  { key: 'account', href: '/settings/account', label: 'Cont' },
+  { key: 'gdpr', href: '/settings/gdpr', label: 'GDPR', ownerOnly: true },
 ];
 
 export function isSettingsTabKey(value: string | null | undefined): value is SettingsTabKey {

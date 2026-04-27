@@ -51,7 +51,11 @@ function extractErrorMessage(payload: unknown, fallback: string): string {
   return fallback;
 }
 
-export function usePendingShares(): UsePendingSharesResult {
+interface UsePendingSharesOptions {
+  fallbackData?: PendingSharesResponse | null;
+}
+
+export function usePendingShares(options: UsePendingSharesOptions = {}): UsePendingSharesResult {
   const [actionShareId, setActionShareId] = useState<number | null>(null);
   const { data, error, isLoading, mutate } = useSWR<PendingSharesResponse>(
     '/api/calendar-shares/pending',
@@ -60,6 +64,7 @@ export function usePendingShares(): UsePendingSharesResult {
       keepPreviousData: true,
       revalidateOnFocus: false,
       dedupingInterval: 10_000,
+      fallbackData: options.fallbackData ?? undefined,
     }
   );
 

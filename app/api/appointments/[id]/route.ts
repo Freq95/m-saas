@@ -4,9 +4,12 @@ import { updateClientStats } from '@/lib/client-matching';
 import { canDeleteAppointment, canEditAppointment, getCalendarAuth } from '@/lib/calendar-auth';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { checkAppointmentConflict } from '@/lib/calendar-conflicts';
+import { AppointmentWriteBusyError, withAppointmentWriteLocks } from '@/lib/appointment-write-lock';
 import { getAuthUser, type AuthContext } from '@/lib/auth-helpers';
 import {
+  buildAppointmentDentistFields,
   getServiceOwnerScopeFromAppointment,
+  resolveAppointmentDentistAssignment,
 } from '@/lib/appointment-service';
 import { invalidateReadCaches } from '@/lib/cache-keys';
 import { logger } from '@/lib/logger';
@@ -14,6 +17,7 @@ import { checkUpdateRateLimit } from '@/lib/rate-limit';
 import { generateRecurringInstances } from '@/lib/recurring-utils';
 import { attachCalendarDisplayData } from '@/lib/server/calendar';
 import { getTenantTimeZone } from '@/lib/timezone';
+import { updateAppointmentSchema } from '@/lib/validation';
 import { ExplicitClientSelectionError, resolveAppointmentClientLink } from '../client-linking';
 
 const CONFLICT_MESSAGE_BY_TYPE: Record<string, string> = {
@@ -98,7 +102,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       client_phone: clientDoc?.phone || appointmentDoc.client_phone,
       service_name: serviceDoc?.name || (appointmentDoc.service_name as string | null) || null,
     };
-    const [decoratedAppointment] = await attachCalendarDisplayData([appointment]);
+    const [decoratedAppointment] = await attachCalendarDisplayData([appointment], auth.userId);
 
     return createSuccessResponse({ appointment: decoratedAppointment || appointment });
   } catch (error) {
@@ -122,7 +126,6 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       return createErrorResponse('Invalid appointment ID', 400);
     }
 
-    const { updateAppointmentSchema } = await import('@/lib/validation');
     const validationResult = updateAppointmentSchema.safeParse(body);
     if (!validationResult.success) {
       return NextResponse.json(
@@ -136,6 +139,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       startTime,
       endTime,
       notes,
+      dentistUserId,
       serviceId,
       clientId,
       clientName,
@@ -157,11 +161,13 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       return createErrorResponse('Appointment not found', 404);
     }
 
+    let isSharedCalendar = false;
     if (typeof existingAppointment.calendar_id === 'number') {
       const calendarAuth = await getCalendarAuth(auth, existingAppointment.calendar_id);
       if (!canEditAppointment(calendarAuth, existingAppointment as any, dbUserId)) {
         return createErrorResponse('Not authorized to edit this appointment', 403);
       }
+      isSharedCalendar = !calendarAuth.isOwner;
     } else if (!matchesLegacyAppointmentOwner(existingAppointment, auth)) {
       return createErrorResponse('Not found or not authorized', 404);
     }
@@ -171,6 +177,15 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     const appointmentCalendarId = typeof existingAppointment.calendar_id === 'number'
       ? existingAppointment.calendar_id
       : undefined;
+
+    // Determine if the appointment's assigned dentist is the current user.
+    // For new appointments dentist_id is always set; for legacy ones fall back to isSharedCalendar.
+    const appointmentDentistId = typeof existingAppointment.dentist_id === 'number'
+      ? existingAppointment.dentist_id
+      : null;
+    const isDentistCurrentUser = appointmentDentistId !== null
+      ? appointmentDentistId === userId
+      : !isSharedCalendar;
     const appointmentTimeZone = await getTenantTimeZone(appointmentTenantId);
     const mutationFilter = appointmentMutationFilter(appointmentId, existingAppointment);
 
@@ -205,13 +220,15 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       startTime !== undefined ||
       endTime !== undefined;
 
-    // If times or assignment are being changed, check for conflicts
+    // Compute effective new times up-front so we can both queue the update and
+    // acquire a write lock over the right slot when times are changing.
+    let newStartTime: Date | null = null;
+    let newEndTime: Date | null = null;
     if (hasTimeOrAllocationChange) {
-      const newStartTime = startTime
+      newStartTime = startTime
         ? (typeof startTime === 'string' ? new Date(startTime) : startTime)
         : new Date(existingAppointment.start_time);
-
-      const newEndTime = endTime
+      newEndTime = endTime
         ? (typeof endTime === 'string' ? new Date(endTime) : endTime)
         : new Date(existingAppointment.end_time);
 
@@ -221,35 +238,6 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         newStartTime >= newEndTime
       ) {
         return createErrorResponse('Invalid appointment time range', 400);
-      }
-
-      // Check for conflicts (excluding this appointment)
-      const conflictCheck = await checkAppointmentConflict(
-        appointmentUserId,
-        appointmentTenantId,
-        newStartTime,
-        newEndTime,
-        appointmentId,
-        true,
-        {
-          calendarId: appointmentCalendarId,
-          timeZone: appointmentTimeZone,
-        }
-      );
-
-      if (conflictCheck.hasConflict) {
-        return NextResponse.json(
-          {
-            error: 'Time slot conflicts with existing appointment or blocked time',
-            conflicts: conflictCheck.conflicts.map(formatConflictPayload),
-            suggestions: conflictCheck.suggestions.map((slot) => ({
-              startTime: slot.start.toISOString(),
-              endTime: slot.end.toISOString(),
-              reason: 'Interval alternativ disponibil',
-            })),
-          },
-          { status: 409 }
-        );
       }
 
       if (startTime) {
@@ -264,15 +252,41 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       updates.notes = notes;
     }
 
-    if (serviceId !== undefined) {
-      const serviceOwnerScope = getServiceOwnerScopeFromAppointment(existingAppointment);
+    const serviceOwnerScope = getServiceOwnerScopeFromAppointment(existingAppointment);
+    let effectiveServiceOwnerScope = serviceOwnerScope;
+    let effectiveDentistIsCurrentUser = isDentistCurrentUser;
+
+    if (dentistUserId !== undefined) {
+      if (!appointmentCalendarId) {
+        return createErrorResponse('Assigned dentist can only be changed for calendar appointments', 400);
+      }
       if (!serviceOwnerScope) {
+        return createErrorResponse('Appointment owner context is missing for this appointment', 400);
+      }
+      const dentistAssignment = await resolveAppointmentDentistAssignment(
+        auth,
+        appointmentCalendarId,
+        dentistUserId
+      );
+      effectiveServiceOwnerScope = {
+        serviceOwnerUserId: dentistAssignment.assignedDentistUserId,
+        serviceOwnerTenantId: dentistAssignment.assignedDentistTenantId,
+      };
+      effectiveDentistIsCurrentUser = dentistAssignment.isCurrentUser;
+      Object.assign(
+        updates,
+        buildAppointmentDentistFields(dentistAssignment)
+      );
+    }
+
+    if (serviceId !== undefined) {
+      if (!effectiveServiceOwnerScope) {
         return createErrorResponse('Assigned dentist context is missing for this appointment', 400);
       }
       const serviceDoc = await db.collection('services').findOne({
         id: serviceId,
-        user_id: serviceOwnerScope.serviceOwnerUserId,
-        tenant_id: serviceOwnerScope.serviceOwnerTenantId,
+        user_id: effectiveServiceOwnerScope.serviceOwnerUserId,
+        tenant_id: effectiveServiceOwnerScope.serviceOwnerTenantId,
         deleted_at: { $exists: false },
       });
       if (!serviceDoc) {
@@ -292,6 +306,11 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         return createErrorResponse('Client name is required', 400);
       }
 
+      // Only the dentist themselves can create new patients in their own account.
+      if (!effectiveDentistIsCurrentUser && (typeof clientId !== 'number' || forceNewClient)) {
+        return createErrorResponse('Selecteaza un pacient existent. Pacientii pot fi adaugati doar de medicul selectat.', 403);
+      }
+
       const normalizedEmail = clientEmail !== undefined
         ? (clientEmail || null)
         : (existingAppointment.client_email || null);
@@ -299,10 +318,15 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         ? (clientPhone || null)
         : (existingAppointment.client_phone || null);
 
+      // Clients belong to the dentist's account (serviceOwnerScope reflects the dentist
+      // for new appointments, or the calendar owner for legacy appointments).
+      const clientUserId = effectiveServiceOwnerScope?.serviceOwnerUserId ?? appointmentUserId;
+      const clientTenantId = effectiveServiceOwnerScope?.serviceOwnerTenantId ?? appointmentTenantId;
+
       const linkedClient = await resolveAppointmentClientLink({
         db,
-        userId: appointmentUserId,
-        tenantId: appointmentTenantId,
+        userId: clientUserId,
+        tenantId: clientTenantId,
         clientId,
         name: normalizedName,
         email: normalizedEmail,
@@ -332,7 +356,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       updates.recurrence = {
         frequency: recurrence.frequency,
         interval: Math.max(1, Number(recurrence.interval) || 1),
-        end_date: recurrence.end_date || recurrence.endDate,
+        end_date: recurrence.endDate,
         count: recurrence.count,
       };
       updates.recurrence_group_id = existingAppointment.recurrence_group_id
@@ -346,20 +370,80 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     updates.updated_at = new Date().toISOString();
 
     const previousClientId = typeof existingAppointment.client_id === 'number' ? existingAppointment.client_id : null;
-    const updateResult = await db.collection('appointments').updateOne(
-      mutationFilter,
-      { $set: updates }
-    );
-    if (updateResult.matchedCount === 0) {
+
+    type PatchResult =
+      | { kind: 'conflict'; conflicts: unknown[]; suggestions: { start: Date; end: Date }[] }
+      | { kind: 'not_found' }
+      | { kind: 'ok'; doc: any };
+
+    const runMutation = async (): Promise<PatchResult> => {
+      if (hasTimeOrAllocationChange && newStartTime && newEndTime) {
+        const conflictCheck = await checkAppointmentConflict(
+          appointmentUserId,
+          appointmentTenantId,
+          newStartTime,
+          newEndTime,
+          appointmentId,
+          true,
+          {
+            calendarId: appointmentCalendarId,
+          }
+        );
+        if (conflictCheck.hasConflict) {
+          return {
+            kind: 'conflict',
+            conflicts: conflictCheck.conflicts,
+            suggestions: conflictCheck.suggestions,
+          };
+        }
+      }
+
+      const doc = await db.collection('appointments').findOneAndUpdate(
+        mutationFilter,
+        { $set: updates },
+        { returnDocument: 'after' }
+      );
+      if (!doc) {
+        return { kind: 'not_found' };
+      }
+      return { kind: 'ok', doc };
+    };
+
+    const patchResult: PatchResult =
+      hasTimeOrAllocationChange && newStartTime && newEndTime
+        ? await withAppointmentWriteLocks(
+            {
+              tenantId: appointmentTenantId,
+              userId: appointmentUserId,
+              calendarId: appointmentCalendarId,
+              startTime: newStartTime,
+              endTime: newEndTime,
+              timeZone: appointmentTimeZone,
+            },
+            runMutation
+          )
+        : await runMutation();
+
+    if (patchResult.kind === 'conflict') {
+      return NextResponse.json(
+        {
+          error: 'Time slot conflicts with existing appointment or blocked time',
+          conflicts: patchResult.conflicts.map(formatConflictPayload),
+          suggestions: patchResult.suggestions.map((slot) => ({
+            startTime: slot.start.toISOString(),
+            endTime: slot.end.toISOString(),
+            reason: 'Interval alternativ disponibil',
+          })),
+        },
+        { status: 409 }
+      );
+    }
+
+    if (patchResult.kind === 'not_found') {
       return createErrorResponse('Not found or not authorized', 404);
     }
 
-    const appointmentDoc = await db.collection('appointments').findOne({
-      ...mutationFilter,
-    });
-    if (!appointmentDoc) {
-      return createErrorResponse('Appointment not found', 404);
-    }
+    const appointmentDoc = patchResult.doc;
 
     const shouldSyncRecurringSeriesFromAnchor =
       !shouldCreateRecurringInstances &&
@@ -389,7 +473,6 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
           true,
           {
             calendarId: typeof appointmentDoc.calendar_id === 'number' ? appointmentDoc.calendar_id : undefined,
-            timeZone: appointmentTimeZone,
           }
         );
         if (conflictCheck.hasConflict) {
@@ -406,6 +489,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
           calendar_id: appointmentDoc.calendar_id || null,
           created_by_user_id: appointmentDoc.created_by_user_id || null,
           dentist_db_user_id: appointmentDoc.dentist_db_user_id || null,
+          dentist_id: appointmentDoc.dentist_id || null,
           service_owner_user_id: appointmentDoc.service_owner_user_id || appointmentDoc.user_id,
           service_owner_tenant_id: appointmentDoc.service_owner_tenant_id || appointmentTenantId,
           conversation_id: appointmentDoc.conversation_id || null,
@@ -436,21 +520,33 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         db,
         tenantId: appointmentTenantId,
         anchorAppointment: appointmentDoc,
-        timeZone: appointmentTimeZone,
       });
     }
 
-    const impactedClientIds = new Set<number>();
+    const impactedClientScopes = new Map<string, { clientId: number; tenantId: any }>();
+    const addImpactedClientScope = (clientId: unknown, tenantId: unknown) => {
+      if (typeof clientId !== 'number' || !tenantId) return;
+      impactedClientScopes.set(`${String(tenantId)}:${clientId}`, { clientId, tenantId });
+    };
+
     if (previousClientId !== null) {
-      impactedClientIds.add(previousClientId);
+      addImpactedClientScope(
+        previousClientId,
+        serviceOwnerScope?.serviceOwnerTenantId ?? appointmentTenantId
+      );
     }
     if (typeof appointmentDoc.client_id === 'number') {
-      impactedClientIds.add(appointmentDoc.client_id);
+      const nextServiceOwnerScope = getServiceOwnerScopeFromAppointment(appointmentDoc);
+      addImpactedClientScope(
+        appointmentDoc.client_id,
+        nextServiceOwnerScope?.serviceOwnerTenantId ?? appointmentTenantId
+      );
     }
     if (
-      impactedClientIds.size > 0 &&
+      impactedClientScopes.size > 0 &&
       (
         previousClientId !== appointmentDoc.client_id ||
+        dentistUserId !== undefined ||
         status !== undefined ||
         serviceId !== undefined ||
         startTime !== undefined ||
@@ -462,7 +558,11 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         recurrence !== undefined
       )
     ) {
-      await Promise.all(Array.from(impactedClientIds).map((clientId) => updateClientStats(clientId, appointmentTenantId)));
+      await Promise.all(
+        Array.from(impactedClientScopes.values()).map((scope) =>
+          updateClientStats(scope.clientId, scope.tenantId)
+        )
+      );
     }
     await invalidateReadCaches({
       tenantId: appointmentTenantId,
@@ -474,6 +574,12 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     if (error instanceof ExplicitClientSelectionError) {
       return createErrorResponse(error.message, 409);
     }
+    if (error instanceof AppointmentWriteBusyError) {
+      return createErrorResponse(
+        'Another booking is being updated for this slot. Please try again.',
+        409
+      );
+    }
     return handleApiError(error, 'Failed to update appointment');
   }
 }
@@ -482,12 +588,10 @@ async function syncRecurringSeriesFromAnchor({
   db,
   tenantId,
   anchorAppointment,
-  timeZone,
 }: {
   db: any;
   tenantId: any;
   anchorAppointment: any;
-  timeZone: string;
 }): Promise<void> {
   if (!anchorAppointment.recurrence || !anchorAppointment.recurrence_group_id) {
     return;
@@ -566,7 +670,6 @@ async function syncRecurringSeriesFromAnchor({
       true,
       {
         calendarId: typeof anchorAppointment.calendar_id === 'number' ? anchorAppointment.calendar_id : undefined,
-        timeZone,
       }
     );
     if (conflictCheck.hasConflict) {
@@ -583,6 +686,7 @@ async function syncRecurringSeriesFromAnchor({
       calendar_id: anchorAppointment.calendar_id || null,
       created_by_user_id: anchorAppointment.created_by_user_id || null,
       dentist_db_user_id: anchorAppointment.dentist_db_user_id || null,
+      dentist_id: anchorAppointment.dentist_id || null,
       service_owner_user_id: anchorAppointment.service_owner_user_id || anchorAppointment.user_id,
       service_owner_tenant_id: anchorAppointment.service_owner_tenant_id || tenantId,
       conversation_id: anchorAppointment.conversation_id || null,
@@ -626,6 +730,7 @@ async function syncRecurringSeriesFromAnchor({
             $set: {
               service_id: anchorAppointment.service_id,
               dentist_db_user_id: anchorAppointment.dentist_db_user_id || null,
+              dentist_id: anchorAppointment.dentist_id || null,
               service_owner_user_id: anchorAppointment.service_owner_user_id || anchorAppointment.user_id,
               service_owner_tenant_id: anchorAppointment.service_owner_tenant_id || tenantId,
               service_name: anchorAppointment.service_name || null,
@@ -704,7 +809,11 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
       return createErrorResponse('Not found or not authorized', 404);
     }
     if (typeof existingAppointment.client_id === 'number') {
-      await updateClientStats(existingAppointment.client_id, existingAppointment.tenant_id);
+      const clientScope = getServiceOwnerScopeFromAppointment(existingAppointment);
+      await updateClientStats(
+        existingAppointment.client_id,
+        clientScope?.serviceOwnerTenantId ?? existingAppointment.tenant_id
+      );
     }
     await invalidateReadCaches({
       tenantId: existingAppointment.tenant_id,

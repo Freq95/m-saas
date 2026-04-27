@@ -64,11 +64,12 @@ export const createAppointmentSchema = z.object({
   notes: z.string().max(2000).optional(),
   exportToGoogle: z.boolean().optional().default(false),
   googleAccessToken: z.string().optional(),
-});
+}).strict();
 
 export const updateAppointmentSchema = z.object({
   startTime: dateTimeSchema.optional(),
   endTime: dateTimeSchema.optional(),
+  dentistUserId: z.number().int().positive().optional(),
   serviceId: z.number().int().positive().optional(),
   clientId: z.number().int().positive().nullable().optional(),
   clientName: z.string().min(1).max(255).optional(),
@@ -83,12 +84,11 @@ export const updateAppointmentSchema = z.object({
     interval: z.number().int().positive().default(1),
     endType: z.enum(['date', 'count']).optional(),
     endDate: z.string().date().optional(),
-    end_date: z.string().date().optional(),
     count: z.number().int().positive().max(52).optional(),
   }).strict().optional().nullable(),
   status: z.enum(['scheduled', 'completed', 'cancelled', 'no-show']).optional(),
   notes: z.string().max(2000).optional(),
-});
+}).strict();
 
 const calendarPermissionsSchema = z
   .object({
@@ -105,17 +105,17 @@ const calendarPermissionsSchema = z
     can_view: true,
   }));
 
+const DENTIST_COLOR_IDS = ['blue', 'pink', 'green', 'purple', 'orange', 'teal', 'amber', 'red'] as const;
+const dentistColorIdSchema = z.enum(DENTIST_COLOR_IDS);
+
 export const createCalendarSchema = z.object({
   name: z.string().min(1, 'Calendar name is required').max(255),
-  color_mine: hexColorSchema.optional(),
-  color_others: hexColorSchema.optional(),
-});
+}).strict();
 
 export const updateCalendarSchema = z.object({
   name: z.string().min(1).max(255).optional(),
-  color_mine: hexColorSchema.optional(),
-  color_others: hexColorSchema.optional(),
-});
+  color_mine: dentistColorIdSchema.optional(),
+}).strict();
 
 export const createCalendarShareSchema = z.object({
   email: emailSchema,
@@ -124,6 +124,7 @@ export const createCalendarShareSchema = z.object({
 
 export const updateCalendarShareSchema = z.object({
   permissions: calendarPermissionsSchema.optional(),
+  dentist_color: dentistColorIdSchema.optional().nullable(),
 });
 
 const recurrenceSchema = z
@@ -132,7 +133,6 @@ const recurrenceSchema = z
     interval: z.number().int().positive().default(1),
     endType: z.enum(['date', 'count']).optional(),
     endDate: z.string().date().optional(),
-    end_date: z.string().date().optional(),
     count: z.number().int().positive().max(52).optional(),
   })
   .strict();

@@ -5,6 +5,11 @@
 
 import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from './db/mongo-utils';
 import { ObjectId } from 'mongodb';
+import {
+  buildClientAppointmentFilter,
+  buildServiceScopeFilter,
+  collectServiceScopesFromAppointments,
+} from './client-appointment-scope';
 
 export interface Client {
   id: number;
@@ -237,14 +242,20 @@ export async function updateClientStats(clientId: number, tenantId: ObjectId): P
 
   const client = await db.collection('clients').findOne({ id: clientId, tenant_id: tenantId, deleted_at: { $exists: false } });
   if (!client) return;
+  const clientUserId = typeof client.user_id === 'number' ? client.user_id : null;
+  if (!clientUserId) return;
 
-  const [appointments, services, conversations] = await Promise.all([
-    db.collection('appointments').find({
-      client_id: clientId,
-      tenant_id: tenantId,
-      deleted_at: { $exists: false },
-    }).toArray(),
-    db.collection('services').find({ tenant_id: tenantId, deleted_at: { $exists: false } }).toArray(),
+  const appointments = await db.collection('appointments').find(
+    buildClientAppointmentFilter(clientId, { tenantId, userId: clientUserId })
+  ).toArray();
+  const serviceScopeFilter = buildServiceScopeFilter(
+    collectServiceScopesFromAppointments(appointments as any[], { tenantId, userId: clientUserId })
+  );
+
+  const [services, conversations] = await Promise.all([
+    serviceScopeFilter
+      ? db.collection('services').find({ ...serviceScopeFilter, deleted_at: { $exists: false } }).toArray()
+      : Promise.resolve([]),
     db.collection('conversations').find({ client_id: clientId, tenant_id: tenantId }).toArray(),
   ]);
 
@@ -317,7 +328,8 @@ export async function linkConversationToClient(
 export async function linkAppointmentToClient(
   appointmentId: number,
   clientId: number,
-  tenantId: ObjectId
+  tenantId: ObjectId,
+  clientTenantId: ObjectId = tenantId
 ): Promise<void> {
   const db = await getMongoDbOrThrow();
 
@@ -326,118 +338,5 @@ export async function linkAppointmentToClient(
     { $set: { client_id: clientId, updated_at: new Date().toISOString() } }
   );
 
-  await updateClientStats(clientId, tenantId);
-}
-
-/**
- * Get client segments
- * Returns clients grouped by segments: VIP, inactive, new, frequent
- */
-export interface ClientSegments {
-  vip: Client[];
-  inactive: Client[];
-  new: Client[];
-  frequent: Client[];
-}
-
-export async function getClientSegments(
-  userId: number,
-  tenantId: ObjectId,
-  options: {
-    vipThreshold?: number; // Default: 1000 RON
-    inactiveDays?: number; // Default: 30 days
-    newDays?: number; // Default: 7 days
-    frequentAppointmentsPerMonth?: number; // Default: 2 appointments/month
-  } = {}
-): Promise<ClientSegments> {
-  const db = await getMongoDbOrThrow();
-
-  const vipThreshold = options.vipThreshold || 1000;
-  const inactiveDays = options.inactiveDays || 30;
-  const newDays = options.newDays || 7;
-  const frequentAppointmentsPerMonth = options.frequentAppointmentsPerMonth || 2;
-
-  const now = new Date();
-  const inactiveDate = new Date(now);
-  inactiveDate.setDate(inactiveDate.getDate() - inactiveDays);
-
-  const newDate = new Date(now);
-  newDate.setDate(newDate.getDate() - newDays);
-
-  const clients: Client[] = (await db.collection('clients').find({
-    tenant_id: tenantId,
-    user_id: userId,
-    deleted_at: { $exists: false },
-  }).toArray())
-    .map(normalizeClientDoc);
-
-  const vip = clients
-    .filter((client: Client) => client.total_spent >= vipThreshold)
-    .sort((a: Client, b: Client) => b.total_spent - a.total_spent);
-
-  const inactive = clients
-    .filter((client: Client) => {
-      const lastAppointment = client.last_appointment_date ? new Date(client.last_appointment_date) : null;
-      const lastConversation = client.last_conversation_date ? new Date(client.last_conversation_date) : null;
-      const appointmentOk = !lastAppointment || lastAppointment < inactiveDate;
-      const conversationOk = !lastConversation || lastConversation < inactiveDate;
-      return appointmentOk && conversationOk;
-    })
-    .sort((a: Client, b: Client) => {
-      const dateA = new Date(a.last_appointment_date || a.last_conversation_date || a.created_at).getTime();
-      const dateB = new Date(b.last_appointment_date || b.last_conversation_date || b.created_at).getTime();
-      return dateB - dateA;
-    });
-
-  const newClients = clients
-    .filter((client: Client) => new Date(client.created_at) >= newDate)
-    .sort((a: Client, b: Client) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-  const appointmentRows = await db.collection('appointments').find({
-    tenant_id: tenantId,
-    user_id: userId,
-    status: { $in: ['scheduled', 'completed'] },
-    client_id: { $ne: null },
-    deleted_at: { $exists: false },
-  }).toArray();
-
-  const statsByClient = new Map<number, { count: number; first: string; last: string }>();
-  for (const apt of appointmentRows) {
-    if (!apt.client_id || !apt.start_time) continue;
-    const clientStats = statsByClient.get(apt.client_id) || {
-      count: 0,
-      first: apt.start_time,
-      last: apt.start_time,
-    };
-    clientStats.count += 1;
-    if (new Date(apt.start_time) < new Date(clientStats.first)) {
-      clientStats.first = apt.start_time;
-    }
-    if (new Date(apt.start_time) > new Date(clientStats.last)) {
-      clientStats.last = apt.start_time;
-    }
-    statsByClient.set(apt.client_id, clientStats);
-  }
-
-  const frequent: Client[] = [];
-  for (const client of clients) {
-    const stats = statsByClient.get(client.id);
-    if (!stats || stats.count === 0) continue;
-
-    const firstApp = new Date(stats.first);
-    const lastApp = new Date(stats.last);
-    const monthsDiff = (lastApp.getTime() - firstApp.getTime()) / (1000 * 60 * 60 * 24 * 30);
-    const appointmentsPerMonth = monthsDiff > 0 ? stats.count / monthsDiff : stats.count;
-
-    if (appointmentsPerMonth >= frequentAppointmentsPerMonth) {
-      frequent.push(client);
-    }
-  }
-
-  return {
-    vip,
-    inactive,
-    new: newClients,
-    frequent,
-  };
+  await updateClientStats(clientId, clientTenantId);
 }

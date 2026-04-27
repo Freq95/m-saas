@@ -17,6 +17,12 @@ interface ClientSectionProps {
   onDropdownOpenChange?: (isOpen: boolean) => void;
   disabled: boolean;
   readOnly: boolean;
+  /** Calendar context — used for permission validation in the API call. */
+  calendarId?: number | null;
+  /** Scopes patient suggestions to this specific dentist's client list. */
+  dentistUserId?: number | null;
+  /** When true, the current user is creating an appointment for themselves and can create new patients. */
+  isOwnDentist?: boolean;
 }
 
 export function ClientSection({
@@ -33,6 +39,9 @@ export function ClientSection({
   onDropdownOpenChange,
   disabled,
   readOnly,
+  calendarId,
+  dentistUserId,
+  isOwnDentist = true,
 }: ClientSectionProps) {
   const [isFocused, setIsFocused] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -47,8 +56,10 @@ export function ClientSection({
     resolvedQuery,
     hasExactNameMatch,
   } = useClientSuggestions({
-    isOpen: isOpen && !readOnly,
+    isOpen: isOpen && !readOnly && isFocused,
     query: clientName,
+    calendarId,
+    dentistUserId,
   });
 
   useEffect(() => {
@@ -75,7 +86,7 @@ export function ClientSection({
   const trimmed = clientName.trim();
   const hasLinked = selectedClientId !== null;
   const showDropdown =
-    !readOnly && isFocused && !hasLinked && trimmed.length >= 2 && (suggestions.length > 0 || loading);
+    !readOnly && isFocused && !hasLinked && (suggestions.length > 0 || loading);
   const activeSuggestion =
     activeIndex >= 0 && activeIndex < suggestions.length ? suggestions[activeIndex] : null;
   const showNewClientBadge =
@@ -256,12 +267,20 @@ export function ClientSection({
             </button>
           </div>
         )}
-        {showNewClientBadge && (
+        {showNewClientBadge && isOwnDentist && (
           <div
             className={`${styles.clientStatusBadge} ${styles.clientStatusBadgeNew}`}
             role="status"
           >
             <span>Client nou — va fi creat la salvare</span>
+          </div>
+        )}
+        {showNewClientBadge && !isOwnDentist && (
+          <div
+            className={`${styles.clientStatusBadge} ${styles.clientStatusBadgeNew}`}
+            role="status"
+          >
+            <span>Selecteaza un pacient existent — pacientii pot fi adaugati doar de medicul selectat.</span>
           </div>
         )}
       </div>

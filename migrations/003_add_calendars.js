@@ -95,10 +95,6 @@ async function ensureIndexes(db) {
       { name: 'calendars_tenant_owner_active' }
     ),
     db.collection('calendars').createIndex(
-      { tenant_id: 1, resource_id: 1 },
-      { name: 'calendars_tenant_resource' }
-    ),
-    db.collection('calendars').createIndex(
       { tenant_id: 1, owner_user_id: 1 },
       {
         name: 'calendars_single_default_per_owner',
@@ -218,7 +214,6 @@ async function backfillDefaultCalendars(db) {
         owner_db_user_id: user._id,
         name: DEFAULT_PERSONAL_CALENDAR_NAME,
         type: 'personal',
-        resource_id: null,
         color: DEFAULT_PERSONAL_CALENDAR_COLOR,
         is_default: true,
         is_active: true,

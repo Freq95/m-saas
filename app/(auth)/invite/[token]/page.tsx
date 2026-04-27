@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import styles from '../../auth.module.css';
 
 type InviteState = {
   email: string;
@@ -61,38 +62,93 @@ export default function InvitePage() {
     router.replace('/login?success=password-set');
   }
 
-  if (loading) return <p>Se incarca invitatia...</p>;
-  if (!invite) return <p style={{ color: 'var(--color-danger)' }}>{error || 'Invitatie invalida.'}</p>;
+  if (loading) {
+    return (
+      <section className={styles.card}>
+        <p className={styles.loadingText}>Se incarca invitatia...</p>
+      </section>
+    );
+  }
+
+  if (!invite) {
+    return (
+      <section className={styles.card}>
+        <p className={`${styles.message} ${styles.messageError}`} role="alert">
+          {error || 'Invitatie invalida.'}
+        </p>
+      </section>
+    );
+  }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
-      <h2>Seteaza parola</h2>
-      <p>Te alaturi la: <strong>{invite.tenantName}</strong></p>
-      {error && <p style={{ color: 'var(--color-danger)' }}>{error}</p>}
-      <label style={{ display: 'grid', gap: 6 }}>
-        <span>Email</span>
-        <input type="email" value={invite.email} readOnly />
-      </label>
-      <label style={{ display: 'grid', gap: 6 }}>
-        <span>Nume</span>
-        <input type="text" value={invite.name} readOnly />
-      </label>
-      <label style={{ display: 'grid', gap: 6 }}>
-        <span>Parola</span>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-      </label>
-      <label style={{ display: 'grid', gap: 6 }}>
-        <span>Confirma parola</span>
-        <input
-          type="password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          required
-        />
-      </label>
-      <button type="submit" disabled={submitting}>
-        {submitting ? 'Se salveaza...' : 'Seteaza parola'}
-      </button>
-    </form>
+    <section className={styles.card} aria-labelledby="auth-invite-title">
+      <header className={styles.header}>
+        <h1 id="auth-invite-title" className={styles.title}>Seteaza parola</h1>
+        <p className={styles.subtitle}>
+          Te alaturi la <strong style={{ color: 'var(--color-text)' }}>{invite.tenantName}</strong>.
+          Alege o parola si vei fi conectat imediat.
+        </p>
+      </header>
+
+      {error && (
+        <p className={`${styles.message} ${styles.messageError}`} role="alert">{error}</p>
+      )}
+
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.field}>
+          <label htmlFor="invite-email" className={styles.label}>Email</label>
+          <input
+            id="invite-email"
+            type="email"
+            className={styles.input}
+            value={invite.email}
+            readOnly
+          />
+        </div>
+
+        <div className={styles.field}>
+          <label htmlFor="invite-name" className={styles.label}>Nume</label>
+          <input
+            id="invite-name"
+            type="text"
+            className={styles.input}
+            value={invite.name}
+            readOnly
+          />
+        </div>
+
+        <div className={styles.field}>
+          <label htmlFor="invite-password" className={styles.label}>Parola</label>
+          <input
+            id="invite-password"
+            type="password"
+            className={styles.input}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Minim 8 caractere"
+            autoComplete="new-password"
+            required
+          />
+        </div>
+
+        <div className={styles.field}>
+          <label htmlFor="invite-confirm" className={styles.label}>Confirma parola</label>
+          <input
+            id="invite-confirm"
+            type="password"
+            className={styles.input}
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Reintrodu parola"
+            autoComplete="new-password"
+            required
+          />
+        </div>
+
+        <button type="submit" className={styles.primaryButton} disabled={submitting}>
+          {submitting ? 'Se salveaza...' : 'Seteaza parola'}
+        </button>
+      </form>
+    </section>
   );
 }

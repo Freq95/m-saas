@@ -1,6 +1,5 @@
 export { useCalendar } from './useCalendar';
 export { useAppointmentsSWR } from './useAppointmentsSWR';
-export { useCalendarNavigation } from './useCalendarNavigation';
 export { useCalendarList } from './useCalendarList';
 export { usePendingShares } from './usePendingShares';
 export { useCalendarScopeSelection } from './useCalendarScopeSelection';

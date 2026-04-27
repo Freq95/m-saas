@@ -44,7 +44,7 @@ function isRetryableStatus(status: number, options: Required<RetryOptions>): boo
   return options.retryableStatuses.includes(status);
 }
 
-export async function retry<T>(
+async function retry<T>(
   fn: () => Promise<T>,
   options: RetryOptions = {}
 ): Promise<T> {

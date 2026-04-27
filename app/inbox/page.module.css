@@ -274,6 +274,33 @@
   font-size: 0.875rem;
 }
 
+.noIntegrationCta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.noIntegrationCta p {
+  margin: 0;
+}
+
+.noIntegrationLink {
+  display: inline-block;
+  padding: 0.5rem 1.25rem;
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background var(--transition-fast);
+}
+
+.noIntegrationLink:hover {
+  background: var(--color-accent-strong);
+}
+
 .conversationItem {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--color-border);

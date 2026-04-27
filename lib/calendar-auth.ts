@@ -1,6 +1,7 @@
 import { ObjectId } from 'mongodb';
 import { AuthError, type AuthContext } from '@/lib/auth-helpers';
 import { getMongoDbOrThrow, getNextNumericId, type FlexDoc } from '@/lib/db/mongo-utils';
+import { DEFAULT_COLOR_MINE, DEFAULT_COLOR_OTHERS } from '@/lib/calendar-color-policy';
 
 export interface CalendarPermissions {
   can_view: boolean;
@@ -59,8 +60,6 @@ export interface CalendarAuthContext {
 }
 
 const DEFAULT_PERSONAL_CALENDAR_NAME = 'Calendarul meu';
-const DEFAULT_PERSONAL_CALENDAR_COLOR_MINE = '#2563EB';
-const DEFAULT_PERSONAL_CALENDAR_COLOR_OTHERS = '#64748B';
 
 export const OWNER_CALENDAR_PERMISSIONS: CalendarPermissions = {
   can_view: true,
@@ -97,7 +96,7 @@ export function normalizeCalendarPermissions(value: Partial<CalendarPermissions>
   };
 }
 
-export function isCalendarOwner(calendar: Pick<CalendarDoc, 'tenant_id' | 'owner_user_id' | 'owner_db_user_id'>, authContext: AuthContext): boolean {
+function isCalendarOwner(calendar: Pick<CalendarDoc, 'tenant_id' | 'owner_user_id' | 'owner_db_user_id'>, authContext: AuthContext): boolean {
   return (
     objectIdEquals(calendar.owner_db_user_id, authContext.dbUserId) ||
     (objectIdEquals(calendar.tenant_id, authContext.tenantId) && calendar.owner_user_id === authContext.userId)
@@ -136,8 +135,8 @@ export async function getOrCreateDefaultCalendar(authContext: AuthContext): Prom
     owner_user_id: authContext.userId,
     owner_db_user_id: authContext.dbUserId,
     name: DEFAULT_PERSONAL_CALENDAR_NAME,
-    color_mine: DEFAULT_PERSONAL_CALENDAR_COLOR_MINE,
-    color_others: DEFAULT_PERSONAL_CALENDAR_COLOR_OTHERS,
+    color_mine: DEFAULT_COLOR_MINE,
+    color_others: DEFAULT_COLOR_OTHERS,
     is_default: true,
     is_active: true,
     created_at: now,
@@ -228,20 +227,34 @@ function appointmentCreatorMatches(appointment: { created_by_user_id?: ObjectId 
   return createdBy ? createdBy.equals(currentDbUserId) : false;
 }
 
+function assignedDentistMatches(
+  appointment: {
+    dentist_db_user_id?: ObjectId | string | null;
+    created_by_user_id?: ObjectId | string | null;
+  },
+  currentDbUserId: ObjectId
+): boolean {
+  const assignedDentist = toObjectId(appointment.dentist_db_user_id);
+  if (assignedDentist) {
+    return assignedDentist.equals(currentDbUserId);
+  }
+  return appointmentCreatorMatches(appointment, currentDbUserId);
+}
+
 export function canEditAppointment(
   calendarAuth: CalendarAuthContext,
-  appointment: { created_by_user_id?: ObjectId | string | null },
+  appointment: { dentist_db_user_id?: ObjectId | string | null; created_by_user_id?: ObjectId | string | null },
   currentDbUserId: ObjectId
 ): boolean {
   return calendarAuth.permissions.can_edit_all
-    || (calendarAuth.permissions.can_edit_own && appointmentCreatorMatches(appointment, currentDbUserId));
+    || (calendarAuth.permissions.can_edit_own && assignedDentistMatches(appointment, currentDbUserId));
 }
 
 export function canDeleteAppointment(
   calendarAuth: CalendarAuthContext,
-  appointment: { created_by_user_id?: ObjectId | string | null },
+  appointment: { dentist_db_user_id?: ObjectId | string | null; created_by_user_id?: ObjectId | string | null },
   currentDbUserId: ObjectId
 ): boolean {
   return calendarAuth.permissions.can_delete_all
-    || (calendarAuth.permissions.can_delete_own && appointmentCreatorMatches(appointment, currentDbUserId));
+    || (calendarAuth.permissions.can_delete_own && assignedDentistMatches(appointment, currentDbUserId));
 }

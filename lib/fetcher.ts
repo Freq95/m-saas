@@ -1,4 +1,4 @@
-export class AuthError extends Error {
+class AuthError extends Error {
   constructor() {
     super('Session expired');
     this.name = 'AuthError';

@@ -4,6 +4,7 @@ type LoginPageProps = {
   searchParams?: Promise<{
     success?: string;
     redirect?: string;
+    forced?: string;
   }>;
 };
 
@@ -17,5 +18,6 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const redirectPath = typeof resolvedSearchParams?.redirect === 'string'
     ? resolvedSearchParams.redirect
     : undefined;
-  return <LoginForm successMessage={successMessage} redirectPath={redirectPath} />;
+  const forcedLogout = resolvedSearchParams?.forced === '1';
+  return <LoginForm successMessage={successMessage} redirectPath={redirectPath} forcedLogout={forcedLogout} />;
 }

@@ -60,7 +60,7 @@ function extractBody(part: gmail_v1.Schema$MessagePart): { text?: string; html?:
   return result;
 }
 
-export function parseGmailMessage(msg: gmail_v1.Schema$Message): ParsedGmailMessage {
+function parseGmailMessage(msg: gmail_v1.Schema$Message): ParsedGmailMessage {
   const headers = msg.payload?.headers ?? [];
   const getHeader = (name: string) =>
     headers.find((h) => h.name?.toLowerCase() === name.toLowerCase())?.value ?? '';

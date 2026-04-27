@@ -4,7 +4,7 @@ import { logger } from './logger';
 
 let oauth2Client: any = null;
 
-export function initGoogleCalendar() {
+function initGoogleCalendar() {
   if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
     logger.warn('Google Calendar API not configured');
     return null;
@@ -107,23 +107,3 @@ export async function exportToGoogleCalendar(
   }
 }
 
-/**
- * Get Google Calendar authorization URL
- */
-export function getAuthUrl(): string {
-  if (!oauth2Client) {
-    initGoogleCalendar();
-  }
-
-  if (!oauth2Client) {
-    throw new Error('Google Calendar not configured');
-  }
-
-  const scopes = ['https://www.googleapis.com/auth/calendar.events'];
-
-  return oauth2Client.generateAuthUrl({
-    access_type: 'offline',
-    scope: scopes,
-    prompt: 'consent',
-  });
-}

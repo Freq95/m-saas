@@ -7,7 +7,9 @@ export interface ServiceOwnerScope {
   serviceOwnerTenantId: ObjectId;
 }
 
-export interface AppointmentDentistAssignment extends ServiceOwnerScope {
+export interface AppointmentDentistAssignment {
+  assignedDentistUserId: number;
+  assignedDentistTenantId: ObjectId;
   dentistDbUserId: ObjectId;
   dentistDisplayName: string;
   isOwner: boolean;
@@ -24,16 +26,9 @@ function toObjectId(value: unknown): ObjectId | null {
   return null;
 }
 
-export function getServiceOwnerScopeFromAuth(
-  auth: Pick<AuthContext, 'userId' | 'tenantId'>
-): ServiceOwnerScope {
-  return {
-    serviceOwnerUserId: auth.userId,
-    serviceOwnerTenantId: auth.tenantId,
-  };
-}
-
 export function getServiceOwnerScopeFromAppointment(appointment: Record<string, any>): ServiceOwnerScope | null {
+  // service_owner_user_id is the dentist who owns the service catalog for this appointment.
+  // Falls back to user_id (calendar owner) for legacy appointments that pre-date dentist-scoped services.
   const serviceOwnerUserId = typeof appointment.service_owner_user_id === 'number'
     ? appointment.service_owner_user_id
     : typeof appointment.user_id === 'number'
@@ -51,7 +46,7 @@ export function getServiceOwnerScopeFromAppointment(appointment: Record<string, 
   };
 }
 
-export function buildServiceOwnerFields(scope: ServiceOwnerScope) {
+function buildServiceOwnerFields(scope: ServiceOwnerScope) {
   return {
     service_owner_user_id: scope.serviceOwnerUserId,
     service_owner_tenant_id: scope.serviceOwnerTenantId,
@@ -60,8 +55,8 @@ export function buildServiceOwnerFields(scope: ServiceOwnerScope) {
 
 function mapBookableDentistToAssignment(dentist: BookableCalendarDentist): AppointmentDentistAssignment {
   return {
-    serviceOwnerUserId: dentist.userId,
-    serviceOwnerTenantId: dentist.tenantId,
+    assignedDentistUserId: dentist.userId,
+    assignedDentistTenantId: dentist.tenantId,
     dentistDbUserId: dentist.dbUserId,
     dentistDisplayName: dentist.displayName,
     isOwner: dentist.isOwner,
@@ -78,10 +73,19 @@ export async function resolveAppointmentDentistAssignment(
   return mapBookableDentistToAssignment(dentist);
 }
 
-export function buildAppointmentDentistFields(assignment: AppointmentDentistAssignment) {
+export function buildAppointmentDentistFields(
+  assignment: AppointmentDentistAssignment,
+  serviceOwner?: ServiceOwnerScope
+) {
+  // service_owner_* points at the selected dentist's service/client catalog.
+  // dentist_* points at who is performing the appointment.
+  const ownerScope: ServiceOwnerScope = serviceOwner ?? {
+    serviceOwnerUserId: assignment.assignedDentistUserId,
+    serviceOwnerTenantId: assignment.assignedDentistTenantId,
+  };
   return {
-    ...buildServiceOwnerFields(assignment),
+    ...buildServiceOwnerFields(ownerScope),
     dentist_db_user_id: assignment.dentistDbUserId,
-    dentist_id: assignment.serviceOwnerUserId,
+    dentist_id: assignment.assignedDentistUserId,
   };
 }

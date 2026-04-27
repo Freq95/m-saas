@@ -12,7 +12,7 @@ export interface CalendarPermissions {
   can_delete_all: boolean;
 }
 
-interface Appointment {
+export interface Appointment {
   id: number;
   service_id?: number;
   service_owner_user_id?: number;
@@ -43,13 +43,15 @@ interface Appointment {
   calendar_name?: string | null;
   color_mine?: string | null;
   color_others?: string | null;
+  is_default_calendar?: boolean | null;
+  is_shared_calendar?: boolean | null;
   can_edit?: boolean;
   can_delete?: boolean;
   can_drag?: boolean;
   can_change_status?: boolean;
 }
 
-interface CalendarState {
+export interface CalendarState {
   viewType: CalendarViewType;
   currentDate: Date;
   selectedAppointment: Appointment | null;
@@ -191,5 +193,3 @@ export function useCalendar(
 
   return { state, actions };
 }
-
-export type { Appointment, CalendarState };

@@ -1,6 +1,5 @@
 import { getMongoDbOrThrow } from './db/mongo-utils';
-import { format, addMinutes } from 'date-fns';
-import { ro } from 'date-fns/locale';
+import { addMinutes } from 'date-fns';
 import { ObjectId } from 'mongodb';
 import {
   DEFAULT_TIME_ZONE,
@@ -201,9 +200,3 @@ export async function isSlotAvailable(
   return true;
 }
 
-/**
- * Format time slot for display
- */
-export function formatTimeSlot(slot: TimeSlot): string {
-  return format(slot.start, "EEEE, d MMMM 'la' HH:mm", { locale: ro });
-}

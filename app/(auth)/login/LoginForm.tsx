@@ -3,11 +3,12 @@
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
 import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import styles from '../auth.module.css';
 
 type LoginFormProps = {
   successMessage?: string;
   redirectPath?: string;
+  forcedLogout?: boolean;
 };
 
 function normalizeRedirectPath(value?: string): string | null {
@@ -18,8 +19,7 @@ function normalizeRedirectPath(value?: string): string | null {
   return value;
 }
 
-export default function LoginForm({ successMessage, redirectPath }: LoginFormProps) {
-  const router = useRouter();
+export default function LoginForm({ successMessage, redirectPath, forcedLogout }: LoginFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -27,12 +27,12 @@ export default function LoginForm({ successMessage, redirectPath }: LoginFormPro
 
   function getLoginErrorMessage(result: Awaited<ReturnType<typeof signIn>>): string {
     if (result?.code === 'database_connection_failed') {
-      return 'Database connection failed. Try again in a moment.';
+      return 'Conexiunea cu baza de date a esuat. Incearca din nou in scurt timp.';
     }
     if (result?.error === 'CallbackRouteError') {
-      return 'Authentication service failed. Try again in a moment.';
+      return 'Serviciul de autentificare nu raspunde. Incearca din nou in scurt timp.';
     }
-    return 'Invalid credentials.';
+    return 'Email sau parola incorecte.';
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -52,38 +52,77 @@ export default function LoginForm({ successMessage, redirectPath }: LoginFormPro
       return;
     }
 
-    const sessionRes = await fetch('/api/auth/session');
-    const session = await sessionRes.json();
-    if (session?.user?.role === 'super_admin') {
-      router.replace('/admin');
-      return;
-    }
-    router.replace(normalizeRedirectPath(redirectPath) || '/dashboard');
+    // Skip the /api/auth/session round-trip; the dashboard page redirects
+    // super_admins to /admin if needed (see app/dashboard/page.tsx).
+    // Use a hard navigation so the fresh auth cookie is guaranteed to ship
+    // with the next request. SPA navigation (router.replace) has shown
+    // intermittent hangs in dev after a failed-then-successful login, where
+    // the RSC payload for the target route gets served stale.
+    const target = normalizeRedirectPath(redirectPath) || '/dashboard';
+    window.location.assign(target);
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
-      <h2>Login</h2>
-      {successMessage && <p style={{ color: 'var(--color-success)' }}>{successMessage}</p>}
-      {error && <p style={{ color: 'var(--color-danger)' }}>{error}</p>}
-      <label style={{ display: 'grid', gap: 6 }}>
-        <span>Email</span>
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-      </label>
-      <label style={{ display: 'grid', gap: 6 }}>
-        <span>Password</span>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-      </label>
-      <Link href="/forgot-password" style={{ color: 'var(--color-info)', fontSize: 14 }}>
-        Ai uitat parola?
-      </Link>
-      <button type="submit" disabled={submitting}>
-        {submitting ? 'Signing in...' : 'Sign in'}
-      </button>
-      <div style={{ textAlign: 'center', marginTop: '2rem', fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>
-        <Link href="/privacy" style={{ color: 'var(--color-text-soft)', marginRight: '1rem' }}>Politica de confidentialitate</Link>
-        <Link href="/terms" style={{ color: 'var(--color-text-soft)' }}>Termeni si conditii</Link>
+    <section className={styles.card} aria-labelledby="auth-login-title">
+      <header className={styles.header}>
+        <h1 id="auth-login-title" className={styles.title}>Conecteaza-te</h1>
+        <p className={styles.subtitle}>Acceseaza programarile, mesajele si datele clinicii tale.</p>
+      </header>
+
+      {forcedLogout && (
+        <p className={`${styles.message} ${styles.messageInfo}`}>
+          Sesiunea ta a fost inchisa automat. Te rog autentifica-te din nou.
+        </p>
+      )}
+      {successMessage && (
+        <p className={`${styles.message} ${styles.messageSuccess}`}>{successMessage}</p>
+      )}
+      {error && (
+        <p className={`${styles.message} ${styles.messageError}`} role="alert">{error}</p>
+      )}
+
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.field}>
+          <label htmlFor="auth-email" className={styles.label}>Email</label>
+          <input
+            id="auth-email"
+            type="email"
+            className={styles.input}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="email@clinica.ro"
+            autoComplete="email"
+            required
+          />
+        </div>
+
+        <div className={styles.field}>
+          <label htmlFor="auth-password" className={styles.label}>Parola</label>
+          <input
+            id="auth-password"
+            type="password"
+            className={styles.input}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Introdu parola"
+            autoComplete="current-password"
+            required
+          />
+        </div>
+
+        <Link href="/forgot-password" className={styles.inlineLink}>
+          Ai uitat parola?
+        </Link>
+
+        <button type="submit" className={styles.primaryButton} disabled={submitting}>
+          {submitting ? 'Se autentifica...' : 'Conecteaza-te'}
+        </button>
+      </form>
+
+      <div className={styles.footer}>
+        <Link href="/privacy" className={styles.footerLink}>Politica de confidentialitate</Link>
+        <Link href="/terms" className={styles.footerLink}>Termeni si conditii</Link>
       </div>
-    </form>
+    </section>
   );
 }

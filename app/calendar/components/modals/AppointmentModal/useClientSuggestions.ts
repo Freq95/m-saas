@@ -4,6 +4,10 @@ import type { ClientSuggestion } from './types';
 interface UseClientSuggestionsOptions {
   isOpen: boolean;
   query: string;
+  /** Calendar context — required for permission validation when dentistUserId is set. */
+  calendarId?: number | null;
+  /** When set, scopes the search to this dentist's clients (must be bookable on calendarId). */
+  dentistUserId?: number | null;
   /** Skip fetching until the name has at least this many non-whitespace chars. */
   minChars?: number;
   /** Debounce window in ms. */
@@ -27,7 +31,9 @@ interface UseClientSuggestionsResult {
 export function useClientSuggestions({
   isOpen,
   query,
-  minChars = 2,
+  calendarId,
+  dentistUserId,
+  minChars = 0,
   debounceMs = 220,
 }: UseClientSuggestionsOptions): UseClientSuggestionsResult {
   const [suggestions, setSuggestions] = useState<ClientSuggestion[]>([]);
@@ -64,6 +70,12 @@ export function useClientSuggestions({
           sortBy: 'last_activity_date',
           sortOrder: 'DESC',
         });
+        if (typeof calendarId === 'number' && calendarId > 0) {
+          params.set('calendarId', String(calendarId));
+          if (typeof dentistUserId === 'number' && dentistUserId > 0) {
+            params.set('dentistUserId', String(dentistUserId));
+          }
+        }
         const res = await fetch(`/api/clients?${params.toString()}`, {
           cache: 'no-store',
           signal: controller.signal,
@@ -97,7 +109,7 @@ export function useClientSuggestions({
       clearTimeout(handle);
       if (abortRef.current) abortRef.current.abort();
     };
-  }, [isOpen, query, minChars, debounceMs]);
+  }, [isOpen, query, calendarId, dentistUserId, minChars, debounceMs]);
 
   useEffect(() => {
     return () => {

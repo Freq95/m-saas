@@ -239,23 +239,6 @@ export async function deleteEmailIntegration(integrationId: number, userId: numb
 }
 
 /**
- * Update integration sync time
- */
-export async function updateIntegrationSyncTime(integrationId: number): Promise<void> {
-  const db = await getMongoDbOrThrow();
-
-  try {
-    const now = new Date().toISOString();
-    await db.collection('email_integrations').updateOne(
-      { id: integrationId },
-      { $set: { last_sync_at: now, updated_at: now } }
-    );
-  } catch (error) {
-    logger.error('Error updating integration sync time', { error, integrationId });
-  }
-}
-
-/**
  * Get integration by ID
  */
 export async function getEmailIntegrationById(integrationId: number, userId: number, tenantId?: ObjectId): Promise<EmailIntegration | null> {

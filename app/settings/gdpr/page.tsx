@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { getAuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, redirectToLogin } from '@/lib/auth-helpers';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import GdprSettingsPageClient from './GdprSettingsPageClient';
 
@@ -14,8 +14,8 @@ export default async function GdprSettingsPage() {
   let auth;
   try {
     auth = await getAuthUser();
-  } catch {
-    redirect('/login');
+  } catch (err) {
+    redirectToLogin(err);
   }
 
   if (auth.role !== 'owner') {

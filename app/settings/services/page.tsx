@@ -1,5 +1,4 @@
-import { redirect } from 'next/navigation';
-import { getAuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, redirectToLogin } from '@/lib/auth-helpers';
 import { getServicesData } from '@/lib/server/calendar';
 import ServicesSettingsPageClient, { type Service } from './ServicesSettingsPageClient';
 
@@ -9,8 +8,8 @@ export default async function ServicesSettingsPage() {
   let auth;
   try {
     auth = await getAuthUser();
-  } catch {
-    redirect('/login');
+  } catch (err) {
+    redirectToLogin(err);
   }
 
   let initialServices: Service[] = [];

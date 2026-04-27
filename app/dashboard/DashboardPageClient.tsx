@@ -98,7 +98,11 @@ function DashboardSkeleton() {
   );
 }
 
-export default function DashboardPageClient() {
+interface DashboardPageClientProps {
+  initialDashboard?: DashboardData | null;
+}
+
+export default function DashboardPageClient({ initialDashboard }: DashboardPageClientProps = {}) {
   const router = useRouter();
   const { status } = useSession();
   const key = status === 'authenticated' ? '/api/dashboard?days=7' : null;
@@ -106,6 +110,7 @@ export default function DashboardPageClient() {
   const { data, error, isLoading, mutate } = useSWR<DashboardData>(key, fetchDashboard, {
     revalidateOnFocus: false,
     dedupingInterval: 10000,
+    fallbackData: initialDashboard ?? undefined,
   });
 
   useEffect(() => {
@@ -114,7 +119,7 @@ export default function DashboardPageClient() {
     }
   }, [status, router]);
 
-  if (status !== 'authenticated' || isLoading) {
+  if (status !== 'authenticated' || (isLoading && !initialDashboard)) {
     return <DashboardSkeleton />;
   }
 
@@ -136,9 +141,55 @@ export default function DashboardPageClient() {
   const messagesPerDayMaxCount = Math.max(...dashboard.messagesPerDay.map((item) => item.count || 0), 1);
   const clientGrowthMaxCount = Math.max(...dashboard.clients.growth.map((item) => item.count || 0), 1);
 
+  const isNewTenant =
+    !isLoading &&
+    dashboard.today.totalClients === 0 &&
+    dashboard.today.appointments === 0 &&
+    dashboard.today.messages === 0 &&
+    dashboard.clients.topClients.length === 0;
+
   return (
     <div className={styles.container}>
       <main className={styles.main}>
+        {isNewTenant && (
+          <div className={styles.onboardingChecklist}>
+            <h3 className={styles.onboardingTitle}>Bun venit! Hai să configurăm clinica ta.</h3>
+            <div className={styles.onboardingItems}>
+              <Link href="/settings/services" className={styles.onboardingItem}>
+                <span className={styles.onboardingIcon}>⚕️</span>
+                <div>
+                  <div className={styles.onboardingItemTitle}>Adaugă primul serviciu</div>
+                  <div className={styles.onboardingItemSub}>Definește tipurile de consultații și durata lor.</div>
+                </div>
+                <span className={styles.onboardingArrow}>→</span>
+              </Link>
+              <Link href="/settings/email" className={styles.onboardingItem}>
+                <span className={styles.onboardingIcon}>📧</span>
+                <div>
+                  <div className={styles.onboardingItemTitle}>Conectează email-ul clinicii</div>
+                  <div className={styles.onboardingItemSub}>Gestionează mesajele pacienților direct din inbox.</div>
+                </div>
+                <span className={styles.onboardingArrow}>→</span>
+              </Link>
+              <Link href="/settings/team" className={styles.onboardingItem}>
+                <span className={styles.onboardingIcon}>👥</span>
+                <div>
+                  <div className={styles.onboardingItemTitle}>Invită echipa</div>
+                  <div className={styles.onboardingItemSub}>Adaugă colegi care să gestioneze programările.</div>
+                </div>
+                <span className={styles.onboardingArrow}>→</span>
+              </Link>
+              <Link href="/calendar" className={styles.onboardingItem}>
+                <span className={styles.onboardingIcon}>📅</span>
+                <div>
+                  <div className={styles.onboardingItemTitle}>Creează prima programare</div>
+                  <div className={styles.onboardingItemSub}>Adaugă un pacient în calendar.</div>
+                </div>
+                <span className={styles.onboardingArrow}>→</span>
+              </Link>
+            </div>
+          </div>
+        )}
         <div className={styles.statsGrid}>
           <div className={styles.statCard}>
             <div className={styles.statLabel}>Mesaje astazi</div>

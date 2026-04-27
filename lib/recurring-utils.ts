@@ -1,4 +1,4 @@
-export function addMonthsClamped(date: Date, monthsToAdd: number): Date {
+function addMonthsClamped(date: Date, monthsToAdd: number): Date {
   const next = new Date(date);
   const dayOfMonth = next.getDate();
   next.setDate(1);

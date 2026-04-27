@@ -2,6 +2,8 @@
 
 import type { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
+import Link from 'next/link';
+import styles from './auth.module.css';
 
 const LEGAL_PATHS = ['/privacy', '/terms'];
 
@@ -13,11 +15,11 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '24px' }}>
-      <div style={{ width: '100%', maxWidth: 440 }}>
-        <h1 className="brand-wordmark" style={{ marginBottom: 16 }}>densa</h1>
-        {children}
-      </div>
+    <div className={styles.page}>
+      <Link href="/login" className={styles.brand} aria-label="densa — mergi la autentificare">
+        densa
+      </Link>
+      {children}
     </div>
   );
 }

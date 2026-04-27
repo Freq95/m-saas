@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import InboxPageClient from './InboxPageClient';
-import { getAuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, redirectToLogin } from '@/lib/auth-helpers';
 import { getConversationsData } from '@/lib/server/inbox';
 
 export const revalidate = 0;
@@ -10,8 +10,8 @@ export default async function InboxPage() {
   let auth;
   try {
     auth = await getAuthUser();
-  } catch {
-    redirect('/login');
+  } catch (err) {
+    redirectToLogin(err);
   }
 
   const initialConversations = await getConversationsData({

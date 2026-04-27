@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
+import styles from '../auth.module.css';
 
 export function ForgotPasswordForm() {
   const [email, setEmail] = useState('');
@@ -42,23 +43,40 @@ export function ForgotPasswordForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
-      <h2>Recuperare parola</h2>
-      <p style={{ color: 'var(--color-text-muted)', margin: 0 }}>
-        Introdu adresa de email folosita la autentificare.
-      </p>
-      {message && <p style={{ color: 'var(--color-success)' }}>{message}</p>}
-      {error && <p style={{ color: 'var(--color-danger)' }}>{error}</p>}
-      <label style={{ display: 'grid', gap: 6 }}>
-        <span>Email</span>
-        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-      </label>
-      <button type="submit" disabled={submitting}>
-        {submitting ? 'Se trimite...' : 'Trimite link de resetare'}
-      </button>
-      <Link href="/login" style={{ color: 'var(--color-info)', fontSize: 14 }}>
-        Inapoi la login
-      </Link>
-    </form>
+    <section className={styles.card} aria-labelledby="auth-forgot-title">
+      <header className={styles.header}>
+        <h1 id="auth-forgot-title" className={styles.title}>Recupereaza parola</h1>
+        <p className={styles.subtitle}>Introdu adresa de email folosita la autentificare.</p>
+      </header>
+
+      {message && (
+        <p className={`${styles.message} ${styles.messageSuccess}`} role="status">{message}</p>
+      )}
+      {error && (
+        <p className={`${styles.message} ${styles.messageError}`} role="alert">{error}</p>
+      )}
+
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.field}>
+          <label htmlFor="auth-forgot-email" className={styles.label}>Email</label>
+          <input
+            id="auth-forgot-email"
+            type="email"
+            className={styles.input}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="email@clinica.ro"
+            autoComplete="email"
+            required
+          />
+        </div>
+
+        <button type="submit" className={styles.primaryButton} disabled={submitting}>
+          {submitting ? 'Se trimite...' : 'Trimite linkul de resetare'}
+        </button>
+      </form>
+
+      <Link href="/login" className={styles.backLink}>Inapoi la autentificare</Link>
+    </section>
   );
 }
