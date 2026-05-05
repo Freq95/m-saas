@@ -47,6 +47,14 @@ export default async function RootLayout({
             </ErrorBoundary>
           </AuthSessionProvider>
         </ThemeProvider>
+        <div className="landscape-lock" aria-hidden="true">
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="5" y="2" width="14" height="20" rx="2.5" />
+            <path d="M12 18h.01" />
+          </svg>
+          <div className="landscape-lock-title">Roteste dispozitivul</div>
+          <div className="landscape-lock-sub">Aplicatia este optimizata pentru modul portret.</div>
+        </div>
       </body>
     </html>
   )

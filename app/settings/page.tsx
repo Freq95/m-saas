@@ -11,5 +11,5 @@ export default async function SettingsPage() {
     redirectToLogin(err);
   }
 
-  return <SettingsMenuClient role={auth.role} />;
+  return <SettingsMenuClient role={auth.role} accountLabel={auth.email || auth.name || 'Contul tau'} />;
 }

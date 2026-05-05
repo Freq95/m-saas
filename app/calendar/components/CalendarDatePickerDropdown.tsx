@@ -19,6 +19,7 @@ import styles from '../page.module.css';
 interface CalendarDatePickerDropdownProps {
   className?: string;
   hideSidePanel?: boolean;
+  hideTodayLink?: boolean;
   pickerDate: Date;
   currentDate: Date;
   pickerMonthStart: Date;
@@ -33,6 +34,7 @@ interface CalendarDatePickerDropdownProps {
 export function CalendarDatePickerDropdown({
   className,
   hideSidePanel = false,
+  hideTodayLink = false,
   pickerDate,
   currentDate,
   pickerMonthStart,
@@ -155,14 +157,18 @@ export function CalendarDatePickerDropdown({
             ))}
           </div>
 
-          <button type="button" className={styles.dropdownTodayLink} onClick={onTodayClick}>
-            Astazi
-          </button>
+          {!hideTodayLink && (
+            <button type="button" className={styles.dropdownTodayLink} onClick={onTodayClick}>
+              Astazi
+            </button>
+          )}
         </div>
-      ) : (
+      ) : !hideTodayLink ? (
         <button type="button" className={styles.dropdownTodayLink} onClick={onTodayClick}>
           Astazi
         </button>
+      ) : (
+        null
       )}
     </div>
   );

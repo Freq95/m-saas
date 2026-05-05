@@ -6,6 +6,7 @@ import { useToast } from '@/lib/useToast';
 import navStyles from '../../dashboard/page.module.css';
 import styles from './page.module.css';
 import SettingsTabs from '../SettingsTabs';
+import { SettingsMobileHeader } from '../SettingsMobileHeader';
 interface AccountSettingsPageClientProps {
   initialName: string;
   initialEmail: string;
@@ -93,7 +94,8 @@ export default function AccountSettingsPageClient({ initialName, initialEmail }:
   return (
     <div className={navStyles.container}>
       <div className={styles.container}>
-        <div className={styles.tabRow}>
+        <SettingsMobileHeader title="Cont" />
+        <div className={`${styles.tabRow} ${styles.desktopTabRow}`}>
           <SettingsTabs activeTab="account" />
         </div>
 

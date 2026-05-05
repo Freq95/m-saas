@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import RouteTransition from '@/components/RouteTransition';
 import AppTopNav from '@/components/AppTopNav';
+import { SETTINGS_EXIT_PATH_STORAGE_KEY } from '@/app/settings/settings-tabs';
 
 const HIDDEN_NAV_PREFIXES = [
   '/login',
@@ -26,6 +27,12 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
       document.documentElement.style.setProperty('--app-nav-offset', '0px');
     }
   }, [hideNav]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (hideNav || pathname.startsWith('/settings')) return;
+    window.localStorage.setItem(SETTINGS_EXIT_PATH_STORAGE_KEY, pathname || '/dashboard');
+  }, [hideNav, pathname]);
 
   return (
     <>

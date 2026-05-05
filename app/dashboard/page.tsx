@@ -1,8 +1,8 @@
-import { redirect } from 'next/navigation';
 import { getAuthUser, redirectToLogin } from '@/lib/auth-helpers';
 import { getCached } from '@/lib/redis';
-import { dashboardCacheKey } from '@/lib/cache-keys';
+import { dashboardVisibleCalendarsCacheKey } from '@/lib/cache-keys';
 import { getDashboardData } from '@/lib/server/dashboard';
+import { getCalendarListForUser } from '@/lib/server/calendars-list';
 import DashboardPageClient from './DashboardPageClient';
 
 export const dynamic = 'force-dynamic';
@@ -15,15 +15,18 @@ export default async function DashboardPage() {
     redirectToLogin(err);
   }
 
-  if (auth.role === 'super_admin') {
-    redirect('/admin');
-  }
-
   const days = 7;
+  const calendarList = await getCalendarListForUser(auth).catch(() => null);
+  const visibleCalendarIds = [
+    ...(calendarList?.ownCalendars || []),
+    ...(calendarList?.sharedCalendars || []),
+  ]
+    .map((calendar: any) => calendar.id)
+    .filter((id: unknown): id is number => typeof id === 'number');
   const initialDashboard = await getCached(
-    dashboardCacheKey({ tenantId: auth.tenantId, userId: auth.userId }, days),
+    dashboardVisibleCalendarsCacheKey({ tenantId: auth.tenantId, userId: auth.userId }, days, visibleCalendarIds),
     900,
-    () => getDashboardData(auth.userId, auth.tenantId, days)
+    () => getDashboardData(auth.userId, auth.tenantId, days, visibleCalendarIds)
   ).catch(() => null);
 
   return <DashboardPageClient initialDashboard={initialDashboard} />;

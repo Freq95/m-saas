@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import {
+  addDays,
   addWeeks,
   eachDayOfInterval,
   endOfMonth,
@@ -101,6 +102,70 @@ type AppointmentModalData = {
   };
 };
 
+type MobileRangeMode = '3days' | '5days' | '7days' | 'workweek' | 'week';
+type MobileSlotInterval = 15 | 30 | 60;
+
+const MOBILE_RANGE_STORAGE_KEY = 'calendar:mobile-range-mode';
+const MOBILE_SLOT_INTERVAL_STORAGE_KEY = 'calendar:mobile-slot-interval';
+const MOBILE_WORKING_HOURS_STORAGE_KEY = 'calendar:mobile-working-hours';
+const MOBILE_RANGE_OPTIONS: Array<{ value: MobileRangeMode; label: string }> = [
+  { value: '3days', label: '3 zile' },
+  { value: '5days', label: '5 zile' },
+  { value: '7days', label: '7 zile' },
+  { value: 'workweek', label: 'Lu-Vi' },
+  { value: 'week', label: 'Lu-Du' },
+];
+const MOBILE_SLOT_INTERVAL_OPTIONS: Array<{ value: MobileSlotInterval; label: string }> = [
+  { value: 15, label: '15 min' },
+  { value: 30, label: '30 min' },
+  { value: 60, label: '60 min' },
+];
+
+function startOfLocalDay(date: Date): Date {
+  const next = new Date(date);
+  next.setHours(0, 0, 0, 0);
+  return next;
+}
+
+function getMobileRollingDayCount(mode: MobileRangeMode): number | null {
+  if (mode === '3days') return 3;
+  if (mode === '5days') return 5;
+  if (mode === '7days') return 7;
+  return null;
+}
+
+function readSavedMobileSlotInterval(): MobileSlotInterval {
+  if (typeof window === 'undefined') return 15;
+  const parsed = Number.parseInt(window.localStorage.getItem(MOBILE_SLOT_INTERVAL_STORAGE_KEY) || '', 10);
+  return parsed === 30 || parsed === 60 ? parsed : 15;
+}
+
+function clampWorkingHour(value: number, fallback: number): number {
+  if (!Number.isInteger(value)) return fallback;
+  return Math.min(24, Math.max(0, value));
+}
+
+function hourToTimeValue(hour: number): string {
+  return `${String(hour).padStart(2, '0')}:00`;
+}
+
+function timeValueToHour(value: string, fallback: number): number {
+  const [hourPart] = value.split(':');
+  return clampWorkingHour(Number.parseInt(hourPart, 10), fallback);
+}
+
+function readSavedMobileWorkingHours(): { startHour: number; endHour: number } {
+  if (typeof window === 'undefined') return { startHour: 8, endHour: 20 };
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(MOBILE_WORKING_HOURS_STORAGE_KEY) || '{}');
+    const startHour = clampWorkingHour(Number.parseInt(String(parsed.startHour), 10), 8);
+    const endHour = clampWorkingHour(Number.parseInt(String(parsed.endHour), 10), 20);
+    return endHour > startHour ? { startHour, endHour } : { startHour: 8, endHour: 20 };
+  } catch {
+    return { startHour: 8, endHour: 20 };
+  }
+}
+
 export default function CalendarPageClient({
   initialAppointments,
   initialServices,
@@ -116,6 +181,16 @@ export default function CalendarPageClient({
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [hasFinishedInitialLoad, setHasFinishedInitialLoad] = useState(initialAppointments.length > 0);
+  const [mobileRangeMode, setMobileRangeMode] = useState<MobileRangeMode>(() => {
+    if (typeof window === 'undefined') return 'week';
+    const savedMode = window.localStorage.getItem(MOBILE_RANGE_STORAGE_KEY);
+    return MOBILE_RANGE_OPTIONS.some((option) => option.value === savedMode)
+      ? (savedMode as MobileRangeMode)
+      : 'week';
+  });
+  const [mobileRangeStartDate, setMobileRangeStartDate] = useState<Date>(() => startOfLocalDay(new Date()));
+  const [mobileSlotInterval, setMobileSlotInterval] = useState<MobileSlotInterval>(readSavedMobileSlotInterval);
+  const [mobileWorkingHours, setMobileWorkingHours] = useState(readSavedMobileWorkingHours);
   const { data: session } = useSession();
   const sessionUserId = parseSessionUserId(session) ?? undefined;
   const sessionDbUserId = parseSessionDbUserId(session) ?? undefined;
@@ -185,10 +260,45 @@ export default function CalendarPageClient({
     : selectedCalendar
       ? [selectedCalendar.id]
       : allCalendarIds;
-  const { weekDays, hours } = useCalendarNavigation({
+  const { weekDays } = useCalendarNavigation({
     currentDate: state.currentDate,
     viewType: 'week',
   });
+  const visibleHours = useMemo(
+    () =>
+      Array.from(
+        { length: Math.max(1, mobileWorkingHours.endHour - mobileWorkingHours.startHour) },
+        (_, index) => mobileWorkingHours.startHour + index
+      ),
+    [mobileWorkingHours]
+  );
+  const visibleWeekDays = useMemo(() => {
+    const rollingDayCount = getMobileRollingDayCount(mobileRangeMode);
+    if (rollingDayCount) {
+      return Array.from({ length: rollingDayCount }, (_, index) => addDays(mobileRangeStartDate, index));
+    }
+
+    if (mobileRangeMode === 'workweek') {
+      const weekStart = startOfWeek(state.currentDate, { weekStartsOn: 1 });
+      return Array.from({ length: 5 }, (_, index) => addDays(weekStart, index));
+    }
+
+    return weekDays;
+  }, [mobileRangeMode, mobileRangeStartDate, state.currentDate, weekDays]);
+  const mobileHours = visibleHours;
+  const mobileWeekDays = visibleWeekDays;
+  const appointmentFetchRange = useMemo(() => {
+    if (visibleWeekDays.length === 0) return null;
+    return {
+      start: visibleWeekDays[0],
+      end: visibleWeekDays[visibleWeekDays.length - 1],
+    };
+  }, [visibleWeekDays]);
+
+  const isTodayInMobileRange = useMemo(() => {
+    if (!isMobile || mobileWeekDays.length === 0) return false;
+    return mobileWeekDays.some((day) => isToday(day));
+  }, [isMobile, mobileWeekDays]);
 
   useLayoutEffect(() => {
     const updateHeight = () => {
@@ -218,6 +328,8 @@ export default function CalendarPageClient({
     useAppointments({
       currentDate: state.currentDate,
       viewType: 'week',
+      rangeStartDate: appointmentFetchRange?.start,
+      rangeEndDate: appointmentFetchRange?.end,
       userId: sessionUserId,
       calendarIds: appointmentsFetchCalendarIds,
       search: debouncedSearchQuery,
@@ -260,7 +372,11 @@ export default function CalendarPageClient({
   const [mobileView, setMobileView] = useState<'day' | 'week'>('day');
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [mobileSearchQuery, setMobileSearchQuery] = useState('');
-  const mobileViewContainerRef = useRef<HTMLDivElement>(null);
+  const [mobileSwipeDeltaX, setMobileSwipeDeltaX] = useState(0);
+  const mobileSwipeDeltaXRef = useRef(0);
+  const mobileSwipeStartXRef = useRef<number | null>(null);
+  const mobileSwipeStartYRef = useRef<number | null>(null);
+  const mobileSwipeAxisRef = useRef<'horizontal' | 'vertical' | null>(null);
   const mobileSearchInputRef = useRef<HTMLInputElement>(null);
 
   // Mobile day appointments (filtered + sorted for the selected day)
@@ -284,28 +400,6 @@ export default function CalendarPageClient({
       .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
   }, [isMobile, mobileSearchQuery, decoratedAppointments]);
 
-  // Sync scroll-snap position with mobileView state
-  useEffect(() => {
-    const el = mobileViewContainerRef.current;
-    if (!el || !isMobile) return;
-
-    let rafId: number;
-    const handleScroll = () => {
-      cancelAnimationFrame(rafId);
-      rafId = requestAnimationFrame(() => {
-        const scrollLeft = el.scrollLeft;
-        const width = el.clientWidth;
-        const newView = scrollLeft > width * 0.5 ? 'week' : 'day';
-        setMobileView((prev) => (prev !== newView ? newView : prev));
-      });
-    };
-
-    el.addEventListener('scroll', handleScroll, { passive: true });
-    return () => {
-      el.removeEventListener('scroll', handleScroll);
-      cancelAnimationFrame(rafId);
-    };
-  }, [isMobile]);
 
   // Focus search input when search overlay opens
   useEffect(() => {
@@ -324,6 +418,10 @@ export default function CalendarPageClient({
     }
     return `${format(weekStart, 'd', { locale: ro })} ${monthLabel(weekStart)}-${format(weekEnd, 'd', { locale: ro })} ${monthLabel(weekEnd)} ${format(weekEnd, 'yyyy', { locale: ro })}`;
   }, [weekStart, weekEnd]);
+  const mobileMonthLabel = useMemo(
+    () => format(state.currentDate, 'LLLL yyyy', { locale: ro }).toLocaleLowerCase('ro-RO'),
+    [state.currentDate]
+  );
   const pickerMonthStart = useMemo(() => startOfMonth(pickerDate), [pickerDate]);
   const pickerDays = useMemo(() => {
     const monthStartWeek = startOfWeek(pickerMonthStart, { weekStartsOn: 1 });
@@ -351,6 +449,18 @@ export default function CalendarPageClient({
       actions.setViewType('week');
     }
   }, [state.viewType, actions.setViewType]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MOBILE_RANGE_STORAGE_KEY, mobileRangeMode);
+  }, [mobileRangeMode]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MOBILE_SLOT_INTERVAL_STORAGE_KEY, String(mobileSlotInterval));
+  }, [mobileSlotInterval]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MOBILE_WORKING_HOURS_STORAGE_KEY, JSON.stringify(mobileWorkingHours));
+  }, [mobileWorkingHours]);
 
   useEffect(() => {
     if (!showDateDropdown) return;
@@ -874,23 +984,132 @@ export default function CalendarPageClient({
     actions.navigateToDate(date);
   };
 
+  const handleMobileDaySelect = (date: Date) => {
+    setSelectedDay(date);
+    actions.navigateToDate(date);
+  };
+
+  const handleMobileViewToggle = () => {
+    setMobileView((prev) => (prev === 'day' ? 'week' : 'day'));
+  };
+
+  const handleMobilePanelTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    // Always wipe prior swipe state so a stale ref from an interrupted gesture
+    // (multi-touch, scroll cancel, etc.) can't poison the next single-finger swipe.
+    mobileSwipeAxisRef.current = null;
+    mobileSwipeDeltaXRef.current = 0;
+    setMobileSwipeDeltaX(0);
+    if (e.touches.length !== 1) {
+      mobileSwipeStartXRef.current = null;
+      mobileSwipeStartYRef.current = null;
+      return;
+    }
+    mobileSwipeStartXRef.current = e.touches[0].clientX;
+    mobileSwipeStartYRef.current = e.touches[0].clientY;
+  };
+
+  const handleMobilePanelTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (mobileSwipeStartXRef.current === null || mobileSwipeStartYRef.current === null) return;
+    const dx = e.touches[0].clientX - mobileSwipeStartXRef.current;
+    const dy = e.touches[0].clientY - mobileSwipeStartYRef.current;
+    if (mobileSwipeAxisRef.current === null) {
+      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+        mobileSwipeAxisRef.current = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
+      }
+    }
+    if (mobileSwipeAxisRef.current === 'horizontal') {
+      const damped = Math.sign(dx) * Math.min(Math.abs(dx), 200);
+      mobileSwipeDeltaXRef.current = damped;
+      setMobileSwipeDeltaX(damped);
+    }
+  };
+
+  const handleMobilePanelTouchEnd = () => {
+    const dx = mobileSwipeDeltaXRef.current;
+    const wasHorizontal = mobileSwipeAxisRef.current === 'horizontal';
+    mobileSwipeStartXRef.current = null;
+    mobileSwipeStartYRef.current = null;
+    mobileSwipeAxisRef.current = null;
+    mobileSwipeDeltaXRef.current = 0;
+    setMobileSwipeDeltaX(0);
+    if (!wasHorizontal) return;
+    const width = typeof window !== 'undefined' ? window.innerWidth : 360;
+    const threshold = Math.min(80, width * 0.3);
+    if (Math.abs(dx) > threshold) {
+      if (dx < 0) {
+        handleNextWeek();
+      } else {
+        handlePrevWeek();
+      }
+    }
+  };
+
   const handleTodayClick = () => {
-    const today = new Date();
+    const today = startOfLocalDay(new Date());
+    setMobileRangeStartDate(today);
     navigateToDate(today);
     setShowDateDropdown(false);
   };
 
   const handlePrevWeek = () => {
+    const rollingDayCount = getMobileRollingDayCount(mobileRangeMode);
+    if (rollingDayCount) {
+      const nextStart = addDays(mobileRangeStartDate, -rollingDayCount);
+      setMobileRangeStartDate(nextStart);
+      navigateToDate(nextStart);
+      return;
+    }
+
     const prevWeek = subWeeks(state.currentDate, 1);
     navigateToDate(prevWeek);
   };
 
   const handleNextWeek = () => {
+    const rollingDayCount = getMobileRollingDayCount(mobileRangeMode);
+    if (rollingDayCount) {
+      const nextStart = addDays(mobileRangeStartDate, rollingDayCount);
+      setMobileRangeStartDate(nextStart);
+      navigateToDate(nextStart);
+      return;
+    }
+
     const nextWeek = addWeeks(state.currentDate, 1);
     navigateToDate(nextWeek);
   };
 
+  const handleMobileRangeModeChange = (mode: MobileRangeMode) => {
+    setMobileRangeMode(mode);
+    if (mode === '3days' || mode === '5days' || mode === '7days') {
+      const today = startOfLocalDay(new Date());
+      setMobileRangeStartDate(today);
+      navigateToDate(today);
+    }
+  };
+
+  const updateMobileWorkingHour = (field: 'startHour' | 'endHour', value: string) => {
+    const fallback = field === 'startHour' ? mobileWorkingHours.startHour : mobileWorkingHours.endHour;
+    const nextHour = timeValueToHour(value, fallback);
+
+    setMobileWorkingHours((current) => {
+      if (field === 'startHour') {
+        const nextStartHour = Math.min(nextHour, current.endHour - 1);
+        return { ...current, startHour: nextStartHour };
+      }
+
+      const nextEndHour = Math.max(nextHour, current.startHour + 1);
+      return { ...current, endHour: nextEndHour };
+    });
+  };
+
   const handlePickerDaySelect = (date: Date) => {
+    if (getMobileRollingDayCount(mobileRangeMode)) {
+      const nextStart = startOfLocalDay(date);
+      setMobileRangeStartDate(nextStart);
+      navigateToDate(nextStart);
+      setShowDateDropdown(false);
+      return;
+    }
+
     navigateToDate(date);
     setShowDateDropdown(false);
   };
@@ -930,7 +1149,7 @@ export default function CalendarPageClient({
         label: calendar.sharedByName
           ? `${calendar.name} - ${calendar.sharedByName}`
           : calendar.name,
-        color: calendar.color_others,
+        color: calendar.color_mine,
         group: 'shared' as const,
       })),
     ],
@@ -940,23 +1159,86 @@ export default function CalendarPageClient({
   const renderDateDropdown = ({
     className,
     hideSidePanel = false,
+    hideTodayLink = false,
+    showCalendarControls = false,
   }: {
     className?: string;
     hideSidePanel?: boolean;
+    hideTodayLink?: boolean;
+    showCalendarControls?: boolean;
   } = {}) => (
-    <CalendarDatePickerDropdown
-      className={className}
-      hideSidePanel={hideSidePanel}
-      pickerDate={pickerDate}
-      currentDate={state.currentDate}
-      pickerMonthStart={pickerMonthStart}
-      pickerWeeks={pickerWeeks}
-      months={months}
-      years={years}
-      onPickerDateChange={setPickerDate}
-      onDaySelect={handlePickerDaySelect}
-      onTodayClick={handleTodayClick}
-    />
+    <div className={showCalendarControls ? styles.dateDropdownWithControls : undefined}>
+      {showCalendarControls && (
+        <div className={styles.dateDropdownControls}>
+          <div className={styles.desktopRangeSelector} aria-label="Interval calendar">
+            {MOBILE_RANGE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`${styles.desktopRangeOption} ${mobileRangeMode === option.value ? styles.desktopRangeOptionActive : ''}`}
+                onClick={() => handleMobileRangeModeChange(option.value)}
+                aria-pressed={mobileRangeMode === option.value}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          <div className={`${styles.desktopRangeSelector} ${styles.desktopSlotSelector}`} aria-label="Granularitate sloturi">
+            {MOBILE_SLOT_INTERVAL_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`${styles.desktopRangeOption} ${mobileSlotInterval === option.value ? styles.desktopRangeOptionActive : ''}`}
+                onClick={() => setMobileSlotInterval(option.value)}
+                aria-pressed={mobileSlotInterval === option.value}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          <div className={styles.desktopWorkingHours} aria-label="Program de lucru dentist">
+            <div className={styles.desktopWorkingHoursTitle}>Program dentist</div>
+            <label className={styles.desktopWorkingHourField}>
+              <span>Ora inceput</span>
+              <input
+                type="time"
+                step="3600"
+                value={hourToTimeValue(mobileWorkingHours.startHour)}
+                max={hourToTimeValue(mobileWorkingHours.endHour - 1)}
+                onChange={(event) => updateMobileWorkingHour('startHour', event.target.value)}
+              />
+            </label>
+            <label className={styles.desktopWorkingHourField}>
+              <span>Ora final</span>
+              <input
+                type="time"
+                step="3600"
+                value={hourToTimeValue(mobileWorkingHours.endHour)}
+                min={hourToTimeValue(mobileWorkingHours.startHour + 1)}
+                onChange={(event) => updateMobileWorkingHour('endHour', event.target.value)}
+              />
+            </label>
+          </div>
+        </div>
+      )}
+
+      <CalendarDatePickerDropdown
+        className={className}
+        hideSidePanel={hideSidePanel}
+        pickerDate={pickerDate}
+        currentDate={state.currentDate}
+        pickerMonthStart={pickerMonthStart}
+        pickerWeeks={pickerWeeks}
+        months={months}
+        years={years}
+        onPickerDateChange={setPickerDate}
+        onDaySelect={handlePickerDaySelect}
+        onTodayClick={handleTodayClick}
+        hideTodayLink={hideTodayLink}
+      />
+    </div>
   );
 
   const weekToolbarControls = (
@@ -990,7 +1272,7 @@ export default function CalendarPageClient({
         <span className={styles.rangeChevron}>{showDateDropdown ? '\u25b2' : '\u25bc'}</span>
       </button>
 
-      {showDateDropdown && renderDateDropdown()}
+      {showDateDropdown && renderDateDropdown({ showCalendarControls: true })}
     </div>
   );
 
@@ -998,8 +1280,8 @@ export default function CalendarPageClient({
   const calendarWithPanel = (
     <div className={styles.calendarWithPanel}>
       <WeekView
-        weekDays={weekDays}
-        hours={hours}
+        weekDays={visibleWeekDays}
+        hours={visibleHours}
         appointments={decoratedAppointments}
         viewerUserId={sessionUserId ?? null}
         selectedDay={selectedDay}
@@ -1012,6 +1294,7 @@ export default function CalendarPageClient({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onDrop={async (day, hour, minute) => { await handleDrop(day, hour, minute); }}
+        slotIntervalMinutes={mobileSlotInterval}
       />
 
       <DayPanel
@@ -1040,149 +1323,238 @@ export default function CalendarPageClient({
 
   const mobileCalendarView = (
     <div className={styles.mobileCalendar}>
-      {/* Layer 1: Compact header — date nav + search icon + scope chip */}
+      {/* Row 1: Compact centered header — picker · month · today · view · search */}
       <div className={styles.mobileHeader} ref={dateDropdownRef}>
-        <button
-          type="button"
-          className={styles.mobileNavArrow}
-          onClick={handlePrevWeek}
-          aria-label="Saptamana anterioara"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-        </button>
+        <div className={styles.mobileHeaderCluster}>
+          <button
+            type="button"
+            className={styles.mobileHeaderDateBtn}
+            onClick={() => setShowDateDropdown((prev) => !prev)}
+            aria-expanded={showDateDropdown}
+          >
+            {mobileMonthLabel}
+          </button>
 
-        <button
-          type="button"
-          className={styles.mobileHeaderDateBtn}
-          onClick={() => setShowDateDropdown((prev) => !prev)}
-          aria-expanded={showDateDropdown}
-        >
-          {mobileView === 'week'
-            ? weekRangeLabel.replace(/\s*\d{4}$/, '')
-            : format(selectedDay, 'd MMMM', { locale: ro })}
-        </button>
+          <button
+            type="button"
+            className={`${styles.mobileHeaderIcon} ${!isTodayInMobileRange ? styles.mobileHeaderIconAccent : ''}`}
+            onClick={handleTodayClick}
+            aria-label="Astazi"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="4" width="18" height="18" rx="2" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="3" y1="10" x2="21" y2="10" />
+              <circle cx="12" cy="15" r="2.2" fill="currentColor" stroke="none" />
+            </svg>
+          </button>
 
-        <button
-          type="button"
-          className={styles.mobileNavArrow}
-          onClick={handleNextWeek}
-          aria-label="Saptamana urmatoare"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        </button>
-
-        <button
-          type="button"
-          className={styles.mobileHeaderIcon}
-          onClick={() => setMobileSearchOpen(true)}
-          aria-label="Cauta programari"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-        </button>
-
-        {calendarScopeOptions.length > 1 && (
-          <CalendarScopeDropdown
-            value={calendarScopeValue}
-            options={calendarScopeOptions}
-            onChange={handleCalendarScopeChange}
-            className={styles.mobileScopePicker}
-            triggerClassName={styles.mobileScopeTrigger}
-            menuClassName={styles.mobileScopeMenu}
-          />
-        )}
-
-        {showDateDropdown && renderDateDropdown({
-          className: styles.mobileHeaderDateDropdown,
-          hideSidePanel: true,
-        })}
-      </div>
-
-      {/* Layer 2: Day strip */}
-      <div className={styles.mobileDayStrip}>
-        {weekDays.map((day) => {
-          const isActive = isSameDay(day, selectedDay);
-          const isTodayDay = isToday(day);
-          const dayLabel = format(day, 'EEE', { locale: ro }).replace('.', '');
-          const shortDayLabel = `${dayLabel.charAt(0).toUpperCase()}${dayLabel.slice(1, 3)}`;
-
-          return (
-            <button
-              key={day.toISOString()}
-              type="button"
-              className={[
-                styles.mobileDayBtn,
-                isActive ? styles.mobileDayBtnActive : '',
-                isTodayDay ? styles.mobileDayBtnToday : '',
-              ].filter(Boolean).join(' ')}
-              onClick={() => navigateToDate(day)}
-            >
-              <span className={styles.mobileDayBtnLabel}>{shortDayLabel}</span>
-              <span className={styles.mobileDayBtnNumber}>{format(day, 'd')}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Layer 3: Swipeable content — day list (left) + week grid (right) */}
-      <div className={styles.mobileViewContainer} ref={mobileViewContainerRef}>
-        {/* Day view panel */}
-        <div className={styles.mobileViewPanel}>
-          {mobileDayAppointments.length === 0 ? (
-            <div className={styles.mobileEmptyDay}>
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ opacity: 0.3, marginBottom: '0.75rem' }}>
-                <rect x="3" y="4" width="18" height="18" rx="2" />
-                <line x1="16" y1="2" x2="16" y2="6" />
-                <line x1="8" y1="2" x2="8" y2="6" />
-                <line x1="3" y1="10" x2="21" y2="10" />
+          <button
+            type="button"
+            className={styles.mobileHeaderIcon}
+            onClick={handleMobileViewToggle}
+            aria-label={mobileView === 'day' ? 'Vezi grila' : 'Vezi lista'}
+            aria-pressed={mobileView === 'week'}
+          >
+            {mobileView === 'day' ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="3" width="7" height="7" rx="1" />
+                <rect x="14" y="3" width="7" height="7" rx="1" />
+                <rect x="3" y="14" width="7" height="7" rx="1" />
+                <rect x="14" y="14" width="7" height="7" rx="1" />
               </svg>
-              <span>Nicio programare</span>
-              <span className={styles.mobileEmptyDaySub}>
-                {isToday(selectedDay) ? 'Astazi' : format(selectedDay, 'EEEE, d MMMM', { locale: ro })}
-              </span>
-            </div>
-          ) : (
-            <div className={styles.mobileAppointmentList}>
-              {mobileDayAppointments.map((apt) => (
-                <AppointmentCard
-                  key={apt.id}
-                  appointment={apt}
-                  viewerUserId={sessionUserId ?? null}
-                  onClick={handleAppointmentClick}
-                  onStatusChange={handlePanelStatusChange}
-                  onHoverAppointment={setHoveredAppointmentId}
-                />
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="4" y1="6" x2="20" y2="6" />
+                <line x1="4" y1="12" x2="20" y2="12" />
+                <line x1="4" y1="18" x2="20" y2="18" />
+              </svg>
+            )}
+          </button>
+
+          <button
+            type="button"
+            className={styles.mobileHeaderIcon}
+            onClick={() => setMobileSearchOpen(true)}
+            aria-label="Cauta programari"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </button>
+        </div>
+
+        {showDateDropdown && (
+          <div className={styles.mobileHeaderDateDropdown}>
+            {calendarScopeOptions.length > 1 && (
+              <CalendarScopeDropdown
+                value={calendarScopeValue}
+                options={calendarScopeOptions}
+                onChange={handleCalendarScopeChange}
+                className={styles.mobileScopePicker}
+                triggerClassName={styles.mobileScopeTrigger}
+                menuClassName={styles.mobileScopeMenu}
+              />
+            )}
+            <div className={styles.mobileRangeSelector} aria-label="Interval calendar">
+              {MOBILE_RANGE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`${styles.mobileRangeOption} ${mobileRangeMode === option.value ? styles.mobileRangeOptionActive : ''}`}
+                  onClick={() => handleMobileRangeModeChange(option.value)}
+                  aria-pressed={mobileRangeMode === option.value}
+                >
+                  {option.label}
+                </button>
               ))}
             </div>
-          )}
-        </div>
+            <div className={`${styles.mobileRangeSelector} ${styles.mobileSlotSelector}`} aria-label="Granularitate sloturi">
+              {MOBILE_SLOT_INTERVAL_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`${styles.mobileRangeOption} ${mobileSlotInterval === option.value ? styles.mobileRangeOptionActive : ''}`}
+                  onClick={() => setMobileSlotInterval(option.value)}
+                  aria-pressed={mobileSlotInterval === option.value}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <div className={styles.mobileWorkingHours} aria-label="Program de lucru dentist">
+              <div className={styles.mobileWorkingHoursTitle}>Program dentist</div>
+              <label className={styles.mobileWorkingHourField}>
+                <span>Ora inceput</span>
+                <input
+                  type="time"
+                  step="3600"
+                  value={hourToTimeValue(mobileWorkingHours.startHour)}
+                  max={hourToTimeValue(mobileWorkingHours.endHour - 1)}
+                  onChange={(event) => updateMobileWorkingHour('startHour', event.target.value)}
+                />
+              </label>
+              <label className={styles.mobileWorkingHourField}>
+                <span>Ora final</span>
+                <input
+                  type="time"
+                  step="3600"
+                  value={hourToTimeValue(mobileWorkingHours.endHour)}
+                  min={hourToTimeValue(mobileWorkingHours.startHour + 1)}
+                  onChange={(event) => updateMobileWorkingHour('endHour', event.target.value)}
+                />
+              </label>
+            </div>
+            {renderDateDropdown({
+              className: styles.mobileHeaderDateDropdownPicker,
+              hideSidePanel: true,
+              hideTodayLink: true,
+            })}
+          </div>
+        )}
+      </div>
 
-        {/* Week view panel */}
-        <div className={styles.mobileViewPanel}>
-          <WeekView
-            weekDays={weekDays}
-            hours={hours}
-            appointments={decoratedAppointments}
-            viewerUserId={sessionUserId ?? null}
-                selectedDay={selectedDay}
-            onSlotClick={handleSlotClick}
-            onDayHeaderClick={(day) => {
-              navigateToDate(day);
-              // Scroll back to day view
-              mobileViewContainerRef.current?.scrollTo({ left: 0, behavior: 'smooth' });
-            }}
-            onAppointmentClick={handleAppointmentClick}
-            enableDragDrop={false}
-            hoveredAppointmentId={null}
-            compact
-          />
+      {/* Row 2: Day strip — leading time-gutter spacer aligns cells with grid columns when in week view */}
+      <div
+        className={`${styles.mobileDayStrip} ${mobileView === 'week' ? styles.mobileDayStripGridAligned : ''}`}
+      >
+        <div className={styles.mobileDayStripGutter} aria-hidden="true" />
+        <div
+          className={styles.mobileDayStripCells}
+          style={{ gridTemplateColumns: `repeat(${mobileWeekDays.length}, minmax(0, 1fr))` }}
+        >
+          {mobileWeekDays.map((day) => {
+            const isActive = isSameDay(day, selectedDay);
+            const isTodayDay = isToday(day);
+            const dayLabel = format(day, 'EEE', { locale: ro }).replace('.', '');
+            const shortDayLabel = `${dayLabel.charAt(0).toUpperCase()}${dayLabel.slice(1, 3)}`;
+
+            return (
+              <button
+                key={day.toISOString()}
+                type="button"
+                className={[
+                  styles.mobileDayBtn,
+                  isActive ? styles.mobileDayBtnActive : '',
+                  isTodayDay ? styles.mobileDayBtnToday : '',
+                ].filter(Boolean).join(' ')}
+                onClick={() => handleMobileDaySelect(day)}
+                aria-current={isTodayDay ? 'date' : undefined}
+                aria-pressed={isActive}
+              >
+                <span className={styles.mobileDayBtnLabel}>{shortDayLabel}</span>
+                <span className={styles.mobileDayBtnDigitWrap}>
+                  <span className={styles.mobileDayBtnDigit}>{format(day, 'd')}</span>
+                </span>
+              </button>
+            );
+          })}
         </div>
+      </div>
+
+      {/* Row 3: Active panel only — horizontal swipe = prev/next period */}
+      <div
+        className={styles.mobileActivePanel}
+        onTouchStart={handleMobilePanelTouchStart}
+        onTouchMove={handleMobilePanelTouchMove}
+        onTouchEnd={handleMobilePanelTouchEnd}
+        onTouchCancel={handleMobilePanelTouchEnd}
+        style={
+          mobileSwipeDeltaX !== 0
+            ? { transform: `translateX(${mobileSwipeDeltaX}px)`, transition: 'none' }
+            : undefined
+        }
+      >
+        {mobileView === 'day' ? (
+          <div className={styles.mobileViewPanel}>
+            {mobileDayAppointments.length === 0 ? (
+              <div className={styles.mobileEmptyDay}>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ opacity: 0.3, marginBottom: '0.75rem' }}>
+                  <rect x="3" y="4" width="18" height="18" rx="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                <span>Nicio programare</span>
+                <span className={styles.mobileEmptyDaySub}>
+                  {isToday(selectedDay) ? 'Astazi' : format(selectedDay, 'EEEE, d MMMM', { locale: ro })}
+                </span>
+              </div>
+            ) : (
+              <div className={styles.mobileAppointmentList}>
+                {mobileDayAppointments.map((apt) => (
+                  <AppointmentCard
+                    key={apt.id}
+                    appointment={apt}
+                    viewerUserId={sessionUserId ?? null}
+                    onClick={handleAppointmentClick}
+                    onStatusChange={handlePanelStatusChange}
+                    onHoverAppointment={setHoveredAppointmentId}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className={styles.mobileViewPanel}>
+            <WeekView
+              weekDays={mobileWeekDays}
+              hours={mobileHours}
+              appointments={decoratedAppointments}
+              viewerUserId={sessionUserId ?? null}
+              selectedDay={selectedDay}
+              onSlotClick={handleSlotClick}
+              onDayHeaderClick={handleMobileDaySelect}
+              onAppointmentClick={handleAppointmentClick}
+              enableDragDrop={false}
+              hoveredAppointmentId={null}
+              compact
+              slotIntervalMinutes={mobileSlotInterval}
+            />
+          </div>
+        )}
       </div>
 
       {/* Layer 4: FAB */}

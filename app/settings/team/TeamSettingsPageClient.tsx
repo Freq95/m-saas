@@ -7,6 +7,7 @@ import { ConfirmModal } from '@/app/calendar/components/modals/ConfirmModal';
 import navStyles from '../../dashboard/page.module.css';
 import styles from './page.module.css';
 import SettingsTabs from '../SettingsTabs';
+import { SettingsMobileHeader } from '../SettingsMobileHeader';
 import type { TeamData, TeamMemberRow } from '@/lib/server/team';
 
 interface TeamSettingsPageClientProps {
@@ -114,6 +115,7 @@ export default function TeamSettingsPageClient({ initialTeamData }: TeamSettings
   return (
     <div className={navStyles.container}>
       <div className={styles.container}>
+        <SettingsMobileHeader title="Echipă" />
         <div className={styles.tabRow}>
           <SettingsTabs activeTab="team" />
           {!showInviteForm && (
@@ -241,6 +243,33 @@ export default function TeamSettingsPageClient({ initialTeamData }: TeamSettings
                 ))}
               </tbody>
             </table>
+            <ul className={styles.mobileMemberList} aria-label="Membri echipa">
+              {activeMembers.map((member) => (
+                <li key={member.userId} className={styles.mobileMemberItem}>
+                  <div className={styles.mobileMemberMain}>
+                    <div className={styles.mobileMemberName}>{member.name || member.email}</div>
+                    {member.name && <div className={styles.mobileMemberEmail}>{member.email}</div>}
+                    <div className={styles.mobileMemberMeta}>
+                      <span>{ROLE_LABEL[member.role] || member.role}</span>
+                      <span className={styles.mobileMemberDot} aria-hidden="true">·</span>
+                      <span className={`${styles.statusBadge} ${styles[`status_${member.status}`] || ''}`}>
+                        {STATUS_LABEL[member.status] || member.status}
+                      </span>
+                    </div>
+                  </div>
+                  {member.role !== 'owner' && (
+                    <button
+                      type="button"
+                      className={styles.mobileRemoveButton}
+                      onClick={() => setRemoveTarget(member)}
+                      aria-label={`Elimina ${member.name || member.email}`}
+                    >
+                      Sterge
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>

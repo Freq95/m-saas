@@ -1,6 +1,56 @@
 /* densa — Global Styles & Component System
    Font: Satoshi for UI, Chillax for densa wordmarks. */
 
+/* ── Landscape lock for phones ───────────────────────────────
+   PWA users are blocked at the manifest level (`orientation: portrait`).
+   Browser users on phones-in-landscape see this overlay instead. The
+   `max-height: 480px` filter targets phones (≤480px in their shorter
+   dimension) without affecting tablets, which have ample landscape height. */
+.landscape-lock {
+  display: none;
+}
+
+@media screen and (orientation: landscape) and (max-height: 480px) {
+  .landscape-lock {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    padding: 1.5rem;
+    text-align: center;
+    background: var(--color-bg, #06080d);
+    color: var(--color-text, #f1f5f9);
+  }
+
+  .landscape-lock svg {
+    opacity: 0.7;
+    margin-bottom: 0.25rem;
+  }
+
+  .landscape-lock-title {
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .landscape-lock-sub {
+    font-size: 0.85rem;
+    color: var(--color-text-muted, #94a3b8);
+    max-width: 32ch;
+    line-height: 1.4;
+  }
+
+  /* Hide the rest of the app while the overlay is shown. */
+  body > :not(.landscape-lock) {
+    visibility: hidden;
+  }
+}
+
+
 /* ── Reset ───────────────────────────────────────────────────── */
 *,
 *::before,
@@ -58,6 +108,13 @@ main {
 .route-fade-in {
   animation: routeFadeIn 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
   will-change: opacity, transform, filter;
+}
+
+@media (max-width: 640px) {
+  .route-fade-in.route-mobile-motion-static {
+    animation: none;
+    will-change: auto;
+  }
 }
 
 @keyframes routeFadeIn {
@@ -671,7 +728,7 @@ option {
    RESPONSIVE TOUCH TARGETS
    ============================================================ */
 
-@media (max-width: 767px) {
+@media (max-width: 640px) {
   .btn {
     min-height: 44px;
   }

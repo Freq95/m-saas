@@ -141,6 +141,133 @@
   padding: 0.9rem;
 }
 
+.dateDropdownWithControls {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  left: auto;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: min(94vw, 760px);
+  min-width: 660px;
+  background: var(--color-surface-strong);
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 84%, white);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 0.9rem;
+}
+
+.dateDropdownWithControls > .dateDropdown {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.dateDropdownControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 0.55rem;
+}
+
+.desktopRangeSelector {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.25rem;
+  padding: 0.2rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+}
+
+.desktopSlotSelector {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.desktopRangeOption {
+  min-height: 30px;
+  padding: 0 0.35rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-soft);
+  font-size: 0.74rem;
+  font-weight: 680;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.desktopRangeOption:hover {
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+
+.desktopRangeOptionActive {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-text);
+  box-shadow: var(--shadow-sm);
+}
+
+.desktopWorkingHours {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  padding: 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+}
+
+.desktopWorkingHoursTitle {
+  grid-column: 1 / -1;
+  color: var(--color-text);
+  font-size: 0.76rem;
+  font-weight: 720;
+  line-height: 1.2;
+}
+
+.desktopWorkingHourField {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.desktopWorkingHourField span {
+  color: var(--color-text-soft);
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.desktopWorkingHourField input {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.desktopWorkingHourField input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: var(--focus-ring);
+}
+
 .dateDropdownCalendar {
   padding-right: 0.6rem;
   border-right: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
@@ -365,6 +492,13 @@
     grid-template-columns: minmax(330px, 1fr) 220px;
   }
 
+  .dateDropdownWithControls {
+    left: auto;
+    right: 0;
+    width: min(94vw, 700px);
+    min-width: min(90vw, 400px);
+  }
+
   .calendarWithPanel {
     grid-template-columns: minmax(0, 1fr) clamp(245px, 38vw, 320px);
     gap: 0.75rem;
@@ -389,6 +523,15 @@
     grid-template-columns: 1fr;
     width: min(96vw, 560px);
     min-width: 0;
+  }
+
+  .dateDropdownWithControls {
+    width: min(96vw, 560px);
+    min-width: 0;
+  }
+
+  .dateDropdownControls {
+    grid-template-columns: 1fr;
   }
 
   .dateDropdownCalendar {
@@ -2602,7 +2745,7 @@
   .colorFieldRow { flex-wrap: wrap; }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 640px) {
   .main {
     padding: 0;
   }
@@ -2619,52 +2762,53 @@
   .mobileHeader {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
-    padding: 0.5rem 0.5rem;
+    justify-content: center;
+    padding: 0.45rem max(0.9rem, env(safe-area-inset-right)) 0.4rem max(0.9rem, env(safe-area-inset-left));
     background: var(--color-bg);
     flex-shrink: 0;
     position: relative;
+    min-width: 0;
   }
 
-  .mobileNavArrow {
-    background: none;
-    border: none;
-    width: 36px;
-    height: 36px;
-    display: flex;
+  .mobileHeaderCluster {
+    display: grid;
+    grid-template-columns: minmax(0, 0.86fr) 34px 34px 34px;
     align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-sm);
-    color: var(--color-text-soft);
-    cursor: pointer;
-    min-height: unset;
-    flex-shrink: 0;
-  }
-
-  .mobileNavArrow:active {
-    background: var(--color-surface-muted);
+    gap: 0.48rem;
+    width: 100%;
+    max-width: 350px;
   }
 
   .mobileHeaderDateBtn {
-    flex: 1;
-    background: none;
-    border: none;
-    font-size: 0.92rem;
-    font-weight: 600;
+    width: 100%;
+    height: 34px;
+    background: var(--color-surface-muted);
+    border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
     color: var(--color-text);
     text-align: center;
     cursor: pointer;
     text-transform: capitalize;
     min-height: unset;
-    padding: 0.25rem 0;
+    padding: 0 0.58rem;
     line-height: 1.3;
+    white-space: nowrap;
+    letter-spacing: 0;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 5%, transparent);
+  }
+
+  .mobileHeaderDateBtn:active {
+    background: var(--color-surface-strong);
+    transform: scale(0.98);
   }
 
   .mobileHeaderIcon {
-    background: none;
-    border: none;
-    width: 36px;
-    height: 36px;
+    background: var(--color-surface-muted);
+    border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
+    width: 34px;
+    height: 34px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -2673,10 +2817,17 @@
     border-radius: var(--radius-sm);
     min-height: unset;
     flex-shrink: 0;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 5%, transparent);
   }
 
   .mobileHeaderIcon:active {
-    background: var(--color-surface-muted);
+    background: var(--color-surface-strong);
+    transform: scale(0.96);
+  }
+
+  .mobileHeaderIconAccent {
+    color: var(--color-accent);
+    border-color: color-mix(in srgb, var(--color-accent) 38%, transparent);
   }
 
   .mobileHeaderDateDropdown {
@@ -2688,7 +2839,115 @@
     min-width: 0;
     max-width: calc(100vw - 1rem);
     z-index: 30;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    padding: 0.55rem;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+  }
+
+  .mobileRangeSelector {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.25rem;
+    padding: 0.18rem;
+    border: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-muted);
+  }
+
+  .mobileSlotSelector {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .mobileWorkingHours {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+    padding: 0.58rem;
+    border: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+    border-radius: var(--radius-md);
+    background: var(--color-surface-muted);
+  }
+
+  .mobileWorkingHoursTitle {
+    grid-column: 1 / -1;
+    color: var(--color-text);
+    font-size: 0.72rem;
+    font-weight: 720;
+    line-height: 1.2;
+  }
+
+  .mobileWorkingHourField {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.28rem;
+  }
+
+  .mobileWorkingHourField span {
+    color: var(--color-text-soft);
+    font-size: 0.66rem;
+    font-weight: 650;
+  }
+
+  .mobileWorkingHourField input {
+    width: 100%;
+    min-height: 34px;
+    padding: 0 0.45rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font: inherit;
+    font-size: 0.78rem;
+  }
+
+  .mobileWorkingHourField input:focus {
+    outline: none;
+    border-color: var(--color-accent);
+    box-shadow: var(--focus-ring);
+  }
+
+  .mobileRangeOption {
+    min-height: 32px;
+    padding: 0 0.28rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--color-text-soft);
+    font-size: 0.68rem;
+    font-weight: 680;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .mobileRangeOption:active {
+    transform: scale(0.97);
+  }
+
+  .mobileRangeOptionActive {
+    background: var(--color-surface);
+    border-color: var(--color-border);
+    color: var(--color-text);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .mobileHeaderDateDropdownPicker {
+    position: static;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    display: grid;
     grid-template-columns: minmax(0, 1fr);
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
   }
 
   .mobileHeaderDateDropdown .dateDropdownSide {
@@ -2706,17 +2965,27 @@
   }
 
   .mobileScopePicker {
-    flex-shrink: 0;
-    width: auto;
+    width: 100%;
+    max-width: none;
     min-width: 0;
   }
 
   .mobileScopeTrigger {
-    padding: 0.2rem 0.5rem;
-    font-size: 0.72rem;
-    gap: 0.25rem;
+    width: 100%;
+    justify-content: center;
+    min-height: 32px;
+    padding: 0.28rem 0.5rem;
+    font-size: 0.68rem;
+    gap: 0.28rem;
     border-radius: 999px;
-    min-height: unset;
+    border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
+    background: var(--color-surface-muted);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 5%, transparent);
+  }
+
+  .mobileScopeTrigger:active {
+    background: var(--color-surface-strong);
+    transform: scale(0.98);
   }
 
   .mobileScopeMenu {
@@ -2728,106 +2997,158 @@
   /* ── Day strip ──────────────────────────────────────────── */
   .mobileDayStrip {
     display: flex;
-    overflow-x: auto;
-    scrollbar-width: none;
-    gap: 0.25rem;
+    align-items: stretch;
+    gap: 0;
     padding-top: 0.35rem;
     padding-bottom: 0.35rem;
-    padding-left: max(0.5rem, env(safe-area-inset-left));
-    padding-right: max(0.5rem, env(safe-area-inset-right));
+    padding-left: max(0.75rem, env(safe-area-inset-left));
+    padding-right: 0;
     border-bottom: 1px solid var(--color-border);
     background: var(--color-bg);
     flex-shrink: 0;
-    -webkit-overflow-scrolling: touch;
   }
 
-  .mobileDayStrip::-webkit-scrollbar {
-    display: none;
+  .mobileDayStripGutter {
+    flex-shrink: 0;
+    width: 0;
+    transition: width 200ms ease-out;
+  }
+
+  .mobileDayStripGridAligned .mobileDayStripGutter {
+    /* Matches the time gutter in <WeekView compact /> (44px) so day strip cells
+       overlay the grid's day columns exactly when the user is in week view. */
+    width: 44px;
+  }
+
+  .mobileDayStripCells {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    gap: 0;
   }
 
   .mobileDayBtn {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.15rem;
-    padding: 0.25rem 0.45rem;
-    min-width: 40px;
+    gap: 0.18rem;
+    padding: 0.3rem 0.2rem 0.42rem;
+    min-width: 0;
     border: none;
-    border-radius: var(--radius-md);
+    border-radius: 0;
     background: none;
     cursor: pointer;
-    flex-shrink: 0;
     min-height: unset;
   }
 
-  .mobileDayBtn:last-child {
-    margin-right: 0.25rem;
+  .mobileDayBtn:active {
+    background: var(--color-surface-muted);
   }
 
   .mobileDayBtnLabel {
-    font-size: 0.65rem;
+    font-size: 0.66rem;
     font-weight: 500;
-    color: var(--color-text-soft);
+    color: var(--color-text-muted);
     text-transform: uppercase;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    transition: color var(--transition-fast);
   }
 
-  .mobileDayBtnNumber {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--color-text);
-    width: 30px;
-    height: 30px;
-    display: flex;
+  .mobileDayBtnDigitWrap {
+    position: relative;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
+    width: 28px;
+    height: 28px;
   }
 
-  .mobileDayBtnActive .mobileDayBtnNumber {
+  .mobileDayBtnDigit {
+    position: relative;
+    z-index: 1;
+    font-size: 1.05rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text);
+    line-height: 1;
+    transition: color var(--transition-fast), font-weight var(--transition-fast);
+  }
+
+  /* Selected state: tinted pill behind digit (vertical lift). */
+  .mobileDayBtnActive .mobileDayBtnDigitWrap::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  }
+
+  .mobileDayBtnActive .mobileDayBtnDigit {
+    font-weight: 620;
+  }
+
+  /* Today state: thin underline (horizontal cue), accent weekday label. */
+  .mobileDayBtnToday::after {
+    content: '';
+    position: absolute;
+    left: 22%;
+    right: 22%;
+    bottom: 4px;
+    height: 1.5px;
+    border-radius: 1px;
     background: var(--color-accent);
-    color: var(--color-text-on-accent);
   }
 
-  .mobileDayBtnToday .mobileDayBtnNumber {
-    border: 2px solid var(--color-accent);
+  .mobileDayBtnToday .mobileDayBtnLabel {
     color: var(--color-accent);
   }
 
-  .mobileDayBtnActive.mobileDayBtnToday .mobileDayBtnNumber {
-    background: var(--color-accent);
-    color: var(--color-text-on-accent);
-    border: none;
+  .mobileDayBtnToday .mobileDayBtnDigit {
+    font-weight: 620;
   }
 
-  /* ── Swipeable content container ────────────────────────── */
-  .mobileViewContainer {
+  /* ── Active panel — single panel, horizontal swipe = period nav ───────── */
+  .mobileActivePanel {
     flex: 1;
     min-height: 0;
+    width: 100%;
     display: flex;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scroll-snap-type: x mandatory;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
+    flex-direction: column;
+    overflow: hidden;
     position: relative;
+    touch-action: pan-y;
+    will-change: transform;
+    transition: transform 180ms ease-out;
   }
 
-  .mobileViewContainer::-webkit-scrollbar {
-    display: none;
+  @media (prefers-reduced-motion: reduce) {
+    .mobileActivePanel,
+    .mobileDayStripGutter,
+    .mobileDayBtnLabel,
+    .mobileDayBtnDigit {
+      transition: none !important;
+    }
   }
 
   .mobileViewPanel {
-    flex: 0 0 100%;
+    flex: 1;
+    min-height: 0;
     width: 100%;
-    scroll-snap-align: start;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    overflow-y: hidden;
     overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
   }
 
   /* ── Day view: appointment list ─────────────────────────── */
   .mobileAppointmentList {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
     padding: 0.5rem 0.75rem;
     display: flex;
     flex-direction: column;
@@ -2836,6 +3157,11 @@
   }
 
   .mobileEmptyDay {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -2854,7 +3180,11 @@
 
   /* ── Week view compact overrides ────────────────────────── */
   .mobileViewPanel .weekGrid {
+    flex: 1;
+    min-height: 0;
     font-size: 0.7rem;
+    width: calc(100% - max(0.75rem, env(safe-area-inset-left)));
+    margin-left: max(0.75rem, env(safe-area-inset-left));
   }
 
   .mobileViewPanel .weekHeaderRow {
@@ -2863,10 +3193,42 @@
 
   .mobileViewPanel .timeSlot {
     font-size: 0.6rem;
+    padding-left: 0.1rem;
+    padding-right: 0.35rem;
   }
 
   .mobileViewPanel .weekBody {
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
     padding-bottom: 80px; /* space for FAB */
+  }
+
+  .mobileViewPanel .appointment {
+    padding: 0.2rem 0.28rem !important;
+    border-left-width: 3px !important;
+  }
+
+  .mobileViewPanel .appointmentHeader {
+    margin-bottom: 0;
+    gap: 0;
+  }
+
+  .mobileViewPanel .appointmentTitle {
+    display: block;
+    font-size: 0.62rem;
+    line-height: 1.15;
+  }
+
+  .mobileViewPanel .appointmentName {
+    display: block;
+  }
+
+  .mobileViewPanel .appointmentTime,
+  .mobileViewPanel .appointmentService,
+  .mobileViewPanel .statusDot {
+    display: none;
   }
 
   /* ── FAB ─────────────────────────────────────────────────── */

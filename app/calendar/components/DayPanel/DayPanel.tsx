@@ -492,6 +492,7 @@ export function DayPanel({
   return (
     <aside className={styles.panel}>
       {topControls}
+      {(selectedDay || isSearching) && searchBar}
 
       {isSearching ? (
         <>
@@ -520,8 +521,6 @@ export function DayPanel({
               </div>
             </div>
           )}
-
-          {searchBar}
 
           <div className={styles.list}>
             {groupedResults.length === 0 ? (
@@ -642,8 +641,6 @@ export function DayPanel({
                   </div>
                 </div>
               )}
-
-              {searchBar}
 
               <div className={styles.list}>
                 {filteredDayAppointments.length === 0 ? (

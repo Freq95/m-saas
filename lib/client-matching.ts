@@ -272,6 +272,11 @@ export async function updateClientStats(clientId: number, tenantId: ObjectId): P
   }, 0);
 
   const totalAppointments = appointments.filter((apt: any) => ['scheduled', 'completed'].includes(apt.status)).length;
+  const appointmentActivityDate = appointments
+    .filter((apt: any) => ['scheduled', 'completed'].includes(apt.status))
+    .map((apt: any) => apt.start_time)
+    .filter(Boolean)
+    .sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime())[0] || null;
 
   const lastAppointmentDate = appointments
     .filter((apt: any) => apt.status === 'completed')
@@ -284,7 +289,7 @@ export async function updateClientStats(clientId: number, tenantId: ObjectId): P
     .filter(Boolean)
     .sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime())[0] || null;
 
-  const activityCandidates = [lastAppointmentDate, lastConversationDate].filter(Boolean) as string[];
+  const activityCandidates = [appointmentActivityDate, lastConversationDate, client.last_activity_date, client.created_at].filter(Boolean) as string[];
   const lastActivityDate = activityCandidates.length > 0
     ? activityCandidates.sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0]
     : null;

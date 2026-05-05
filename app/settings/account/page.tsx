@@ -1,9 +1,19 @@
+import { Suspense } from 'react';
 import { getAuthUser, redirectToLogin } from '@/lib/auth-helpers';
+import { SettingsSkeleton } from '../SettingsSkeleton';
 import AccountSettingsPageClient from './AccountSettingsPageClient';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 30;
 
-export default async function AccountSettingsPage() {
+export default function AccountSettingsPage() {
+  return (
+    <Suspense fallback={<SettingsSkeleton activeTab="account" />}>
+      <AccountContent />
+    </Suspense>
+  );
+}
+
+async function AccountContent() {
   let auth;
   try {
     auth = await getAuthUser();

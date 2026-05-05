@@ -100,6 +100,10 @@ const STATUS_CLASS: Record<CalendarShareItem['status'], string> = {
   pending: styles.shareStatusPending,
 };
 
+function isActiveShare(share: CalendarShareItem): boolean {
+  return share.status === 'pending' || share.status === 'accepted';
+}
+
 const IconX = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <line x1="18" y1="6" x2="6" y2="18" />
@@ -237,6 +241,7 @@ export function ShareCalendarModal({
   };
 
   const handleEditShare = (share: CalendarShareItem) => {
+    if (!isActiveShare(share)) return;
     setEditingShareId(share.id);
     setEmail(share.shared_with_email);
     setPermissions({
@@ -413,7 +418,9 @@ export function ShareCalendarModal({
                     </tr>
                   </thead>
                   <tbody>
-                    {shares.map((share) => (
+                    {shares.map((share) => {
+                      const activeShare = isActiveShare(share);
+                      return (
                       <tr key={share.id} className={styles.shareTableRow}>
                         <td>
                           <div className={styles.shareRecipientCell}>
@@ -442,7 +449,7 @@ export function ShareCalendarModal({
                               type="button"
                               className={styles.secondaryInlineAction}
                               onClick={() => handleEditShare(share)}
-                              disabled={processingShareId === share.id || isSubmitting}
+                              disabled={!activeShare || processingShareId === share.id || isSubmitting}
                               title="Editeaza permisiunile"
                               aria-label={`Editeaza ${share.shared_with_email}`}
                             >
@@ -461,7 +468,8 @@ export function ShareCalendarModal({
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    );
+                    })}
                   </tbody>
                 </table>
               </div>

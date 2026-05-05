@@ -7,6 +7,7 @@ import navStyles from '../../dashboard/page.module.css';
 import sharedStyles from '../services/page.module.css';
 import styles from './page.module.css';
 import SettingsTabs from '../SettingsTabs';
+import { SettingsMobileHeader } from '../SettingsMobileHeader';
 import { DENTIST_COLOR_PALETTE } from '@/lib/calendar-color-policy';
 import {
   useCalendarList,
@@ -344,6 +345,7 @@ export default function CalendarsSettingsPageClient({
   return (
     <div className={navStyles.container}>
       <div className={sharedStyles.container}>
+        <SettingsMobileHeader title="Calendare" />
         <div className={styles.tabRow}>
           <SettingsTabs activeTab="calendars" />
           <div className={styles.tabRowRight}>

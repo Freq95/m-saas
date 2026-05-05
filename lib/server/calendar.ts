@@ -276,18 +276,26 @@ async function loadCalendarDisplayMaps(
 
 export async function attachCalendarDisplayData<T extends CalendarDisplayAppointment>(
   appointments: T[],
-  _viewerUserId?: number | null
+  _viewerUserId?: number | null,
+  preloadedMaps?: Awaited<ReturnType<typeof loadCalendarDisplayMaps>>
 ): Promise<T[]> {
   if (appointments.length === 0) {
     return appointments;
   }
 
-  const db = await getMongoDbOrThrow();
-  const calendarIds = appointments
-    .map((appointment) => appointment.calendar_id)
-    .filter((id): id is number => typeof id === 'number' && id > 0);
+  let calendarById: Awaited<ReturnType<typeof loadCalendarDisplayMaps>>['calendarById'];
+  let dentistNameByDbUserId: Awaited<ReturnType<typeof loadCalendarDisplayMaps>>['dentistNameByDbUserId'];
+  let dentistColorByCalendarAndUser: Awaited<ReturnType<typeof loadCalendarDisplayMaps>>['dentistColorByCalendarAndUser'];
 
-  const { calendarById, dentistNameByDbUserId, dentistColorByCalendarAndUser } = await loadCalendarDisplayMaps(db, calendarIds);
+  if (preloadedMaps) {
+    ({ calendarById, dentistNameByDbUserId, dentistColorByCalendarAndUser } = preloadedMaps);
+  } else {
+    const db = await getMongoDbOrThrow();
+    const calendarIds = appointments
+      .map((appointment) => appointment.calendar_id)
+      .filter((id): id is number => typeof id === 'number' && id > 0);
+    ({ calendarById, dentistNameByDbUserId, dentistColorByCalendarAndUser } = await loadCalendarDisplayMaps(db, calendarIds));
+  }
 
   return appointments.map((appointment) => {
     if (typeof appointment.calendar_id !== 'number') {
@@ -389,6 +397,12 @@ export async function getAppointmentsData(query: AppointmentQuery) {
     filter.$or = searchOr;
   }
 
+  // When calendar IDs are known upfront, prefetch display maps in parallel with
+  // the appointments query — removes one sequential barrier from the hot path.
+  const mapsPromise = hasCalendarScope
+    ? loadCalendarDisplayMaps(db, calendarIds)
+    : Promise.resolve(undefined);
+
   const appointments = await db
     .collection('appointments')
     .find(filter)
@@ -434,12 +448,18 @@ export async function getAppointmentsData(query: AppointmentQuery) {
     )
   );
   const servicesFilter = buildServiceScopeFilter(appointmentServiceScopes);
-  const services = servicesFilter && appointmentServiceIds.length > 0
-    ? await db.collection('services').find({
-        ...servicesFilter,
-        id: { $in: appointmentServiceIds },
-      }).project(SERVICES_PROJECTION).toArray().then((docs: any[]) => docs.map(stripMongoId))
-    : [];
+
+  // Run services query and calendar maps fetch in parallel — both are independent
+  // at this point: maps were prefetched from step 1, services filter is now ready.
+  const [services, preloadedMaps] = await Promise.all([
+    servicesFilter && appointmentServiceIds.length > 0
+      ? db.collection('services').find({
+          ...servicesFilter,
+          id: { $in: appointmentServiceIds },
+        }).project(SERVICES_PROJECTION).toArray().then((docs: any[]) => docs.map(stripMongoId))
+      : Promise.resolve([]),
+    mapsPromise,
+  ]);
 
   const serviceById = new Map<number, any>(
     services.map((service: any) => [service.id, service])
@@ -455,7 +475,7 @@ export async function getAppointmentsData(query: AppointmentQuery) {
     };
   });
 
-  return attachCalendarDisplayData(hydratedAppointments, userId);
+  return attachCalendarDisplayData(hydratedAppointments, userId, preloadedMaps);
 }
 
 export async function getServicesData(userId: number, tenantId: ObjectId) {

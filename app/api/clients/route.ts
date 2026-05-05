@@ -47,8 +47,8 @@ export async function GET(request: NextRequest) {
       }
     }
     const search = searchParams.get('search') || '';
-    const sortBy = searchParams.get('sortBy') || 'last_appointment_date';
-    const sortOrder = searchParams.get('sortOrder') || 'DESC';
+    const sortBy = searchParams.get('sortBy') || 'name';
+    const sortOrder = searchParams.get('sortOrder') || 'ASC';
     const rawConsentFilter = searchParams.get('consentFilter') || 'all';
     const consentFilter = ['all', 'consented', 'not_consented', 'withdrawn'].includes(rawConsentFilter)
       ? (rawConsentFilter as 'all' | 'consented' | 'not_consented' | 'withdrawn')

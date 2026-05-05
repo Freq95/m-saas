@@ -1,12 +1,27 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { signOut } from 'next-auth/react';
+import { useTheme } from '@/components/ThemeProvider';
 import styles from './SettingsMenu.module.css';
 import navStyles from '../dashboard/page.module.css';
+import { SETTINGS_EXIT_PATH_STORAGE_KEY } from './settings-tabs';
 
 interface SettingsMenuClientProps {
   role: string;
+  accountLabel: string;
 }
+
+const MOBILE_SETTINGS_BREAKPOINT = 640;
+const SWIPE_DOWN_EXIT_DISTANCE = 72;
+const SWIPE_RIGHT_EXIT_DISTANCE = 72;
+const SWIPE_SIDE_TOLERANCE = 44;
+const SWIPE_VERTICAL_TOLERANCE = 44;
+const SWIPE_EXIT_DURATION_MS = 180;
+const TOP_EDGE_TOLERANCE = 8;
+const LEFT_EDGE_TOLERANCE = 36;
 
 const MENU_GROUPS = [
   {
@@ -106,13 +121,105 @@ const MENU_GROUPS = [
   },
 ];
 
-export default function SettingsMenuClient({ role }: SettingsMenuClientProps) {
+export default function SettingsMenuClient({ role, accountLabel }: SettingsMenuClientProps) {
+  const router = useRouter();
+  const { theme, toggle } = useTheme();
   const isOwner = role === 'owner';
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const exitTimerRef = useRef<number | null>(null);
+  const [isExiting, setIsExiting] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  const exitSettings = () => {
+    const target =
+      typeof window !== 'undefined'
+        ? window.localStorage.getItem(SETTINGS_EXIT_PATH_STORAGE_KEY)
+        : null;
+    router.push(target && !target.startsWith('/settings') ? target : '/dashboard');
+  };
+
+  const beginExit = () => {
+    if (isExiting) return;
+
+    if (
+      typeof window === 'undefined' ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      window.innerWidth > MOBILE_SETTINGS_BREAKPOINT
+    ) {
+      exitSettings();
+      return;
+    }
+
+    setIsExiting(true);
+    exitTimerRef.current = window.setTimeout(exitSettings, SWIPE_EXIT_DURATION_MS);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (exitTimerRef.current) {
+        window.clearTimeout(exitTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (
+      event.pointerType === 'mouse' ||
+      typeof window === 'undefined' ||
+      window.innerWidth > MOBILE_SETTINGS_BREAKPOINT ||
+      (window.scrollY > TOP_EDGE_TOLERANCE && event.clientX > LEFT_EDGE_TOLERANCE)
+    ) {
+      return;
+    }
+
+    swipeStartRef.current = { x: event.clientX, y: event.clientY };
+  };
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    if (!start || isExiting) return;
+
+    const deltaX = event.clientX - start.x;
+    const deltaY = event.clientY - start.y;
+    const isPullDownFromTop =
+      typeof window !== 'undefined' &&
+      window.scrollY <= TOP_EDGE_TOLERANCE &&
+      deltaY >= SWIPE_DOWN_EXIT_DISTANCE &&
+      Math.abs(deltaX) <= SWIPE_SIDE_TOLERANCE;
+    const isEdgeSwipeRight =
+      start.x <= LEFT_EDGE_TOLERANCE &&
+      deltaX >= SWIPE_RIGHT_EXIT_DISTANCE &&
+      Math.abs(deltaY) <= SWIPE_VERTICAL_TOLERANCE;
+
+    if (isPullDownFromTop || isEdgeSwipeRight) {
+      beginExit();
+    }
+  };
 
   return (
     <div className={navStyles.container}>
-      <div className={styles.page}>
+      <div
+        className={`${styles.page} ${isExiting ? styles.pageExiting : ''}`}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={() => {
+          swipeStartRef.current = null;
+        }}
+      >
         <h1 className={styles.pageTitle}>Setări</h1>
+        <div className={styles.mobileHeader}>
+          <button type="button" className={styles.mobileBackButton} onClick={beginExit} aria-label="Inapoi">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+          <div className={styles.mobileTitleGroup}>
+            <h1 className={styles.mobileTitle}>Setări</h1>
+            <p className={styles.mobileSubtitle}>{accountLabel}</p>
+          </div>
+          <span aria-hidden="true" />
+        </div>
         <div className={styles.groups}>
           {MENU_GROUPS.map((group) => {
             const visibleItems = group.items.filter((item) => !item.ownerOnly || isOwner);
@@ -138,6 +245,57 @@ export default function SettingsMenuClient({ role }: SettingsMenuClientProps) {
             );
           })}
         </div>
+        <div className={styles.mobileSystemActions}>
+          <div className={styles.mobileThemeRow}>
+            <div className={styles.mobileThemeText}>
+              <span className={styles.mobileThemeLabel}>Tema</span>
+              <span className={styles.mobileThemeSub}>
+                {theme === 'dark' ? 'Interfata intunecata' : 'Interfata luminoasa'}
+              </span>
+            </div>
+            <button
+              type="button"
+              className={styles.mobileThemeToggle}
+              onClick={toggle}
+              aria-label={theme === 'dark' ? 'Schimba la tema luminoasa' : 'Schimba la tema intunecata'}
+            >
+              <span className={styles.mobileThemeToggleThumb} data-theme={theme} />
+              <span className={styles.mobileThemeToggleIcon} aria-hidden="true">
+                {theme === 'dark' ? (
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                  </svg>
+                ) : (
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="5" />
+                    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                  </svg>
+                )}
+              </span>
+            </button>
+          </div>
+
+          <button type="button" className={styles.mobileLogoutButton} onClick={() => setShowLogoutConfirm(true)}>
+            Deconectare
+          </button>
+        </div>
+
+        {showLogoutConfirm && (
+          <div className={styles.mobileLogoutOverlay} role="dialog" aria-modal="true" aria-labelledby="settings-logout-title">
+            <div className={styles.mobileLogoutSheet}>
+              <h2 id="settings-logout-title">Deconectare cont</h2>
+              <p>Sigur vrei sa te deconectezi din cont?</p>
+              <div className={styles.mobileLogoutActions}>
+                <button type="button" className={styles.mobileLogoutCancel} onClick={() => setShowLogoutConfirm(false)}>
+                  Renunta
+                </button>
+                <button type="button" className={styles.mobileLogoutConfirm} onClick={() => signOut({ callbackUrl: '/login' })}>
+                  Deconecteaza
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

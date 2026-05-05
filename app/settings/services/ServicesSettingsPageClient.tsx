@@ -1,11 +1,12 @@
 'use client';
 
-import { Fragment, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { ToastContainer } from '@/components/Toast';
 import { useToast } from '@/lib/useToast';
 import navStyles from '../../dashboard/page.module.css';
 import styles from './page.module.css';
 import SettingsTabs from '../SettingsTabs';
+import { SettingsMobileHeader } from '../SettingsMobileHeader';
 
 export interface Service {
   id: number;
@@ -35,6 +36,14 @@ function formatPrice(value: number | null): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
+function formatServiceMeta(service: Service): string {
+  const parts = [`${service.duration_minutes} min`];
+  if (service.price !== null && service.price !== undefined) {
+    parts.push(`${formatPrice(service.price)} RON`);
+  }
+  return parts.join(' · ');
+}
+
 function validateForm(form: ServiceFormState): string | null {
   const name = form.name.trim();
   if (name.length < 1 || name.length > 255) {
@@ -60,6 +69,7 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
   const [services, setServices] = useState<Service[]>(initialServices);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [mobileEditingId, setMobileEditingId] = useState<number | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +79,7 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const deleteBackdropPressRef = useRef(false);
+  const editBackdropPressRef = useRef(false);
   const toast = useToast();
 
   function openAddForm() {
@@ -85,6 +96,7 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
 
   function startEdit(service: Service) {
     setEditingId(service.id);
+    setMobileEditingId(null);
     setConfirmDeleteId(null);
     setError(null);
     setEditForm({
@@ -96,8 +108,27 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
 
   function cancelEdit() {
     setEditingId(null);
+    setMobileEditingId(null);
     setEditForm(EMPTY_FORM);
     setError(null);
+  }
+
+  function openMobileEditor(service: Service) {
+    setMobileEditingId(service.id);
+    setEditingId(null);
+    setConfirmDeleteId(null);
+    setError(null);
+    setEditForm({
+      name: service.name,
+      durationMinutes: String(service.duration_minutes),
+      price: service.price === null ? '' : String(service.price),
+    });
+  }
+
+  function requestDelete(id: number) {
+    setConfirmDeleteId(id);
+    setEditingId(null);
+    setMobileEditingId(null);
   }
 
   async function handleAddService() {
@@ -168,6 +199,7 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
 
       setServices((prev) => prev.map((service) => (service.id === id ? data.service as Service : service)));
       setEditingId(null);
+      setMobileEditingId(null);
       setEditForm(EMPTY_FORM);
       toast.success('Serviciu actualizat.');
     } catch (err) {
@@ -210,6 +242,7 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
   return (
     <div className={navStyles.container}>
       <div className={styles.container}>
+        <SettingsMobileHeader title="Servicii" />
         <div className={styles.tabRow}>
           <SettingsTabs activeTab="services" />
           <button
@@ -294,8 +327,7 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
                   const isEditing = editingId === service.id;
 
                   return (
-                    <Fragment key={service.id}>
-                      <tr className={styles.row}>
+                      <tr key={service.id} className={styles.row}>
                         {isEditing ? (
                           <>
                             <td>
@@ -370,10 +402,7 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
                                 <button
                                   type="button"
                                   className={styles.iconButton}
-                                  onClick={() => {
-                                    setConfirmDeleteId(service.id);
-                                    setEditingId(null);
-                                  }}
+                                  onClick={() => requestDelete(service.id)}
                                   disabled={saving}
                                   aria-label="Sterge serviciu"
                                   title="Sterge"
@@ -385,14 +414,111 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
                           </>
                         )}
                       </tr>
-                    </Fragment>
                   );
                 })}
               </tbody>
             </table>
+            <ul className={styles.mobileServiceList} aria-label="Servicii medicale">
+              {services.map((service) => (
+                <li key={service.id} className={styles.mobileServiceItem}>
+                  <button
+                    type="button"
+                    className={styles.mobileServiceMain}
+                    onClick={() => openMobileEditor(service)}
+                    disabled={saving}
+                  >
+                    <span className={styles.mobileServiceName}>{service.name}</span>
+                    <span className={styles.mobileServiceMeta}>{formatServiceMeta(service)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>
+      {mobileEditingId !== null && (() => {
+        const serviceToEdit = services.find((service) => service.id === mobileEditingId);
+        if (!serviceToEdit) return null;
+        return (
+          <div
+            className={styles.overlay}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-sheet-title"
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && !saving) {
+                cancelEdit();
+              }
+            }}
+            onPointerDown={(e) => { editBackdropPressRef.current = e.target === e.currentTarget; }}
+            onClick={(e) => {
+              if (saving) return;
+              const endedOnBackdrop = e.target === e.currentTarget;
+              if (editBackdropPressRef.current && endedOnBackdrop) {
+                cancelEdit();
+              }
+              editBackdropPressRef.current = false;
+            }}
+          >
+            <div
+              className={`${styles.modal} ${styles.editSheet}`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className={styles.sheetHandle} aria-hidden="true" />
+              <h3 id="edit-sheet-title">Editare serviciu</h3>
+              <div className={styles.sheetFormGrid}>
+                <label className={styles.field}>
+                  <span>Serviciu *</span>
+                  <input
+                    type="text"
+                    maxLength={255}
+                    value={editForm.name}
+                    onChange={(event) => setEditForm((prev) => ({ ...prev, name: event.target.value }))}
+                    disabled={saving}
+                    autoFocus
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Durata (min) *</span>
+                  <input
+                    type="number"
+                    min={1}
+                    step={1}
+                    value={editForm.durationMinutes}
+                    onChange={(event) => setEditForm((prev) => ({ ...prev, durationMinutes: event.target.value }))}
+                    disabled={saving}
+                  />
+                </label>
+                <label className={styles.field}>
+                  <span>Pret (RON)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={editForm.price}
+                    onChange={(event) => setEditForm((prev) => ({ ...prev, price: event.target.value }))}
+                    disabled={saving}
+                  />
+                </label>
+              </div>
+              {error && <p className={styles.modalError}>{error}</p>}
+              <div className={styles.sheetFooter}>
+                <button type="button" className={styles.sheetDeleteButton} onClick={() => requestDelete(serviceToEdit.id)} disabled={saving}>
+                  Sterge
+                </button>
+                <div className={styles.sheetFooterActions}>
+                  <button type="button" className={styles.btnGhost} onClick={cancelEdit} disabled={saving}>
+                    Anuleaza
+                  </button>
+                  <button type="button" className={styles.primaryButton} onClick={() => handleSaveEdit(serviceToEdit.id)} disabled={saving}>
+                    {saving ? 'Se salveaza...' : 'Salveaza'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {confirmDeleteId !== null && (() => {
         const serviceToDelete = services.find((s) => s.id === confirmDeleteId);
         return (

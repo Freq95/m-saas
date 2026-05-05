@@ -12,6 +12,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import styles from './page.module.css';
 import navStyles from '../../dashboard/page.module.css';
 import SettingsTabs from '../SettingsTabs';
+import { SettingsMobileHeader } from '../SettingsMobileHeader';
 
 interface EmailIntegration {
   id: number;
@@ -343,6 +344,10 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
     return (
       <div className={navStyles.container}>
         <div className={styles.container}>
+          <SettingsMobileHeader title="Email" />
+          <div className={styles.tabRow}>
+            <SettingsTabs activeTab="email" />
+          </div>
           <div role="status" aria-live="polite">Încărcare...</div>
         </div>
       </div>
@@ -410,6 +415,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
   return (
     <div className={navStyles.container}>
       <div className={styles.container}>
+        <SettingsMobileHeader title="Email" />
         <div className={styles.tabRow}>
           <SettingsTabs activeTab="email" />
           {activeIntegrations.length > 0 && (

@@ -530,9 +530,20 @@
   border-width: 0;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 640px) {
   .container {
     padding: var(--space-6) var(--space-4);
+  }
+
+  .tabRow {
+    align-items: stretch;
+    flex-direction: column;
+    flex-wrap: nowrap;
+  }
+
+  .tabStatus {
+    max-width: 100%;
+    white-space: normal;
   }
 
   .colEmail,

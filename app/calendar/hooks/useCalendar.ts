@@ -43,6 +43,7 @@ export interface Appointment {
   calendar_name?: string | null;
   color_mine?: string | null;
   color_others?: string | null;
+  dentist_color?: string | null;
   is_default_calendar?: boolean | null;
   is_shared_calendar?: boolean | null;
   can_edit?: boolean;

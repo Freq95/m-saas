@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-export function useIsMobile(breakpoint = 768): boolean {
+export function useIsMobile(breakpoint = 640): boolean {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
@@ -10,7 +10,8 @@ export function useIsMobile(breakpoint = 768): boolean {
       return;
     }
 
-    const mediaQuery = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+    // Match CSS breakpoints: `(max-width: 640px)` means mobile ≤ 640, desktop ≥ 641.
+    const mediaQuery = window.matchMedia(`(max-width: ${breakpoint}px)`);
     const update = (matches: boolean) => {
       setIsMobile(matches);
     };

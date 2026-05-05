@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import SettingsTabs from '../SettingsTabs';
+import { SettingsMobileHeader } from '../SettingsMobileHeader';
 import styles from '../services/page.module.css';
 import navStyles from '../../dashboard/page.module.css';
 
@@ -43,7 +44,8 @@ export default function GdprSettingsPageClient({ initialText }: GdprSettingsPage
   return (
     <div className={navStyles.container}>
       <div className={styles.container}>
-        <div className={styles.tabRow}>
+        <SettingsMobileHeader title="GDPR" />
+        <div className={`${styles.tabRow} ${styles.desktopTabRow}`}>
           <SettingsTabs activeTab="gdpr" />
         </div>
 

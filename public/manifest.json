@@ -4,6 +4,7 @@
   "description": "Gestionare centralizata pentru mesaje, programari si automatizari",
   "start_url": "/dashboard",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#06080d",
   "theme_color": "#06080d",
   "icons": [

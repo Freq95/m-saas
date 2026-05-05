@@ -13,6 +13,8 @@ type Scope = {
 type CacheInvalidationScope = Scope & {
   calendarId?: number;
   viewerDbUserId?: ObjectId | string | null;
+  additionalScopes?: Scope[];
+  additionalViewerDbUserIds?: Array<ObjectId | string | null | undefined>;
 };
 
 function scopePrefix({ tenantId, userId }: Scope): string {
@@ -78,6 +80,11 @@ export function dashboardCacheKey(scope: Scope, days: number): string {
   return `${scopePrefix(scope)}:dashboard:days=${days}`;
 }
 
+export function dashboardVisibleCalendarsCacheKey(scope: Scope, days: number, calendarIds: number[]): string {
+  const normalizedIds = Array.from(new Set(calendarIds)).sort((a, b) => a - b).join(',');
+  return `${scopePrefix(scope)}:dashboard:days=${days}:calendars=${normalizedIds || 'none'}`;
+}
+
 export function conversationsCacheKey(scope: Scope): string {
   return `${scopePrefix(scope)}:conversations:list`;
 }
@@ -87,6 +94,18 @@ export async function invalidateReadCaches(scope: CacheInvalidationScope): Promi
 
   if (scope.viewerDbUserId) {
     patterns.add(calendarListCacheKey(scope.viewerDbUserId));
+  }
+
+  for (const dbUserId of scope.additionalViewerDbUserIds || []) {
+    if (dbUserId) {
+      patterns.add(calendarListCacheKey(dbUserId));
+    }
+  }
+
+  for (const extraScope of scope.additionalScopes || []) {
+    for (const pattern of buildScopePatterns(extraScope)) {
+      patterns.add(pattern);
+    }
   }
 
   if (scope.calendarId) {

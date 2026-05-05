@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { ObjectId } from 'mongodb';
 import {
   getCalendarAuth,
   getCalendarById,
@@ -163,6 +164,19 @@ export async function DELETE(_request: NextRequest, props: { params: Promise<{ c
 
     const db = await getMongoDbOrThrow();
     const now = new Date().toISOString();
+    const acceptedShares = await db.collection('calendar_shares').find(
+      {
+        calendar_id: calendarId,
+        status: 'accepted',
+      },
+      {
+        projection: {
+          shared_with_user_id: 1,
+          shared_with_numeric_user_id: 1,
+          shared_with_tenant_id: 1,
+        },
+      }
+    ).toArray();
     await db.collection('calendars').updateOne(
       { id: calendarId, is_active: true, deleted_at: { $exists: false } },
       {
@@ -194,6 +208,18 @@ export async function DELETE(_request: NextRequest, props: { params: Promise<{ c
       userId,
       calendarId,
       viewerDbUserId: dbUserId,
+      additionalViewerDbUserIds: acceptedShares
+        .map((share: any) => share.shared_with_user_id)
+        .filter((value: unknown): value is ObjectId => value instanceof ObjectId),
+      additionalScopes: acceptedShares
+        .filter((share: any) =>
+          share.shared_with_tenant_id instanceof ObjectId &&
+          typeof share.shared_with_numeric_user_id === 'number'
+        )
+        .map((share: any) => ({
+          tenantId: share.shared_with_tenant_id,
+          userId: share.shared_with_numeric_user_id,
+        })),
     });
 
     return createSuccessResponse({ success: true });

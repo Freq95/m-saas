@@ -43,7 +43,12 @@ export async function resolveAppointmentClientLink({
       throw new ExplicitClientSelectionError();
     }
 
-    return explicitClient as unknown as { id: number };
+    return explicitClient as unknown as {
+      id: number;
+      name?: string | null;
+      email?: string | null;
+      phone?: string | null;
+    };
   }
 
   return findOrCreateClient(

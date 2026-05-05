@@ -43,6 +43,7 @@ export async function GET(_request: NextRequest, props: { params: Promise<{ cale
     const db = await getMongoDbOrThrow();
     const shareDocs = await db.collection('calendar_shares').find({
       calendar_id: calendarId,
+      status: { $in: ['pending', 'accepted'] },
     }).sort({ created_at: -1 }).toArray();
 
     const userIds = shareDocs

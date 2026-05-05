@@ -57,8 +57,10 @@ export function useCalendarList(options: UseCalendarListOptions = {}): UseCalend
     authFetcher,
     {
       keepPreviousData: true,
-      revalidateOnFocus: false,
-      dedupingInterval: 10_000,
+      revalidateOnFocus: true,
+      focusThrottleInterval: 60_000,
+      dedupingInterval: 60_000,
+      revalidateOnMount: !options.fallbackData,
       fallbackData: options.fallbackData ?? undefined,
     }
   );

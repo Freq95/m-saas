@@ -3,13 +3,15 @@ import { createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { getDashboardData } from '@/lib/server/dashboard';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { getCached } from '@/lib/redis';
-import { dashboardCacheKey } from '@/lib/cache-keys';
+import { dashboardVisibleCalendarsCacheKey } from '@/lib/cache-keys';
 import { logDataAccess } from '@/lib/audit';
+import { getCalendarListForUser } from '@/lib/server/calendars-list';
 
 // GET /api/dashboard - Get dashboard statistics
 export async function GET(request: NextRequest) {
   try {
-    const { userId, dbUserId, tenantId, email, role } = await getAuthUser();
+    const auth = await getAuthUser();
+    const { userId, dbUserId, tenantId, email, role } = auth;
     const searchParams = request.nextUrl.searchParams;
     
     // Validate query parameters
@@ -25,9 +27,16 @@ export async function GET(request: NextRequest) {
     
     const { days } = validationResult.data;
     const numericDays = Number(days);
-    const cacheKey = dashboardCacheKey({ tenantId, userId }, numericDays);
+    const calendarList = await getCalendarListForUser(auth);
+    const visibleCalendarIds = [
+      ...calendarList.ownCalendars,
+      ...calendarList.sharedCalendars,
+    ]
+      .map((calendar: any) => calendar.id)
+      .filter((id: unknown): id is number => typeof id === 'number');
+    const cacheKey = dashboardVisibleCalendarsCacheKey({ tenantId, userId }, numericDays, visibleCalendarIds);
     const data = await getCached(cacheKey, 900, async () =>
-      getDashboardData(userId, tenantId, numericDays)
+      getDashboardData(userId, tenantId, numericDays, visibleCalendarIds)
     );
 
     await logDataAccess({
@@ -41,6 +50,7 @@ export async function GET(request: NextRequest) {
       request,
       metadata: {
         days: numericDays,
+        calendarIds: visibleCalendarIds,
       },
     });
     return createSuccessResponse(data);
@@ -48,4 +58,3 @@ export async function GET(request: NextRequest) {
     return handleApiError(error, 'Failed to fetch dashboard data');
   }
 }
-

@@ -23,6 +23,29 @@ function shareBelongsToCurrentUser(share: any, auth: Awaited<ReturnType<typeof g
   );
 }
 
+function isActiveShare(share: any): boolean {
+  return share?.status === 'pending' || share?.status === 'accepted';
+}
+
+function buildShareRecipientInvalidation(share: any) {
+  const additionalViewerDbUserIds = share.shared_with_user_id instanceof ObjectId
+    ? [share.shared_with_user_id]
+    : [];
+  const additionalScopes =
+    share.shared_with_tenant_id instanceof ObjectId &&
+    typeof share.shared_with_numeric_user_id === 'number'
+      ? [{
+          tenantId: share.shared_with_tenant_id,
+          userId: share.shared_with_numeric_user_id,
+        }]
+      : [];
+
+  return {
+    additionalViewerDbUserIds,
+    additionalScopes,
+  };
+}
+
 async function loadCalendarShare(calendarId: number, shareId: number) {
   const db = await getMongoDbOrThrow();
   const share = await db.collection('calendar_shares').findOne({
@@ -66,6 +89,9 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ cal
 
     if (!isOwner && !isRecipient) {
       return createErrorResponse('Only the calendar owner or the share recipient can update this share', 403);
+    }
+    if (!isActiveShare(share)) {
+      return createErrorResponse('Aceasta partajare nu mai este activa.', 409);
     }
 
     const updates: Record<string, unknown> = {};
@@ -132,6 +158,11 @@ export async function DELETE(_request: NextRequest, props: { params: Promise<{ c
       return createErrorResponse('Not authorized to remove this share', 403);
     }
 
+    if (!isActiveShare(share)) {
+      return new NextResponse(null, { status: 204 });
+    }
+
+    const recipientInvalidation = buildShareRecipientInvalidation(share);
     const now = new Date().toISOString();
     await db.collection('calendar_shares').updateOne(
       { id: shareId, calendar_id: calendarId },
@@ -150,6 +181,7 @@ export async function DELETE(_request: NextRequest, props: { params: Promise<{ c
       userId,
       calendarId,
       viewerDbUserId: dbUserId,
+      ...recipientInvalidation,
     });
 
     return new NextResponse(null, { status: 204 });

@@ -378,6 +378,17 @@
 /* ── Mobile ─────────────────────────────────────────────────────────────── */
 
 @media (max-width: 480px) {
+  .tabRow {
+    align-items: stretch;
+    flex-direction: column;
+    flex-wrap: nowrap;
+  }
+
+  .tabRowRight {
+    justify-content: space-between;
+    width: 100%;
+  }
+
   .card {
     padding: var(--space-3) var(--space-4);
   }

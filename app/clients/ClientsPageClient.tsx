@@ -41,8 +41,8 @@ export default function ClientsPageClient({
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [sortBy, setSortBy] = useState('last_activity_date');
-  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('DESC');
+  const [sortBy, setSortBy] = useState('name');
+  const [sortOrder, setSortOrder] = useState<'ASC' | 'DESC'>('ASC');
   const [consentFilter, setConsentFilter] = useState<'all' | 'consented' | 'not_consented' | 'withdrawn'>('all');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState<PaginationInfo | null>(initialPagination);
@@ -153,14 +153,14 @@ export default function ClientsPageClient({
               }}
               className={styles.filterSelect}
             >
+              <option value="name-ASC">Nume (A-Z)</option>
+              <option value="name-DESC">Nume (Z-A)</option>
               <option value="last_activity_date-DESC">Ultima activitate (recent)</option>
               <option value="last_activity_date-ASC">Ultima activitate (vechi)</option>
               <option value="last_appointment_date-DESC">Ultima vizita (recent)</option>
               <option value="last_appointment_date-ASC">Ultima vizita (vechi)</option>
               <option value="total_spent-DESC">Total cheltuit (mare)</option>
               <option value="total_spent-ASC">Total cheltuit (mic)</option>
-              <option value="name-ASC">Nume (A-Z)</option>
-              <option value="name-DESC">Nume (Z-A)</option>
             </select>
 
             <select

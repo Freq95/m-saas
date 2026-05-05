@@ -7,22 +7,26 @@ import styles from '../../page.module.css';
 import type { Appointment } from '../../hooks/useCalendar';
 import { AppointmentBlock } from './AppointmentBlock';
 
+type SlotMinute = 0 | 15 | 30 | 45;
+type SlotIntervalMinutes = 15 | 30 | 60;
+
 interface WeekViewProps {
   weekDays: Date[];
   hours: number[];
   appointments: Appointment[];
   viewerUserId: number | null;
   selectedDay?: Date | null;
-  onSlotClick: (day: Date, hour: number, minute?: 0 | 15 | 30 | 45) => void;
+  onSlotClick: (day: Date, hour: number, minute?: SlotMinute) => void;
   onDayHeaderClick?: (day: Date) => void;
   onAppointmentClick: (appointment: Appointment) => void;
   draggedAppointment?: Appointment | null;
   onDragStart?: (appointment: Appointment, day: Date) => void;
   onDragEnd?: () => void;
-  onDrop?: (day: Date, hour: number, minute?: 0 | 15 | 30 | 45) => void;
+  onDrop?: (day: Date, hour: number, minute?: SlotMinute) => void;
   enableDragDrop?: boolean;
   hoveredAppointmentId?: number | null;
   compact?: boolean;
+  slotIntervalMinutes?: SlotIntervalMinutes;
 }
 
 function calculateAppointmentPositions(dayAppointments: Appointment[]) {
@@ -118,17 +122,20 @@ export function WeekView({
   enableDragDrop = false,
   hoveredAppointmentId = null,
   compact = false,
+  slotIntervalMinutes = 15,
 }: WeekViewProps) {
   const SLOT_HEIGHT = compact ? 60 : 96;
   const columnHeightPx = hours.length * SLOT_HEIGHT;
-  const quarterHourSlots = hours.flatMap((hour) => [
-    { hour, minute: 0 as 0 | 15 | 30 | 45 },
-    { hour, minute: 15 as 0 | 15 | 30 | 45 },
-    { hour, minute: 30 as 0 | 15 | 30 | 45 },
-    { hour, minute: 45 as 0 | 15 | 30 | 45 },
-  ]);
+  const slotsPerHour = 60 / slotIntervalMinutes;
+  const slotHeightPx = SLOT_HEIGHT / slotsPerHour;
+  const visibleSlots = hours.flatMap((hour) =>
+    Array.from({ length: slotsPerHour }, (_, index) => ({
+      hour,
+      minute: (index * slotIntervalMinutes) as SlotMinute,
+    }))
+  );
   const CURRENT_TIME_EDGE_PADDING = compact ? 10 : 18;
-  const gutterWidth = compact ? '36px' : '56px';
+  const gutterWidth = compact ? '44px' : '56px';
   const gridTemplateColumns = `${gutterWidth} repeat(${weekDays.length}, minmax(0, 1fr))`;
 
   const [dragOverSlot, setDragOverSlot] = useState<string | null>(null);
@@ -250,8 +257,8 @@ export function WeekView({
 
       <div className={styles.weekBody} ref={weekBodyRef} style={{ gridTemplateColumns }}>
         <div className={styles.timeGutter}>
-          {quarterHourSlots.map(({ hour, minute }) => (
-            <div key={`${hour}:${minute}`} className={styles.timeSlot} style={{ height: `${SLOT_HEIGHT / 4}px` }}>
+          {visibleSlots.map(({ hour, minute }) => (
+            <div key={`${hour}:${minute}`} className={styles.timeSlot} style={{ height: `${slotHeightPx}px` }}>
               {minute === 0 ? `${String(hour).padStart(2, '0')}:00` : ''}
             </div>
           ))}
@@ -284,13 +291,13 @@ export function WeekView({
               className={`${styles.weekDayColumn}${todayFlag ? ` ${styles.isToday}` : ''}`}
               style={{ height: `${columnHeightPx}px` }}
             >
-              {quarterHourSlots.map(({ hour, minute }) => {
+              {visibleSlots.map(({ hour, minute }) => {
                 const slotKey = `${day.toISOString()}-${hour}:${minute}`;
                 return (
                   <div
                     key={`${hour}:${minute}`}
                     className={`${styles.slot}${dragOverSlot === slotKey ? ` ${styles.dragOver}` : ''}`}
-                    style={{ height: `${SLOT_HEIGHT / 4}px` }}
+                    style={{ height: `${slotHeightPx}px` }}
                     onClick={() => onSlotClick(day, hour, minute)}
                     onDragOver={(e) => {
                       if (!enableDragDrop) return;

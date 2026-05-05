@@ -1,10 +1,20 @@
-import EmailSettingsPageClient from './EmailSettingsPageClient';
+import { Suspense } from 'react';
 import { getAuthUser, redirectToLogin } from '@/lib/auth-helpers';
 import { getUserEmailIntegrations } from '@/lib/email-integrations';
+import { SettingsSkeleton } from '../SettingsSkeleton';
+import EmailSettingsPageClient from './EmailSettingsPageClient';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 30;
 
-export default async function EmailSettingsPage() {
+export default function EmailSettingsPage() {
+  return (
+    <Suspense fallback={<SettingsSkeleton activeTab="email" />}>
+      <EmailContent />
+    </Suspense>
+  );
+}
+
+async function EmailContent() {
   let auth;
   try {
     auth = await getAuthUser();

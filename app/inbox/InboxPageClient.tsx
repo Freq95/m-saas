@@ -408,11 +408,12 @@ export default function InboxPageClient({
   const isMobile = useIsMobile();
 
   const initialSelectedConversation = useMemo(() => {
-    if (initialSelectedConversationId !== null) {
-      return initialConversations.find((c) => c.id === initialSelectedConversationId) || null;
+    const requestedId = initialSelectedConversationId ?? (conversationParam ? parseInt(conversationParam, 10) : null);
+    if (requestedId !== null && !Number.isNaN(requestedId)) {
+      return initialConversations.find((c) => c.id === requestedId) || null;
     }
-    return initialConversations[0] || null;
-  }, [initialConversations, initialSelectedConversationId]);
+    return null;
+  }, [conversationParam, initialConversations, initialSelectedConversationId]);
 
   const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
   const [allConversations, setAllConversations] = useState<Conversation[]>(initialConversations);
@@ -540,10 +541,24 @@ export default function InboxPageClient({
   }, [conversationParam, allConversations, selectedConversation]);
 
   useEffect(() => {
-    if (!isMobile) return;
+    if (conversationParam) return;
+    if (selectedConversation) return;
+    if (allConversations.length === 0) return;
+    const isCurrentlyMobile =
+      isMobile ||
+      (typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches);
+    if (isCurrentlyMobile) return;
+
+    setSelectedConversation(allConversations[0]);
+  }, [allConversations, conversationParam, isMobile, selectedConversation]);
+
+  useEffect(() => {
     if (conversationParam) return;
     if (hasManualMobileSelectionRef.current) return;
-    if (selectedConversation) {
+    const isCurrentlyMobile =
+      isMobile ||
+      (typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches);
+    if (isCurrentlyMobile && selectedConversation) {
       setSelectedConversation(null);
     }
   }, [isMobile, conversationParam, selectedConversation]);
@@ -618,7 +633,7 @@ export default function InboxPageClient({
     try {
       const isCurrentlyMobile =
         isMobile ||
-        (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches);
+        (typeof window !== 'undefined' && window.matchMedia('(max-width: 640px)').matches);
 
       const params = new URLSearchParams();
       const trimmedSearch = serverSearch?.trim();

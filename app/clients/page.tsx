@@ -15,6 +15,8 @@ export default async function ClientsPage() {
   const data = await getClientsData({
     userId: auth.userId,
     tenantId: auth.tenantId,
+    sortBy: 'name',
+    sortOrder: 'ASC',
   });
 
   return (

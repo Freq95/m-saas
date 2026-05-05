@@ -44,7 +44,8 @@ function buildScopeFilter(userId: number, tenantId?: ObjectId): ScopeFilter {
 export async function getDashboardData(
   userId: number,
   tenantIdOrDays?: ObjectId | number,
-  days: number = 7
+  days: number = 7,
+  visibleCalendarIds?: number[]
 ): Promise<DashboardData> {
   const tenantId = typeof tenantIdOrDays === 'number' || tenantIdOrDays === undefined
     ? undefined
@@ -72,6 +73,10 @@ export async function getDashboardData(
     const todayStr = format(now, 'yyyy-MM-dd');
 
     const scopeFilter = buildScopeFilter(userId, tenantId);
+    const appointmentScopeFilter =
+      visibleCalendarIds && visibleCalendarIds.length > 0
+        ? { calendar_id: { $in: visibleCalendarIds } }
+        : scopeFilter;
     const activeClientsFilter: Record<string, unknown> = {
       ...scopeFilter,
       deleted_at: { $exists: false },
@@ -91,7 +96,7 @@ export async function getDashboardData(
     const appointmentsRangeQuery = db
       .collection('appointments')
       .find({
-        ...scopeFilter,
+        ...appointmentScopeFilter,
         deleted_at: { $exists: false },
         start_time: { $gte: startIso, $lte: endIso },
       })
@@ -99,7 +104,7 @@ export async function getDashboardData(
     const todayAppointmentsQuery = db
       .collection('appointments')
       .find({
-        ...scopeFilter,
+        ...appointmentScopeFilter,
         deleted_at: { $exists: false },
         start_time: { $gte: todayStartIso, $lte: todayEndIso },
       })

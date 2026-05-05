@@ -57,6 +57,56 @@ function appointmentMutationFilter(
       };
 }
 
+const activeClientFilter = {
+  $or: [
+    { deleted_at: { $exists: false } },
+    { deleted_at: null },
+  ],
+};
+
+async function loadAppointmentClient(
+  db: Awaited<ReturnType<typeof getMongoDbOrThrow>>,
+  appointment: Record<string, any>,
+  serviceOwnerScope: ReturnType<typeof getServiceOwnerScopeFromAppointment>
+) {
+  if (!appointment.client_id) return null;
+
+  const filters: Array<Record<string, unknown>> = [];
+  if (serviceOwnerScope) {
+    filters.push({
+      id: appointment.client_id,
+      tenant_id: serviceOwnerScope.serviceOwnerTenantId,
+      user_id: serviceOwnerScope.serviceOwnerUserId,
+      ...activeClientFilter,
+    });
+    filters.push({
+      id: appointment.client_id,
+      tenant_id: serviceOwnerScope.serviceOwnerTenantId,
+      ...activeClientFilter,
+    });
+  }
+  filters.push({
+    id: appointment.client_id,
+    tenant_id: appointment.tenant_id,
+    ...activeClientFilter,
+  });
+
+  const seen = new Set<string>();
+  for (const filter of filters) {
+    const key = JSON.stringify(filter, (_k, value) =>
+      value && typeof value === 'object' && typeof value.toString === 'function'
+        ? value.toString()
+        : value
+    );
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const client = await db.collection('clients').findOne(filter);
+    if (client) return client;
+  }
+
+  return null;
+}
+
 // GET /api/appointments/[id] - Get single appointment
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -85,7 +135,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
 
     const serviceOwnerScope = getServiceOwnerScopeFromAppointment(appointmentDoc);
     const [clientDoc, serviceDoc] = await Promise.all([
-      appointmentDoc.client_id ? db.collection('clients').findOne({ id: appointmentDoc.client_id, tenant_id: appointmentDoc.tenant_id }) : null,
+      loadAppointmentClient(db, appointmentDoc, serviceOwnerScope),
       appointmentDoc.service_id && serviceOwnerScope
         ? db.collection('services').findOne({
             id: appointmentDoc.service_id,
@@ -256,6 +306,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     let effectiveServiceOwnerScope = serviceOwnerScope;
     let effectiveDentistIsCurrentUser = isDentistCurrentUser;
 
+    let dentistScopeChanged = false;
     if (dentistUserId !== undefined) {
       if (!appointmentCalendarId) {
         return createErrorResponse('Assigned dentist can only be changed for calendar appointments', 400);
@@ -272,11 +323,18 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         serviceOwnerUserId: dentistAssignment.assignedDentistUserId,
         serviceOwnerTenantId: dentistAssignment.assignedDentistTenantId,
       };
+      dentistScopeChanged =
+        serviceOwnerScope.serviceOwnerUserId !== effectiveServiceOwnerScope.serviceOwnerUserId ||
+        serviceOwnerScope.serviceOwnerTenantId.toString() !== effectiveServiceOwnerScope.serviceOwnerTenantId.toString();
       effectiveDentistIsCurrentUser = dentistAssignment.isCurrentUser;
       Object.assign(
         updates,
         buildAppointmentDentistFields(dentistAssignment)
       );
+    }
+
+    if (dentistScopeChanged && serviceId === undefined) {
+      return createErrorResponse('Selecteaza un serviciu valid pentru medicul ales.', 400);
     }
 
     if (serviceId !== undefined) {
@@ -299,6 +357,10 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
     const shouldUpdateClient =
       clientName !== undefined || clientEmail !== undefined || clientPhone !== undefined;
+
+    if (dentistScopeChanged && !shouldUpdateClient) {
+      return createErrorResponse('Selecteaza un pacient valid pentru medicul ales.', 400);
+    }
 
     if (shouldUpdateClient) {
       const normalizedName = (clientName ?? existingAppointment.client_name ?? '').trim();

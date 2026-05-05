@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { ObjectId } from 'mongodb';
@@ -17,8 +18,13 @@ export class AuthError extends Error {
 
 /** Call from server page catch blocks instead of bare redirect('/login'). */
 export function redirectToLogin(err?: unknown): never {
-  if (err instanceof AuthError && err.code === 'SESSION_EXPIRED') {
-    redirect('/login?forced=1');
+  if (err instanceof AuthError) {
+    if (err.code === 'SUPER_ADMIN_REDIRECT') {
+      redirect('/admin');
+    }
+    if (err.code === 'SESSION_EXPIRED') {
+      redirect('/login?forced=1');
+    }
   }
   redirect('/login');
 }
@@ -53,12 +59,18 @@ function parseSessionVersion(rawValue: unknown): number {
   return Math.trunc(parsed);
 }
 
-export async function getAuthUser(): Promise<AuthContext> {
+export const getAuthUser = cache(async function getAuthUser(): Promise<AuthContext> {
   const session = await auth();
   const userIdRaw = session?.user?.id?.trim();
   const dbUserIdRaw = session?.user?.dbUserId;
   if (!userIdRaw || !dbUserIdRaw) {
     throw new AuthError('Not authenticated', 401);
+  }
+
+  // Super-admins must use the platform admin dashboard; they are not tenant
+  // members and have no place inside tenant-scoped surfaces.
+  if (session.user.role === 'super_admin') {
+    throw new AuthError('Super-admins must use the admin dashboard', 403, 'SUPER_ADMIN_REDIRECT');
   }
 
   if (!session.user.tenantId) {
@@ -127,7 +139,7 @@ export async function getAuthUser(): Promise<AuthContext> {
     tenantStatus: String(tenant.status || 'active'),
     membershipStatus: String(membership.status || 'active'),
   };
-}
+});
 
 export async function getSuperAdmin(): Promise<{ userId: ObjectId; userIdRaw: string; email: string }> {
   const session = await auth();

@@ -9,6 +9,8 @@ import { parseSessionUserId } from './sessionUser';
 interface UseAppointmentsOptions {
   currentDate: Date;
   viewType: CalendarViewType;
+  rangeStartDate?: Date;
+  rangeEndDate?: Date;
   userId?: number;
   calendarIds?: number[];
   search?: string;
@@ -150,6 +152,8 @@ function normalizeCalendarIds(calendarIds?: number[]): number[] | undefined {
 export function useAppointmentsSWR({
   currentDate,
   viewType,
+  rangeStartDate,
+  rangeEndDate,
   userId,
   calendarIds,
   search,
@@ -166,7 +170,10 @@ export function useAppointmentsSWR({
   const trimmedSearch = search?.trim();
   const isGlobalSearch = Boolean(trimmedSearch);
 
-  if (viewType === 'day') {
+  if (rangeStartDate && rangeEndDate) {
+    startDate = startOfDay(rangeStartDate);
+    endDate = endOfDay(rangeEndDate);
+  } else if (viewType === 'day') {
     startDate = startOfDay(currentDate);
     endDate = endOfDay(currentDate);
   } else if (viewType === 'week' || viewType === 'workweek') {
@@ -210,8 +217,12 @@ export function useAppointmentsSWR({
     fallbackData: isGlobalSearch || skipFetchBecauseNoVisibleCalendars ? [] : initialAppointments,
     keepPreviousData: true,
     revalidateOnFocus: true,
-    focusThrottleInterval: 10_000,
-    dedupingInterval: 10_000,
+    focusThrottleInterval: 30_000,
+    dedupingInterval: 60_000,
+    // Skip mount revalidation when SSR returned fresh data (initialAppointments
+    // is always an array from the server page). Only re-fetch on mount for
+    // global search, where results aren't pre-fetched server-side.
+    revalidateOnMount: isGlobalSearch,
     revalidateOnReconnect: true,
     refreshWhenHidden: false,
     refreshWhenOffline: false,

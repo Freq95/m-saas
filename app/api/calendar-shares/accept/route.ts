@@ -230,7 +230,7 @@ export async function GET(request: NextRequest) {
         email: share.shared_with_email,
         calendarId: calendar.id,
         calendarName: calendar.name,
-        calendarColor: calendar.color,
+        calendarColor: calendar.color_mine,
         sharedByName: share.shared_by_name || null,
         existingUser: Boolean(existingUser),
         isLoggedIn: Boolean(session?.user),
