@@ -370,8 +370,8 @@
     display: flex;
     align-items: flex-end;
     justify-content: center;
-    background: color-mix(in srgb, var(--color-bg) 74%, transparent);
-    backdrop-filter: blur(var(--blur-sm));
+    background: color-mix(in srgb, var(--color-bg) 84%, black);
+    backdrop-filter: none;
   }
 
   .mobileLogoutSheet {
@@ -416,13 +416,13 @@
 
   .mobileLogoutCancel {
     border: 1px solid var(--color-border);
-    background: transparent;
+    background: var(--color-surface-muted);
     color: var(--color-text);
   }
 
   .mobileLogoutConfirm {
     border: 1px solid color-mix(in srgb, var(--color-danger) 48%, transparent);
-    background: color-mix(in srgb, var(--color-danger) 14%, transparent);
+    background: var(--color-danger-bg);
     color: color-mix(in srgb, var(--color-danger) 80%, white);
   }
 }

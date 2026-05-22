@@ -29,9 +29,7 @@ export function redirectToLogin(err?: unknown): never {
   redirect('/login');
 }
 
-// MVP roles: super_admin (platform), owner (clinic), staff (clinic).
-// 'admin' removed (merged into owner). 'viewer' reserved but not implemented.
-export type UserRole = 'super_admin' | 'owner' | 'staff';
+export type UserRole = 'super_admin' | 'owner' | 'dentist' | 'receptionist' | 'asistent';
 
 export interface AuthContext {
   userId: number;
@@ -41,6 +39,7 @@ export interface AuthContext {
   email: string;
   name: string;
   role: UserRole;
+  assigned_dentist_user_ids?: number[];
   userStatus: string;
   tenantStatus: string;
   membershipStatus: string;
@@ -96,15 +95,61 @@ export const getAuthUser = cache(async function getAuthUser(): Promise<AuthConte
   const dbUserId = new ObjectId(dbUserIdRaw);
   const tenantId = new ObjectId(session.user.tenantId);
 
-  const [dbUser, tenant, membership] = await Promise.all([
-    db.collection('users').findOne({ _id: dbUserId, tenant_id: tenantId }),
-    db.collection('tenants').findOne({ _id: tenantId }),
-    db.collection('team_members').findOne({ user_id: dbUserId, tenant_id: tenantId }),
-  ]);
+  // Single aggregation replaces 3 parallel findOne calls (1 round trip vs 3).
+  const [authDoc] = await db.collection('users').aggregate<{
+    _id: ObjectId;
+    id?: number;
+    role?: string;
+    name?: string;
+    email?: string;
+    status?: string;
+    session_version?: number;
+    tenant?: Array<{ status?: string }>;
+    membership?: Array<{ status?: string; assigned_dentist_user_ids?: unknown[] }>;
+  }>([
+    { $match: { _id: dbUserId, tenant_id: tenantId } },
+    {
+      $lookup: {
+        from: 'tenants',
+        let: { tid: '$tenant_id' },
+        pipeline: [
+          { $match: { $expr: { $eq: ['$_id', '$$tid'] } } },
+          { $project: { status: 1 } },
+          { $limit: 1 },
+        ],
+        as: 'tenant',
+      },
+    },
+    {
+      $lookup: {
+        from: 'team_members',
+        let: { uid: '$_id', tid: '$tenant_id' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ['$user_id', '$$uid'] },
+                  { $eq: ['$tenant_id', '$$tid'] },
+                ],
+              },
+            },
+          },
+          { $project: { status: 1, assigned_dentist_user_ids: 1 } },
+          { $limit: 1 },
+        ],
+        as: 'membership',
+      },
+    },
+    { $limit: 1 },
+  ]).toArray();
 
-  if (!dbUser) {
+  if (!authDoc) {
     throw new AuthError('User account not found', 401);
   }
+  const dbUser = authDoc;
+  const tenant = authDoc.tenant?.[0];
+  const membership = authDoc.membership?.[0];
 
   const dbSessionVersion = parseSessionVersion(dbUser.session_version ?? 0);
   if (dbSessionVersion !== sessionVersion) {
@@ -127,6 +172,15 @@ export const getAuthUser = cache(async function getAuthUser(): Promise<AuthConte
     }
   }
 
+  const rawRole = String(dbUser.role || session.user.role || 'dentist');
+  const resolvedRole = (rawRole === 'staff' ? 'dentist' : rawRole) as UserRole;
+  const assigned_dentist_user_ids =
+    resolvedRole === 'asistent' && Array.isArray(membership.assigned_dentist_user_ids)
+      ? membership.assigned_dentist_user_ids.filter((id: unknown): id is number => (
+          typeof id === 'number' && Number.isInteger(id) && id > 0
+        ))
+      : undefined;
+
   return {
     userId,
     userIdRaw,
@@ -134,7 +188,8 @@ export const getAuthUser = cache(async function getAuthUser(): Promise<AuthConte
     tenantId,
     email: dbUser.email || session.user.email || '',
     name: dbUser.name || session.user.name || '',
-    role: (dbUser.role || session.user.role || 'staff') as UserRole,
+    role: resolvedRole,
+    assigned_dentist_user_ids,
     userStatus: String(dbUser.status || 'active'),
     tenantStatus: String(tenant.status || 'active'),
     membershipStatus: String(membership.status || 'active'),

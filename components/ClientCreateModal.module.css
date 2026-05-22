@@ -6,9 +6,9 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-4);
-  background: rgba(4, 8, 16, 0.72);
-  backdrop-filter: blur(8px) saturate(0.85);
-  -webkit-backdrop-filter: blur(8px) saturate(0.85);
+  background: color-mix(in srgb, var(--color-bg) 84%, black);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .modal {
@@ -16,9 +16,9 @@
   max-height: 90vh;
   overflow: auto;
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-lg);
   padding: var(--space-6);
 }
 
@@ -139,6 +139,297 @@
 .submitButton:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.mobileOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  animation: clientFadeIn 180ms ease-out;
+  touch-action: none;
+}
+
+.mobileSheet {
+  position: fixed;
+  inset: 0;
+  z-index: 2001;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  color: var(--color-text);
+  animation: clientSlideUp 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  overscroll-behavior: contain;
+}
+
+@keyframes clientFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes clientSlideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.mobileForm,
+.mobileFieldset {
+  display: contents;
+}
+
+.mobileFieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+.mobileTopBar {
+  position: relative;
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: max(env(safe-area-inset-top), 0.6rem) 1rem 0.5rem;
+  background: var(--color-bg);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+}
+
+.mobileTopBarCenter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0 0.1rem;
+}
+
+.mobileDragHandle {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-text-soft) 50%, transparent);
+}
+
+.mobileTopBarTitle {
+  max-width: 44vw;
+  overflow: hidden;
+  color: var(--color-text-soft);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobileActionBtn {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 36px;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  padding: 0.5rem 0.25rem;
+}
+
+.mobileActionBtn:disabled {
+  color: color-mix(in srgb, var(--color-text-soft) 70%, transparent);
+  cursor: not-allowed;
+}
+
+.mobileActionBtnLeft {
+  justify-self: start;
+}
+
+.mobileActionBtnPrimary {
+  justify-self: end;
+  font-weight: 700;
+}
+
+.mobileBody {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 1.5rem);
+  -webkit-overflow-scrolling: touch;
+}
+
+.mobileSection {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
+}
+
+.mobileSection:last-child {
+  border-bottom: 0;
+}
+
+.mobileInputRow {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  align-items: flex-start;
+  gap: 0.85rem;
+  min-height: 56px;
+  padding: 0.9rem 1rem;
+}
+
+.mobileRowIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--color-text-soft);
+  opacity: 0.85;
+}
+
+.mobileInputMain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.mobileInputLabel,
+.mobileSectionTitle {
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.mobileSectionCaption,
+.mobileSwitchSubtitle {
+  display: block;
+  color: var(--color-text-soft);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.mobileInputRow input,
+.mobileInputRow textarea,
+.mobileInputRow select {
+  width: 100%;
+  min-height: 28px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 0.98rem;
+  outline: none;
+  padding: 0;
+}
+
+.mobileInputRow textarea {
+  min-height: 78px;
+  resize: vertical;
+  line-height: 1.4;
+}
+
+.mobileInputRow input::placeholder,
+.mobileInputRow textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+.mobileInputRow select {
+  color: var(--color-text-soft);
+}
+
+.mobileError,
+.mobileFieldError {
+  color: var(--color-danger-text);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.mobileError {
+  margin: 0.85rem 1rem 0;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--color-danger-text) 35%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-danger-text) 12%, transparent);
+}
+
+.mobileSectionHeader {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 0.85rem;
+  padding: 0.9rem 1rem 0.65rem;
+}
+
+.mobileNotice {
+  margin: 0 1rem 0.85rem 3.85rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: 12px;
+  background: var(--color-surface-muted);
+  color: var(--color-text-soft);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.mobileSwitchRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 56px;
+  padding: 0.9rem 1rem 0.9rem 3.85rem;
+}
+
+.mobileSwitchTitle {
+  display: block;
+  color: var(--color-text);
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.mobileSwitch {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 50px;
+  height: 30px;
+}
+
+.mobileSwitchInput {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+
+.mobileSwitchTrack {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-text-soft) 35%, transparent);
+  cursor: pointer;
+  transition: background 180ms ease;
+}
+
+.mobileSwitchThumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 180ms ease;
+}
+
+.mobileSwitchInput:checked + .mobileSwitchTrack {
+  background: var(--color-accent);
+}
+
+.mobileSwitchInput:checked + .mobileSwitchTrack .mobileSwitchThumb {
+  transform: translateX(20px);
 }
 
 @media (max-width: 700px) {

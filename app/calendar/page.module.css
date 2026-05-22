@@ -44,7 +44,7 @@
   gap: 0.42rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
-  background: color-mix(in srgb, var(--color-surface-muted) 62%, transparent);
+  background: var(--color-surface-muted);
   color: var(--color-text);
   font-size: 0.86rem;
   font-weight: 620;
@@ -53,7 +53,7 @@
 }
 
 .todayButton:hover {
-  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  background: var(--color-surface-strong);
   border-color: color-mix(in srgb, var(--color-accent) 38%, transparent);
 }
 
@@ -69,7 +69,7 @@
   min-height: unset;
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
-  background: transparent;
+  background: var(--color-surface-muted);
   color: var(--color-text-soft);
   cursor: pointer;
   padding: 0;
@@ -80,7 +80,7 @@
 .navArrowButton:hover {
   color: var(--color-text);
   border-color: var(--color-border-strong);
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  background: var(--color-surface-strong);
 }
 
 .rangeButton {
@@ -119,6 +119,51 @@
 .rangeChevron {
   font-size: 0.72rem;
   color: color-mix(in srgb, var(--color-text-soft) 78%, white);
+}
+
+.densityToolbarWrap {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.densityToolbarButton {
+  height: 36px;
+  min-height: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.42rem;
+  padding: 0 0.58rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  font-size: 0.78rem;
+  font-weight: 680;
+  cursor: pointer;
+}
+
+.densityToolbarButton span:last-child {
+  color: var(--color-text-soft);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.densityToolbarButton:hover {
+  background: var(--color-surface-strong);
+  border-color: var(--color-border-strong);
+}
+
+.densityToolbarPopover {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 95;
+  width: min(320px, calc(100vw - 2rem));
+}
+
+.densityToolbarPopover .desktopDensityControl {
+  box-shadow: var(--shadow-md);
+  background: var(--color-surface);
 }
 
 .dateDropdown {
@@ -169,7 +214,7 @@
   padding: 0;
   border: 0;
   border-radius: 0;
-  background: transparent;
+  background: var(--color-surface-strong);
   box-shadow: none;
 }
 
@@ -198,7 +243,7 @@
   padding: 0 0.35rem;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  background: transparent;
+  background: var(--color-surface-muted);
   color: var(--color-text-soft);
   font-size: 0.74rem;
   font-weight: 680;
@@ -262,10 +307,80 @@
   font-size: 0.8rem;
 }
 
+.desktopWorkingHourField input[type='time'],
+.mobileWorkingHourField input[type='time'],
+.modalField input[type='time'],
+.modalField input[type='date'] {
+  cursor: pointer;
+}
+
+.desktopWorkingHourField input[type='time']::-webkit-calendar-picker-indicator,
+.mobileWorkingHourField input[type='time']::-webkit-calendar-picker-indicator,
+.modalField input[type='time']::-webkit-calendar-picker-indicator,
+.modalField input[type='date']::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
 .desktopWorkingHourField input:focus {
   outline: none;
   border-color: var(--color-accent);
   box-shadow: var(--focus-ring);
+}
+
+.desktopDensityControl {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+}
+
+.desktopDensityHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  color: var(--color-text);
+  font-size: 0.76rem;
+  font-weight: 720;
+  line-height: 1.2;
+}
+
+.desktopDensityHeader span:last-child {
+  color: var(--color-text-soft);
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.desktopDensitySlider {
+  width: 100%;
+  accent-color: var(--color-accent);
+}
+
+.desktopDensityActions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.3rem;
+}
+
+.desktopDensityActions button {
+  min-height: 28px;
+  padding: 0 0.35rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-soft);
+  font-size: 0.7rem;
+  font-weight: 680;
+  cursor: pointer;
+}
+
+.desktopDensityActions button:hover {
+  color: var(--color-text);
+  border-color: var(--color-border);
 }
 
 .dateDropdownCalendar {
@@ -290,7 +405,7 @@
   min-height: unset;
   border-radius: var(--radius-xs);
   border: 1px solid color-mix(in srgb, var(--color-border) 85%, transparent);
-  background: transparent;
+  background: var(--color-surface-muted);
   color: var(--color-text-soft);
   cursor: pointer;
   line-height: 1;
@@ -584,6 +699,49 @@
   cursor: pointer;
   transition: background var(--transition-fast);
   user-select: none;
+  min-width: 0;
+}
+
+.weekDayHeaderMulti {
+  padding-bottom: 0;
+}
+
+.weekCalendarHeaderGrid {
+  display: grid;
+  gap: 0;
+  margin: 0.45rem -0.5rem 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.weekCalendarHeaderCell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  min-width: 0;
+  padding: 0.35rem 0.25rem;
+  border-right: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  line-height: 1.1;
+}
+
+.weekCalendarHeaderCell:last-child {
+  border-right: 0;
+}
+
+.weekCalendarHeaderCell > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.weekCalendarHeaderDot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 999px;
 }
 
 .weekDayHeader:last-child {
@@ -596,6 +754,18 @@
 
 .weekDayHeader.isSelectedDay {
   background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+.weekDayHeaderMulti.isSelectedDay {
+  background: transparent;
+}
+
+.weekDayHeaderMulti.isSelectedDay:hover {
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+.weekDayHeaderMulti.isSelectedDay .weekCalendarHeaderGrid {
+  background: color-mix(in srgb, var(--color-surface-muted) 45%, var(--color-surface));
 }
 
 /* Body row: scrollable time gutter + day columns */
@@ -616,6 +786,11 @@
   left: 0;
   z-index: 2;
   overflow: visible;
+}
+
+.timeGutterResizable {
+  cursor: ns-resize;
+  user-select: none;
 }
 
 .timeSlot {
@@ -899,6 +1074,39 @@
   opacity: 0.8;
 }
 
+.appointmentNameFirst {
+  display: flex;
+  align-items: center;
+}
+
+.appointmentNameFirst .appointmentHeader {
+  width: 100%;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.appointmentNameFirst .appointmentTitle {
+  display: block;
+  min-width: 0;
+  font-size: 0.68rem;
+  font-weight: 720;
+  line-height: 1.15;
+}
+
+.appointmentNameFirst .appointmentName {
+  display: block;
+  max-width: 100%;
+}
+
+.appointmentNameFirst .statusDot {
+  display: none;
+}
+
+.appointmentNarrow {
+  padding-left: 0.34rem;
+  padding-right: 0.28rem;
+}
+
 /* Status dot — coloured circle shown in WeekView + MonthView + PreviewModal */
 .statusDot {
   width: 7px;
@@ -945,6 +1153,137 @@
 
 .blockedTimeIcon   { font-size: 1rem; opacity: 0.7; }
 .blockedTimeReason { font-weight: 500; text-align: center; line-height: 1.2; word-break: break-word; }
+
+.availabilityBlock {
+  position: absolute;
+  left: 4px;
+  width: calc(100% - 8px);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 0.15rem;
+  overflow: hidden;
+  padding: 0.32rem 0.45rem;
+  border: 1px dashed color-mix(in srgb, var(--color-text-soft) 62%, transparent);
+  border-left: 5px solid var(--color-text-soft);
+  border-radius: var(--radius-sm);
+  background:
+    repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-text-soft) 14%, var(--color-surface-muted)) 0,
+      color-mix(in srgb, var(--color-text-soft) 14%, var(--color-surface-muted)) 6px,
+      var(--color-surface-muted) 6px,
+      var(--color-surface-muted) 13px
+    );
+  color: var(--color-text);
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.availabilityBlock:hover {
+  border-color: var(--color-border-strong);
+  background:
+    repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-text-soft) 20%, var(--color-surface-strong)) 0,
+      color-mix(in srgb, var(--color-text-soft) 20%, var(--color-surface-strong)) 6px,
+      var(--color-surface-strong) 6px,
+      var(--color-surface-strong) 13px
+    );
+}
+
+.availabilityBlockTitle,
+.availabilityBlockReason {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.availabilityBlockTitle {
+  font-size: 0.72rem;
+  font-weight: 760;
+}
+
+.availabilityBlockReason {
+  color: var(--color-text-soft);
+  font-size: 0.66rem;
+  font-weight: 600;
+}
+
+.availabilityBlockCompact {
+  padding-top: 0.16rem;
+  padding-bottom: 0.16rem;
+}
+
+.mobileAvailabilityBlockCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.22rem;
+  width: 100%;
+  min-height: 66px;
+  padding: 0.75rem 0.85rem;
+  border: 1px dashed color-mix(in srgb, var(--color-text-soft) 58%, transparent);
+  border-left: 4px solid var(--color-text-soft);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+  box-shadow: var(--shadow-sm);
+  box-sizing: border-box;
+  overflow: hidden;
+  text-align: left;
+}
+
+.mobileAvailabilityBlockCard::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-text-soft) 14%, transparent) 0,
+      color-mix(in srgb, var(--color-text-soft) 14%, transparent) 7px,
+      transparent 7px,
+      transparent 15px
+    );
+}
+
+.mobileAvailabilityBlockMeta {
+  position: relative;
+  z-index: 1;
+  color: var(--color-text-soft);
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.mobileAvailabilityBlockTitle {
+  position: relative;
+  z-index: 1;
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.92rem;
+  font-weight: 760;
+  line-height: 1.2;
+}
+
+.mobileAvailabilityBlockReason {
+  position: relative;
+  z-index: 1;
+  color: var(--color-text-soft);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
 .recurringIndicator { font-size: 0.8rem; opacity: 0.6; margin-top: 0.1rem; }
 
 /* ─────────────────────────────────────────────────────────
@@ -1073,6 +1412,35 @@
   color: var(--color-text-soft);
   padding: 0.15rem 0.38rem;
   font-weight: 500;
+}
+
+.monthAvailabilityBlock {
+  display: flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0.14rem 0.35rem;
+  border: 1px dashed color-mix(in srgb, var(--color-text-soft) 58%, transparent);
+  border-left: 3px solid var(--color-text-soft);
+  border-radius: var(--radius-xs);
+  background:
+    repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-text-soft) 14%, var(--color-surface-muted)) 0,
+      color-mix(in srgb, var(--color-text-soft) 14%, var(--color-surface-muted)) 5px,
+      var(--color-surface-muted) 5px,
+      var(--color-surface-muted) 11px
+    );
+  color: var(--color-text);
+  font-size: 0.68rem;
+  font-weight: 720;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.monthAvailabilityBlock span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ─────────────────────────────────────────────────────────
@@ -1329,7 +1697,7 @@
   padding: 0.55rem 0.8rem;
   cursor: pointer;
   border: 0;
-  background: transparent;
+  background: var(--color-surface);
   width: 100%;
   text-align: left;
   color: var(--color-text);
@@ -1961,7 +2329,7 @@
   min-height: unset;
   border-radius: var(--radius-xs);
   border: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
-  background: transparent;
+  background: var(--color-surface-muted);
   color: var(--color-text-soft);
   display: flex;
   align-items: center;
@@ -1999,7 +2367,7 @@
   min-height: unset;
   border: none;
   border-radius: var(--radius-xs);
-  background: color-mix(in srgb, var(--color-surface-muted) 25%, transparent);
+  background: var(--color-surface-muted);
   color: var(--color-text);
   font-size: 0.76rem;
   font-weight: 520;
@@ -2011,7 +2379,7 @@
 }
 
 .modalDateDay:hover {
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  background: var(--color-surface-strong);
   color: var(--color-accent);
 }
 
@@ -2020,7 +2388,7 @@
 }
 
 .modalDateDayToday {
-  background: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  background: var(--color-surface-strong);
   color: var(--color-accent);
   font-weight: 700;
 }
@@ -2216,7 +2584,7 @@
   text-align: left;
   min-height: unset;
   padding: 0.55rem 0.68rem;
-  background: transparent;
+  background: var(--color-surface);
   color: var(--color-text);
   border: none;
   border-bottom: 1px solid var(--color-border);
@@ -2278,7 +2646,7 @@
   text-align: left;
   border: 0;
   border-bottom: 1px solid var(--color-border);
-  background: transparent;
+  background: var(--color-surface);
   color: var(--color-text);
   padding: 0.55rem 0.7rem;
   cursor: pointer;
@@ -2540,9 +2908,9 @@
    PREVIEW MODAL (Apple-style)
 ───────────────────────────────────────────────────────── */
 .previewModal {
-  background: color-mix(in srgb, var(--color-bg) 35%, var(--color-surface-strong));
-  backdrop-filter: blur(calc(var(--blur-md) + 6px));
-  -webkit-backdrop-filter: blur(calc(var(--blur-md) + 6px));
+  background: var(--color-surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   border-radius: var(--radius-lg);
   width: 90%;
   max-width: 520px;
@@ -2572,7 +2940,7 @@
 .previewSubtitle { font-size: 0.92rem; color: var(--color-text-soft); margin: 0.35rem 0 0; font-weight: 400; }
 
 .closeButton {
-  background: transparent;
+  background: var(--color-surface-muted);
   border: none;
   color: var(--color-text-soft);
   font-size: 1.8rem;
@@ -2605,7 +2973,7 @@
   font-size: 0.8rem;
   font-weight: 500;
   letter-spacing: 0.3px;
-  background: color-mix(in srgb, var(--color-surface-muted) 80%, transparent);
+  background: var(--color-surface-muted);
   border: 1px solid var(--color-border);
 }
 
@@ -2635,7 +3003,7 @@
 
 .deleteButton {
   padding: 0.7rem 1.4rem;
-  background: transparent;
+  background: var(--color-danger-bg);
   color: color-mix(in srgb, var(--color-danger) 78%, white);
   border: 1px solid color-mix(in srgb, var(--color-danger) 45%, transparent);
   border-radius: var(--radius-md);
@@ -2750,6 +3118,21 @@
     padding: 0;
   }
 
+  /* Size the calendar container to exactly the visible viewport minus the bottom
+     nav, using `dvh` so iOS Safari's dynamic URL bar doesn't break the math.
+     We deliberately AVOID position:fixed here: the global `.route-fade-in`
+     wrapper sets `will-change: transform`, which per the CSS spec makes it the
+     containing block for any fixed descendant. A position:fixed `.container`
+     would then collapse to the wrapper's intrinsic height (zero, because the
+     container is its only child and was out of flow) and render an empty page.
+     The body scroll lock in CalendarPageClient (mobile only) keeps the body
+     from ever scrolling so the header/day-strip stay pinned. */
+  .container {
+    height: calc(100dvh - var(--app-nav-offset, 0px) - var(--app-nav-bottom-offset, 0px));
+    max-height: calc(100dvh - var(--app-nav-offset, 0px) - var(--app-nav-bottom-offset, 0px));
+    overflow: hidden;
+  }
+
   .mobileCalendar {
     display: flex;
     flex-direction: column;
@@ -2782,13 +3165,16 @@
   .mobileHeaderDateBtn {
     width: 100%;
     height: 34px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.28rem;
     background: var(--color-surface-muted);
     border: 1px solid color-mix(in srgb, var(--color-border) 82%, transparent);
     border-radius: 999px;
     font-size: 0.78rem;
     font-weight: 700;
     color: var(--color-text);
-    text-align: center;
     cursor: pointer;
     text-transform: capitalize;
     min-height: unset;
@@ -2917,7 +3303,7 @@
     padding: 0 0.28rem;
     border: 1px solid transparent;
     border-radius: var(--radius-sm);
-    background: transparent;
+    background: var(--color-surface-muted);
     color: var(--color-text-soft);
     font-size: 0.68rem;
     font-weight: 680;
@@ -2946,7 +3332,7 @@
     padding: 0;
     border: 0;
     border-radius: 0;
-    background: transparent;
+    background: var(--color-surface);
     box-shadow: none;
   }
 
@@ -3153,7 +3539,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    padding-bottom: 80px; /* space for FAB */
+    padding-bottom: calc(var(--app-nav-bottom-offset, 0px) + 88px);
   }
 
   .mobileEmptyDay {
@@ -3185,6 +3571,8 @@
     font-size: 0.7rem;
     width: calc(100% - max(0.75rem, env(safe-area-inset-left)));
     margin-left: max(0.75rem, env(safe-area-inset-left));
+    touch-action: pan-y;
+    overscroll-behavior: contain;
   }
 
   .mobileViewPanel .weekHeaderRow {
@@ -3202,7 +3590,9 @@
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
-    padding-bottom: 80px; /* space for FAB */
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+    padding-bottom: calc(var(--app-nav-bottom-offset, 0px) + 88px);
   }
 
   .mobileViewPanel .appointment {
@@ -3221,6 +3611,12 @@
     line-height: 1.15;
   }
 
+  .mobileViewPanel .appointmentNameFirst .appointmentTitle {
+    font-size: 0.64rem;
+    font-weight: 720;
+    line-height: 1.12;
+  }
+
   .mobileViewPanel .appointmentName {
     display: block;
   }
@@ -3231,25 +3627,34 @@
     display: none;
   }
 
-  /* ── FAB ─────────────────────────────────────────────────── */
+  /* ── FAB ─────────────────────────────────────────────────────
+     Matches the patients page FAB exactly (.fab in
+     app/clients/MobileClientsView.module.css) so the "add" action
+     sits in the same spot, at the same size, with the same shadow,
+     on every mobile page. The bottom calc deliberately does NOT
+     include --app-nav-bottom-offset because the .container is
+     already constrained to dvh minus that offset — adding it again
+     would push the FAB ~52px higher than it should be.
+     ─────────────────────────────────────────────────────────── */
   .mobileFab {
     position: absolute;
-    bottom: max(1.25rem, env(safe-area-inset-bottom, 1.25rem));
-    right: 1.25rem;
-    width: 52px;
-    height: 52px;
+    right: 1.1rem;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 1.1rem);
+    width: 56px;
+    height: 56px;
     border-radius: 50%;
     background: var(--color-accent);
-    color: var(--color-text-on-accent);
-    border: none;
-    font-size: 1.6rem;
-    display: flex;
+    color: var(--color-accent-contrast, white);
+    border: 0;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
-    z-index: 10;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    box-shadow:
+      0 8px 22px -6px color-mix(in srgb, var(--color-accent) 70%, transparent),
+      0 2px 6px rgba(0, 0, 0, 0.35);
+    z-index: 5;
+    transition: transform 160ms ease, box-shadow 160ms ease;
     min-height: unset;
   }
 
@@ -3262,15 +3667,14 @@
 
   .mobileFabIcon {
     display: block;
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     pointer-events: none;
     flex-shrink: 0;
   }
 
   .mobileFab:active {
-    transform: scale(0.93);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+    transform: scale(0.94);
   }
 
   /* ── Search overlay ─────────────────────────────────────── */

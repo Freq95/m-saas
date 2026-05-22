@@ -186,6 +186,31 @@ export async function getCalendarAuth(authContext: AuthContext, calendarId: numb
     };
   }
 
+  if (objectIdEquals(calendar.tenant_id, authContext.tenantId)) {
+    const hasRoleGrant =
+      authContext.role === 'receptionist' ||
+      (
+        authContext.role === 'asistent' &&
+        Array.isArray(authContext.assigned_dentist_user_ids) &&
+        authContext.assigned_dentist_user_ids.includes(calendar.owner_user_id)
+      );
+
+    if (hasRoleGrant) {
+      return {
+        calendarId: calendar.id,
+        calendarTenantId: calendar.tenant_id,
+        calendarOwnerId: calendar.owner_user_id,
+        calendarOwnerDbUserId: toObjectId(calendar.owner_db_user_id),
+        // Role grants intentionally do not make the actor a calendar owner.
+        // Calendar settings and destructive calendar operations must continue
+        // to check isOwner, while appointment CRUD can use permissions below.
+        isOwner: false,
+        permissions: OWNER_CALENDAR_PERMISSIONS,
+        shareId: null,
+      };
+    }
+  }
+
   const normalizedEmail = authContext.email.toLowerCase().trim();
   const share = await db.collection<CalendarShareDoc>('calendar_shares').findOne({
     calendar_id: calendar.id,

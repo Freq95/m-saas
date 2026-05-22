@@ -28,7 +28,7 @@ const NAV_ITEMS = [
   { key: 'dashboard', href: '/dashboard', label: 'Dashboard' },
   { key: 'inbox', href: '/inbox', label: 'Inbox' },
   { key: 'calendar', href: '/calendar', label: 'Calendar' },
-  { key: 'clients', href: '/clients', label: 'Clienti' },
+  { key: 'clients', href: '/clients', label: 'Pacienti' },
 ] as const;
 
 const MOBILE_SETTINGS_BREAKPOINT = 780;
@@ -134,11 +134,19 @@ export default function AppTopNav({
 
     const updateNavOffset = () => {
       const height = Math.ceil(navElement.getBoundingClientRect().height);
-      document.documentElement.style.setProperty('--app-nav-offset', `${height}px`);
+      const isMobileBottomNav = window.matchMedia('(max-width: 640px)').matches;
+      document.documentElement.style.setProperty('--app-nav-offset', isMobileBottomNav ? '0px' : `${height}px`);
+      document.documentElement.style.setProperty('--app-nav-bottom-offset', isMobileBottomNav ? `${height}px` : '0px');
     };
 
     updateNavOffset();
+    const mobileNavQuery = window.matchMedia('(max-width: 640px)');
     window.addEventListener('resize', updateNavOffset);
+    if (typeof mobileNavQuery.addEventListener === 'function') {
+      mobileNavQuery.addEventListener('change', updateNavOffset);
+    } else {
+      mobileNavQuery.addListener(updateNavOffset);
+    }
 
     let resizeObserver: ResizeObserver | null = null;
     if (typeof ResizeObserver !== 'undefined') {
@@ -148,6 +156,11 @@ export default function AppTopNav({
 
     return () => {
       window.removeEventListener('resize', updateNavOffset);
+      if (typeof mobileNavQuery.removeEventListener === 'function') {
+        mobileNavQuery.removeEventListener('change', updateNavOffset);
+      } else {
+        mobileNavQuery.removeListener(updateNavOffset);
+      }
       if (resizeObserver) {
         resizeObserver.disconnect();
       }

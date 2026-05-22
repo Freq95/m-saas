@@ -14,12 +14,78 @@ import navStyles from '../../dashboard/page.module.css';
 import SettingsTabs from '../SettingsTabs';
 import { SettingsMobileHeader } from '../SettingsMobileHeader';
 
+type SyncErrorCode = 'AUTH_REVOKED' | 'NETWORK' | 'UNKNOWN';
+
 interface EmailIntegration {
   id: number;
   provider: 'yahoo' | 'gmail' | 'outlook';
   email: string;
   is_active: boolean;
   last_sync_at: string | null;
+  // Sync-health fields — set by Gmail/Yahoo runners after each attempt.
+  last_sync_status?: 'success' | 'failed' | null;
+  last_sync_attempted_at?: string | null;
+  last_sync_error_code?: SyncErrorCode | null;
+  last_sync_error_message?: string | null;
+}
+
+type IntegrationHealth = 'green' | 'yellow' | 'red' | 'off';
+
+/**
+ * 🟢 green — active and last sync succeeded within last 24h
+ * 🟡 yellow — active and last successful sync was >24h ago (stale)
+ * 🔴 red — active but last sync attempt failed (token revoked, network, etc.)
+ * ⚫ off — integration not active / not connected
+ */
+function computeIntegrationHealth(integration: EmailIntegration | null | undefined): IntegrationHealth {
+  if (!integration || !integration.is_active) return 'off';
+  if (integration.last_sync_status === 'failed') return 'red';
+  const lastSync = integration.last_sync_at ? new Date(integration.last_sync_at).getTime() : 0;
+  if (!lastSync) return 'yellow'; // never synced yet — show stale, not broken
+  const ageMs = Date.now() - lastSync;
+  if (ageMs > 24 * 60 * 60 * 1000) return 'yellow';
+  return 'green';
+}
+
+function healthLabel(integration: EmailIntegration | null | undefined): string | null {
+  if (!integration || !integration.is_active) return null;
+  if (integration.last_sync_status === 'failed') {
+    return integration.last_sync_error_code === 'AUTH_REVOKED'
+      ? 'Reconecteaza — autorizarea a expirat'
+      : 'Sincronizarea a esuat — incearca din nou';
+  }
+  return null;
+}
+
+const HEALTH_DOT_COLORS: Record<IntegrationHealth, string> = {
+  green: 'var(--color-success-text)',
+  yellow: 'var(--color-warning-text)',
+  red: 'var(--color-danger-text)',
+  off: 'var(--color-border-strong)',
+};
+
+const HEALTH_DOT_TITLES: Record<IntegrationHealth, string> = {
+  green: 'Functional',
+  yellow: 'Sincronizare veche — fa o sincronizare manuala',
+  red: 'Eroare la ultima sincronizare',
+  off: 'Neconectat',
+};
+
+function HealthDot({ integration }: { integration: EmailIntegration | null | undefined }) {
+  const health = computeIntegrationHealth(integration);
+  return (
+    <span
+      title={HEALTH_DOT_TITLES[health]}
+      aria-label={HEALTH_DOT_TITLES[health]}
+      style={{
+        flexShrink: 0,
+        width: 7,
+        height: 7,
+        borderRadius: '50%',
+        background: HEALTH_DOT_COLORS[health],
+      }}
+    />
+  );
 }
 
 interface EmailMessage {
@@ -36,9 +102,10 @@ interface EmailMessage {
 interface EmailSettingsPageContentProps {
   initialIntegrations: EmailIntegration[];
   initialUserId: number;
+  isOwner?: boolean;
 }
 
-function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailSettingsPageContentProps) {
+function EmailSettingsPageContent({ initialIntegrations, initialUserId, isOwner }: EmailSettingsPageContentProps) {
   const [integrations, setIntegrations] = useState<EmailIntegration[]>(initialIntegrations);
   const [loading, setLoading] = useState(initialIntegrations.length === 0);
   const [showYahooForm, setShowYahooForm] = useState(false);
@@ -346,7 +413,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
         <div className={styles.container}>
           <SettingsMobileHeader title="Email" />
           <div className={styles.tabRow}>
-            <SettingsTabs activeTab="email" />
+            <SettingsTabs activeTab="email" isOwner={isOwner} />
           </div>
           <div role="status" aria-live="polite">Încărcare...</div>
         </div>
@@ -417,7 +484,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
       <div className={styles.container}>
         <SettingsMobileHeader title="Email" />
         <div className={styles.tabRow}>
-          <SettingsTabs activeTab="email" />
+          <SettingsTabs activeTab="email" isOwner={isOwner} />
           {activeIntegrations.length > 0 && (
             <span className={styles.tabStatus}>
               <span className={styles.tabStatusDot} />
@@ -447,8 +514,20 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
               <tr className={styles.row}>
                 <td>
                   <div className={styles.providerRow}>
-                    <span className={yahooIntegration?.is_active ? styles.statusDot : styles.statusDotOff} />
+                    <HealthDot integration={yahooIntegration} />
                     <span className={styles.providerName}>Yahoo Mail</span>
+                    {healthLabel(yahooIntegration) && (
+                      <span
+                        style={{
+                          fontSize: '0.72rem',
+                          color: 'var(--color-danger-text)',
+                          marginLeft: '0.5rem',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {healthLabel(yahooIntegration)}
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td className={styles.colEmail}>
@@ -512,8 +591,20 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
               <tr className={styles.row}>
                 <td>
                   <div className={styles.providerRow}>
-                    <span className={gmailIntegration?.is_active ? styles.statusDot : styles.statusDotOff} />
+                    <HealthDot integration={gmailIntegration} />
                     <span className={styles.providerName}>Gmail</span>
+                    {healthLabel(gmailIntegration) && (
+                      <span
+                        style={{
+                          fontSize: '0.72rem',
+                          color: 'var(--color-danger-text)',
+                          marginLeft: '0.5rem',
+                          fontWeight: 500,
+                        }}
+                      >
+                        {healthLabel(gmailIntegration)}
+                      </span>
+                    )}
                   </div>
                 </td>
                 <td className={styles.colEmail}>
@@ -803,10 +894,10 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId }: EmailS
   );
 }
 
-export default function EmailSettingsPageClient({ initialIntegrations, initialUserId }: EmailSettingsPageContentProps) {
+export default function EmailSettingsPageClient({ initialIntegrations, initialUserId, isOwner }: EmailSettingsPageContentProps) {
   return (
     <ErrorBoundary>
-      <EmailSettingsPageContent initialIntegrations={initialIntegrations} initialUserId={initialUserId} />
+      <EmailSettingsPageContent initialIntegrations={initialIntegrations} initialUserId={initialUserId} isOwner={isOwner} />
     </ErrorBoundary>
   );
 }

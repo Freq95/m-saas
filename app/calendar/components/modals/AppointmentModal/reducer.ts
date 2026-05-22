@@ -12,6 +12,7 @@ export interface AppointmentFormState {
   forceNewClient: boolean;
   serviceId: string;
   category: string;
+  categoryId: number | null;
   date: string;
   startTime: string;
   endTime: string;
@@ -39,7 +40,7 @@ export type AppointmentFormAction =
   | { type: 'SET_DENTIST'; dentistUserId: string }
   | { type: 'RESET_SERVICE' }
   | { type: 'SET_SERVICE'; serviceId: string; durationMinutes?: number }
-  | { type: 'SET_CATEGORY'; category: string }
+  | { type: 'SET_CATEGORY'; category: string; categoryId: number | null }
   | { type: 'SET_CLIENT_NAME'; value: string }
   | { type: 'APPLY_CLIENT_SUGGESTION'; clientId: number; name: string; email: string | null; phone: string | null }
   | { type: 'CLEAR_CLIENT_LINK' }
@@ -77,6 +78,8 @@ export function appointmentFormReducer(
         calendarId: action.calendarId,
         dentistUserId: '',
         serviceId: '',
+        category: '',
+        categoryId: null,
         clientName: '',
         clientEmail: '',
         clientPhone: '',
@@ -90,6 +93,8 @@ export function appointmentFormReducer(
         ...state,
         dentistUserId: action.dentistUserId,
         serviceId: '',
+        category: '',
+        categoryId: null,
         clientName: '',
         clientEmail: '',
         clientPhone: '',
@@ -109,7 +114,7 @@ export function appointmentFormReducer(
     }
 
     case 'SET_CATEGORY':
-      return { ...state, category: action.category };
+      return { ...state, category: action.category, categoryId: action.categoryId };
 
     case 'SET_CLIENT_NAME': {
       // Editing the name breaks any previous explicit link.
@@ -175,6 +180,7 @@ export function buildInitialState(args: {
     clientId?: number | null;
     serviceId: string;
     category?: string | null;
+    categoryId?: number | null;
     startTime: string;
     endTime: string;
     notes: string;
@@ -226,6 +232,7 @@ export function buildInitialState(args: {
     forceNewClient: false,
     serviceId: initialData?.serviceId || '',
     category: initialData?.category || '',
+    categoryId: typeof initialData?.categoryId === 'number' ? initialData.categoryId : null,
     date: toDateStr(startDate),
     startTime: toTimeStr(startDate),
     endTime: toTimeStr(endDate),
@@ -258,7 +265,7 @@ export function computeDurationMinutes(startTime: string, endTime: string): numb
 
 export function validate(state: AppointmentFormState): string | null {
   if (!state.calendarId) return 'Selecteaza un calendar.';
-  if (!state.clientName.trim()) return 'Completeaza numele clientului.';
+  if (!state.clientName.trim()) return 'Completeaza numele pacientului.';
   if (!state.serviceId) return 'Selecteaza un serviciu.';
   if (!state.date || !state.startTime || !state.endTime) return 'Completeaza data si ora.';
   if (state.startTime >= state.endTime) return 'Ora de final trebuie sa fie dupa ora de inceput.';

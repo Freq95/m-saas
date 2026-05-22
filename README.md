@@ -4,6 +4,18 @@ Multi-tenant SaaS platform for managing appointments, clients, email inbox, and 
 
 ---
 
+## Recent Updates (2026-05-12)
+
+- Mobile app shell was redesigned for phone/PWA use: icon-only bottom navigation, settings/theme/logout moved into Settings, reduced route motion on mobile, and smoother immediate tap feedback.
+- Mobile Settings now uses a Twitter-style index list, with sub-pages using a compact back-header instead of horizontal tabs.
+- Calendar gained persistent mobile view preferences, configurable mobile/desktop view density, selectable 3/5/7 day and weekday/full-week ranges, working-hours controls, visible-calendar checkboxes, and unified-vs-columns calendar layout.
+- Appointment categories are now configurable per dentist, use a pastel palette, and apply only to the dentist's own default calendar. Shared calendars continue to use dentist/calendar colors.
+- Services, team, calendar, and client profile mobile layouts were cleaned up to avoid horizontal scroll, hidden actions, and unstable panels.
+- Client profiles now support editing/deleting notes, appointment notes appear in the Notes tab with appointment context, and GDPR list status display was refined.
+- Multi-role clinic workflows were expanded around owner/dentist/receptionist/asistent permissions, shared calendars, delegated services, and team management.
+
+---
+
 ## Recent Updates (2026-04-05)
 
 - Improved confirmation modal accessibility across logout, email disconnect, and service delete flows with dialog semantics, `Escape` dismissal, and initial focus on open.
@@ -59,7 +71,7 @@ Application at **http://localhost:3000**
 - **Services** — catalog with pricing, soft delete (historical appointments preserve service name)
 - **Theme system** - dark/light mode support via centralized theme tokens and client-side theme provider
 - **PWA installability** - manifest + icons + service worker (installable on Android Chrome and iOS Safari 'Add to Home Screen')
-- **Team** — invite members, role assignment (owner/staff), seat limits
+- **Team** — invite members, role assignment (owner/dentist/receptionist/asistent), seat limits
 - **Admin Panel** — tenant management, user management, audit logs, access logs, security incident register with breach notification workflow
 - **Auth** — login, password reset, invite acceptance, session invalidation, 5-minute session refresh
 - **Reminders** — API exists, processing gated behind feature flag (no UI yet)
@@ -123,5 +135,5 @@ tests/               # Vitest test files
 
 **Private project — Not open source**
 
-**Last updated:** 2026-04-05
+**Last updated:** 2026-05-12
 

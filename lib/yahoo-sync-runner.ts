@@ -4,6 +4,9 @@ import { fetchYahooEmails, getYahooConfig, markEmailAsRead } from '@/lib/yahoo-m
 import { getStorageProvider } from '@/lib/storage';
 import { decrypt } from '@/lib/encryption';
 import { logger } from '@/lib/logger';
+import { invalidateCache } from '@/lib/redis';
+import { conversationsCacheKey } from '@/lib/cache-keys';
+import { recordIntegrationSyncResult } from '@/lib/email-integrations';
 
 export type YahooSyncOptions = {
   todayOnly?: boolean;
@@ -176,6 +179,17 @@ async function runYahooSyncCore(
   let attachmentUploadFailures = 0;
   const attachmentFailureSamples: string[] = [];
   let maxFetchedUid = typeof lastSyncedUid === 'number' ? lastSyncedUid : 0;
+  // Periodic cache invalidation while sync is running lets the UI polling loop
+  // pick up partial progress instead of waiting for the whole batch to finish.
+  const PROGRESS_FLUSH_EVERY = 5;
+  let syncedSincePartialFlush = 0;
+  const flushInboxCache = async () => {
+    try {
+      await invalidateCache(conversationsCacheKey({ tenantId, userId }));
+    } catch {
+      // Non-critical; final invalidation below will still run.
+    }
+  };
 
   const addAttachmentFailureSample = (filename: string) => {
     if (!filename) return;
@@ -365,6 +379,11 @@ async function runYahooSyncCore(
         }
 
         syncedCount++;
+        syncedSincePartialFlush++;
+        if (syncedSincePartialFlush >= PROGRESS_FLUSH_EVERY) {
+          syncedSincePartialFlush = 0;
+          await flushInboxCache();
+        }
       } else {
         skippedCount++;
       }
@@ -397,6 +416,19 @@ async function runYahooSyncCore(
     }
   }
 
+  // Inbox cache is keyed per-user; clear it whenever sync actually inserts new
+  // messages so the next /inbox load shows them. See gmail-sync-runner for the
+  // matching pattern.
+  if (syncedCount > 0) {
+    await invalidateCache(conversationsCacheKey({ tenantId, userId }));
+  }
+
+  // Mark this attempt as a success so the UI dot stays green. Failures bubble
+  // out of runYahooSyncCore and are recorded by the entry-point wrappers below.
+  if (typeof integrationId === 'number') {
+    await recordIntegrationSyncResult(integrationId, { status: 'success' });
+  }
+
   return {
     success: true,
     synced: syncedCount,
@@ -420,7 +452,14 @@ export async function syncYahooInboxForUser(
   options: YahooSyncOptions = {}
 ): Promise<YahooSyncRunResult> {
   const { config, integrationDoc } = await resolveYahooConfigForUser(userId, tenantId);
-  return runYahooSyncCore(userId, tenantId, config, integrationDoc, options, integrationDoc?.id);
+  try {
+    return await runYahooSyncCore(userId, tenantId, config, integrationDoc, options, integrationDoc?.id);
+  } catch (error) {
+    if (integrationDoc?.id) {
+      await recordIntegrationSyncResult(integrationDoc.id, { status: 'failed', error });
+    }
+    throw error;
+  }
 }
 
 export async function syncYahooInboxForIntegration(
@@ -429,12 +468,17 @@ export async function syncYahooInboxForIntegration(
   tenantId?: ObjectId
 ): Promise<YahooSyncRunResult> {
   const { config, integrationDoc } = await resolveYahooConfigByIntegrationId(integrationId, tenantId);
-  return runYahooSyncCore(
-    integrationDoc.user_id,
-    integrationDoc.tenant_id,
-    config,
-    integrationDoc,
-    options,
-    integrationDoc.id
-  );
+  try {
+    return await runYahooSyncCore(
+      integrationDoc.user_id,
+      integrationDoc.tenant_id,
+      config,
+      integrationDoc,
+      options,
+      integrationDoc.id
+    );
+  } catch (error) {
+    await recordIntegrationSyncResult(integrationDoc.id, { status: 'failed', error });
+    throw error;
+  }
 }

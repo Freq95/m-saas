@@ -3,6 +3,8 @@ import crypto from 'crypto';
 import { getMongoDbOrThrow, getNextNumericId, type FlexDoc } from '@/lib/db/mongo-utils';
 import { linkConversationToClient } from '@/lib/client-matching';
 import { handleApiError, createErrorResponse, createSuccessResponse } from '@/lib/error-handler';
+import { invalidateCache } from '@/lib/redis';
+import { conversationsCacheKey } from '@/lib/cache-keys';
 
 function verifyWebhookSignature(rawBody: string, signature: string): boolean {
   const secret = process.env.WEBHOOK_SECRET;
@@ -116,6 +118,9 @@ export async function POST(request: NextRequest) {
       sent_at: now,
       created_at: now,
     });
+
+    // Clear the recipient's inbox cache so the new message appears on next /inbox load.
+    await invalidateCache(conversationsCacheKey({ tenantId, userId: normalizedUserId }));
 
     return createSuccessResponse({ success: true, conversationId });
   } catch (error) {

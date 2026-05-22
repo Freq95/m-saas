@@ -2,19 +2,21 @@ import { NextRequest } from 'next/server';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getClientStatsData } from '@/lib/server/client-profile';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { resolveClientScopeForClient } from '@/lib/client-permissions';
 
 // GET /api/clients/[id]/stats - Get detailed statistics for a client
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
     const clientId = parseInt(params.id);
 
     // Validate ID
     if (isNaN(clientId) || clientId <= 0) {
       return createErrorResponse('Invalid client ID', 400);
     }
-    const stats = await getClientStatsData(clientId, tenantId, userId);
+    const scope = await resolveClientScopeForClient(auth, clientId);
+    const stats = scope ? await getClientStatsData(clientId, scope.tenantId, scope.userId) : null;
     if (!stats) {
       return createErrorResponse('Client not found', 404);
     }

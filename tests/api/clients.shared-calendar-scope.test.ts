@@ -60,7 +60,7 @@ describe('GET /api/clients shared calendar scope', () => {
       dbUserId: viewerDbUserId,
       email: 'viewer@example.com',
       name: 'Viewer',
-      role: 'staff',
+      role: 'dentist',
     });
     mockResolveCalendarOwnerScope.mockResolvedValue({
       userId: 42,

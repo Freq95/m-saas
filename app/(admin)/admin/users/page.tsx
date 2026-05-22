@@ -70,7 +70,7 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
     <div style={{ display: 'grid', gap: 12 }}>
       <h1>Users</h1>
       <p>
-        Users represent all accounts in `users`: super-admin plus tenant users (`owner/admin/staff/viewer`), both
+        Users represent all accounts in `users`: super-admin plus tenant users (`owner/dentist/receptionist/asistent`), both
         `active` and `pending_invite`.
       </p>
 
@@ -80,7 +80,9 @@ export default async function AdminUsersPage({ searchParams }: AdminUsersPagePro
           <option value="">All roles</option>
           <option value="super_admin">super_admin</option>
           <option value="owner">owner</option>
-          <option value="staff">staff</option>
+          <option value="dentist">dentist</option>
+          <option value="receptionist">receptionist</option>
+          <option value="asistent">asistent</option>
         </select>
         <select name="status" defaultValue={status}>
           <option value="">All status</option>

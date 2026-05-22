@@ -392,6 +392,7 @@ export async function getAppointmentsData(query: AppointmentQuery) {
       { client_phone: regex },
       { service_name: regex },
       { category: regex },
+      { category_label: regex },
       { notes: regex },
     ];
     filter.$or = searchOr;
@@ -427,6 +428,8 @@ export async function getAppointmentsData(query: AppointmentQuery) {
       calendar_id: 1,
       created_by_user_id: 1,
       category: 1,
+      category_label: 1,
+      category_color: 1,
       color: 1,
       notes: 1,
       reminder_sent: 1,

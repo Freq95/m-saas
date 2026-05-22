@@ -25,6 +25,7 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
     if (typeof window === 'undefined') return;
     if (hideNav) {
       document.documentElement.style.setProperty('--app-nav-offset', '0px');
+      document.documentElement.style.setProperty('--app-nav-bottom-offset', '0px');
     }
   }, [hideNav]);
 

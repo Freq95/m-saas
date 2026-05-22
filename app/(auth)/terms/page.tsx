@@ -16,7 +16,7 @@ export default function TermsPage() {
           <h2>1. Descrierea serviciului</h2>
           <p>
             <span className="brand-wordmark-inline">densa</span> este o platforma SaaS de management pentru cabinete stomatologice
-            care ofera: programarea pacientilor, gestionarea clientilor, sincronizarea
+            care ofera: programarea pacientilor, gestionarea pacientilor, sincronizarea
             email-urilor si instrumente de comunicare. Serviciul este furnizat de
             [NUMELE COMPANIEI], inregistrata in Romania.
           </p>

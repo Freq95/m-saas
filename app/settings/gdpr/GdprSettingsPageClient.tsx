@@ -8,9 +8,11 @@ import navStyles from '../../dashboard/page.module.css';
 
 interface GdprSettingsPageClientProps {
   initialText: string;
+  canEdit?: boolean;
+  isOwner?: boolean;
 }
 
-export default function GdprSettingsPageClient({ initialText }: GdprSettingsPageClientProps) {
+export default function GdprSettingsPageClient({ initialText, canEdit = true, isOwner = false }: GdprSettingsPageClientProps) {
   const [text, setText] = useState(initialText);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -18,6 +20,7 @@ export default function GdprSettingsPageClient({ initialText }: GdprSettingsPage
   const isDirty = text.trim() !== initialText.trim();
 
   async function handleSave() {
+    if (!canEdit) return;
     setSaving(true);
     setError(null);
     setSaved(false);
@@ -46,7 +49,7 @@ export default function GdprSettingsPageClient({ initialText }: GdprSettingsPage
       <div className={styles.container}>
         <SettingsMobileHeader title="GDPR" />
         <div className={`${styles.tabRow} ${styles.desktopTabRow}`}>
-          <SettingsTabs activeTab="gdpr" />
+          <SettingsTabs activeTab="gdpr" isOwner={isOwner} />
         </div>
 
         <div className={styles.formCard}>
@@ -63,6 +66,9 @@ export default function GdprSettingsPageClient({ initialText }: GdprSettingsPage
               onChange={(e) => setText(e.target.value)}
               rows={6}
               maxLength={2000}
+              readOnly={!canEdit}
+              disabled={!canEdit}
+              aria-readonly={!canEdit}
               style={{
                 width: '100%',
                 background: 'var(--color-surface-muted)',
@@ -73,34 +79,40 @@ export default function GdprSettingsPageClient({ initialText }: GdprSettingsPage
                 fontSize: '0.95rem',
                 lineHeight: 1.6,
                 resize: 'vertical',
+                opacity: canEdit ? 1 : 0.85,
+                cursor: canEdit ? 'text' : 'default',
               }}
             />
-            <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', textAlign: 'right' }}>
-              {text.length} / 2000 caractere
-            </div>
+            {canEdit && (
+              <div style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)', textAlign: 'right' }}>
+                {text.length} / 2000 caractere
+              </div>
+            )}
             <p style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
               Acest text este afisat pacientilor atunci cand cabinetul inregistreaza consimtamantul GDPR.
-              Editarea este disponibila doar pentru proprietarul cabinetului.
+              {canEdit ? ' Editarea este disponibila pentru proprietar si medici.' : ' Doar proprietarul si medicii pot edita acest text.'}
             </p>
           </div>
 
           {error && <p className={styles.error}>{error}</p>}
 
-          <div className={styles.formActions}>
-            {saved && (
-              <span style={{ fontSize: '0.9rem', color: 'var(--color-success)', alignSelf: 'center' }}>
-                Salvat cu succes
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving || !isDirty}
-              className={styles.primaryButton}
-            >
-              {saving ? 'Se salveaza...' : 'Salveaza'}
-            </button>
-          </div>
+          {canEdit && (
+            <div className={styles.formActions}>
+              {saved && (
+                <span style={{ fontSize: '0.9rem', color: 'var(--color-success)', alignSelf: 'center' }}>
+                  Salvat cu succes
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={saving || !isDirty}
+                className={styles.primaryButton}
+              >
+                {saving ? 'Se salveaza...' : 'Salveaza'}
+              </button>
+            </div>
+          )}
         </div>
 
         <div className={styles.formCard}>

@@ -3,12 +3,13 @@ import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from 
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
+import { resolveClientScopeForClient } from '@/lib/client-permissions';
 
 // GET /api/clients/[id]/notes - Get notes for a client
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
 
@@ -17,10 +18,11 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       return createErrorResponse('Invalid client ID', 400);
     }
 
-    const client = await db.collection('clients').findOne({ id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } });
-    if (!client) {
+    const scope = await resolveClientScopeForClient(auth, clientId);
+    if (!scope) {
       return createErrorResponse('Client not found', 404);
     }
+    const { userId, tenantId } = scope;
 
     let notes = await db
       .collection('client_notes')
@@ -46,8 +48,8 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
 export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    const { userId, tenantId } = await getAuthUser();
-    const limited = await checkWriteRateLimit(userId);
+    const auth = await getAuthUser();
+    const limited = await checkWriteRateLimit(auth.userId);
     if (limited) return limited;
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
@@ -57,10 +59,11 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       return createErrorResponse('Invalid client ID', 400);
     }
 
-    const client = await db.collection('clients').findOne({ id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } });
-    if (!client) {
+    const scope = await resolveClientScopeForClient(auth, clientId);
+    if (!scope) {
       return createErrorResponse('Client not found', 404);
     }
+    const { userId, tenantId } = scope;
 
     const body = await request.json();
 

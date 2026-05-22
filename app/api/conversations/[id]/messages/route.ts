@@ -3,6 +3,7 @@ import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from 
 import { getYahooConfig, sendYahooEmail } from '@/lib/yahoo-mail';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { requireInboxAccess } from '@/lib/inbox-access';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
 
 // POST /api/conversations/[id]/messages - Send message
@@ -12,7 +13,9 @@ export async function POST(
 ) {
   try {
     const resolvedParams = await params;
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
+    requireInboxAccess(auth);
+    const { userId, tenantId } = auth;
     const limited = await checkWriteRateLimit(userId);
     if (limited) return limited;
     const db = await getMongoDbOrThrow();

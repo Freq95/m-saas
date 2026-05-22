@@ -3,6 +3,9 @@ import { getMongoDbOrThrow, getNextNumericId, type FlexDoc } from '@/lib/db/mong
 import { decrypt } from '@/lib/encryption';
 import { fetchGmailMessages, getValidAccessToken } from '@/lib/gmail';
 import { logger } from '@/lib/logger';
+import { invalidateCache } from '@/lib/redis';
+import { conversationsCacheKey } from '@/lib/cache-keys';
+import { recordIntegrationSyncResult } from '@/lib/email-integrations';
 
 export type GmailSyncOptions = {
   markAsRead?: boolean;
@@ -90,6 +93,20 @@ export async function syncGmailInboxForIntegration(
     throw new Error(`Gmail integration ${integrationId} not found or inactive.`);
   }
 
+  try {
+    return await runGmailSync(db, integration);
+  } catch (error) {
+    // Record failure on the integration so the UI can flag it red.
+    // Re-throw so the route's existing error handling and logs still fire.
+    await recordIntegrationSyncResult(integration.id, { status: 'failed', error });
+    throw error;
+  }
+}
+
+async function runGmailSync(
+  db: Awaited<ReturnType<typeof getMongoDbOrThrow>>,
+  integration: GmailIntegrationDoc
+): Promise<GmailSyncRunResult> {
   const decryptedAccessToken = integration.encrypted_access_token ? decrypt(integration.encrypted_access_token) : null;
   const decryptedRefreshToken = integration.encrypted_refresh_token
     ? decrypt(integration.encrypted_refresh_token)
@@ -107,6 +124,19 @@ export async function syncGmailInboxForIntegration(
   let synced = 0;
   let skipped = 0;
   let errors = 0;
+  // Periodic cache invalidation while sync is running lets the UI polling loop
+  // pick up partial progress instead of waiting for the whole batch to finish.
+  const PROGRESS_FLUSH_EVERY = 5;
+  let syncedSincePartialFlush = 0;
+  const flushInboxCache = async () => {
+    try {
+      await invalidateCache(
+        conversationsCacheKey({ tenantId: integration.tenant_id, userId: integration.user_id })
+      );
+    } catch {
+      // Non-critical; the final invalidation below will still run.
+    }
+  };
 
   for (const message of gmailMessages) {
     try {
@@ -165,10 +195,15 @@ export async function syncGmailInboxForIntegration(
       });
 
       synced++;
+      syncedSincePartialFlush++;
+      if (syncedSincePartialFlush >= PROGRESS_FLUSH_EVERY) {
+        syncedSincePartialFlush = 0;
+        await flushInboxCache();
+      }
     } catch (error) {
       errors++;
       logger.error('Gmail sync: failed to process message', error instanceof Error ? error : new Error(String(error)), {
-        integrationId,
+        integrationId: integration.id,
         messageId: message.messageId,
       });
     }
@@ -178,6 +213,19 @@ export async function syncGmailInboxForIntegration(
     { id: integration.id, tenant_id: integration.tenant_id },
     { $set: { last_sync_at: new Date().toISOString(), updated_at: new Date().toISOString() } }
   );
+
+  // Inbox cache is keyed per-user; clear it whenever sync actually inserts new
+  // messages so the next /inbox load shows them. Without this the user could
+  // click Sync and still see stale results until the cache TTL expires.
+  if (synced > 0) {
+    await invalidateCache(
+      conversationsCacheKey({ tenantId: integration.tenant_id, userId: integration.user_id })
+    );
+  }
+
+  // Mark this attempt as a success so the UI dot stays green. Failures are
+  // recorded by the outer wrapper (syncGmailInboxForIntegration's catch).
+  await recordIntegrationSyncResult(integration.id, { status: 'success' });
 
   return {
     success: true,

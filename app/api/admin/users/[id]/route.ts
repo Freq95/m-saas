@@ -78,7 +78,10 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
     const updates: Record<string, unknown> = {};
     if (typeof body?.name === 'string' && body.name.trim()) updates.name = body.name.trim();
-    if (typeof body?.role === 'string' && ['super_admin', 'owner', 'staff'].includes(body.role)) {
+    if (
+      typeof body?.role === 'string' &&
+      ['super_admin', 'owner', 'dentist', 'receptionist', 'asistent'].includes(body.role)
+    ) {
       updates.role = body.role;
     }
     if (typeof body?.status === 'string' && ['active', 'pending_invite', 'suspended', 'deleted'].includes(body.status)) {

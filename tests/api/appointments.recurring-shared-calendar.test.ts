@@ -12,9 +12,7 @@ const {
   mockResolveAppointmentDentistAssignment,
   mockCheckAppointmentConflict,
   mockCheckWriteRateLimit,
-  mockWithAppointmentWriteLocks,
   mockUpdateClientStats,
-  mockGetTenantTimeZone,
 } = vi.hoisted(() => ({
   mockGetMongoDbOrThrow: vi.fn(),
   mockGetNextNumericId: vi.fn(),
@@ -23,9 +21,7 @@ const {
   mockResolveAppointmentDentistAssignment: vi.fn(),
   mockCheckAppointmentConflict: vi.fn(),
   mockCheckWriteRateLimit: vi.fn(),
-  mockWithAppointmentWriteLocks: vi.fn(),
   mockUpdateClientStats: vi.fn(),
-  mockGetTenantTimeZone: vi.fn(),
 }));
 
 vi.mock('@/lib/db/mongo-utils', async () => {
@@ -62,14 +58,6 @@ vi.mock('@/lib/appointment-service', async () => {
   };
 });
 
-vi.mock('@/lib/appointment-write-lock', () => {
-  class AppointmentWriteBusyError extends Error {}
-  return {
-    AppointmentWriteBusyError,
-    withAppointmentWriteLocks: mockWithAppointmentWriteLocks,
-  };
-});
-
 vi.mock('@/lib/calendar-conflicts', () => ({
   checkAppointmentConflict: mockCheckAppointmentConflict,
 }));
@@ -89,10 +77,6 @@ vi.mock('@/lib/cache-keys', async () => {
 vi.mock('@/lib/client-matching', () => ({
   updateClientStats: mockUpdateClientStats,
   findOrCreateClient: vi.fn(),
-}));
-
-vi.mock('@/lib/timezone', () => ({
-  getTenantTimeZone: mockGetTenantTimeZone,
 }));
 
 import { POST } from '@/app/api/appointments/recurring/route';
@@ -146,9 +130,7 @@ describe('POST /api/appointments/recurring shared calendar behavior', () => {
     });
     mockCheckWriteRateLimit.mockResolvedValue(null);
     mockCheckAppointmentConflict.mockResolvedValue({ hasConflict: false, conflicts: [], suggestions: [] });
-    mockWithAppointmentWriteLocks.mockImplementation(async (_context: unknown, callback: () => Promise<unknown>) => callback());
     mockUpdateClientStats.mockResolvedValue(undefined);
-    mockGetTenantTimeZone.mockResolvedValue('Europe/Bucharest');
     mockGetNextNumericId.mockImplementation(async (collectionName: string) => (
       collectionName === 'recurrence_groups' ? 9001 : 7001 + insertedAppointments.length
     ));
@@ -167,6 +149,11 @@ describe('POST /api/appointments/recurring shared calendar behavior', () => {
               insertedAppointments.push(doc);
               return insertOne(doc);
             },
+          };
+        }
+        if (name === 'calendars') {
+          return {
+            findOne: vi.fn().mockResolvedValue({ id: 11, tenant_id: tenantId, is_default: false }),
           };
         }
         throw new Error(`Unexpected collection: ${name}`);
@@ -267,5 +254,65 @@ describe('POST /api/appointments/recurring shared calendar behavior', () => {
     expect(json.error).toContain('Selecteaza un pacient existent');
     expect(serviceFindOne).not.toHaveBeenCalled();
     expect(insertOne).not.toHaveBeenCalled();
+  });
+
+  it('preflights availability blocks before inserting any recurring instance', async () => {
+    serviceFindOne.mockResolvedValue({
+      id: 222,
+      name: 'Consultatie initiala',
+      duration_minutes: 30,
+      price: 150,
+    });
+    clientFindOne.mockResolvedValue({ id: 301, user_id: 13, tenant_id: tenantId, name: 'Ana Viewer' });
+    let conflictCalls = 0;
+    mockCheckAppointmentConflict.mockImplementation(async () => {
+      conflictCalls += 1;
+      if (conflictCalls === 2) {
+        return {
+          hasConflict: true,
+          conflicts: [
+            {
+              type: 'availability_block',
+              block: {
+                id: 55,
+                type_label: 'Curs',
+                reason: 'Curs Bucuresti',
+                start_time: '2026-04-17T09:00:00.000Z',
+                end_time: '2026-04-17T10:00:00.000Z',
+              },
+            },
+          ],
+          suggestions: [],
+        };
+      }
+      return { hasConflict: false, conflicts: [], suggestions: [] };
+    });
+
+    const req = new NextRequest('http://localhost/api/appointments/recurring', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        calendarId: 11,
+        dentistUserId: 13,
+        serviceId: 222,
+        clientId: 301,
+        clientName: 'Ana Viewer',
+        startTime: '2026-04-10T09:00:00.000Z',
+        endTime: '2026-04-10T09:30:00.000Z',
+        recurrence: {
+          frequency: 'weekly',
+          interval: 1,
+          count: 2,
+        },
+      }),
+    });
+
+    const res = await POST(req);
+    const json = await res.json() as Doc;
+
+    expect(res.status).toBe(409);
+    expect(json.error).toContain('blocaj de disponibilitate');
+    expect(insertOne).not.toHaveBeenCalled();
+    expect(insertedAppointments).toHaveLength(0);
   });
 });

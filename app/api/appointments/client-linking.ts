@@ -3,7 +3,7 @@ import { findOrCreateClient } from '@/lib/client-matching';
 
 export class ExplicitClientSelectionError extends Error {
   constructor() {
-    super('Clientul selectat nu mai exista. Selecteaza din nou clientul sau continua ca pacient nou.');
+    super('Pacientul selectat nu mai exista. Selecteaza din nou pacientul sau continua ca pacient nou.');
     this.name = 'ExplicitClientSelectionError';
   }
 }

@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
-import { signIn } from 'next-auth/react';
+import { signIn, getSession } from 'next-auth/react';
 import styles from '../auth.module.css';
 
 type LoginFormProps = {
@@ -52,13 +52,23 @@ export default function LoginForm({ successMessage, redirectPath, forcedLogout }
       return;
     }
 
-    // Skip the /api/auth/session round-trip; the dashboard page redirects
-    // super_admins to /admin if needed (see app/dashboard/page.tsx).
+    // Read role from the freshly minted JWT instead of a server round-trip to
+    // /api/user/landing. getSession() decodes the cookie locally — no DB call.
+    let roleLandingPath = '/dashboard';
+    try {
+      const session = await getSession();
+      const role = session?.user?.role;
+      if (role === 'dentist' || role === 'asistent') {
+        roleLandingPath = '/calendar';
+      }
+    } catch {
+      roleLandingPath = '/dashboard';
+    }
+
     // Use a hard navigation so the fresh auth cookie is guaranteed to ship
     // with the next request. SPA navigation (router.replace) has shown
-    // intermittent hangs in dev after a failed-then-successful login, where
-    // the RSC payload for the target route gets served stale.
-    const target = normalizeRedirectPath(redirectPath) || '/dashboard';
+    // intermittent hangs in dev after a failed-then-successful login.
+    const target = normalizeRedirectPath(redirectPath) || roleLandingPath;
     window.location.assign(target);
   }
 

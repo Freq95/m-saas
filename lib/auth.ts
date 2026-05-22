@@ -71,7 +71,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             dbUserId: String(user._id),
             email: user.email,
             name: user.name || '',
-            role: String(user.role || 'staff'),
+            role: String(user.role || 'dentist'),
             tenantId: user.tenant_id ? String(user.tenant_id) : null,
             sessionVersion: Number(user.session_version || 0),
           };

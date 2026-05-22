@@ -5,6 +5,7 @@ import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from 
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { getConversationsData } from '@/lib/server/inbox';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { requireInboxAccess } from '@/lib/inbox-access';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
 import { getCached, invalidateCache } from '@/lib/redis';
 import { conversationsCacheKey } from '@/lib/cache-keys';
@@ -13,7 +14,9 @@ import { logDataAccess } from '@/lib/audit';
 // GET /api/conversations - Get all conversations from storage
 export async function GET(request: NextRequest) {
   try {
-    const { userId, dbUserId, tenantId, email, role } = await getAuthUser();
+    const auth = await getAuthUser();
+    requireInboxAccess(auth);
+    const { userId, dbUserId, tenantId, email, role } = auth;
     const searchParams = request.nextUrl.searchParams;
     const { conversationsQuerySchema } = await import('@/lib/validation');
     const queryParams = {
@@ -31,7 +34,8 @@ export async function GET(request: NextRequest) {
       conversations = await getConversationsData({ userId, tenantId, search });
     } else {
       const cacheKey = conversationsCacheKey({ tenantId, userId });
-      conversations = await getCached(cacheKey, 60, () =>
+      // 30-min TTL — see note in app/inbox/page.tsx. All write paths invalidate this key.
+      conversations = await getCached(cacheKey, 1800, () =>
         getConversationsData({ userId, tenantId, search })
       );
     }
@@ -58,7 +62,9 @@ export async function GET(request: NextRequest) {
 // POST /api/conversations - Create new conversation
 export async function POST(request: NextRequest) {
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
+    requireInboxAccess(auth);
+    const { userId, tenantId } = auth;
     const limited = await checkWriteRateLimit(userId);
     if (limited) return limited;
     const db = await getMongoDbOrThrow();

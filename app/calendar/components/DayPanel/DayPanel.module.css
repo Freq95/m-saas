@@ -145,7 +145,7 @@
   padding: 0.28rem 0.38rem;
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
-  background: transparent;
+  background: var(--color-surface-muted);
   cursor: pointer;
   transition: background 120ms ease, border-color 120ms ease;
   user-select: none;
@@ -199,8 +199,8 @@
   flex-direction: column;
   gap: 0.3rem;
   padding: 0.45rem;
-  background: var(--color-surface);
-  border: 1px solid color-mix(in srgb, var(--color-border) 85%, transparent);
+  background: var(--color-surface-strong);
+  border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-md);
   animation: statusMenuIn 150ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -236,7 +236,7 @@
   cursor: pointer;
   border-radius: var(--radius-sm);
   border: none;
-  background: transparent;
+  background: var(--color-surface);
   width: 100%;
   text-align: left;
   min-height: unset;
@@ -261,13 +261,61 @@
   text-overflow: ellipsis;
 }
 
-.scopeMenuCheck {
+.scopeMenuCheckbox {
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   color: var(--color-accent);
+  border: 1px solid color-mix(in srgb, var(--color-border-strong) 80%, transparent);
+  border-radius: 4px;
   flex-shrink: 0;
   margin-left: auto;
+  background: color-mix(in srgb, var(--color-surface-muted) 80%, transparent);
+}
+
+.scopeMenuItemActive .scopeMenuCheckbox {
+  border-color: color-mix(in srgb, var(--color-accent) 65%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 
 /* ── Stats strip ── */
+.scopeLayoutGroup {
+  padding-top: 0.25rem;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 55%, transparent);
+}
+
+.scopeLayoutToggle {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.78fr);
+  gap: 0.25rem;
+  padding: 0 0.12rem 0.08rem;
+}
+
+.scopeLayoutButton {
+  min-height: 28px;
+  padding: 0.34rem 0.45rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-soft);
+  font-size: 0.72rem;
+  font-weight: 590;
+  white-space: nowrap;
+}
+
+.scopeLayoutButton:hover {
+  background: color-mix(in srgb, var(--color-border) 40%, transparent);
+  color: var(--color-text);
+}
+
+.scopeLayoutButtonActive {
+  color: var(--color-text);
+  border-color: color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface));
+}
+
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -535,7 +583,7 @@
   cursor: pointer;
   border-radius: var(--radius-sm);
   border: none;
-  background: transparent;
+  background: var(--color-surface);
   width: 100%;
   text-align: left;
   min-height: unset;

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import Link from 'next/link';
 import styles from '../../../../page.module.css';
 import type { AppointmentService } from '../types';
@@ -18,7 +19,7 @@ function formatPrice(price: number): string {
   return ` — ${price} lei`;
 }
 
-export function ServiceSection({
+function ServiceSectionBase({
   services,
   serviceId,
   onSelect,
@@ -73,3 +74,5 @@ export function ServiceSection({
     </div>
   );
 }
+
+export const ServiceSection = memo(ServiceSectionBase);

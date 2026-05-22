@@ -11,11 +11,20 @@ import {
 
 interface SettingsTabsProps {
   activeTab: SettingsTabKey;
+  /**
+   * Server-known role override. When provided, takes precedence over the
+   * client-side useSession() check (which can lag during hydration or carry a
+   * stale JWT). Pages that already know the role from `getAuthUser()` should
+   * pass this so owner-only tabs render reliably on first paint.
+   */
+  isOwner?: boolean;
 }
 
-export default function SettingsTabs({ activeTab }: SettingsTabsProps) {
+export default function SettingsTabs({ activeTab, isOwner: isOwnerProp }: SettingsTabsProps) {
   const { data: session } = useSession();
-  const isOwner = session?.user?.role === 'owner';
+  const isOwner = typeof isOwnerProp === 'boolean'
+    ? isOwnerProp
+    : session?.user?.role === 'owner';
   const navRef = useRef<HTMLElement>(null);
   const [optimisticActiveTab, setOptimisticActiveTab] = useState<SettingsTabKey>(activeTab);
 

@@ -4,7 +4,12 @@ import { updateClientStats } from '@/lib/client-matching';
 import { canDeleteAppointment, canEditAppointment, getCalendarAuth } from '@/lib/calendar-auth';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { checkAppointmentConflict } from '@/lib/calendar-conflicts';
-import { AppointmentWriteBusyError, withAppointmentWriteLocks } from '@/lib/appointment-write-lock';
+import {
+  formatAppointmentConflictPayload,
+  formatAppointmentConflictSuggestions,
+  getAppointmentConflictWarning,
+  hasAvailabilityBlockConflict,
+} from '@/lib/appointment-conflict-response';
 import { getAuthUser, type AuthContext } from '@/lib/auth-helpers';
 import {
   buildAppointmentDentistFields,
@@ -13,28 +18,12 @@ import {
 } from '@/lib/appointment-service';
 import { invalidateReadCaches } from '@/lib/cache-keys';
 import { logger } from '@/lib/logger';
+import { resolveAppointmentCategoryForWrite } from '@/lib/server/appointment-categories';
 import { checkUpdateRateLimit } from '@/lib/rate-limit';
 import { generateRecurringInstances } from '@/lib/recurring-utils';
 import { attachCalendarDisplayData } from '@/lib/server/calendar';
-import { getTenantTimeZone } from '@/lib/timezone';
 import { updateAppointmentSchema } from '@/lib/validation';
 import { ExplicitClientSelectionError, resolveAppointmentClientLink } from '../client-linking';
-
-const CONFLICT_MESSAGE_BY_TYPE: Record<string, string> = {
-  calendar_appointment: 'Exista deja o alta programare in acest interval.',
-  appointment_overlap: 'Exista deja o alta programare in acest interval.',
-};
-
-function formatConflictPayload(conflict: any) {
-  const baseMessage = CONFLICT_MESSAGE_BY_TYPE[conflict.type] || 'Conflict detectat.';
-  if (conflict.appointment) {
-    return {
-      type: conflict.type,
-      message: `${baseMessage} ${conflict.appointment.client_name || 'Client'} (${conflict.appointment.start_time} - ${conflict.appointment.end_time}).`,
-    };
-  }
-  return { type: conflict.type, message: baseMessage };
-}
 
 function matchesLegacyAppointmentOwner(
   appointment: Record<string, any>,
@@ -197,6 +186,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       clientPhone,
       forceNewClient,
       category,
+      categoryId,
       color,
       isRecurring,
       recurrence,
@@ -227,6 +217,13 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     const appointmentCalendarId = typeof existingAppointment.calendar_id === 'number'
       ? existingAppointment.calendar_id
       : undefined;
+    const appointmentCalendar = appointmentCalendarId
+      ? await db.collection('calendars').findOne(
+          { id: appointmentCalendarId, tenant_id: appointmentTenantId },
+          { projection: { is_default: 1 } }
+        )
+      : null;
+    const canUseAppointmentCategories = Boolean(appointmentCalendar?.is_default && !isSharedCalendar);
 
     // Determine if the appointment's assigned dentist is the current user.
     // For new appointments dentist_id is always set; for legacy ones fall back to isSharedCalendar.
@@ -236,7 +233,6 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     const isDentistCurrentUser = appointmentDentistId !== null
       ? appointmentDentistId === userId
       : !isSharedCalendar;
-    const appointmentTimeZone = await getTenantTimeZone(appointmentTenantId);
     const mutationFilter = appointmentMutationFilter(appointmentId, existingAppointment);
 
     const updates: Record<string, unknown> = {};
@@ -270,8 +266,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       startTime !== undefined ||
       endTime !== undefined;
 
-    // Compute effective new times up-front so we can both queue the update and
-    // acquire a write lock over the right slot when times are changing.
+    // Compute effective new times up-front so we can warn about overlaps without blocking the update.
     let newStartTime: Date | null = null;
     let newEndTime: Date | null = null;
     if (hasTimeOrAllocationChange) {
@@ -333,10 +328,6 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       );
     }
 
-    if (dentistScopeChanged && serviceId === undefined) {
-      return createErrorResponse('Selecteaza un serviciu valid pentru medicul ales.', 400);
-    }
-
     if (serviceId !== undefined) {
       if (!effectiveServiceOwnerScope) {
         return createErrorResponse('Assigned dentist context is missing for this appointment', 400);
@@ -357,10 +348,6 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
     const shouldUpdateClient =
       clientName !== undefined || clientEmail !== undefined || clientPhone !== undefined;
-
-    if (dentistScopeChanged && !shouldUpdateClient) {
-      return createErrorResponse('Selecteaza un pacient valid pentru medicul ales.', 400);
-    }
 
     if (shouldUpdateClient) {
       const normalizedName = (clientName ?? existingAppointment.client_name ?? '').trim();
@@ -403,8 +390,36 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       updates.client_phone = normalizedPhone;
     }
 
-    if (category !== undefined) {
-      updates.category = category || null;
+    if (canUseAppointmentCategories && categoryId !== undefined) {
+      if (categoryId === null) {
+        updates.category = null;
+        updates.category_label = null;
+        updates.category_color = null;
+      } else {
+        if (!effectiveServiceOwnerScope) {
+          return createErrorResponse('Assigned dentist context is missing for this appointment', 400);
+        }
+        const resolvedCategory = await resolveAppointmentCategoryForWrite({
+          db,
+          tenantId: effectiveServiceOwnerScope.serviceOwnerTenantId,
+          userId: effectiveServiceOwnerScope.serviceOwnerUserId,
+          categoryId,
+        });
+        if (!resolvedCategory) {
+          return createErrorResponse('Selected category was not found for the assigned dentist', 400);
+        }
+        updates.category = resolvedCategory.key;
+        updates.category_label = resolvedCategory.label;
+        updates.category_color = resolvedCategory.color;
+      }
+    } else if (canUseAppointmentCategories && category !== undefined) {
+      const nextCategory = category || null;
+      const currentCategory = existingAppointment.category || null;
+      if (nextCategory !== currentCategory) {
+        updates.category = nextCategory;
+        updates.category_label = null;
+        updates.category_color = null;
+      }
     }
 
     if (color !== undefined) {
@@ -433,9 +448,17 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
     const previousClientId = typeof existingAppointment.client_id === 'number' ? existingAppointment.client_id : null;
 
+    let conflictWarningData: {
+      conflicts: unknown[];
+      suggestions: Array<{ start: Date; end: Date }>;
+    } = {
+      conflicts: [],
+      suggestions: [],
+    };
+
     type PatchResult =
-      | { kind: 'conflict'; conflicts: unknown[]; suggestions: { start: Date; end: Date }[] }
       | { kind: 'not_found' }
+      | { kind: 'availability_conflict'; conflicts: unknown[]; suggestions: Array<{ start: Date; end: Date }> }
       | { kind: 'ok'; doc: any };
 
     const runMutation = async (): Promise<PatchResult> => {
@@ -449,14 +472,16 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
           true,
           {
             calendarId: appointmentCalendarId,
+            dentistUserId: effectiveServiceOwnerScope?.serviceOwnerUserId ?? appointmentDentistId ?? appointmentUserId,
+            dentistTenantId: effectiveServiceOwnerScope?.serviceOwnerTenantId ?? appointmentTenantId,
           }
         );
-        if (conflictCheck.hasConflict) {
-          return {
-            kind: 'conflict',
-            conflicts: conflictCheck.conflicts,
-            suggestions: conflictCheck.suggestions,
-          };
+        conflictWarningData = {
+          conflicts: conflictCheck.conflicts,
+          suggestions: conflictCheck.suggestions,
+        };
+        if (hasAvailabilityBlockConflict(conflictCheck.conflicts)) {
+          return { kind: 'availability_conflict', conflicts: conflictCheck.conflicts, suggestions: conflictCheck.suggestions };
         }
       }
 
@@ -471,31 +496,14 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       return { kind: 'ok', doc };
     };
 
-    const patchResult: PatchResult =
-      hasTimeOrAllocationChange && newStartTime && newEndTime
-        ? await withAppointmentWriteLocks(
-            {
-              tenantId: appointmentTenantId,
-              userId: appointmentUserId,
-              calendarId: appointmentCalendarId,
-              startTime: newStartTime,
-              endTime: newEndTime,
-              timeZone: appointmentTimeZone,
-            },
-            runMutation
-          )
-        : await runMutation();
+    const patchResult: PatchResult = await runMutation();
 
-    if (patchResult.kind === 'conflict') {
+    if (patchResult.kind === 'availability_conflict') {
       return NextResponse.json(
         {
-          error: 'Time slot conflicts with existing appointment or blocked time',
-          conflicts: patchResult.conflicts.map(formatConflictPayload),
-          suggestions: patchResult.suggestions.map((slot) => ({
-            startTime: slot.start.toISOString(),
-            endTime: slot.end.toISOString(),
-            reason: 'Interval alternativ disponibil',
-          })),
+          error: 'Intervalul este blocat in calendar.',
+          conflicts: patchResult.conflicts.map(formatAppointmentConflictPayload),
+          suggestions: formatAppointmentConflictSuggestions(patchResult.suggestions),
         },
         { status: 409 }
       );
@@ -535,10 +543,27 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
           true,
           {
             calendarId: typeof appointmentDoc.calendar_id === 'number' ? appointmentDoc.calendar_id : undefined,
+            dentistUserId: typeof appointmentDoc.service_owner_user_id === 'number'
+              ? appointmentDoc.service_owner_user_id
+              : typeof appointmentDoc.dentist_id === 'number'
+                ? appointmentDoc.dentist_id
+                : appointmentDoc.user_id,
+            dentistTenantId: getServiceOwnerScopeFromAppointment(appointmentDoc)?.serviceOwnerTenantId ?? appointmentTenantId,
           }
         );
+        if (hasAvailabilityBlockConflict(conflictCheck.conflicts)) {
+          return NextResponse.json(
+            {
+              error: 'Una sau mai multe programari recurente cad peste un blocaj de disponibilitate.',
+              conflicts: conflictCheck.conflicts.map(formatAppointmentConflictPayload),
+              suggestions: formatAppointmentConflictSuggestions(conflictCheck.suggestions),
+            },
+            { status: 409 }
+          );
+        }
         if (conflictCheck.hasConflict) {
-          continue;
+          conflictWarningData.conflicts.push(...conflictCheck.conflicts);
+          conflictWarningData.suggestions.push(...conflictCheck.suggestions);
         }
 
         const nextRecurringId = await getNextNumericId('appointments');
@@ -565,6 +590,8 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
           end_time: instance.end.toISOString(),
           status: 'scheduled',
           category: appointmentDoc.category || null,
+          category_label: appointmentDoc.category_label || null,
+          category_color: appointmentDoc.category_color || null,
           color: appointmentDoc.color || null,
           notes: appointmentDoc.notes || null,
           price_at_time: appointmentDoc.price_at_time ?? null,
@@ -631,16 +658,21 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       userId: appointmentUserId,
       calendarId: appointmentCalendarId,
     });
-    return createSuccessResponse({ appointment: stripMongoId(appointmentDoc), warning });
+    const conflictWarning = getAppointmentConflictWarning(conflictWarningData.conflicts);
+    const responseWarning = [warning, conflictWarning].filter(Boolean).join(' ') || null;
+
+    return createSuccessResponse({
+      appointment: stripMongoId(appointmentDoc),
+      warning: responseWarning,
+      conflicts: conflictWarningData.conflicts.map(formatAppointmentConflictPayload),
+      suggestions: formatAppointmentConflictSuggestions(conflictWarningData.suggestions),
+    });
   } catch (error) {
     if (error instanceof ExplicitClientSelectionError) {
       return createErrorResponse(error.message, 409);
     }
-    if (error instanceof AppointmentWriteBusyError) {
-      return createErrorResponse(
-        'Another booking is being updated for this slot. Please try again.',
-        409
-      );
+    if (error instanceof Error && error.message === 'AVAILABILITY_BLOCK_CONFLICT') {
+      return createErrorResponse('Una sau mai multe programari recurente cad peste un blocaj de disponibilitate.', 409);
     }
     return handleApiError(error, 'Failed to update appointment');
   }
@@ -732,8 +764,17 @@ async function syncRecurringSeriesFromAnchor({
       true,
       {
         calendarId: typeof anchorAppointment.calendar_id === 'number' ? anchorAppointment.calendar_id : undefined,
+        dentistUserId: typeof anchorAppointment.service_owner_user_id === 'number'
+          ? anchorAppointment.service_owner_user_id
+          : typeof anchorAppointment.dentist_id === 'number'
+            ? anchorAppointment.dentist_id
+            : anchorAppointment.user_id,
+        dentistTenantId: getServiceOwnerScopeFromAppointment(anchorAppointment)?.serviceOwnerTenantId ?? tenantId,
       }
     );
+    if (hasAvailabilityBlockConflict(conflictCheck.conflicts)) {
+      throw new Error('AVAILABILITY_BLOCK_CONFLICT');
+    }
     if (conflictCheck.hasConflict) {
       continue;
     }
@@ -762,6 +803,8 @@ async function syncRecurringSeriesFromAnchor({
       end_time: desired.end.toISOString(),
       status: 'scheduled',
       category: anchorAppointment.category || null,
+      category_label: anchorAppointment.category_label || null,
+      category_color: anchorAppointment.category_color || null,
       color: anchorAppointment.color || null,
       notes: anchorAppointment.notes || null,
       price_at_time: anchorAppointment.price_at_time ?? null,
@@ -801,6 +844,8 @@ async function syncRecurringSeriesFromAnchor({
               client_email: anchorAppointment.client_email || null,
               client_phone: anchorAppointment.client_phone || null,
               category: anchorAppointment.category || null,
+              category_label: anchorAppointment.category_label || null,
+              category_color: anchorAppointment.category_color || null,
               color: anchorAppointment.color || null,
               notes: anchorAppointment.notes || null,
               recurrence: anchorAppointment.recurrence,
@@ -870,6 +915,35 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
     if (result.matchedCount === 0) {
       return createErrorResponse('Not found or not authorized', 404);
     }
+
+    // Optional bulk delete: when `?scope=series` is passed and the anchor is
+    // part of a recurring series, soft-delete every other instance in the
+    // group. Authorization is established via the anchor delete above; all
+    // instances in a recurrence_group share calendar_id/user_id/tenant_id by
+    // construction (see /api/appointments/recurring), so anchor permission is
+    // sufficient. Single-delete (no scope) remains the default behaviour.
+    const url = new URL(request.url);
+    const scope = url.searchParams.get('scope');
+    let seriesDeletedCount = 0;
+    if (scope === 'series' && existingAppointment.recurrence_group_id) {
+      const seriesResult = await db.collection('appointments').updateMany(
+        {
+          tenant_id: existingAppointment.tenant_id,
+          recurrence_group_id: existingAppointment.recurrence_group_id,
+          deleted_at: { $exists: false },
+          id: { $ne: appointmentId },
+        },
+        {
+          $set: {
+            deleted_at: new Date().toISOString(),
+            deleted_by: userId,
+            updated_at: new Date().toISOString(),
+          },
+        }
+      );
+      seriesDeletedCount = seriesResult.modifiedCount;
+    }
+
     if (typeof existingAppointment.client_id === 'number') {
       const clientScope = getServiceOwnerScopeFromAppointment(existingAppointment);
       await updateClientStats(
@@ -882,7 +956,7 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
       userId: existingAppointment.user_id,
       calendarId: typeof existingAppointment.calendar_id === 'number' ? existingAppointment.calendar_id : undefined,
     });
-    return new NextResponse(null, { status: 204 });
+    return NextResponse.json({ seriesDeletedCount: seriesDeletedCount + 1 }, { status: 200 });
   } catch (error) {
     return handleApiError(error, 'Failed to delete appointment');
   }

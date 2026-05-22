@@ -1,0 +1,735 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Mobile appointment sheet — iOS Google-Calendar-inspired bottom sheet.
+   Full-screen on phones, dark theme, list-of-rows layout with subtle dividers.
+───────────────────────────────────────────────────────────────────────────── */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.5);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 180ms ease-out;
+  touch-action: none;
+}
+
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg);
+  color: var(--color-text);
+  animation: slideUp 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  overscroll-behavior: contain;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+/* ── Top bar ─────────────────────────────────────────────────────────────── */
+.topBar {
+  position: relative;
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: max(env(safe-area-inset-top), 0.6rem) 1rem 0.5rem;
+  background: var(--color-bg);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+}
+
+.dragHandle {
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-text-soft) 50%, transparent);
+  justify-self: center;
+  margin-top: 0.25rem;
+}
+
+.topBarCenter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.15rem 0 0.1rem;
+}
+
+.topBarTitle {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--color-text-soft);
+  letter-spacing: 0.01em;
+}
+
+.actionBtn {
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  border: 0;
+  padding: 0.5rem 0.25rem;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-accent);
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: -0.01em;
+}
+
+.actionBtn:disabled {
+  color: color-mix(in srgb, var(--color-text-soft) 70%, transparent);
+  cursor: not-allowed;
+}
+
+.actionBtnPrimary {
+  font-weight: 700;
+  justify-self: end;
+}
+
+.actionBtnLeft {
+  justify-self: start;
+  font-weight: 500;
+}
+
+.iconHeaderBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: none;
+  border: 0;
+  color: var(--color-text-soft);
+  cursor: pointer;
+  padding: 0;
+  margin-left: 0.25rem;
+}
+
+.iconHeaderBtn:hover {
+  background: color-mix(in srgb, var(--color-text-soft) 12%, transparent);
+  color: var(--color-text);
+}
+
+.iconHeaderBtnDanger:hover {
+  background: color-mix(in srgb, var(--color-danger-text) 15%, transparent);
+  color: var(--color-danger-text);
+}
+
+.headerActionGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  justify-self: end;
+}
+
+/* ── Body ────────────────────────────────────────────────────────────────── */
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 1.5rem);
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Recurring instance banner ───────────────────────────────────────────── */
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  padding: 0.7rem 1rem;
+  margin: 0.85rem 1rem 0;
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 28%, transparent);
+  border-radius: 12px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--color-text);
+}
+
+.bannerIcon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  opacity: 0.75;
+}
+
+/* ── Section + row pattern ──────────────────────────────────────────────── */
+.section {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
+}
+
+.section:last-child {
+  border-bottom: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.9rem 1rem;
+  min-height: 56px;
+  background: transparent;
+  border: 0;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  font-size: 1rem;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.rowStatic {
+  cursor: default;
+}
+
+.rowDanger {
+  color: var(--color-danger-text);
+}
+
+.rowIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--color-text-soft);
+  opacity: 0.85;
+}
+
+.rowMain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.rowLabel {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--color-text);
+  line-height: 1.3;
+}
+
+.rowLabelMuted {
+  color: var(--color-text-soft);
+  font-weight: 400;
+}
+
+.rowValue {
+  font-size: 0.82rem;
+  color: var(--color-text-soft);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowChevron {
+  flex-shrink: 0;
+  color: var(--color-text-soft);
+  opacity: 0.5;
+  transition: transform 200ms ease;
+}
+
+.rowChevronOpen {
+  transform: rotate(90deg);
+}
+
+.rowTrailing {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--color-text-soft);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Inline input rows (name/email/phone) ───────────────────────────────── */
+.inputRow {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 1rem;
+  min-height: 56px;
+}
+
+.inputBare {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 0;
+  outline: none;
+  width: 100%;
+  font-family: inherit;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--color-text);
+  padding: 0;
+  letter-spacing: -0.005em;
+}
+
+.inputBare::placeholder {
+  color: color-mix(in srgb, var(--color-text-soft) 80%, transparent);
+  font-weight: 400;
+}
+
+.inputBare:disabled {
+  color: var(--color-text-soft);
+  cursor: not-allowed;
+}
+
+.textareaBare {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 0;
+  outline: none;
+  width: 100%;
+  font-family: inherit;
+  font-size: 0.95rem;
+  color: var(--color-text);
+  padding: 0;
+  resize: none;
+  min-height: 24px;
+  line-height: 1.4;
+}
+
+.textareaBare::placeholder {
+  color: color-mix(in srgb, var(--color-text-soft) 80%, transparent);
+}
+
+.inputRowWithLabel {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  align-items: start;
+  gap: 0.85rem;
+  padding: 0.85rem 1rem;
+}
+
+.inputRowMain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.inputRowLabel {
+  font-size: 0.73rem;
+  font-weight: 500;
+  color: var(--color-text-soft);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ── Time block (inline date + start/end) ───────────────────────────────── */
+.timeBlock {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  align-items: start;
+  gap: 0.85rem;
+  padding: 0.95rem 1rem 1rem;
+}
+
+.timeBlockMain {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.timeBlockGroup {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.45rem 0;
+  margin: 0;
+  cursor: default;
+  -webkit-tap-highlight-color: transparent;
+  border-radius: 8px;
+}
+
+.timeBlockGroupDisabled {
+  opacity: 0.72;
+}
+
+/* Only the right-hand value area opens the picker. Generous padding via negative
+   margin gives a comfortable touch surface without pushing the value visually
+   away from its right-edge alignment. The label on the left stays inert. */
+.timeBlockValueArea {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 96px;
+  padding: 0.4rem 0.55rem;
+  margin: -0.4rem -0.55rem;
+  border-radius: 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  transition: background 120ms ease;
+}
+
+.timeBlockValueArea:active {
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+
+.timeBlockLabel {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.nativeDateInput,
+.nativeTimeInput {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--color-text-soft);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+  padding: 0.25rem 0;
+  text-align: right;
+  outline: none;
+  min-height: unset;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 999px;
+}
+
+.nativeDateInput {
+  width: auto;
+  min-width: 130px;
+}
+
+.nativeTimeInput {
+  width: auto;
+  min-width: 64px;
+}
+
+/* Hide the native iOS calendar/clock picker indicator; the value text itself
+   is the picker target so the left-side labels remain inert. */
+.nativeDateInput::-webkit-calendar-picker-indicator,
+.nativeTimeInput::-webkit-calendar-picker-indicator {
+  display: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.nativeDateInput::-webkit-date-and-time-value,
+.nativeTimeInput::-webkit-date-and-time-value {
+  text-align: right;
+  min-height: 1.2em;
+}
+
+.timeDuration {
+  font-size: 0.78rem;
+  color: var(--color-text-soft);
+  margin-top: -0.25rem;
+}
+
+/* ── Expanded selector content (chips, options) ─────────────────────────── */
+.expanded {
+  padding: 0.25rem 1rem 1rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  animation: revealDown 180ms ease-out;
+}
+
+@keyframes revealDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-surface) 85%, transparent);
+  color: var(--color-text);
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.9rem;
+  width: 100%;
+  text-align: left;
+  font-weight: 500;
+}
+
+.option:hover,
+.option:active {
+  background: color-mix(in srgb, var(--color-surface) 95%, transparent);
+}
+
+.optionSelected {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+  color: var(--color-text);
+}
+
+.optionMeta {
+  font-size: 0.75rem;
+  color: var(--color-text-soft);
+}
+
+.optionDot {
+  flex-shrink: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-text-soft);
+}
+
+/* ── Pill chip row (for category-style displays) ────────────────────────── */
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.42rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
+  background: transparent;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.chipSelected {
+  background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent) 60%, transparent);
+}
+
+.chipDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* ── iOS-style toggle ───────────────────────────────────────────────────── */
+.toggle {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 30px;
+  flex-shrink: 0;
+}
+
+.toggleInput {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggleTrack {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--color-text-soft) 35%, transparent);
+  border-radius: 999px;
+  transition: background 180ms ease;
+  cursor: pointer;
+}
+
+.toggleThumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 180ms ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.toggleInput:checked + .toggleTrack {
+  background: var(--color-accent);
+}
+
+.toggleInput:checked + .toggleTrack .toggleThumb {
+  transform: translateX(20px);
+}
+
+/* ── Recurrence expanded options ────────────────────────────────────────── */
+.recurrenceGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+
+.recurrenceField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.recurrenceFieldLabel {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-soft);
+  font-weight: 600;
+}
+
+.recurrenceSelect,
+.recurrenceInput {
+  appearance: none;
+  -webkit-appearance: none;
+  background: color-mix(in srgb, var(--color-surface) 85%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: 10px;
+  padding: 0.55rem 0.8rem;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 0.92rem;
+  outline: none;
+  min-height: 40px;
+}
+
+.recurrenceSelect:focus,
+.recurrenceInput:focus {
+  border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+}
+
+/* ── Error + hint text ──────────────────────────────────────────────────── */
+/* Sticky at top of the scrolling body so a validation error stays visible
+   while the user scrolls down to fix the field that's missing. The `top: 0`
+   pins it just under the top bar; z-index keeps it above accordion content. */
+.error {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  margin: 0 1rem;
+  padding: 0.7rem 0.9rem;
+  background: color-mix(in srgb, var(--color-danger-text) 18%, var(--color-bg));
+  border: 1px solid color-mix(in srgb, var(--color-danger-text) 38%, transparent);
+  border-radius: 0 0 12px 12px;
+  color: var(--color-danger-text);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  margin-top: 0;
+  box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.35);
+}
+
+/* ── Patient name autocomplete dropdown ─────────────────────────────────── */
+.autocompleteWrapper {
+  position: relative;
+  width: 100%;
+}
+
+.autocomplete {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: -2.7rem;
+  right: -1rem;
+  z-index: 5;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  max-height: 260px;
+  overflow-y: auto;
+  box-shadow: 0 14px 40px -10px rgba(0, 0, 0, 0.6);
+  padding: 0.3rem;
+}
+
+.autocompleteItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 8px;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  color: var(--color-text);
+}
+
+.autocompleteItem:hover,
+.autocompleteItemActive {
+  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+}
+
+.autocompleteName {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.autocompleteMeta {
+  font-size: 0.76rem;
+  color: var(--color-text-soft);
+}
+
+.autocompleteEmpty {
+  padding: 0.7rem 0.85rem;
+  color: var(--color-text-soft);
+  font-size: 0.85rem;
+}
+
+/* Linked patient badge (replaces input when a client is selected) */
+.linkedBadge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  background: color-mix(in srgb, var(--color-success-text) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-success-text) 30%, transparent);
+  border-radius: 10px;
+  color: var(--color-text);
+  font-size: 0.88rem;
+  font-weight: 500;
+  width: 100%;
+}
+
+.linkedBadgeClear {
+  background: none;
+  border: 0;
+  color: var(--color-text-soft);
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0 0.3rem;
+  line-height: 1;
+}
+
+.linkedBadgeClear:hover {
+  color: var(--color-danger-text);
+}
+
+.newClientBadge {
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.7rem;
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: var(--color-text-soft);
+  font-weight: 500;
+}

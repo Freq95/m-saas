@@ -13,318 +13,744 @@
   flex-wrap: wrap;
 }
 
-.seatsLabel {
-  margin: 0 0 var(--space-4);
-  font-size: 0.88rem;
-  color: var(--color-text-muted);
-}
-
-.tableWrap {
+/* ── Surface ────────────────────────────────────────────────── */
+.surface {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   overflow: hidden;
 }
 
-.mobileMemberList {
-  display: none;
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.table th,
-.table td {
-  text-align: left;
-  padding: var(--space-4);
+.surfaceHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--color-border);
-  color: var(--color-text);
-  vertical-align: middle;
+  flex-wrap: wrap;
 }
 
-.table th {
-  color: var(--color-text-soft);
-  font-size: 0.88rem;
+.surfaceTitle {
+  margin: 0;
+  font-size: 1rem;
   font-weight: 600;
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+
+.surfaceMeta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+/* ── Seat hero ──────────────────────────────────────────────── */
+.seatHero {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.seatLabel strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.seatTrack {
+  position: relative;
+  width: 64px;
+  height: 2px;
+  background: var(--color-surface-muted);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.seatTrack > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--color-warning, #f59e0b);
+  border-radius: inherit;
+  transition: width var(--transition-fast);
+}
+
+/* ── Split-button invite ────────────────────────────────────── */
+.splitWrap {
+  display: inline-flex;
+  align-items: stretch;
+  border-radius: var(--radius-md);
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+  overflow: hidden;
+}
+
+.splitMain,
+.splitCaret {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 var(--space-3);
+  min-height: 32px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: background var(--transition-fast);
+}
+
+.splitMain {
+  padding-right: var(--space-3);
+}
+
+.splitMain:hover {
+  background: color-mix(in srgb, white 8%, transparent);
+}
+
+.splitCaret {
+  padding: 0 var(--space-2);
+  border-left: 1px solid color-mix(in srgb, white 20%, transparent);
+}
+
+.splitCaret:hover,
+.splitCaretOpen {
+  background: color-mix(in srgb, white 12%, transparent);
+}
+
+/* ── Floating menu (split-button dropdown + popovers) ───────── */
+.menu {
+  z-index: 100;
+  min-width: 200px;
+  padding: 0.3rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+  display: grid;
+  gap: 0.1rem;
+}
+
+.menuItem {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.menuItem:hover,
+.menuItem:focus-visible {
+  background: var(--color-surface-muted);
+  outline: none;
+}
+
+/* ── Roster list ────────────────────────────────────────────── */
+.list {
+  display: grid;
+}
+
+.cluster {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.cluster:last-child {
+  border-bottom: 0;
+}
+
+.clusterWarning {
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 6%, transparent);
+}
+
+.warningHeader {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: var(--space-3) var(--space-5) 0;
+  color: color-mix(in srgb, var(--color-warning, #f59e0b) 70%, var(--color-text));
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* ── Member row ─────────────────────────────────────────────── */
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  min-height: 48px;
+  position: relative;
 }
 
 .row:hover {
   background: var(--color-surface-muted);
 }
 
-.table tr:last-child td {
-  border-bottom: none;
+.row:hover .overflowButton {
+  opacity: 1;
 }
 
-.statusBadge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  font-size: 0.78rem;
+/* Subtle accent dot for dentist rows — tied to their calendar color */
+.rowDentist::before {
+  content: '';
+  position: absolute;
+  left: var(--space-4);
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--row-accent, var(--color-accent));
+  transform: translate(-50%, -50%);
+  opacity: 0.85;
+}
+
+.rowDentist {
+  padding-left: calc(var(--space-5) + 6px);
+}
+
+.rowName {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.rowNameText {
+  color: var(--color-text);
+  font-size: 0.92rem;
   font-weight: 500;
-  background: var(--color-surface-muted);
-  color: var(--color-text-soft);
+  letter-spacing: -0.005em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.status_active {
-  background: color-mix(in srgb, var(--color-success) 15%, transparent);
-  color: var(--color-success-text);
+.rowMeta {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.status_pending {
-  background: color-mix(in srgb, var(--color-warning, #f59e0b) 15%, transparent);
-  color: color-mix(in srgb, var(--color-warning, #f59e0b) 80%, var(--color-text));
-}
-
-.primaryButton,
-.secondaryButton {
-  min-height: 36px;
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-4);
+.rowTag {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent);
+  font-size: 0.68rem;
   font-weight: 600;
-  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+  letter-spacing: 0.02em;
 }
 
-.primaryButton {
+.tagYou {
+  /* same vocabulary as rowTag — neutral palette */
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+}
+
+/* Subtle "în așteptare" pill — same shape as tagYou, amber palette to match
+   the orphan-asistent warning band so "pending" reads consistently. */
+.tagPending {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 14%, transparent);
+  color: color-mix(in srgb, var(--color-warning, #f59e0b) 75%, var(--color-text));
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+}
+
+/* Pending rows render slightly muted so accepted teammates feel "primary"
+   and pending ones feel "queued" — but never invisible. */
+.rowPending .rowNameText {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.rowActions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  justify-self: end;
+}
+
+.overflowButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+
+.row:hover .overflowButton {
+  opacity: 1;
+}
+
+.overflowButton:hover,
+.overflowButton:focus-visible,
+.overflowOpen {
+  opacity: 1;
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+}
+
+.overflowButton:focus-visible,
+.overflowOpen {
+  outline: 1px solid var(--color-border);
+}
+
+/* ── Nested asistent rows ─────────────────────────────────────
+   Hierarchy is shown by **indentation only**. No vertical rail,
+   no horizontal stub, no glyph — calm and uncluttered. The
+   asistent row sits clearly under its dentist by virtue of its
+   left padding. */
+.branch {
+  display: grid;
+  padding-left: calc(var(--space-5) + 18px);
+}
+
+.rowNested {
+  padding-left: var(--space-2);
+  min-height: 38px;
+}
+
+.rowNested .rowNameText {
+  font-weight: 500;
+  font-size: 0.88rem;
+  color: var(--color-text);
+}
+
+.rowNested:hover {
+  background: color-mix(in srgb, var(--color-surface-muted) 75%, transparent);
+}
+
+/* ── Warning row affordances ────────────────────────────────── */
+.rowWarning .rowNameText {
+  color: var(--color-text);
+}
+
+.assignButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 28px;
+  padding: 0 0.7rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--color-warning, #f59e0b) 50%, transparent);
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 14%, transparent);
+  color: color-mix(in srgb, var(--color-warning, #f59e0b) 75%, var(--color-text));
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.assignButton:hover {
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 22%, transparent);
+}
+
+/* ── Edit popover ─────────────────────────────────────────────
+   Compact across breakpoints. Floating-ui's `size` middleware
+   sets max-height/max-width inline so the popover never clips
+   the viewport — `overflow-y: auto` here lets tall content
+   scroll inside that envelope. */
+.popover {
+  z-index: 100;
+  width: 240px;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+  display: grid;
+  gap: 0.55rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.popoverHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.popoverHeader strong {
+  color: var(--color-text);
+  font-size: 0.88rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popoverEmail {
+  margin-top: -4px;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popoverClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.popoverClose:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+}
+
+.popoverField {
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  margin-top: 0.1rem;
+}
+
+.roleRadioGroup {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.roleRadio {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.32rem 0.4rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.roleRadio:hover {
+  background: var(--color-surface-muted);
+}
+
+.roleRadio input {
+  accent-color: var(--color-accent);
+}
+
+.roleRadio span {
+  font-size: 0.82rem;
+  color: var(--color-text);
+}
+
+.dentistChecklist {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.dentistCheck {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 0.4rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.dentistCheck:hover {
+  background: var(--color-surface-muted);
+}
+
+.dentistCheck input {
+  accent-color: var(--color-accent);
+}
+
+.dentistCheck span {
+  font-size: 0.8rem;
+  color: var(--color-text);
+}
+
+.popoverNote {
+  margin: 0;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.popoverActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+.popoverPrimary,
+.popoverSecondary {
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 0.38rem 0.7rem;
+  min-height: 30px;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.popoverPrimary {
   background: var(--color-accent);
   color: var(--color-text-on-accent);
-  border-color: transparent;
-  transition: background var(--transition-fast), transform var(--transition-fast);
 }
 
-.primaryButton:hover:not(:disabled) {
+.popoverPrimary:hover:not(:disabled) {
   background: var(--color-accent-strong, var(--color-accent));
   transform: translateY(-1px);
 }
 
-.secondaryButton {
-  background: var(--color-surface-muted);
+.popoverSecondary {
+  background: var(--color-surface);
   color: var(--color-text);
   border-color: var(--color-border);
 }
 
-.secondaryButton:hover:not(:disabled) {
-  background: var(--color-surface);
+.popoverSecondary:hover:not(:disabled) {
+  background: var(--color-surface-muted);
 }
 
-.primaryButton:disabled,
-.secondaryButton:disabled,
-.iconButton:disabled {
+.popoverPrimary:disabled,
+.popoverSecondary:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-.formCard {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-5);
-  margin-bottom: var(--space-5);
+.popoverDanger {
+  align-self: flex-start;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 0.74rem;
+  color: var(--color-danger);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, var(--color-danger) 40%, transparent);
 }
 
-.formTitle {
-  margin: 0 0 var(--space-4);
-  font-size: 0.95rem;
-  font-weight: 600;
+.popoverDanger:hover {
+  text-decoration-color: var(--color-danger);
+}
+
+/* ── Invite form ────────────────────────────────────────────── */
+.inviteCard {
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-4) var(--space-5);
+  background: color-mix(in srgb, var(--color-accent) 4%, transparent);
+}
+
+.inviteHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  font-size: 0.85rem;
   color: var(--color-text);
 }
 
-.formGrid {
+.inviteClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.inviteClose:hover:not(:disabled) {
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+}
+
+.inviteGrid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  color: var(--color-text-soft);
+  gap: 0.3rem;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+.field input,
+.field select {
+  width: 100%;
+  min-height: 34px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 0.4rem 0.55rem;
   font-size: 0.88rem;
 }
 
-.field input {
-  width: 100%;
-  min-height: 36px;
-  background: var(--color-surface-muted);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-text);
-  padding: var(--space-2) var(--space-3);
+.field select[multiple] {
+  min-height: 80px;
+  padding: 0.3rem 0.4rem;
 }
 
-.field input:focus {
+.field input:focus,
+.field select:focus {
   border-color: var(--color-accent);
   outline: none;
 }
 
-.field input:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.formActions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
-}
-
-.actionGroup {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-2);
-}
-
-.iconButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  color: var(--color-text-soft);
-  cursor: pointer;
-  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
-}
-
-.iconButton:hover:not(:disabled) {
+.inviteError {
+  margin: var(--space-3) 0 0;
   color: var(--color-danger);
-  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
-  border-color: color-mix(in srgb, var(--color-danger) 30%, transparent);
+  font-size: 0.85rem;
 }
 
-.error {
+.inviteActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
   margin-top: var(--space-3);
-  color: var(--color-danger);
-  font-size: 0.88rem;
 }
 
+/* ── Empty state CTA (only owner) ───────────────────────────── */
 .emptyState {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-4);
+  margin-top: var(--space-4);
+  padding: var(--space-4) var(--space-5);
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
-  padding: var(--space-6);
-  color: var(--color-text-soft);
-}
-
-.mobileMemberItem {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 68px;
-  padding: var(--space-3) var(--space-4);
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.mobileMemberItem:first-child {
-  border-top-left-radius: var(--radius-lg);
-  border-top-right-radius: var(--radius-lg);
-}
-
-.mobileMemberItem:last-child {
-  border-bottom: 0;
-  border-bottom-right-radius: var(--radius-lg);
-  border-bottom-left-radius: var(--radius-lg);
-}
-
-.mobileMemberMain {
-  flex: 1;
-  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.18rem;
-}
-
-.mobileMemberName {
-  overflow: hidden;
-  color: var(--color-text);
-  font-size: 0.98rem;
-  font-weight: 650;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mobileMemberEmail {
-  overflow: hidden;
+  gap: var(--space-3);
   color: var(--color-text-muted);
-  font-size: 0.82rem;
-  line-height: 1.3;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 0.88rem;
 }
 
-.mobileMemberMeta {
+.emptyState p {
+  margin: 0;
+}
+
+.emptyActions {
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--color-text-muted);
-  font-size: 0.82rem;
-  line-height: 1.3;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
-.mobileMemberDot {
-  color: var(--color-text-soft);
-}
-
-.mobileRemoveButton {
-  flex: 0 0 auto;
-  min-width: 64px;
-  min-height: 44px;
-  padding: 0 var(--space-3);
-  border: 1px solid color-mix(in srgb, var(--color-danger) 36%, transparent);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--color-danger);
-  font-size: 0.82rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.mobileRemoveButton:active {
-  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
-}
-
+/* ── Mobile (≤640px) ───────────────────────────────────────── */
 @media (max-width: 640px) {
   .container {
-    padding: var(--space-6) var(--space-4);
+    padding: var(--space-5) var(--space-4);
   }
 
-  .tabRow {
-    align-items: stretch;
-    flex-direction: column;
-    flex-wrap: nowrap;
+  .surfaceHeader {
+    padding: var(--space-4);
   }
 
-  .formGrid {
+  .row {
+    padding: var(--space-3) var(--space-4);
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .row .rowMeta {
+    grid-column: 1;
+    grid-row: 2;
+    margin-top: 2px;
+  }
+
+  .branch {
+    padding-left: calc(var(--space-4) + 18px);
+  }
+
+  .rowDentist {
+    padding-left: calc(var(--space-4) + 6px);
+  }
+
+  .rowDentist::before {
+    left: var(--space-3);
+  }
+
+  .warningHeader {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
+
+  .overflowButton {
+    /* Always visible on touch — no hover state */
+    opacity: 1;
+  }
+
+  .inviteCard {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .inviteGrid {
     grid-template-columns: 1fr;
   }
 
-  .table {
+  .splitMain span {
+    /* Compact on tight screens */
     display: none;
   }
 
-  .tableWrap {
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-  }
-
-  .mobileMemberList {
-    display: block;
-    margin: 0;
-    padding: 0;
-    list-style: none;
+  .splitMain {
+    padding: 0 var(--space-2);
   }
 }

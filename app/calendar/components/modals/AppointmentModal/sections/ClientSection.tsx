@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'react';
+import { memo, useEffect, useId, useRef, useState } from 'react';
 import styles from '../../../../page.module.css';
 import { useClientSuggestions } from '../useClientSuggestions';
 import type { ClientSuggestion } from '../types';
@@ -25,7 +25,7 @@ interface ClientSectionProps {
   isOwnDentist?: boolean;
 }
 
-export function ClientSection({
+function ClientSectionBase({
   isOpen,
   clientName,
   clientEmail,
@@ -55,6 +55,7 @@ export function ClientSection({
     error,
     resolvedQuery,
     hasExactNameMatch,
+    exactMatch,
   } = useClientSuggestions({
     isOpen: isOpen && !readOnly && isFocused,
     query: clientName,
@@ -112,7 +113,7 @@ export function ClientSection({
     return (
       <>
         <div className={styles.modalField}>
-          <label>Client</label>
+          <label>Pacient</label>
           <div className={styles.previewValue}>{clientName || '—'}</div>
         </div>
         {(clientEmail || clientPhone) && (
@@ -145,6 +146,18 @@ export function ClientSection({
     onApplySuggestion(suggestion);
     setActiveIndex(-1);
     setIsFocused(false);
+  };
+
+  // Auto-link to a uniquely matching existing patient when focus leaves the input.
+  // Prevents duplicate-patient creation when the dentist types a name that already
+  // exists in the chart. `resolvedQuery === trimmed` ensures we only act on a settled
+  // (post-debounce) result, never on a stale match.
+  const handleNameBlur = () => {
+    if (hasLinked) return;
+    if (!exactMatch) return;
+    if (resolvedQuery !== trimmed) return;
+    if (trimmed.length === 0) return;
+    onApplySuggestion(exactMatch);
   };
 
   const handleAutocompleteKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -180,7 +193,7 @@ export function ClientSection({
   return (
     <>
       <div className={styles.modalField}>
-        <label htmlFor="appt-client-name">Nume client *</label>
+        <label htmlFor="appt-client-name">Nume pacient *</label>
         <div className={styles.clientAutocomplete} ref={wrapperRef}>
           <input
             ref={inputRef}
@@ -189,6 +202,7 @@ export function ClientSection({
             value={clientName}
             onChange={(event) => onNameChange(event.target.value)}
             onFocus={() => setIsFocused(true)}
+            onBlur={handleNameBlur}
             onKeyDown={handleAutocompleteKeyDown}
             placeholder="Ion Popescu"
             disabled={disabled}
@@ -248,7 +262,7 @@ export function ClientSection({
             className={`${styles.clientStatusBadge} ${styles.clientStatusBadgeExists}`}
             role="status"
           >
-            <span>✓ Client existent: {clientName}</span>
+            <span>✓ Pacient existent: {clientName}</span>
             <button
               type="button"
               className={styles.clientStatusBadgeClear}
@@ -260,7 +274,7 @@ export function ClientSection({
                   inputRef.current?.focus();
                 });
               }}
-              aria-label="Deconecteaza clientul existent"
+              aria-label="Deconecteaza pacientul existent"
               disabled={disabled}
             >
               ×
@@ -272,7 +286,7 @@ export function ClientSection({
             className={`${styles.clientStatusBadge} ${styles.clientStatusBadgeNew}`}
             role="status"
           >
-            <span>Client nou — va fi creat la salvare</span>
+            <span>Pacient nou — va fi creat la salvare</span>
           </div>
         )}
         {showNewClientBadge && !isOwnDentist && (
@@ -326,3 +340,5 @@ export function ClientSection({
     </>
   );
 }
+
+export const ClientSection = memo(ClientSectionBase);

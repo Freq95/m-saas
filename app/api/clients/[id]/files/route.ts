@@ -4,12 +4,13 @@ import { handleApiError, createSuccessResponse, createErrorResponse } from '@/li
 import { getAuthUser } from '@/lib/auth-helpers';
 import { buildClientStorageKey, getStorageProvider } from '@/lib/storage';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
+import { resolveClientScopeForClient } from '@/lib/client-permissions';
 
 // GET /api/clients/[id]/files - Get files for a client
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
 
@@ -18,10 +19,11 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       return createErrorResponse('Invalid client ID', 400);
     }
 
-    const client = await db.collection('clients').findOne({ id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } });
-    if (!client) {
+    const scope = await resolveClientScopeForClient(auth, clientId);
+    if (!scope) {
       return createErrorResponse('Client not found', 404);
     }
+    const { tenantId } = scope;
 
     let files = await db
       .collection('client_files')
@@ -47,8 +49,8 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
 export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    const { userId, tenantId } = await getAuthUser();
-    const rateLimitResponse = await checkWriteRateLimit(userId);
+    const auth = await getAuthUser();
+    const rateLimitResponse = await checkWriteRateLimit(auth.userId);
     if (rateLimitResponse) return rateLimitResponse;
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
@@ -65,10 +67,11 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       return createErrorResponse('No file provided', 400);
     }
 
-    const client = await db.collection('clients').findOne({ id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } });
-    if (!client) {
+    const scope = await resolveClientScopeForClient(auth, clientId);
+    if (!scope) {
       return createErrorResponse('Client not found', 404);
     }
+    const { tenantId } = scope;
 
     // Validate file size
     const { MAX_FILE_SIZE, ALLOWED_FILE_TYPES } = await import('@/lib/constants');

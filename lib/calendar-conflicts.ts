@@ -1,6 +1,7 @@
 import { getMongoDbOrThrow } from './db/mongo-utils';
 import type { ConflictCheck } from './types/calendar';
 import { ObjectId, type Document, type Filter } from 'mongodb';
+import { findAvailabilityBlockConflicts } from './availability-blocks';
 
 type BusyInterval = Document & {
   start_time: string | Date;
@@ -41,12 +42,22 @@ export async function checkAppointmentConflict(
   includeSuggestions: boolean = true,
   options: {
     calendarId?: number;
+    dentistUserId?: number;
+    dentistTenantId?: ObjectId;
   } = {}
 ): Promise<ConflictCheck> {
   const db = await getMongoDbOrThrow();
   const conflicts: any[] = [];
   const appointmentScope = options.calendarId
-    ? { calendar_id: options.calendarId, tenant_id: tenantId }
+    ? {
+        tenant_id: tenantId,
+        $or: [
+          { calendar_id: options.calendarId },
+          { user_id: userId },
+          { service_owner_user_id: userId },
+          { dentist_id: userId },
+        ],
+      }
     : { user_id: userId, tenant_id: tenantId };
 
   const appointments = await db
@@ -60,12 +71,34 @@ export async function checkAppointmentConflict(
     })
     .toArray();
 
+  const seenAppointmentIds = new Set<number>();
   for (const apt of appointments) {
     if (excludeAppointmentId && apt.id === excludeAppointmentId) continue;
+    if (typeof apt.id === 'number' && seenAppointmentIds.has(apt.id)) continue;
     if (doTimeSlotsOverlap(startTime, endTime, new Date(apt.start_time), new Date(apt.end_time))) {
+      if (typeof apt.id === 'number') {
+        seenAppointmentIds.add(apt.id);
+      }
       conflicts.push({
         type: 'calendar_appointment',
         appointment: apt,
+      });
+    }
+  }
+
+  const availabilityDentistUserId = options.dentistUserId ?? userId;
+  if (availabilityDentistUserId) {
+    const availabilityBlocks = await findAvailabilityBlockConflicts({
+      dentistUserId: availabilityDentistUserId,
+      tenantId: options.dentistTenantId ?? tenantId,
+      startTime,
+      endTime,
+    });
+
+    for (const block of availabilityBlocks) {
+      conflicts.push({
+        type: 'availability_block',
+        block,
       });
     }
   }
@@ -85,7 +118,16 @@ export async function checkAppointmentConflict(
       ...(excludeAppointmentId ? { id: { $ne: excludeAppointmentId } } : {}),
     };
 
-    const busyIntervals = (await db.collection('appointments').find(busyQuery as any).toArray()) as unknown as BusyInterval[];
+    const appointmentBusyIntervals = (await db.collection('appointments').find(busyQuery as any).toArray()) as unknown as BusyInterval[];
+    const availabilityBusyIntervals = availabilityDentistUserId
+      ? await findAvailabilityBlockConflicts({
+          dentistUserId: availabilityDentistUserId,
+          tenantId: options.dentistTenantId ?? tenantId,
+          startTime: endTime,
+          endTime: searchWindowEnd,
+        }) as unknown as BusyInterval[]
+      : [];
+    const busyIntervals = [...appointmentBusyIntervals, ...availabilityBusyIntervals];
 
     let searchStart = new Date(endTime);
     let foundSlots = 0;

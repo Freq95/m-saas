@@ -10,9 +10,10 @@ import { SettingsMobileHeader } from '../SettingsMobileHeader';
 interface AccountSettingsPageClientProps {
   initialName: string;
   initialEmail: string;
+  isOwner?: boolean;
 }
 
-export default function AccountSettingsPageClient({ initialName, initialEmail }: AccountSettingsPageClientProps) {
+export default function AccountSettingsPageClient({ initialName, initialEmail, isOwner }: AccountSettingsPageClientProps) {
   const [name, setName] = useState(initialName);
   const [email, setEmail] = useState(initialEmail);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -96,7 +97,7 @@ export default function AccountSettingsPageClient({ initialName, initialEmail }:
       <div className={styles.container}>
         <SettingsMobileHeader title="Cont" />
         <div className={`${styles.tabRow} ${styles.desktopTabRow}`}>
-          <SettingsTabs activeTab="account" />
+          <SettingsTabs activeTab="account" isOwner={isOwner} />
         </div>
 
         {/* Profile section */}

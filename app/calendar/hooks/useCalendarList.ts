@@ -10,6 +10,7 @@ export interface CalendarListItem {
   color_others: string | null;
   is_default?: boolean;
   is_active?: boolean;
+  owner_user_id?: number;
   isOwner: boolean;
   permissions: CalendarPermissions;
   shareId: number | null;

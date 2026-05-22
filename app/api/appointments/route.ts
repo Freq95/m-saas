@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from '@/lib/db/mongo-utils';
-import { isSlotAvailable } from '@/lib/calendar';
-import { AppointmentWriteBusyError, withAppointmentWriteLocks } from '@/lib/appointment-write-lock';
 import { buildAppointmentDentistFields, resolveAppointmentDentistAssignment } from '@/lib/appointment-service';
+import { checkAppointmentConflict } from '@/lib/calendar-conflicts';
+import {
+  formatAppointmentConflictPayload,
+  formatAppointmentConflictSuggestions,
+  getAppointmentConflictWarning,
+  hasAvailabilityBlockConflict,
+} from '@/lib/appointment-conflict-response';
 import {
   getCalendarAuth,
   getOrCreateDefaultCalendar,
@@ -12,14 +17,16 @@ import { exportToGoogleCalendar } from '@/lib/google-calendar';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { getAppointmentsData } from '@/lib/server/calendar';
 import { getAuthUser } from '@/lib/auth-helpers';
-import { getCached } from '@/lib/redis';
-import { appointmentsListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
+import { invalidateReadCaches } from '@/lib/cache-keys';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
 import { logDataAccess } from '@/lib/audit';
-import { getTenantTimeZone } from '@/lib/timezone';
 import { appointmentsQuerySchema, createAppointmentSchema } from '@/lib/validation';
 import { linkAppointmentToClient } from '@/lib/client-matching';
 import { logger } from '@/lib/logger';
+import {
+  getAppointmentCategoriesForDentist,
+  resolveAppointmentCategoryForWrite,
+} from '@/lib/server/appointment-categories';
 import { ExplicitClientSelectionError, resolveAppointmentClientLink } from './client-linking';
 
 // GET /api/appointments - Get appointments
@@ -59,28 +66,26 @@ export async function GET(request: NextRequest) {
       await Promise.all(calendarIds.map((calendarId) => getCalendarAuth(auth, calendarId)));
     }
 
-    const cacheKey = appointmentsListCacheKey(
-      { tenantId, userId },
-      {
-        calendarIds: calendarIds?.join(','),
-        startDate,
-        endDate,
-        status,
-        search,
-      }
-    );
-    const payload = await getCached(cacheKey, 120, async () => {
-      const appointments = await getAppointmentsData({
-        userId,
-        tenantId,
-        calendarIds,
-        startDate,
-        endDate,
-        status,
-        search,
-      });
-      return { appointments };
+    // No cache layer for the appointments list: this endpoint is write-heavy
+    // (every drag-drop, status change, create and delete invalidates it within
+    // seconds) and Vercel's unstable_cache + revalidateTag has eventual
+    // consistency. When the cache returned a stale payload after a write, the
+    // SWR client would override the freshly-rendered SSR data, causing the
+    // "first refresh shows old, second refresh shows correct" bug.
+    //
+    // The query path uses the (user_id, tenant_id, deleted_at, start_time)
+    // perf index, so a single MongoDB round-trip is ~50-100ms — well within
+    // budget for a per-user calendar view.
+    const appointments = await getAppointmentsData({
+      userId,
+      tenantId,
+      calendarIds,
+      startDate,
+      endDate,
+      status,
+      search,
     });
+    const payload = { appointments };
 
     await logDataAccess({
       actorUserId: dbUserId,
@@ -140,6 +145,7 @@ export async function POST(request: NextRequest) {
       startTime,
       endTime,
       category,
+      categoryId,
       color,
       notes,
       exportToGoogle,
@@ -208,91 +214,110 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const tenantTimeZone = await getTenantTimeZone(appointmentTenantId);
-
-    const creationResult = await withAppointmentWriteLocks(
+    const conflictCheck = await checkAppointmentConflict(
+      appointmentUserId,
+      appointmentTenantId,
+      start,
+      end,
+      undefined,
+      true,
       {
-        tenantId: appointmentTenantId,
-        userId: appointmentUserId,
-        calendarId: typeof calendarId === 'number' ? targetCalendarId : undefined,
-        startTime: start,
-        endTime: end,
-        timeZone: tenantTimeZone,
-      },
-      async () => {
-        const available = await isSlotAvailable(
-          appointmentUserId,
-          appointmentTenantId,
-          start,
-          end,
-          {
-            calendarId: typeof calendarId === 'number' ? targetCalendarId : undefined,
-          }
-        );
-        if (!available) {
-          return null;
-        }
-
-        const client = await resolveAppointmentClientLink({
-          db,
-          userId: dentistAssignment.assignedDentistUserId,
-          tenantId: dentistAssignment.assignedDentistTenantId,
-          clientId,
-          name: clientName,
-          email: clientEmail || null,
-          phone: clientPhone || null,
-          forceNewClient: forceNewClient ?? false,
-        });
-
-        const now = new Date().toISOString();
-        const appointmentId = await getNextNumericId('appointments');
-        const appointmentDoc = {
-          _id: appointmentId,
-          id: appointmentId,
-          tenant_id: appointmentTenantId,
-          user_id: appointmentUserId,
-          calendar_id: targetCalendarId,
-          created_by_user_id: createdByUserId,
-          ...buildAppointmentDentistFields(dentistAssignment),
-          conversation_id: conversationId || null,
-          service_id: serviceId,
-          service_name: serviceDoc.name,
-          client_id: client.id,
-          client_name: client.name || clientName,
-          client_email: client.email || clientEmail || null,
-          client_phone: client.phone || clientPhone || null,
-          start_time: start.toISOString(),
-          end_time: end.toISOString(),
-          status: 'scheduled',
-          category: category || null,
-          color: color || null,
-          notes: notes || null,
-          price_at_time: typeof serviceDoc.price === 'number' ? serviceDoc.price : null,
-          reminder_sent: false,
-          created_at: now,
-          updated_at: now,
-        };
-
-        await db.collection<FlexDoc>('appointments').insertOne(appointmentDoc);
-
-        return {
-          appointmentDoc,
-          clientId: client.id,
-        };
+        calendarId: targetCalendarId,
+        dentistUserId: dentistAssignment.assignedDentistUserId,
+        dentistTenantId: dentistAssignment.assignedDentistTenantId,
       }
     );
 
-    if (!creationResult) {
+    if (hasAvailabilityBlockConflict(conflictCheck.conflicts)) {
       return NextResponse.json(
-        { error: 'Time slot is not available' },
-        { status: 400 }
+        {
+          error: 'Intervalul este blocat in calendar.',
+          conflicts: conflictCheck.conflicts.map(formatAppointmentConflictPayload),
+          suggestions: formatAppointmentConflictSuggestions(conflictCheck.suggestions),
+        },
+        { status: 409 }
       );
     }
 
+    const client = await resolveAppointmentClientLink({
+      db,
+      userId: dentistAssignment.assignedDentistUserId,
+      tenantId: dentistAssignment.assignedDentistTenantId,
+      clientId,
+      name: clientName,
+      email: clientEmail || null,
+      phone: clientPhone || null,
+      forceNewClient: forceNewClient ?? false,
+    });
+
+    const calendarDoc = await db.collection('calendars').findOne(
+      { id: targetCalendarId, tenant_id: appointmentTenantId },
+      { projection: { is_default: 1 } }
+    );
+    const isDefaultPersonalCalendar = Boolean(calendarDoc?.is_default && !isSharedCalendar);
+    const effectiveCategoryId =
+      typeof categoryId === 'number'
+        ? categoryId
+        : !category && isDefaultPersonalCalendar
+          ? (await getAppointmentCategoriesForDentist(
+              dentistAssignment.assignedDentistUserId,
+              dentistAssignment.assignedDentistTenantId
+            ))[0]?.id
+          : undefined;
+
+    let resolvedCategory: Awaited<ReturnType<typeof resolveAppointmentCategoryForWrite>> = null;
+    if (typeof effectiveCategoryId === 'number') {
+      resolvedCategory = await resolveAppointmentCategoryForWrite({
+        db,
+        tenantId: dentistAssignment.assignedDentistTenantId,
+        userId: dentistAssignment.assignedDentistUserId,
+        categoryId: effectiveCategoryId,
+      });
+      if (!resolvedCategory) {
+        return NextResponse.json(
+          { error: 'Selected category was not found for the chosen dentist' },
+          { status: 400 }
+        );
+      }
+    }
+
+    const now = new Date().toISOString();
+    const appointmentId = await getNextNumericId('appointments');
+    const appointmentDoc = {
+      _id: appointmentId,
+      id: appointmentId,
+      tenant_id: appointmentTenantId,
+      user_id: appointmentUserId,
+      calendar_id: targetCalendarId,
+      created_by_user_id: createdByUserId,
+      ...buildAppointmentDentistFields(dentistAssignment),
+      conversation_id: conversationId || null,
+      service_id: serviceId,
+      service_name: serviceDoc.name,
+      client_id: client.id,
+      client_name: client.name || clientName,
+      client_email: client.email || clientEmail || null,
+      client_phone: client.phone || clientPhone || null,
+      start_time: start.toISOString(),
+      end_time: end.toISOString(),
+      status: 'scheduled',
+      category: isDefaultPersonalCalendar ? (resolvedCategory?.key || category || null) : null,
+      category_label: isDefaultPersonalCalendar ? (resolvedCategory?.label || null) : null,
+      category_color: isDefaultPersonalCalendar ? (resolvedCategory?.color || null) : null,
+      color: color || null,
+      notes: notes || null,
+      price_at_time: typeof serviceDoc.price === 'number' ? serviceDoc.price : null,
+      reminder_sent: false,
+      created_at: now,
+      updated_at: now,
+    };
+
+    await db.collection<FlexDoc>('appointments').insertOne(appointmentDoc);
+
     // Link appointment to client and update stats
     await linkAppointmentToClient(
-      creationResult.appointmentDoc.id,
-      creationResult.clientId,
+      appointmentDoc.id,
+      client.id,
       appointmentTenantId,
       dentistAssignment.assignedDentistTenantId
     );
@@ -302,38 +327,35 @@ export async function POST(request: NextRequest) {
       calendarId: targetCalendarId,
     });
 
-    const appointment = stripMongoId(creationResult.appointmentDoc) as any;
+    const appointment = stripMongoId(appointmentDoc) as any;
 
-    // Export to Google Calendar if requested for the actor's own calendar context.
+    // Google Calendar export is fire-and-forget: the appointment is already saved
+    // in our DB, so a slow Google API round-trip (often 200-500ms) shouldn't block
+    // the response. If it fails or eventually returns, we log it but never surface
+    // the eventId in the immediate response. Callers needing it can re-fetch.
     if (exportToGoogle && googleAccessToken && appointmentUserId === userId && appointmentTenantId.equals(tenantId)) {
-      try {
-        const eventId = await exportToGoogleCalendar(
-          Number(userId),
-          appointment.id,
-          googleAccessToken
-        );
-        if (eventId) {
-          appointment.googleCalendarEventId = eventId;
-        }
-      } catch (error) {
-        logger.warn('Failed to export to Google Calendar', {
-          error: error instanceof Error ? error.message : String(error),
-          appointmentId: appointment.id,
+      void exportToGoogleCalendar(Number(userId), appointment.id, googleAccessToken)
+        .catch((error) => {
+          logger.warn('Failed to export to Google Calendar', {
+            error: error instanceof Error ? error.message : String(error),
+            appointmentId: appointment.id,
+          });
         });
-        // Don't fail the appointment creation if Google export fails
-      }
     }
-    return createSuccessResponse({ appointment }, 201);
+    const warning = getAppointmentConflictWarning(conflictCheck.conflicts);
+    return createSuccessResponse(
+      {
+        appointment,
+        warning,
+        conflicts: conflictCheck.conflicts.map(formatAppointmentConflictPayload),
+        suggestions: formatAppointmentConflictSuggestions(conflictCheck.suggestions),
+      },
+      201
+    );
   } catch (error) {
     if (error instanceof ExplicitClientSelectionError) {
       return NextResponse.json(
         { error: error.message },
-        { status: 409 }
-      );
-    }
-    if (error instanceof AppointmentWriteBusyError) {
-      return NextResponse.json(
-        { error: 'Another booking is being created for this slot. Please try again.' },
         { status: 409 }
       );
     }

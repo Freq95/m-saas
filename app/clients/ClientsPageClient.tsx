@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ClientCreateModal from '@/components/ClientCreateModal';
+import MobileClientsView from './MobileClientsView';
+import { useIsMobile } from '@/lib/useIsMobile';
 import { logger } from '@/lib/logger';
 import styles from './page.module.css';
 import navStyles from '../dashboard/page.module.css';
@@ -30,11 +32,15 @@ interface PaginationInfo {
 interface ClientsPageClientProps {
   initialClients: Client[];
   initialPagination: PaginationInfo | null;
+  dentistOptions?: Array<{ userId: number; name: string }>;
+  initialDentistUserId?: number;
 }
 
 export default function ClientsPageClient({
   initialClients,
   initialPagination,
+  dentistOptions = [],
+  initialDentistUserId,
 }: ClientsPageClientProps) {
   const router = useRouter();
   const [clients, setClients] = useState<Client[]>(initialClients);
@@ -48,7 +54,9 @@ export default function ClientsPageClient({
   const [pagination, setPagination] = useState<PaginationInfo | null>(initialPagination);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [hasFinishedInitialLoad, setHasFinishedInitialLoad] = useState(initialClients.length > 0);
+  const [selectedDentistUserId, setSelectedDentistUserId] = useState<number | undefined>(initialDentistUserId);
   const skipInitialFetch = useRef(true);
+  const showDentistSelector = dentistOptions.length > 0;
 
   const fetchClients = useCallback(async (
     currentSearch: string,
@@ -56,6 +64,7 @@ export default function ClientsPageClient({
     currentSortOrder: string,
     currentPage: number,
     currentConsentFilter: string,
+    currentDentistUserId?: number,
   ) => {
     try {
       setLoading(true);
@@ -66,9 +75,10 @@ export default function ClientsPageClient({
         page: currentPage.toString(),
         limit: '20',
         consentFilter: currentConsentFilter,
+        ...(currentDentistUserId ? { dentistUserId: String(currentDentistUserId) } : {}),
       });
 
-      const response = await fetch(`/api/clients?${params}`);
+      const response = await fetch(`/api/clients?${params}`, { cache: 'no-store' });
       if (!response.ok) throw new Error('Failed to fetch clients');
 
       const result = await response.json();
@@ -99,8 +109,30 @@ export default function ClientsPageClient({
       skipInitialFetch.current = false;
       return;
     }
-    fetchClients(debouncedSearch, sortBy, sortOrder, page, consentFilter);
-  }, [fetchClients, page, debouncedSearch, sortBy, sortOrder, consentFilter]);
+    fetchClients(debouncedSearch, sortBy, sortOrder, page, consentFilter, selectedDentistUserId);
+  }, [fetchClients, page, debouncedSearch, sortBy, sortOrder, consentFilter, selectedDentistUserId]);
+
+  useEffect(() => {
+    let lastRefreshAt = 0;
+    const refresh = () => {
+      const now = Date.now();
+      if (now - lastRefreshAt < 500) return;
+      lastRefreshAt = now;
+      fetchClients(debouncedSearch, sortBy, sortOrder, page, consentFilter, selectedDentistUserId);
+    };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+
+    window.addEventListener('focus', refresh);
+    window.addEventListener('pageshow', refresh);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('pageshow', refresh);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [fetchClients, debouncedSearch, sortBy, sortOrder, page, consentFilter, selectedDentistUserId]);
 
   useEffect(() => {
     if (!loading) {
@@ -125,11 +157,88 @@ export default function ClientsPageClient({
     }).format(amount);
   };
 
+  // ── Mobile branch ────────────────────────────────────────────────────────
+  // Phones get a dedicated Google/Apple-style list (search + chip filters +
+  // tappable rows + FAB). Desktop keeps the current table layout below.
+  const isMobile = useIsMobile();
+  const exportHref = `/api/clients/export${selectedDentistUserId ? `?dentistUserId=${selectedDentistUserId}` : ''}`;
+
+  if (isMobile) {
+    return (
+      <div className={navStyles.container}>
+        <div className={`${styles.container} ${styles.mobileShell}`}>
+          <MobileClientsView
+            clients={clients}
+            loading={loading}
+            hasFinishedInitialLoad={hasFinishedInitialLoad}
+            pagination={pagination}
+            page={page}
+            setPage={setPage}
+            search={search}
+            onSearchChange={(next) => {
+              setSearch(next);
+              if (page !== 1) setPage(1);
+            }}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            onSortChange={(col, order) => {
+              setSortBy(col);
+              setSortOrder(order);
+              if (page !== 1) setPage(1);
+            }}
+            consentFilter={consentFilter}
+            onConsentFilterChange={(next) => {
+              setConsentFilter(next);
+              if (page !== 1) setPage(1);
+            }}
+            dentistOptions={dentistOptions}
+            selectedDentistUserId={selectedDentistUserId}
+            onDentistChange={(next) => {
+              setSelectedDentistUserId(next);
+              if (page !== 1) setPage(1);
+            }}
+            showDentistSelector={showDentistSelector}
+            exportHref={exportHref}
+            onAddClient={() => setShowCreateModal(true)}
+          />
+        </div>
+
+        <ClientCreateModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          dentistUserId={selectedDentistUserId}
+          onCreated={(client) => {
+            setShowCreateModal(false);
+            router.push(`/clients/${client.id}`);
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className={navStyles.container}>
       <div className={styles.container}>
         <div className={styles.filtersCard}>
           <div className={styles.filters}>
+            {showDentistSelector && (
+              <select
+                aria-label="Alege dentistul"
+                value={selectedDentistUserId ?? ''}
+                onChange={(e) => {
+                  setSelectedDentistUserId(Number(e.target.value));
+                  if (page !== 1) setPage(1);
+                }}
+                className={styles.filterSelect}
+              >
+                {dentistOptions.map((dentist) => (
+                  <option key={dentist.userId} value={dentist.userId}>
+                    Pacientii lui {dentist.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
             <input
               type="text"
               aria-label="Cauta dupa nume, email sau telefon"
@@ -178,7 +287,11 @@ export default function ClientsPageClient({
               <option value="withdrawn">Consimtamant retras</option>
             </select>
 
-            <a href="/api/clients/export" download className={styles.exportButton}>
+            <a
+              href={`/api/clients/export${selectedDentistUserId ? `?dentistUserId=${selectedDentistUserId}` : ''}`}
+              download
+              className={styles.exportButton}
+            >
               Export CSV
             </a>
             <button
@@ -186,7 +299,7 @@ export default function ClientsPageClient({
               onClick={() => setShowCreateModal(true)}
               className={styles.addButton}
             >
-              + Adauga client
+              + Adauga pacient
             </button>
           </div>
         </div>
@@ -201,13 +314,13 @@ export default function ClientsPageClient({
           </div>
         ) : clients.length === 0 ? (
           <div className={styles.empty}>
-            <p>Nu exista clienti inregistrati. Apasa 'Adauga primul client' pentru a adauga primul client.</p>
+            <p>Nu exista pacienti inregistrati. Apasa 'Adauga primul pacient' pentru a adauga primul pacient.</p>
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}
               className={styles.addButton}
             >
-              Adauga primul client
+              Adauga primul pacient
             </button>
           </div>
         ) : (
@@ -254,7 +367,23 @@ export default function ClientsPageClient({
                     </td>
                     <td>{client.total_appointments}</td>
                     <td>{formatDate(client.last_appointment_date)}</td>
-                    <td>
+                    <td
+                      className={`${styles.gdprCell} ${client.consent_withdrawn ? styles.gdprCellWithdrawn : ''}`}
+                      aria-label={
+                        client.consent_given && !client.consent_withdrawn
+                          ? 'Cu consimtamant GDPR'
+                          : client.consent_withdrawn
+                            ? 'Consimtamant GDPR retras'
+                            : 'Fara consimtamant GDPR'
+                      }
+                      title={
+                        client.consent_given && !client.consent_withdrawn
+                          ? 'Cu consimtamant'
+                          : client.consent_withdrawn
+                            ? 'Consimtamant retras'
+                            : 'Fara consimtamant'
+                      }
+                    >
                       {client.consent_given && !client.consent_withdrawn ? (
                         <span style={{ color: 'var(--color-success-text)', fontWeight: 500, fontSize: '0.8rem' }}>✓</span>
                       ) : (
@@ -293,6 +422,7 @@ export default function ClientsPageClient({
         <ClientCreateModal
           isOpen={showCreateModal}
           onClose={() => setShowCreateModal(false)}
+          dentistUserId={selectedDentistUserId}
           onCreated={(client) => {
             setShowCreateModal(false);
             router.push(`/clients/${client.id}`);

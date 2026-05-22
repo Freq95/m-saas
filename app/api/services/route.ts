@@ -5,6 +5,7 @@ import { getServicesData } from '@/lib/server/calendar';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { resolveCalendarOwnerScope } from '@/lib/calendar-owner-scope';
 import { resolveBookableDentistForCalendar } from '@/lib/calendar-dentists';
+import { assertTenantDentist, canReadServicesFor, resolveServiceWriteScope } from '@/lib/services-permissions';
 import { getCached } from '@/lib/redis';
 import { servicesListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
@@ -41,6 +42,17 @@ export async function GET(request: NextRequest) {
         targetUserId = ownerScope.userId;
         targetTenantId = ownerScope.tenantId;
       }
+    } else if (rawDentistUserId) {
+      const dentistUserId = Number.parseInt(rawDentistUserId, 10);
+      if (!Number.isInteger(dentistUserId) || dentistUserId <= 0) {
+        return NextResponse.json({ error: 'Invalid dentistUserId' }, { status: 400 });
+      }
+      await assertTenantDentist(auth, dentistUserId);
+      if (!canReadServicesFor(auth, dentistUserId)) {
+        return NextResponse.json({ error: 'Not authorized to read services for this dentist' }, { status: 403 });
+      }
+      targetUserId = dentistUserId;
+      targetTenantId = auth.tenantId;
     }
 
     const cacheKey = servicesListCacheKey({ tenantId: targetTenantId, userId: targetUserId });
@@ -78,15 +90,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { name, durationMinutes, price, description } = validationResult.data;
+    const { name, durationMinutes, price, description, dentistUserId } = validationResult.data;
+    const targetScope = await resolveServiceWriteScope(auth, dentistUserId ?? userId);
 
     const now = new Date().toISOString();
     const serviceId = await getNextNumericId('services');
     const serviceDoc = {
       _id: serviceId,
       id: serviceId,
-      tenant_id: tenantId,
-      user_id: userId,
+      tenant_id: targetScope.tenantId,
+      user_id: targetScope.userId,
       name,
       duration_minutes: durationMinutes,
       price: price || null,
@@ -99,6 +112,9 @@ export async function POST(request: NextRequest) {
     await invalidateReadCaches({
       tenantId,
       userId,
+      additionalScopes: targetScope.userId !== userId
+        ? [{ tenantId: targetScope.tenantId, userId: targetScope.userId }]
+        : undefined,
     });
 
     return createSuccessResponse({ service: stripMongoId(serviceDoc) }, 201);

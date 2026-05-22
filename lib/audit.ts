@@ -14,6 +14,9 @@ export type AuditAction =
   | 'user.update'
   | 'user.soft_delete'
   | 'user.restore'
+  | 'team.role_change'
+  | 'team.asistent_assignment'
+  | 'service.edit_by_proxy'
   | 'incident.create'
   | 'incident.update';
 
@@ -21,8 +24,8 @@ export interface AdminAuditEntryInput {
   action: AuditAction;
   actorUserId: ObjectId | string;
   actorEmail: string;
-  targetType: 'tenant' | 'user' | 'incident';
-  targetId: ObjectId | string;
+  targetType: 'tenant' | 'user' | 'incident' | 'service';
+  targetId: ObjectId | string | number;
   request?: NextRequest;
   before?: Record<string, unknown> | null;
   after?: Record<string, unknown> | null;

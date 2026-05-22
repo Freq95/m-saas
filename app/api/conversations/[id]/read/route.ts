@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { createErrorResponse, createSuccessResponse, handleApiError } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { requireInboxAccess } from '@/lib/inbox-access';
 
 // POST /api/conversations/[id]/read
 // Body: { read: boolean }
@@ -11,7 +12,9 @@ export async function POST(
 ) {
   try {
     const resolvedParams = await params;
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
+    requireInboxAccess(auth);
+    const { userId, tenantId } = auth;
     const db = await getMongoDbOrThrow();
     const conversationId = parseInt(resolvedParams.id, 10);
     if (Number.isNaN(conversationId) || conversationId <= 0) {

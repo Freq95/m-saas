@@ -10,24 +10,20 @@ const {
   mockGetAuthUser,
   mockGetCalendarAuth,
   mockResolveAppointmentDentistAssignment,
-  mockIsSlotAvailable,
+  mockCheckAppointmentConflict,
   mockCheckWriteRateLimit,
-  mockWithAppointmentWriteLocks,
   mockFindOrCreateClient,
   mockLinkAppointmentToClient,
-  mockGetTenantTimeZone,
 } = vi.hoisted(() => ({
   mockGetMongoDbOrThrow: vi.fn(),
   mockGetNextNumericId: vi.fn(),
   mockGetAuthUser: vi.fn(),
   mockGetCalendarAuth: vi.fn(),
   mockResolveAppointmentDentistAssignment: vi.fn(),
-  mockIsSlotAvailable: vi.fn(),
+  mockCheckAppointmentConflict: vi.fn(),
   mockCheckWriteRateLimit: vi.fn(),
-  mockWithAppointmentWriteLocks: vi.fn(),
   mockFindOrCreateClient: vi.fn(),
   mockLinkAppointmentToClient: vi.fn(),
-  mockGetTenantTimeZone: vi.fn(),
 }));
 
 vi.mock('@/lib/db/mongo-utils', async () => {
@@ -67,17 +63,9 @@ vi.mock('@/lib/appointment-service', () => ({
   })),
 }));
 
-vi.mock('@/lib/calendar', () => ({
-  isSlotAvailable: mockIsSlotAvailable,
+vi.mock('@/lib/calendar-conflicts', () => ({
+  checkAppointmentConflict: mockCheckAppointmentConflict,
 }));
-
-vi.mock('@/lib/appointment-write-lock', () => {
-  class AppointmentWriteBusyError extends Error {}
-  return {
-    AppointmentWriteBusyError,
-    withAppointmentWriteLocks: mockWithAppointmentWriteLocks,
-  };
-});
 
 vi.mock('@/lib/rate-limit', () => ({
   checkWriteRateLimit: mockCheckWriteRateLimit,
@@ -94,10 +82,6 @@ vi.mock('@/lib/cache-keys', async () => {
 vi.mock('@/lib/client-matching', () => ({
   findOrCreateClient: mockFindOrCreateClient,
   linkAppointmentToClient: mockLinkAppointmentToClient,
-}));
-
-vi.mock('@/lib/timezone', () => ({
-  getTenantTimeZone: mockGetTenantTimeZone,
 }));
 
 import { POST } from '@/app/api/appointments/route';
@@ -141,8 +125,11 @@ describe('POST /api/appointments service validation', () => {
       shareId: 77,
     });
     mockCheckWriteRateLimit.mockResolvedValue(null);
-    mockIsSlotAvailable.mockResolvedValue(true);
-    mockWithAppointmentWriteLocks.mockImplementation(async (_context: unknown, callback: () => Promise<unknown>) => callback());
+    mockCheckAppointmentConflict.mockResolvedValue({
+      hasConflict: false,
+      conflicts: [],
+      suggestions: [],
+    });
     mockGetNextNumericId.mockResolvedValue(7001);
     mockResolveAppointmentDentistAssignment.mockResolvedValue({
       assignedDentistUserId: 13,
@@ -154,7 +141,6 @@ describe('POST /api/appointments service validation', () => {
     });
     mockFindOrCreateClient.mockResolvedValue({ id: clientId });
     mockLinkAppointmentToClient.mockResolvedValue(undefined);
-    mockGetTenantTimeZone.mockResolvedValue('Europe/Bucharest');
 
     mockGetMongoDbOrThrow.mockResolvedValue({
       collection(name: string) {
@@ -167,6 +153,12 @@ describe('POST /api/appointments service validation', () => {
         if (name === 'appointments') {
           return {
             insertOne,
+          };
+        }
+
+        if (name === 'calendars') {
+          return {
+            findOne: vi.fn().mockResolvedValue({ id: 11, tenant_id: tenantId, is_default: false }),
           };
         }
 
@@ -209,7 +201,58 @@ describe('POST /api/appointments service validation', () => {
       tenant_id: tenantId,
       deleted_at: { $exists: false },
     }));
-    expect(mockIsSlotAvailable).not.toHaveBeenCalled();
+    expect(mockCheckAppointmentConflict).not.toHaveBeenCalled();
+    expect(insertOne).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 when the requested slot overlaps an availability block', async () => {
+    serviceFindOne.mockResolvedValue({
+      id: 222,
+      name: 'Consultatie initiala',
+      duration_minutes: 30,
+      price: 150,
+    });
+    mockCheckAppointmentConflict.mockResolvedValueOnce({
+      hasConflict: true,
+      conflicts: [
+        {
+          type: 'availability_block',
+          block: {
+            id: 44,
+            type_label: 'Curs',
+            reason: 'Curs Brasov',
+            start_time: '2026-04-09T09:00:00.000Z',
+            end_time: '2026-04-09T10:00:00.000Z',
+          },
+        },
+      ],
+      suggestions: [],
+    });
+
+    const req = new NextRequest('http://localhost/api/appointments', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        calendarId: 11,
+        serviceId: 222,
+        clientId,
+        clientName: 'Alice Example',
+        startTime: '2026-04-09T09:00:00.000Z',
+        endTime: '2026-04-09T09:30:00.000Z',
+      }),
+    });
+
+    const res = await POST(req);
+    const json = await res.json() as Doc;
+
+    expect(res.status).toBe(409);
+    expect(json.error).toBe('Intervalul este blocat in calendar.');
+    expect(json.conflicts).toEqual([
+      expect.objectContaining({
+        type: 'availability_block',
+        block: expect.objectContaining({ type_label: 'Curs', reason: 'Curs Brasov' }),
+      }),
+    ]);
     expect(insertOne).not.toHaveBeenCalled();
   });
 
@@ -245,11 +288,13 @@ describe('POST /api/appointments service validation', () => {
       tenant_id: tenantId,
       deleted_at: { $exists: false },
     }));
-    expect(mockIsSlotAvailable).toHaveBeenCalledWith(
+    expect(mockCheckAppointmentConflict).toHaveBeenCalledWith(
       42,
       tenantId,
       expect.any(Date),
       expect.any(Date),
+      undefined,
+      true,
       expect.objectContaining({ calendarId: 11 })
     );
     expect(insertOne).toHaveBeenCalledTimes(1);
@@ -270,6 +315,54 @@ describe('POST /api/appointments service validation', () => {
       client_email: 'alice@example.com',
       price_at_time: 150,
     });
+  });
+
+  it('creates the appointment and returns a warning when the slot overlaps', async () => {
+    serviceFindOne.mockResolvedValue({
+      id: 222,
+      name: 'Consultatie initiala',
+      duration_minutes: 30,
+      price: 150,
+    });
+    clientFindOne.mockResolvedValue({ id: clientId, user_id: 13, tenant_id: tenantId, name: 'Alice Example' });
+    mockCheckAppointmentConflict.mockResolvedValueOnce({
+      hasConflict: true,
+      conflicts: [{
+        type: 'calendar_appointment',
+        appointment: {
+          id: 7000,
+          client_name: 'Existing Client',
+          start_time: '2026-04-09T09:00:00.000Z',
+          end_time: '2026-04-09T09:30:00.000Z',
+        },
+      }],
+      suggestions: [{
+        start: new Date('2026-04-09T09:30:00.000Z'),
+        end: new Date('2026-04-09T10:00:00.000Z'),
+      }],
+    });
+
+    const req = new NextRequest('http://localhost/api/appointments', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        calendarId: 11,
+        serviceId: 222,
+        clientId,
+        clientName: 'Alice Example',
+        startTime: '2026-04-09T09:00:00.000Z',
+        endTime: '2026-04-09T09:30:00.000Z',
+      }),
+    });
+
+    const res = await POST(req);
+    const json = await res.json() as Doc;
+
+    expect(res.status).toBe(201);
+    expect(json.warning).toContain('se suprapune');
+    expect(json.conflicts).toHaveLength(1);
+    expect(json.suggestions).toHaveLength(1);
+    expect(insertOne).toHaveBeenCalledTimes(1);
   });
 
   it('creates a shared-calendar appointment for another selected dentist scoped to that dentist\'s services', async () => {
@@ -393,7 +486,7 @@ describe('POST /api/appointments service validation', () => {
     const json = await res.json() as Doc;
 
     expect(res.status).toBe(409);
-    expect(json.error).toContain('Clientul selectat nu mai exista');
+    expect(json.error).toContain('Pacientul selectat nu mai exista');
     expect(mockFindOrCreateClient).not.toHaveBeenCalled();
     expect(insertOne).not.toHaveBeenCalled();
   });

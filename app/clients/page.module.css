@@ -173,6 +173,31 @@
   border-bottom: none;
 }
 
+.table th:last-child,
+.table td:last-child {
+  text-align: center;
+}
+
+.gdprCell span {
+  font-size: 0 !important;
+  line-height: 0;
+}
+
+.gdprCellWithdrawn span {
+  color: #facc15 !important;
+}
+
+.gdprCell span::before {
+  content: '';
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: currentColor;
+  vertical-align: middle;
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 14%, transparent);
+}
+
 .clientName {
   color: var(--color-text);
   font-weight: 600;
@@ -269,5 +294,30 @@
 
   .table {
     min-width: 740px;
+  }
+}
+
+/* Mobile shell — when the client list renders the Google/Apple-style mobile
+   view (MobileClientsView), the parent .container becomes a tight viewport-
+   sized box with no scroll. The list inside handles its own scrolling so the
+   sticky search/filter chips never scroll out of view. Matches the calendar
+   mobile container pattern (see app/calendar/page.module.css). */
+@media (max-width: 640px) {
+  .mobileShell {
+    padding: 0;
+    margin: 0;
+    width: 100%;
+    max-width: none;
+    /* Critical: override the base .container's `min-height: 100vh`. Without
+       this, min-height wins over our `height` calc and the shell extends to
+       full viewport — pushing the patient list (and the FAB) behind the
+       bottom nav. The calendar's base .container is `min-height: 0` already,
+       which is why the same dvh trick worked there. */
+    min-height: 0;
+    height: calc(100dvh - var(--app-nav-offset, 0px) - var(--app-nav-bottom-offset, 0px));
+    max-height: calc(100dvh - var(--app-nav-offset, 0px) - var(--app-nav-bottom-offset, 0px));
+    overflow: hidden;
+    gap: 0;
+    background: var(--color-bg);
   }
 }

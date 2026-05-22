@@ -3,6 +3,7 @@ import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { handleApiError, createErrorResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { getStorageProvider } from '@/lib/storage';
+import { resolveClientScopeForClient } from '@/lib/client-permissions';
 
 // GET /api/clients/[id]/files/[fileId]/preview - Preview a file in browser
 export async function GET(
@@ -11,7 +12,7 @@ export async function GET(
 ) {
   const params = await props.params;
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const fileId = parseInt(params.fileId);
     const clientId = parseInt(params.id);
@@ -19,10 +20,11 @@ export async function GET(
       return createErrorResponse('Invalid ID', 400);
     }
 
-    const client = await db.collection('clients').findOne({ id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } });
-    if (!client) {
+    const scope = await resolveClientScopeForClient(auth, clientId);
+    if (!scope) {
       return createErrorResponse('Client not found', 404);
     }
+    const { tenantId } = scope;
 
     let file = await db.collection('client_files').findOne({ id: fileId, client_id: clientId, tenant_id: tenantId });
     if (!file) {

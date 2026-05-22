@@ -5,3 +5,5 @@ export { ConfirmModal } from './ConfirmModal';
 export { ConflictWarningModal } from './ConflictWarningModal';
 export { CalendarFormModal } from './CalendarFormModal';
 export { ShareCalendarModal } from './ShareCalendarModal';
+export { AvailabilityBlockModal } from './AvailabilityBlockModal';
+export type { AvailabilityBlockFormData } from './AvailabilityBlockModal';

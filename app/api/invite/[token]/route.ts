@@ -11,16 +11,30 @@ export async function GET(_request: NextRequest, props: { params: Promise<{ toke
     if (!invite) return createErrorResponse('Invalid or expired invite', 404);
 
     const db = await getMongoDbOrThrow();
-    const [user, tenant] = await Promise.all([
+    const [user, tenant, member] = await Promise.all([
       db.collection('users').findOne({ _id: invite.user_id, tenant_id: invite.tenant_id }),
       db.collection('tenants').findOne({ _id: invite.tenant_id }),
+      db.collection('team_members').findOne({ user_id: invite.user_id, tenant_id: invite.tenant_id }),
     ]);
+    const assignedIds = Array.isArray(member?.assigned_dentist_user_ids)
+      ? member.assigned_dentist_user_ids.filter((id: unknown): id is number => typeof id === 'number' && id > 0)
+      : [];
+    const assignedDentists = assignedIds.length > 0
+      ? await db.collection('users').find(
+          { tenant_id: invite.tenant_id, id: { $in: assignedIds } },
+          { projection: { id: 1, name: 1, email: 1 } }
+        ).toArray()
+      : [];
 
     return createSuccessResponse({
       email: invite.email,
       name: user?.name || '',
       tenantName: tenant?.name || '',
       role: invite.role,
+      assignedDentists: assignedDentists.map((dentist: any) => ({
+        id: dentist.id,
+        name: dentist.name || dentist.email || `Medic ${dentist.id}`,
+      })),
     });
   } catch (error) {
     return handleApiError(error, 'Failed to validate invite');

@@ -26,6 +26,8 @@ export interface Appointment {
   status: string;
   notes?: string;
   category?: string;
+  category_label?: string | null;
+  category_color?: string | null;
   color?: string;
   recurrence?: {
     frequency: 'daily' | 'weekly' | 'monthly';
@@ -50,6 +52,21 @@ export interface Appointment {
   can_delete?: boolean;
   can_drag?: boolean;
   can_change_status?: boolean;
+}
+
+export interface AvailabilityBlock {
+  id: number;
+  calendar_id?: number | null;
+  user_id: number;
+  visible_calendar_ids?: number[];
+  type_label: string;
+  reason?: string | null;
+  start_time: string;
+  end_time: string;
+  all_day: boolean;
+  created_by_user_id?: string | null;
+  can_edit?: boolean;
+  can_delete?: boolean;
 }
 
 export interface CalendarState {

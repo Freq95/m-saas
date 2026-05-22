@@ -1,31 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { resolveClientScopeForClient } from '@/lib/client-permissions';
 
 // GET /api/clients/[id]/activities - Get activity timeline for a client
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
     const searchParams = request.nextUrl.searchParams;
     const type = searchParams.get('type'); // 'all' | 'notes' | 'emails' | 'appointments'
 
     const activities: any[] = [];
-    const client = await db.collection('clients').findOne({ id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } });
-    if (!client) {
+    const scope = await resolveClientScopeForClient(auth, clientId);
+    if (!scope) {
       return NextResponse.json({ error: 'Client not found' }, { status: 404 });
     }
+    const { userId, tenantId } = scope;
 
     // Get notes
     if (!type || type === 'all' || type === 'notes') {
+      let noteCollection = 'client_notes';
       let notes = await db
         .collection('client_notes')
         .find({ client_id: clientId, tenant_id: tenantId })
         .toArray();
 
       if (notes.length === 0) {
+        noteCollection = 'contact_notes';
         notes = await db
           .collection('contact_notes')
           .find({ contact_id: clientId, tenant_id: tenantId })
@@ -35,9 +39,28 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       activities.push(...notes.map((note: any) => ({
         ...stripMongoId(note),
         activity_type: 'note',
+        note_collection: noteCollection,
         title: note.content,
         description: note.content,
         activity_date: note.created_at,
+      })));
+
+      const appointmentNotes = await db.collection('appointments').find({
+        client_id: clientId,
+        tenant_id: tenantId,
+        deleted_at: { $exists: false },
+        notes: { $type: 'string', $ne: '' },
+      }).sort({ updated_at: -1, start_time: -1 }).toArray();
+
+      activities.push(...appointmentNotes.map((appointment: any) => ({
+        ...stripMongoId(appointment),
+        activity_type: 'appointment_note',
+        title: appointment.notes,
+        description: appointment.notes,
+        activity_date: appointment.updated_at || appointment.start_time,
+        appointment_date: appointment.start_time,
+        appointment_service_name: appointment.service_name || 'Programare',
+        appointment_status: appointment.status || null,
       })));
     }
 

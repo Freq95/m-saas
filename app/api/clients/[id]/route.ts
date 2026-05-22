@@ -3,6 +3,7 @@ import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getClientProfileData } from '@/lib/server/client-profile';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { resolveClientScopeForClient } from '@/lib/client-permissions';
 import { invalidateReadCaches } from '@/lib/cache-keys';
 import { logDataAccess } from '@/lib/audit';
 import { checkUpdateRateLimit } from '@/lib/rate-limit';
@@ -11,13 +12,15 @@ import { checkUpdateRateLimit } from '@/lib/rate-limit';
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    const { userId, dbUserId, tenantId, email, role } = await getAuthUser();
+    const auth = await getAuthUser();
+    const { dbUserId, email, role } = auth;
     const clientId = parseInt(params.id);
     if (isNaN(clientId) || clientId <= 0) {
       return createErrorResponse('Invalid client ID', 400);
     }
 
-    const profile = await getClientProfileData(clientId, tenantId, userId);
+    const scope = await resolveClientScopeForClient(auth, clientId);
+    const profile = scope ? await getClientProfileData(clientId, scope.tenantId, scope.userId) : null;
     if (!profile) {
       return createErrorResponse('Client not found', 404);
     }
@@ -26,7 +29,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       actorUserId: dbUserId,
       actorEmail: email,
       actorRole: role,
-      tenantId,
+      tenantId: auth.tenantId,
       targetType: 'client',
       targetId: clientId,
       route: `/api/clients/${params.id}`,
@@ -48,19 +51,14 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     if (isNaN(clientId) || clientId <= 0) {
       return createErrorResponse('Invalid client ID', 400);
     }
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
+    const { userId, tenantId } = auth;
     const limited = await checkUpdateRateLimit(userId);
     if (limited) return limited;
     const body = await request.json();
 
-    // Verify client exists and belongs to this user before updating
-    const existing = await db.collection('clients').findOne({
-      id: clientId,
-      user_id: userId,
-      tenant_id: tenantId,
-      deleted_at: { $exists: false },
-    });
-    if (!existing) {
+    const targetScope = await resolveClientScopeForClient(auth, clientId);
+    if (!targetScope) {
       return createErrorResponse('Not found or not authorized', 404);
     }
 
@@ -97,6 +95,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     if (consent_withdrawn !== undefined) {
       updates.consent_withdrawn = consent_withdrawn;
       if (consent_withdrawn) updates.consent_withdrawn_date = new Date().toISOString();
+      else updates.consent_withdrawn_date = null;
     }
     if (is_minor !== undefined) updates.is_minor = is_minor;
     if (parent_guardian_name !== undefined) updates.parent_guardian_name = parent_guardian_name;
@@ -108,20 +107,26 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     updates.updated_at = new Date().toISOString();
 
     await db.collection('clients').updateOne(
-      { id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } },
+      { id: clientId, user_id: targetScope.userId, tenant_id: targetScope.tenantId, deleted_at: { $exists: false } },
       { $set: updates }
     );
 
     const result = await db.collection('clients').findOne({
       id: clientId,
-      user_id: userId,
-      tenant_id: tenantId,
+      user_id: targetScope.userId,
+      tenant_id: targetScope.tenantId,
       deleted_at: { $exists: false },
     });
     if (!result) {
       return createErrorResponse('Not found or not authorized', 404);
     }
-    await invalidateReadCaches({ tenantId, userId });
+    await invalidateReadCaches({
+      tenantId,
+      userId,
+      additionalScopes: targetScope.userId !== userId
+        ? [{ tenantId: targetScope.tenantId, userId: targetScope.userId }]
+        : undefined,
+    });
 
     return createSuccessResponse({
       client: stripMongoId(result),
@@ -141,24 +146,19 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
       return createErrorResponse('Invalid client ID', 400);
     }
 
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
+    const { userId, tenantId } = auth;
     const limited = await checkUpdateRateLimit(userId);
     if (limited) return limited;
 
-    // Verify client exists and belongs to this user
-    const existing = await db.collection('clients').findOne({
-      id: clientId,
-      user_id: userId,
-      tenant_id: tenantId,
-      deleted_at: { $exists: false },
-    });
-    if (!existing) {
+    const targetScope = await resolveClientScopeForClient(auth, clientId);
+    if (!targetScope) {
       return createErrorResponse('Not found or not authorized', 404);
     }
 
     // Soft delete using timestamp and cleanup legacy fields
     const result = await db.collection('clients').updateOne(
-      { id: clientId, user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } },
+      { id: clientId, user_id: targetScope.userId, tenant_id: targetScope.tenantId, deleted_at: { $exists: false } },
       {
         $set: { deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() },
         $unset: { status: '', source: '' },
@@ -167,7 +167,13 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
     if (result.matchedCount === 0) {
       return createErrorResponse('Not found or not authorized', 404);
     }
-    await invalidateReadCaches({ tenantId, userId });
+    await invalidateReadCaches({
+      tenantId,
+      userId,
+      additionalScopes: targetScope.userId !== userId
+        ? [{ tenantId: targetScope.tenantId, userId: targetScope.userId }]
+        : undefined,
+    });
     return createSuccessResponse({ success: true });
   } catch (error) {
     return handleApiError(error, 'Failed to delete client');

@@ -4,6 +4,7 @@ import { createErrorResponse, createSuccessResponse, handleApiError } from '@/li
 import { linkConversationToClient } from '@/lib/client-matching';
 import { parseStoredMessage, serializeMessage } from '@/lib/email-types';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { requireInboxAccess } from '@/lib/inbox-access';
 import { buildClientStorageKey, getStorageProvider } from '@/lib/storage';
 import { invalidateReadCaches } from '@/lib/cache-keys';
 
@@ -27,7 +28,9 @@ export async function POST(
 ) {
   try {
     const resolvedParams = await params;
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
+    requireInboxAccess(auth);
+    const { userId, tenantId } = auth;
     const db = await getMongoDbOrThrow();
     const conversationId = parseInt(resolvedParams.id, 10);
     if (Number.isNaN(conversationId) || conversationId <= 0) {

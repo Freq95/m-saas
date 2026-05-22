@@ -68,6 +68,19 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  touch-action: manipulation; /* prevents pinch-to-zoom + double-tap zoom on Android/Chrome */
+}
+
+/* Prevents iOS Safari from zooming in when tapping inputs with small font sizes.
+   `!important` is intentional: many CSS Module rules (e.g. `.field input { font-size: 0.9rem }`)
+   win on specificity (0,1,1 vs our 0,0,1) and would otherwise trigger the iOS auto-zoom we
+   explicitly disable site-wide. 16px is the iOS Safari threshold below which inputs auto-zoom. */
+@media (hover: none) and (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
 }
 
 body {
@@ -97,6 +110,7 @@ a {
 /* ── App shell ───────────────────────────────────────────────── */
 .app-shell-content {
   padding-top: var(--app-nav-offset, 72px);
+  padding-bottom: var(--app-nav-bottom-offset, 0px);
 }
 
 main {

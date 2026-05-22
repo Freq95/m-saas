@@ -3,7 +3,7 @@
 import { format, isSameDay, isSameMonth } from 'date-fns';
 import { ro } from 'date-fns/locale';
 import styles from '../../page.module.css';
-import type { Appointment } from '../../hooks/useCalendar';
+import type { Appointment, AvailabilityBlock } from '../../hooks/useCalendar';
 import { getAppointmentBlockStyle, getStatusConfig, resolveAppointmentColor } from '@/lib/calendar-color-policy';
 import { useTheme } from '@/components/ThemeProvider';
 
@@ -11,24 +11,40 @@ interface MonthViewProps {
   monthDays: Date[];
   currentDate: Date;
   appointments: Appointment[];
+  availabilityBlocks?: AvailabilityBlock[];
   selectedDay?: Date | null;
   viewerUserId: number | null;
   onDayClick: (day: Date) => void;
   onAppointmentClick: (appointment: Appointment) => void;
+  onAvailabilityBlockClick?: (block: AvailabilityBlock) => void;
 }
 
 export function MonthView({
   monthDays,
   currentDate,
   appointments,
+  availabilityBlocks = [],
   selectedDay = null,
   viewerUserId,
   onDayClick,
   onAppointmentClick,
+  onAvailabilityBlockClick,
 }: MonthViewProps) {
   const { theme } = useTheme();
   const getAppointmentsForDay = (day: Date) =>
     appointments.filter((apt) => isSameDay(new Date(apt.start_time), day));
+  const getBlocksForDay = (day: Date) => {
+    const dayStart = new Date(day);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(day);
+    dayEnd.setHours(23, 59, 59, 999);
+    return availabilityBlocks.filter((block) => {
+      const start = new Date(block.start_time);
+      const end = new Date(block.end_time);
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return false;
+      return start < dayEnd && end > dayStart;
+    });
+  };
 
   return (
     <div className={styles.monthCalendar}>
@@ -42,6 +58,8 @@ export function MonthView({
       <div className={styles.monthGrid}>
         {monthDays.map((day) => {
           const dayAppointments = getAppointmentsForDay(day);
+          const dayBlocks = getBlocksForDay(day);
+          const dayItemsCount = dayAppointments.length + dayBlocks.length;
           const isCurrentMonth = isSameMonth(day, currentDate);
           const isTodayFlag = isSameDay(day, new Date());
           const isSelected = selectedDay ? isSameDay(day, selectedDay) : false;
@@ -69,7 +87,22 @@ export function MonthView({
             >
               <div className={styles.monthDayNumber}>{format(day, 'd')}</div>
               <div className={styles.monthDayAppointments}>
-                {dayAppointments.slice(0, 3).map((apt) => {
+                {dayBlocks.slice(0, 3).map((block) => (
+                  <div
+                    key={`block-${block.id}`}
+                    className={styles.monthAvailabilityBlock}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onAvailabilityBlockClick?.(block);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    title={`${block.type_label}${block.reason ? ` - ${block.reason}` : ''}`}
+                  >
+                    <span>{block.type_label}</span>
+                  </div>
+                ))}
+                {dayAppointments.slice(0, Math.max(0, 3 - dayBlocks.length)).map((apt) => {
                   const statusCfg = getStatusConfig(apt.status);
                   const resolvedColor = resolveAppointmentColor(apt, viewerUserId);
                   const blockStyle = getAppointmentBlockStyle(
@@ -113,9 +146,9 @@ export function MonthView({
                     </div>
                   );
                 })}
-                {dayAppointments.length > 3 && (
+                {dayItemsCount > 3 && (
                   <div className={styles.monthAppointmentMore}>
-                    +{dayAppointments.length - 3} mai multe
+                    +{dayItemsCount - 3} mai multe
                   </div>
                 )}
               </div>

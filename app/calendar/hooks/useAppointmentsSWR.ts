@@ -22,9 +22,9 @@ interface UseAppointmentsResult {
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
-  createAppointment: (data: CreateAppointmentInput) => Promise<{ ok: boolean; error?: string }>;
+  createAppointment: (data: CreateAppointmentInput) => Promise<CreateAppointmentResult>;
   updateAppointment: (id: number, data: UpdateAppointmentInput) => Promise<UpdateAppointmentResult>;
-  deleteAppointment: (id: number) => Promise<DeleteAppointmentResult>;
+  deleteAppointment: (id: number, scope?: 'series') => Promise<DeleteAppointmentResult>;
 }
 
 export interface CreateAppointmentInput {
@@ -38,7 +38,8 @@ export interface CreateAppointmentInput {
   startTime: string;
   endTime: string;
   notes?: string;
-  category?: string;
+  category?: string | null;
+  categoryId?: number | null;
   color?: string;
   calendarId?: number;
 }
@@ -56,6 +57,7 @@ export interface UpdateAppointmentInput {
   status?: string;
   notes?: string;
   category?: string | null;
+  categoryId?: number | null;
   color?: string | null;
 }
 
@@ -71,6 +73,15 @@ interface ConflictSuggestion {
 }
 
 interface UpdateAppointmentResult {
+  ok: boolean;
+  status: number;
+  error?: string;
+  conflicts?: ConflictItem[];
+  suggestions?: ConflictSuggestion[];
+  warning?: string | null;
+}
+
+interface CreateAppointmentResult {
   ok: boolean;
   status: number;
   error?: string;
@@ -206,7 +217,7 @@ export function useAppointmentsSWR({
     : null;
   const refreshInterval = !isReady || isGlobalSearch || skipFetchBecauseNoVisibleCalendars
     ? 0
-    : 20_000;
+    : 60_000;
 
   const {
     data: appointments = [],
@@ -217,7 +228,7 @@ export function useAppointmentsSWR({
     fallbackData: isGlobalSearch || skipFetchBecauseNoVisibleCalendars ? [] : initialAppointments,
     keepPreviousData: true,
     revalidateOnFocus: true,
-    focusThrottleInterval: 30_000,
+    focusThrottleInterval: 300_000,
     dedupingInterval: 60_000,
     // Skip mount revalidation when SSR returned fresh data (initialAppointments
     // is always an array from the server page). Only re-fetch on mount for
@@ -234,9 +245,9 @@ export function useAppointmentsSWR({
   }, [mutate]);
 
   const createAppointment = useCallback(
-    async (data: CreateAppointmentInput): Promise<{ ok: boolean; error?: string }> => {
+    async (data: CreateAppointmentInput): Promise<CreateAppointmentResult> => {
       if (!effectiveUserId) {
-        return { ok: false, error: 'Sesiune invalida. Reautentifica-te.' };
+        return { ok: false, status: 401, error: 'Sesiune invalida. Reautentifica-te.' };
       }
 
       try {
@@ -248,7 +259,7 @@ export function useAppointmentsSWR({
 
         if (response.status === 401) {
           window.location.href = '/login';
-          return { ok: false, error: 'Sesiune expirata.' };
+          return { ok: false, status: response.status, error: 'Sesiune expirata.' };
         }
 
         if (!response.ok) {
@@ -259,34 +270,62 @@ export function useAppointmentsSWR({
             errorData = null;
           }
 
-          const isAvailabilityError =
-            response.status === 400 &&
-            typeof errorData?.error === 'string' &&
-            errorData.error.toLowerCase().includes('time slot is not available');
           const logPayload = {
             status: response.status,
             errorData,
           };
 
-          if (isAvailabilityError) {
-            logger.warn('Calendar hook: create appointment slot unavailable', logPayload);
-          } else {
-            logger.error('Calendar hook: create appointment API error', logPayload);
-          }
+          logger.error('Calendar hook: create appointment API error', logPayload);
 
           return {
             ok: false,
-            error: isAvailabilityError
-              ? 'Intervalul selectat nu este disponibil. Alege un alt interval.'
-              : extractApiError(errorData, 'Nu s-a putut crea programarea.'),
+            status: response.status,
+            error: extractApiError(errorData, 'Nu s-a putut crea programarea.'),
           };
         }
 
-        await mutate();
-        return { ok: true };
+        let resultData: any = null;
+        try {
+          resultData = await response.json();
+        } catch {
+          resultData = null;
+        }
+
+        // Skip the round-trip refetch: the server returned the new appointment
+        // doc, so insert it directly into the SWR cache. Saves 150-250ms of
+        // perceived wait. We still mark the cache for background revalidation
+        // (without await) to pick up server-derived fields like
+        // dentist_display_name that aren't in the immediate response.
+        const newAppointment = resultData?.appointment as Appointment | undefined;
+        if (newAppointment && typeof newAppointment.id === 'number') {
+          mutate(
+            (current) => {
+              const existing = current ?? [];
+              if (existing.some((apt) => apt.id === newAppointment.id)) return existing;
+              return [...existing, newAppointment];
+            },
+            { revalidate: false }
+          );
+          // No background refetch — same race risk as updateAppointment: the
+          // revalidateTag from POST may not have propagated yet, so an
+          // immediate /api/appointments fetch can return stale data without
+          // our new appointment and visibly drop it from the calendar.
+          // The next natural SWR cycle (60s polling) will reconcile.
+        } else {
+          // Fallback: server response missing the appointment payload, refetch to be safe.
+          await mutate();
+        }
+
+        return {
+          ok: true,
+          status: response.status,
+          warning: typeof resultData?.warning === 'string' ? resultData.warning : null,
+          conflicts: Array.isArray(resultData?.conflicts) ? resultData.conflicts : [],
+          suggestions: Array.isArray(resultData?.suggestions) ? resultData.suggestions : [],
+        };
       } catch (err) {
         logger.error('Calendar hook: failed to create appointment', err instanceof Error ? err : new Error(String(err)));
-        return { ok: false, error: 'Eroare de retea la crearea programarii.' };
+        return { ok: false, status: 0, error: 'Eroare de retea la crearea programarii.' };
       }
     },
     [effectiveUserId, mutate]
@@ -294,13 +333,29 @@ export function useAppointmentsSWR({
 
   const updateAppointment = useCallback(
     async (id: number, data: UpdateAppointmentInput): Promise<UpdateAppointmentResult> => {
+      // Optimistic update for fields that don't require server-side derivation
+      // (service_name, dentist_display_name, etc. need a refetch).
+      const hasOptimisticFields = Boolean(
+        (data.startTime && data.endTime) ||
+        data.status ||
+        data.notes !== undefined ||
+        data.category !== undefined ||
+        data.color
+      );
       let snapshot: Appointment[] | undefined;
-      if (data.startTime && data.endTime) {
+      if (hasOptimisticFields) {
         snapshot = appointments;
         mutate(
           appointments.map((apt) =>
             apt.id === id
-              ? { ...apt, start_time: data.startTime!, end_time: data.endTime! }
+              ? {
+                  ...apt,
+                  ...(data.startTime && data.endTime ? { start_time: data.startTime, end_time: data.endTime } : {}),
+                  ...(data.status ? { status: data.status } : {}),
+                  ...(data.notes !== undefined ? { notes: data.notes } : {}),
+                  ...(data.category !== undefined ? { category: data.category ?? undefined } : {}),
+                  ...(data.color ? { color: data.color } : {}),
+                }
               : apt
           ),
           { revalidate: false }
@@ -372,11 +427,33 @@ export function useAppointmentsSWR({
           resultData = null;
         }
 
-        await mutate();
+        // Use the server's authoritative response as the new cache value and
+        // DO NOT trigger any refetch. A refetch here would go through
+        // /api/appointments → getCached → unstable_cache, which on Vercel can
+        // return the previous cached payload for several seconds after the
+        // freshly-issued revalidateTag (the tag invalidation is eventually
+        // consistent). That stale payload then overwrites the optimistic
+        // update and the appointment visibly "bounces back". The next natural
+        // SWR cycle (60s polling) will reconcile any unrelated changes.
+        const updatedAppointment = resultData?.appointment as Appointment | undefined;
+        if (updatedAppointment && typeof updatedAppointment.id === 'number') {
+          mutate(
+            (current) => (current ?? []).map((apt) =>
+              apt.id === updatedAppointment.id ? { ...apt, ...updatedAppointment } : apt
+            ),
+            { revalidate: false }
+          );
+        } else {
+          // Defensive: response missing appointment doc — fall back to refetch.
+          await mutate();
+        }
+
         return {
           ok: true,
           status: response.status,
           warning: typeof resultData?.warning === 'string' ? resultData.warning : null,
+          conflicts: Array.isArray(resultData?.conflicts) ? resultData.conflicts : [],
+          suggestions: Array.isArray(resultData?.suggestions) ? resultData.suggestions : [],
         };
       } catch (err) {
         if (snapshot) {
@@ -392,15 +469,24 @@ export function useAppointmentsSWR({
   );
 
   const deleteAppointment = useCallback(
-    async (id: number): Promise<DeleteAppointmentResult> => {
+    async (id: number, scope?: 'series'): Promise<DeleteAppointmentResult> => {
       const snapshot = appointments;
+      // For series deletes, optimistically drop every appointment in the same
+      // recurrence_group_id from the cache. Roll back to `snapshot` on error.
+      const target = appointments.find((apt) => apt.id === id);
+      const seriesGroupId = scope === 'series' ? target?.recurrence_group_id : undefined;
       mutate(
-        appointments.filter((apt) => apt.id !== id),
+        appointments.filter((apt) =>
+          seriesGroupId
+            ? apt.recurrence_group_id !== seriesGroupId
+            : apt.id !== id
+        ),
         { revalidate: false }
       );
 
       try {
-        const response = await fetch(`/api/appointments/${id}`, {
+        const queryString = scope ? `?scope=${scope}` : '';
+        const response = await fetch(`/api/appointments/${id}${queryString}`, {
           method: 'DELETE',
         });
 

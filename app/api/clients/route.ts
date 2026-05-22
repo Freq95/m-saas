@@ -6,6 +6,7 @@ import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { resolveCalendarOwnerScope } from '@/lib/calendar-owner-scope';
 import { resolveBookableDentistForCalendar } from '@/lib/calendar-dentists';
+import { resolveClientScopeForDentist } from '@/lib/client-permissions';
 import { getCached } from '@/lib/redis';
 import { clientsListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
@@ -45,6 +46,14 @@ export async function GET(request: NextRequest) {
         userId = ownerScope.userId;
         tenantId = ownerScope.tenantId;
       }
+    } else if (rawDentistUserId) {
+      const dentistUserId = Number.parseInt(rawDentistUserId, 10);
+      if (!Number.isInteger(dentistUserId) || dentistUserId <= 0) {
+        return NextResponse.json({ error: 'Invalid dentistUserId' }, { status: 400 });
+      }
+      const scope = await resolveClientScopeForDentist(auth, dentistUserId);
+      userId = scope.userId;
+      tenantId = scope.tenantId;
     }
     const search = searchParams.get('search') || '';
     const sortBy = searchParams.get('sortBy') || 'name';
@@ -103,7 +112,8 @@ export async function GET(request: NextRequest) {
 // this endpoint — patient creation in shared calendars must be done by the owner.
 export async function POST(request: NextRequest) {
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
+    const { userId, tenantId } = auth;
     const limited = await checkWriteRateLimit(userId);
     if (limited) return limited;
     const db = await getMongoDbOrThrow();
@@ -120,14 +130,15 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const { name, email, phone, notes, consent_given, consent_date, consent_method, is_minor, parent_guardian_name } = validationResult.data;
+    const { name, email, phone, notes, consent_given, consent_date, consent_method, is_minor, parent_guardian_name, dentistUserId } = validationResult.data;
+    const targetScope = await resolveClientScopeForDentist(auth, dentistUserId ?? userId);
 
     // Use findOrCreateClient to avoid duplicates
     let client;
     try {
       client = await findOrCreateClient(
-        userId,
-        tenantId,
+        targetScope.userId,
+        targetScope.tenantId,
         name,
         email,
         phone
@@ -152,7 +163,7 @@ export async function POST(request: NextRequest) {
     if (Object.keys(updates).length > 0) {
       updates.updated_at = new Date().toISOString();
       await db.collection('clients').updateOne(
-        { id: client.id, tenant_id: tenantId },
+        { id: client.id, tenant_id: targetScope.tenantId },
         { $set: updates }
       );
       responseClient = {
@@ -160,7 +171,13 @@ export async function POST(request: NextRequest) {
         ...updates,
       };
     }
-    await invalidateReadCaches({ tenantId, userId });
+    await invalidateReadCaches({
+      tenantId,
+      userId,
+      additionalScopes: targetScope.userId !== userId
+        ? [{ tenantId: targetScope.tenantId, userId: targetScope.userId }]
+        : undefined,
+    });
     return createSuccessResponse({
       client: responseClient,
     }, 201);

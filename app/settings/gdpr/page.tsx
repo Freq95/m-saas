@@ -1,5 +1,4 @@
 import { Suspense } from 'react';
-import { redirect } from 'next/navigation';
 import { getAuthUser, redirectToLogin } from '@/lib/auth-helpers';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { SettingsSkeleton } from '../SettingsSkeleton';
@@ -11,6 +10,9 @@ const DEFAULT_PRIVACY_NOTICE =
   'Datele dumneavoastra personale sunt prelucrate in conformitate cu Regulamentul (UE) 2016/679 (GDPR). ' +
   'Aveti dreptul la acces, rectificare, stergere si portabilitatea datelor. ' +
   'Pentru exercitarea drepturilor dumneavoastra, va rugam sa contactati cabinetul.';
+
+// Editable for clinic professionals; receptionists and asistents view read-only.
+const EDIT_ROLES = new Set(['owner', 'dentist']);
 
 export default function GdprSettingsPage() {
   return (
@@ -28,10 +30,6 @@ async function GdprContent() {
     redirectToLogin(err);
   }
 
-  if (auth.role !== 'owner') {
-    redirect('/settings/services');
-  }
-
   const db = await getMongoDbOrThrow();
   const tenant = await db.collection('tenants').findOne(
     { _id: auth.tenantId },
@@ -39,6 +37,8 @@ async function GdprContent() {
   );
 
   const initialText = tenant?.gdpr_privacy_notice_text ?? DEFAULT_PRIVACY_NOTICE;
+  const canEdit = EDIT_ROLES.has(auth.role);
+  const isOwner = auth.role === 'owner';
 
-  return <GdprSettingsPageClient initialText={initialText} />;
+  return <GdprSettingsPageClient initialText={initialText} canEdit={canEdit} isOwner={isOwner} />;
 }

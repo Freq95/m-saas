@@ -14,6 +14,22 @@ export const DEFAULT_COLOR_MINE = '#2563EB';
 export const DEFAULT_COLOR_OTHERS = '#64748B';
 
 /**
+ * Pastel palette for appointment categories. Keep this visibly softer than
+ * DENTIST_COLOR_PALETTE so personal-calendar categories and shared-calendar
+ * dentist colors do different visual jobs.
+ */
+export const CATEGORY_COLOR_PALETTE = [
+  { id: 'sky', hex: '#7dd3fc', label: 'Cer' },
+  { id: 'mint', hex: '#6ee7b7', label: 'Menta' },
+  { id: 'lavender', hex: '#c4b5fd', label: 'Lavanda' },
+  { id: 'peach', hex: '#fdba74', label: 'Piersica' },
+  { id: 'rose', hex: '#fda4af', label: 'Trandafir' },
+  { id: 'lemon', hex: '#fde047', label: 'Lamaie' },
+  { id: 'slate', hex: '#cbd5e1', label: 'Ardezie' },
+  { id: 'aqua', hex: '#67e8f9', label: 'Aqua' },
+] as const;
+
+/**
  * 8-color palette for dentists. Each dentist picks one color; within a set of
  * dentists who share a calendar, two dentists cannot pick the same color.
  * The id is the canonical identifier (stable across themes); the hex is the
@@ -58,6 +74,7 @@ export interface AppointmentColorInput {
   color_mine?: string | null;
   color_others?: string | null;
   category?: string | null;
+  category_color?: string | null;
   color?: string | null;
   is_default_calendar?: boolean | null;
 }
@@ -102,6 +119,9 @@ export function resolveAppointmentColor(
   // Default (auto-created) personal calendar: appointment color is always
   // driven by the service category. The calendar itself has no color.
   if (appointment.is_default_calendar) {
+    if (appointment.category_color && typeof appointment.category_color === 'string') {
+      return appointment.category_color;
+    }
     return getCategoryColor(appointment.category);
   }
 

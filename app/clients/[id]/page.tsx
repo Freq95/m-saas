@@ -1,6 +1,7 @@
 import ClientProfileClient from './ClientProfileClient';
 import { getClientProfileData, getClientStatsData } from '@/lib/server/client-profile';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { resolveClientScopeForClient } from '@/lib/client-permissions';
 
 export const revalidate = 30;
 
@@ -20,8 +21,9 @@ export default async function ClientProfilePage({ params }: { params: Promise<{ 
     );
   }
 
-  const { userId, tenantId } = await getAuthUser();
-  const profile = await getClientProfileData(clientId, tenantId, userId);
+  const auth = await getAuthUser();
+  const scope = await resolveClientScopeForClient(auth, clientId);
+  const profile = scope ? await getClientProfileData(clientId, scope.tenantId, scope.userId) : null;
   if (!profile) {
     return (
       <ClientProfileClient
@@ -33,7 +35,7 @@ export default async function ClientProfilePage({ params }: { params: Promise<{ 
       />
     );
   }
-  const stats = await getClientStatsData(clientId, tenantId, userId);
+  const stats = scope ? await getClientStatsData(clientId, scope.tenantId, scope.userId) : null;
 
   return (
     <ClientProfileClient

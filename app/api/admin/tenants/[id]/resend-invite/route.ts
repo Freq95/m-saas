@@ -32,7 +32,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
     }
     if (user.status !== 'pending_invite') return createErrorResponse('User is not pending invite', 400);
 
-    const token = await createInviteToken(user.email, userId, tenantId, user.role || 'staff', actorUserId);
+    const token = await createInviteToken(user.email, userId, tenantId, user.role || 'dentist', actorUserId);
     const inviteEmail = await sendInviteEmail(user.email, user.name || 'Utilizator', tenant.name, token);
 
     await logAdminAudit({
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       metadata: {
         tenant_id: String(tenantId),
         email: user.email,
-        role: user.role || 'staff',
+        role: user.role || 'dentist',
         invite_sent: inviteEmail.ok,
         invite_reason: inviteEmail.ok ? 'sent' : inviteEmail.reason,
       },

@@ -9,6 +9,14 @@ type InviteState = {
   name: string;
   tenantName: string;
   role: string;
+  assignedDentists?: Array<{ id: number; name: string }>;
+};
+
+const ROLE_LABEL: Record<string, string> = {
+  owner: 'proprietar',
+  dentist: 'medic',
+  receptionist: 'receptioner',
+  asistent: 'asistent',
 };
 
 export default function InvitePage() {
@@ -87,6 +95,11 @@ export default function InvitePage() {
         <p className={styles.subtitle}>
           Te alaturi la <strong style={{ color: 'var(--color-text)' }}>{invite.tenantName}</strong>.
           Alege o parola si vei fi conectat imediat.
+        </p>
+        <p className={styles.subtitle}>
+          {invite.role === 'asistent' && invite.assignedDentists?.length
+            ? `Esti invitat ca asistent al ${invite.assignedDentists.map((dentist) => dentist.name).join(' si ')}.`
+            : `Esti invitat cu rolul de ${ROLE_LABEL[invite.role] || invite.role}.`}
         </p>
       </header>
 

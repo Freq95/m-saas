@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow, getNextNumericId } from '@/lib/db/mongo-utils';
-import { AppointmentWriteBusyError, withAppointmentWriteLocks } from '@/lib/appointment-write-lock';
 import { buildAppointmentDentistFields, resolveAppointmentDentistAssignment } from '@/lib/appointment-service';
 import { checkAppointmentConflict } from '@/lib/calendar-conflicts';
+import {
+  formatAppointmentConflictPayload,
+  formatAppointmentConflictSuggestions,
+  hasAvailabilityBlockConflict,
+} from '@/lib/appointment-conflict-response';
 import {
   getCalendarAuth,
   getOrCreateDefaultCalendar,
@@ -14,10 +18,13 @@ import { invalidateReadCaches } from '@/lib/cache-keys';
 import { logger } from '@/lib/logger';
 import { generateRecurringInstances } from '@/lib/recurring-utils';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
-import { getTenantTimeZone } from '@/lib/timezone';
 import { createRecurringAppointmentSchema } from '@/lib/validation';
 import { updateClientStats } from '@/lib/client-matching';
 import { ExplicitClientSelectionError, resolveAppointmentClientLink } from '../client-linking';
+import {
+  getAppointmentCategoriesForDentist,
+  resolveAppointmentCategoryForWrite,
+} from '@/lib/server/appointment-categories';
 
 interface RecurringConflict {
   start: Date;
@@ -53,6 +60,7 @@ export async function POST(request: NextRequest) {
       endTime,
       notes,
       category,
+      categoryId,
       color,
       recurrence,
       forceNewClient,
@@ -136,7 +144,6 @@ export async function POST(request: NextRequest) {
 
     const createdAppointments: Record<string, unknown>[] = [];
     const conflicts: RecurringConflict[] = [];
-    const tenantTimeZone = await getTenantTimeZone(appointmentTenantId);
 
     // Get service details — services belong to the assigned dentist's catalog.
     const service = await db.collection('services').findOne({
@@ -153,82 +160,140 @@ export async function POST(request: NextRequest) {
     }
     const serviceName = service.name;
 
-    // Create each instance
+    const calendarDoc = await db.collection('calendars').findOne(
+      { id: targetCalendarId, tenant_id: appointmentTenantId },
+      { projection: { is_default: 1 } }
+    );
+    const isDefaultPersonalCalendar = Boolean(calendarDoc?.is_default && !isSharedCalendar);
+    const effectiveCategoryId =
+      typeof categoryId === 'number'
+        ? categoryId
+        : !category && isDefaultPersonalCalendar
+          ? (await getAppointmentCategoriesForDentist(
+              dentistAssignment.assignedDentistUserId,
+              dentistAssignment.assignedDentistTenantId
+            ))[0]?.id
+          : undefined;
+
+    let resolvedCategory: Awaited<ReturnType<typeof resolveAppointmentCategoryForWrite>> = null;
+    if (typeof effectiveCategoryId === 'number') {
+      resolvedCategory = await resolveAppointmentCategoryForWrite({
+        db,
+        tenantId: dentistAssignment.assignedDentistTenantId,
+        userId: dentistAssignment.assignedDentistUserId,
+        categoryId: effectiveCategoryId,
+      });
+      if (!resolvedCategory) {
+        return NextResponse.json(
+          { error: 'Selected category was not found for the chosen dentist' },
+          { status: 400 }
+        );
+      }
+    }
+
     for (const instance of instances) {
-      const creationResult = await withAppointmentWriteLocks(
+      const conflictCheck = await checkAppointmentConflict(
+        appointmentUserId,
+        appointmentTenantId,
+        instance.start,
+        instance.end,
+        undefined,
+        true,
         {
-          tenantId: appointmentTenantId,
-          userId: appointmentUserId,
           calendarId: targetCalendarId,
-          startTime: instance.start,
-          endTime: instance.end,
-          timeZone: tenantTimeZone,
-        },
-        async () => {
-          const conflictCheck = await checkAppointmentConflict(
-            appointmentUserId,
-            appointmentTenantId,
-            instance.start,
-            instance.end,
-            undefined,
-            true,
-            {
-              calendarId: targetCalendarId,
-            }
-          );
-
-          if (conflictCheck.hasConflict) {
-            return { conflictCheck };
-          }
-
-          const nextId = await getNextNumericId('appointments');
-
-          const appointment: Record<string, unknown> = {
-            id: nextId,
-            _id: nextId,
-            tenant_id: appointmentTenantId,
-            user_id: appointmentUserId,
-            calendar_id: targetCalendarId,
-            created_by_user_id: createdByUserId,
-            ...buildAppointmentDentistFields(dentistAssignment),
-            service_id: normalizedServiceId,
-            service_name: serviceName,
-            client_id: client.id,
-            client_name: client.name || clientName,
-            client_email: client.email || clientEmail || null,
-            client_phone: client.phone || clientPhone || null,
-            start_time: instance.start.toISOString(),
-            end_time: instance.end.toISOString(),
-            status: 'scheduled',
-            recurrence: recurrenceRule,
-            recurrence_group_id: recurrenceGroupId,
-            reminder_sent: false,
-            price_at_time: typeof service.price === 'number' ? service.price : null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-
-          if (notes) appointment.notes = notes;
-          if (category !== undefined) appointment.category = category || null;
-          if (color !== undefined) appointment.color = color || null;
-
-          await db.collection('appointments').insertOne(appointment);
-          return { appointment };
+          dentistUserId: dentistAssignment.assignedDentistUserId,
+          dentistTenantId: dentistAssignment.assignedDentistTenantId,
         }
       );
 
-      if ('conflictCheck' in creationResult) {
-        const conflictCheck = creationResult.conflictCheck;
+      if (hasAvailabilityBlockConflict(conflictCheck.conflicts)) {
+        return NextResponse.json(
+          {
+            error: 'Una sau mai multe programari recurente cad peste un blocaj de disponibilitate.',
+            conflicts: conflictCheck.conflicts.map(formatAppointmentConflictPayload),
+            suggestions: formatAppointmentConflictSuggestions(conflictCheck.suggestions),
+          },
+          { status: 409 }
+        );
+      }
+    }
+
+    // Create each instance
+    for (const instance of instances) {
+      const conflictCheck = await checkAppointmentConflict(
+        appointmentUserId,
+        appointmentTenantId,
+        instance.start,
+        instance.end,
+        undefined,
+        true,
+        {
+          calendarId: targetCalendarId,
+          dentistUserId: dentistAssignment.assignedDentistUserId,
+          dentistTenantId: dentistAssignment.assignedDentistTenantId,
+        }
+      );
+
+      if (hasAvailabilityBlockConflict(conflictCheck.conflicts)) {
+        return NextResponse.json(
+          {
+            error: 'Una sau mai multe programari recurente cad peste un blocaj de disponibilitate.',
+            conflicts: conflictCheck.conflicts.map(formatAppointmentConflictPayload),
+            suggestions: formatAppointmentConflictSuggestions(conflictCheck.suggestions),
+          },
+          { status: 409 }
+        );
+      }
+
+      if (conflictCheck.hasConflict) {
         conflicts.push({
           start: instance.start,
           end: instance.end,
-          conflicts: conflictCheck ? conflictCheck.conflicts : [],
+          conflicts: conflictCheck.conflicts,
         });
-        continue;
       }
 
+      const nextId = await getNextNumericId('appointments');
+
+      const appointment: Record<string, unknown> = {
+        id: nextId,
+        _id: nextId,
+        tenant_id: appointmentTenantId,
+        user_id: appointmentUserId,
+        calendar_id: targetCalendarId,
+        created_by_user_id: createdByUserId,
+        ...buildAppointmentDentistFields(dentistAssignment),
+        service_id: normalizedServiceId,
+        service_name: serviceName,
+        client_id: client.id,
+        client_name: client.name || clientName,
+        client_email: client.email || clientEmail || null,
+        client_phone: client.phone || clientPhone || null,
+        start_time: instance.start.toISOString(),
+        end_time: instance.end.toISOString(),
+        status: 'scheduled',
+        recurrence: recurrenceRule,
+        recurrence_group_id: recurrenceGroupId,
+        reminder_sent: false,
+        price_at_time: typeof service.price === 'number' ? service.price : null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      if (notes) appointment.notes = notes;
+      if (isDefaultPersonalCalendar && resolvedCategory) {
+        appointment.category = resolvedCategory.key;
+        appointment.category_label = resolvedCategory.label;
+        appointment.category_color = resolvedCategory.color;
+      } else if (isDefaultPersonalCalendar && category !== undefined) {
+        appointment.category = category || null;
+      }
+      if (color !== undefined) appointment.color = color || null;
+
+      await db.collection('appointments').insertOne(appointment);
+
       createdAppointments.push({
-        ...creationResult.appointment,
+        ...appointment,
         created_by_user_id: createdByUserId ? createdByUserId.toString() : null,
         dentist_db_user_id: dentistAssignment.dentistDbUserId.toString(),
       });
@@ -248,9 +313,12 @@ export async function POST(request: NextRequest) {
       {
         created: createdAppointments.length,
         created_count: createdAppointments.length,
-        skipped: conflicts.length,
+        skipped: 0,
         appointments: createdAppointments,
         conflicts: conflicts.length > 0 ? conflicts : undefined,
+        warning: conflicts.length > 0
+          ? 'Programarile au fost salvate, dar unele intervale se suprapun cu alte programari.'
+          : null,
         recurrence_group_id: recurrenceGroupId,
       },
       { status: 201 }
@@ -259,12 +327,6 @@ export async function POST(request: NextRequest) {
     if (error instanceof ExplicitClientSelectionError) {
       return NextResponse.json(
         { error: error.message },
-        { status: 409 }
-      );
-    }
-    if (error instanceof AppointmentWriteBusyError) {
-      return NextResponse.json(
-        { error: 'Another booking is being created for this slot. Please try again.' },
         { status: 409 }
       );
     }

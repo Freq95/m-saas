@@ -46,12 +46,76 @@ function resolveCalendarHex(rawColorMine: unknown): string {
 }
 
 export async function getCalendarListForUser(auth: AuthContext): Promise<CalendarListPayload> {
-  const { dbUserId, userId, tenantId, email } = auth;
+  const { dbUserId, userId, tenantId, email, role } = auth;
 
   return getCached(calendarListCacheKey(dbUserId), 120, async () => {
-    await getOrCreateDefaultCalendar(auth);
+    if (role === 'owner' || role === 'dentist') {
+      await getOrCreateDefaultCalendar(auth);
+    }
     const db = await getMongoDbOrThrow();
     const normalizedEmail = email.toLowerCase().trim();
+
+    if (role === 'receptionist' || role === 'asistent') {
+      const ownerUserIds = role === 'asistent'
+        ? auth.assigned_dentist_user_ids ?? []
+        : null;
+
+      const roleCalendarDocs = ownerUserIds && ownerUserIds.length === 0
+        ? []
+        : await db.collection('calendars').find({
+            tenant_id: tenantId,
+            ...(ownerUserIds ? { owner_user_id: { $in: ownerUserIds } } : {}),
+            is_active: true,
+            deleted_at: { $exists: false },
+          }).toArray();
+
+      const calendarIds = roleCalendarDocs
+        .map((calendar: any) => calendar.id)
+        .filter((id: unknown): id is number => typeof id === 'number');
+
+      const acceptedSharesOnCalendars = calendarIds.length > 0
+        ? await db.collection('calendar_shares').find(
+            { calendar_id: { $in: calendarIds }, status: 'accepted' },
+            { projection: { calendar_id: 1, dentist_color: 1 } }
+          ).toArray()
+        : [];
+
+      const takenRecipientColorsByCalendar = new Map<number, string[]>();
+      for (const share of acceptedSharesOnCalendars) {
+        const calId = share.calendar_id;
+        if (typeof calId !== 'number') continue;
+        if (!takenRecipientColorsByCalendar.has(calId)) takenRecipientColorsByCalendar.set(calId, []);
+        if (isDentistColorId(share.dentist_color)) {
+          takenRecipientColorsByCalendar.get(calId)!.push(share.dentist_color);
+        }
+      }
+
+      const sharedCalendars = sortCalendars(
+        roleCalendarDocs.map((calendar: any) => {
+          const ownerColorId = isDentistColorId(calendar.color_mine) ? calendar.color_mine : null;
+          const takenColors = takenRecipientColorsByCalendar.get(calendar.id) ?? [];
+          return {
+            ...stripMongoId(calendar),
+            isOwner: false,
+            permissions: OWNER_CALENDAR_PERMISSIONS,
+            shareId: null,
+            sharedByName: null,
+            dentistDisplayName: null,
+            color_mine: resolveCalendarHex(calendar.color_mine),
+            color_others: null,
+            ownerColorId,
+            dentistColorId: null,
+            takenColors,
+          };
+        })
+      );
+
+      return {
+        ownCalendars: [],
+        sharedCalendars,
+        sentPendingShares: [],
+      };
+    }
 
     const [ownCalendarDocs, acceptedSharesAsRecipient] = await Promise.all([
       db.collection('calendars').find({

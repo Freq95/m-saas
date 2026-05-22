@@ -6,7 +6,7 @@ type UserSpec = {
   id: number;
   email: string;
   name: string;
-  role: 'owner' | 'staff';
+  role: 'owner' | 'dentist';
   password: string;
 };
 
@@ -25,7 +25,7 @@ const OWNER_B_BASE = {
 const STAFF_A_BASE = {
   id: 910003,
   name: 'Staff A',
-  role: 'staff',
+  role: 'dentist',
 };
 
 async function getNextNumericId(db: any, collectionName: string): Promise<number> {

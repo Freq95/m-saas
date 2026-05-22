@@ -267,8 +267,47 @@ describe('PATCH /api/appointments/[id] price_at_time behavior', () => {
     expect(res.status).toBe(409);
     const json = await res.json();
 
-    expect(json.error).toContain('Clientul selectat nu mai exista');
+    expect(json.error).toContain('Pacientul selectat nu mai exista');
     expect(appointments[0]?.client_id).toBe(123);
+  });
+
+  it('returns 409 when a time update overlaps an availability block', async () => {
+    mockCheckAppointmentConflict.mockResolvedValueOnce({
+      hasConflict: true,
+      conflicts: [
+        {
+          type: 'availability_block',
+          block: {
+            id: 77,
+            type_label: 'Vacanta',
+            reason: 'Zi libera',
+            start_time: '2026-03-10T10:00:00.000Z',
+            end_time: '2026-03-10T11:00:00.000Z',
+          },
+        },
+      ],
+      suggestions: [],
+    });
+
+    const req = new NextRequest('http://localhost/api/appointments/10', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        startTime: '2026-03-10T10:00:00.000Z',
+        endTime: '2026-03-10T10:30:00.000Z',
+      }),
+    });
+
+    const res = await PATCH(req, { params: Promise.resolve({ id: '10' }) });
+    const json = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(json.error).toBe('Intervalul este blocat in calendar.');
+    expect(json.conflicts[0]).toMatchObject({
+      type: 'availability_block',
+      block: { type_label: 'Vacanta', reason: 'Zi libera' },
+    });
+    expect(appointments[0]?.start_time).toBe('2026-03-10T09:00:00.000Z');
   });
 
   it('updates the assigned dentist and moves the service owner scope', async () => {

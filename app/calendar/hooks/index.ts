@@ -1,12 +1,13 @@
 export { useCalendar } from './useCalendar';
 export { useAppointmentsSWR } from './useAppointmentsSWR';
+export { useAvailabilityBlocks } from './useAvailabilityBlocks';
 export { useCalendarList } from './useCalendarList';
 export { usePendingShares } from './usePendingShares';
-export { useCalendarScopeSelection } from './useCalendarScopeSelection';
+export { useAppointmentCategories } from './useAppointmentCategories';
 export { parseSessionUserId } from './sessionUser';
 export { parseSessionDbUserId } from './sessionUser';
-export type { Appointment, CalendarState, CalendarPermissions } from './useCalendar';
+export type { Appointment, AvailabilityBlock, CalendarState, CalendarPermissions } from './useCalendar';
 export type { CreateAppointmentInput, UpdateAppointmentInput } from './useAppointmentsSWR';
 export type { CalendarListItem, SentPendingShare } from './useCalendarList';
 export type { PendingCalendarShare } from './usePendingShares';
-export type { CalendarScope } from './useCalendarScopeSelection';
+export type { AppointmentCategoryOption } from './useAppointmentCategories';

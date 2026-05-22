@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import styles from '../../../../page.module.css';
 import type { CalendarOption, DentistOption } from '../types';
 
@@ -15,7 +16,7 @@ interface CalendarPickerSectionProps {
   readOnly: boolean;
 }
 
-export function CalendarPickerSection({
+function CalendarPickerSectionBase({
   calendarOptions,
   calendarId,
   onCalendarChange,
@@ -92,3 +93,5 @@ export function CalendarPickerSection({
     </>
   );
 }
+
+export const CalendarPickerSection = memo(CalendarPickerSectionBase);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import styles from '../../page.module.css';
 import type { Appointment } from '../../hooks/useCalendar';
 
@@ -8,7 +8,9 @@ interface DeleteConfirmModalProps {
   isOpen: boolean;
   appointment: Appointment | null;
   onClose: () => void;
-  onConfirm: () => Promise<void>;
+  // Receives an optional scope so recurring deletes can target the whole series.
+  // For non-recurring appointments the scope is always undefined.
+  onConfirm: (scope?: 'series') => Promise<void>;
 }
 
 export function DeleteConfirmModal({
@@ -20,6 +22,14 @@ export function DeleteConfirmModal({
   const backdropPressStartedRef = useRef(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const isRecurring = Boolean(appointment?.recurrence_group_id);
+  const [scope, setScope] = useState<'single' | 'series'>('single');
+
+  // Reset choice each time the modal opens — otherwise a previous "series"
+  // pick would silently carry over to a different appointment.
+  useEffect(() => {
+    if (isOpen) setScope('single');
+  }, [isOpen]);
 
   const handleBackdropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     backdropPressStartedRef.current = event.target === event.currentTarget;
@@ -39,7 +49,7 @@ export function DeleteConfirmModal({
     setDeleteError(null);
     setIsDeleting(true);
     try {
-      await onConfirm();
+      await onConfirm(isRecurring && scope === 'series' ? 'series' : undefined);
     } catch {
       setDeleteError('Nu s-a putut sterge programarea. Incearca din nou.');
     } finally {
@@ -66,13 +76,49 @@ export function DeleteConfirmModal({
         <p className={styles.sheetDescription}>
           Sigur vrei sa stergi programarea pentru <strong>{appointment.client_name}</strong>?
         </p>
+
+        {isRecurring && (
+          <div
+            role="radiogroup"
+            aria-label="Ce vrei sa stergi"
+            style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', margin: '0.5rem 0 0.25rem' }}
+          >
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+              <input
+                type="radio"
+                name="delete-scope"
+                value="single"
+                checked={scope === 'single'}
+                onChange={() => setScope('single')}
+                disabled={isDeleting}
+              />
+              <span>Doar aceasta aparitie</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+              <input
+                type="radio"
+                name="delete-scope"
+                value="series"
+                checked={scope === 'series'}
+                onChange={() => setScope('series')}
+                disabled={isDeleting}
+              />
+              <span>Toata seria recurenta</span>
+            </label>
+          </div>
+        )}
+
         {deleteError && <p className={styles.sheetDescription}>{deleteError}</p>}
         <div className={styles.modalActions}>
           <button type="button" onClick={onClose} className={styles.cancelButton} disabled={isDeleting}>
             Renunta
           </button>
           <button type="button" onClick={handleConfirmClick} className={styles.deleteButton} disabled={isDeleting}>
-            {isDeleting ? 'Se sterge...' : 'Sterge'}
+            {isDeleting
+              ? 'Se sterge...'
+              : isRecurring && scope === 'series'
+                ? 'Sterge seria'
+                : 'Sterge'}
           </button>
         </div>
       </div>

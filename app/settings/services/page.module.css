@@ -19,6 +19,77 @@
   font-size: 0.95rem;
 }
 
+.selectorRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  color: var(--color-text-soft);
+  font-size: 0.9rem;
+}
+
+.selectorRow select {
+  min-width: 220px;
+  min-height: 36px;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  padding: var(--space-2) var(--space-3);
+}
+
+.scopeBanner {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-soft);
+  font-size: 0.9rem;
+}
+
+.groupedServices {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.serviceGroup {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.serviceGroup h3 {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-soft);
+  font-size: 0.85rem;
+}
+
+.readonlyServiceRow {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.readonlyServiceRow:last-child {
+  border-bottom: 0;
+}
+
+.readonlyServiceRow span {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.readonlyServiceRow small {
+  color: var(--color-text-muted);
+}
+
 .tableWrap {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -189,9 +260,9 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: color-mix(in srgb, var(--color-bg) 76%, transparent);
-  backdrop-filter: blur(var(--blur-sm));
-  -webkit-backdrop-filter: blur(var(--blur-sm));
+  background: color-mix(in srgb, var(--color-bg) 84%, black);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   z-index: 1000;
   display: flex;
   align-items: center;
@@ -244,7 +315,7 @@
 
 .btnGhost {
   padding: 0.72rem 1.35rem;
-  background: transparent;
+  background: var(--color-surface-muted);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   color: var(--color-text-soft);
@@ -268,7 +339,7 @@
 
 .btnDanger {
   padding: 0.7rem 1.4rem;
-  background: transparent;
+  background: var(--color-danger-bg);
   border: 1px solid color-mix(in srgb, var(--color-danger) 45%, transparent);
   border-radius: var(--radius-md);
   color: color-mix(in srgb, var(--color-danger) 78%, white);
@@ -435,6 +506,20 @@
     align-items: stretch;
     flex-direction: column;
     flex-wrap: nowrap;
+  }
+
+  .selectorRow {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .selectorRow select {
+    width: 100%;
+  }
+
+  .readonlyServiceRow {
+    flex-direction: column;
+    gap: 0.2rem;
   }
 
   .desktopTabRow {

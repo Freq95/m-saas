@@ -22,7 +22,7 @@ export const authConfig: NextAuthConfig = {
       if (user) {
         token.userId = String(user.id || '');
         token.dbUserId = String((user as any).dbUserId || '');
-        token.role = String((user as any).role || 'staff');
+        token.role = String((user as any).role || 'dentist');
         token.tenantId = (user as any).tenantId ? String((user as any).tenantId) : null;
         token.sessionVersion = Number((user as any).sessionVersion || 0);
       }
@@ -32,7 +32,7 @@ export const authConfig: NextAuthConfig = {
       if (session.user) {
         session.user.id = String(token.userId || '');
         session.user.dbUserId = String(token.dbUserId || '');
-        session.user.role = String(token.role || 'staff');
+        session.user.role = String(token.role || 'dentist');
         session.user.tenantId = token.tenantId ? String(token.tenantId) : null;
         session.user.sessionVersion = Number(token.sessionVersion || 0);
       }

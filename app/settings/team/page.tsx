@@ -1,5 +1,4 @@
 import { Suspense } from 'react';
-import { redirect } from 'next/navigation';
 import { getAuthUser, redirectToLogin } from '@/lib/auth-helpers';
 import { getTeamData } from '@/lib/server/team';
 import { SettingsSkeleton } from '../SettingsSkeleton';
@@ -23,11 +22,14 @@ async function TeamContent() {
     redirectToLogin(err);
   }
 
-  if (auth.role !== 'owner') {
-    redirect('/settings/services');
-  }
-
   const initialTeamData = await getTeamData(auth).catch(() => null);
 
-  return <TeamSettingsPageClient initialTeamData={initialTeamData} />;
+  return (
+    <TeamSettingsPageClient
+      initialTeamData={initialTeamData}
+      viewMode={auth.role === 'owner' ? 'edit' : 'readonly'}
+      isOwner={auth.role === 'owner'}
+      currentUserId={auth.userId}
+    />
+  );
 }

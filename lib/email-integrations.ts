@@ -21,8 +21,80 @@ export interface EmailIntegration {
   last_sync_at: string | null;
   last_synced_uid?: number | null;
   token_expires_at?: number | null;
+  // Health tracking — written by the sync runners. Lets the UI distinguish a
+  // genuinely working integration from one that's enabled but silently broken
+  // (e.g. an OAuth refresh token that returns invalid_grant).
+  last_sync_status?: 'success' | 'failed' | null;
+  last_sync_attempted_at?: string | null;
+  last_sync_error_code?: SyncErrorCode | null;
+  last_sync_error_message?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export type SyncErrorCode = 'AUTH_REVOKED' | 'NETWORK' | 'UNKNOWN';
+
+/** Classify a raw error from a sync runner into a stable, UI-friendly code. */
+export function classifySyncError(err: unknown): SyncErrorCode {
+  const message = err instanceof Error ? err.message : String(err ?? '');
+  const lower = message.toLowerCase();
+  if (
+    lower.includes('invalid_grant') ||
+    lower.includes('invalid grant') ||
+    lower.includes('unauthorized') ||
+    lower.includes('authentication') ||
+    lower.includes('missing refresh token') ||
+    lower.includes('failed to refresh access token')
+  ) {
+    return 'AUTH_REVOKED';
+  }
+  if (
+    lower.includes('econn') ||
+    lower.includes('etimedout') ||
+    lower.includes('network') ||
+    lower.includes('socket')
+  ) {
+    return 'NETWORK';
+  }
+  return 'UNKNOWN';
+}
+
+/**
+ * Record the outcome of a sync attempt against an integration. Safe to call from
+ * inside or outside the runner; failures here are swallowed to avoid masking
+ * the underlying sync error.
+ */
+export async function recordIntegrationSyncResult(
+  integrationId: number,
+  outcome:
+    | { status: 'success' }
+    | { status: 'failed'; error: unknown }
+): Promise<void> {
+  try {
+    const db = await getMongoDbOrThrow();
+    const nowIso = new Date().toISOString();
+    const update: Record<string, unknown> = {
+      last_sync_status: outcome.status,
+      last_sync_attempted_at: nowIso,
+      updated_at: nowIso,
+    };
+    if (outcome.status === 'success') {
+      update.last_sync_error_code = null;
+      update.last_sync_error_message = null;
+    } else {
+      update.last_sync_error_code = classifySyncError(outcome.error);
+      const message = outcome.error instanceof Error
+        ? outcome.error.message
+        : String(outcome.error ?? 'Unknown sync error');
+      update.last_sync_error_message = message.slice(0, 500);
+    }
+    await db.collection('email_integrations').updateOne({ id: integrationId }, { $set: update });
+  } catch (writeErr) {
+    logger.warn('Failed to record integration sync result', {
+      integrationId,
+      writeErr: writeErr instanceof Error ? writeErr.message : String(writeErr),
+    });
+  }
 }
 
 export interface EmailIntegrationConfig {
@@ -209,6 +281,10 @@ export async function getUserEmailIntegrations(userId: number, tenantId?: Object
         is_active: integration.is_active,
         last_sync_at: integration.last_sync_at || null,
         last_synced_uid: integration.last_synced_uid ?? null,
+        last_sync_status: integration.last_sync_status ?? null,
+        last_sync_attempted_at: integration.last_sync_attempted_at ?? null,
+        last_sync_error_code: integration.last_sync_error_code ?? null,
+        last_sync_error_message: integration.last_sync_error_message ?? null,
         created_at: integration.created_at,
         updated_at: integration.updated_at,
       } as EmailIntegration;

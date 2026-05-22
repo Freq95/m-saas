@@ -2,16 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { handleApiError } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { resolveClientScopeForDentist } from '@/lib/client-permissions';
 
 // GET /api/clients/export - Export clients to CSV
 export async function GET(request: NextRequest) {
   try {
     const db = await getMongoDbOrThrow();
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
+    const rawDentistUserId = request.nextUrl.searchParams.get('dentistUserId');
+    const scope = rawDentistUserId
+      ? await resolveClientScopeForDentist(auth, Number.parseInt(rawDentistUserId, 10))
+      : { userId: auth.userId, tenantId: auth.tenantId };
 
     const clients = await db
       .collection('clients')
-      .find({ user_id: userId, tenant_id: tenantId, deleted_at: { $exists: false } })
+      .find({ user_id: scope.userId, tenant_id: scope.tenantId, deleted_at: { $exists: false } })
       .sort({ name: 1 })
       .toArray();
 
@@ -60,7 +65,7 @@ export async function GET(request: NextRequest) {
     return new NextResponse(csvWithBOM, {
       headers: {
         'Content-Type': 'text/csv; charset=utf-8',
-        'Content-Disposition': `attachment; filename="clienti_${new Date().toISOString().split('T')[0]}.csv"`,
+        'Content-Disposition': `attachment; filename="pacienti_${new Date().toISOString().split('T')[0]}.csv"`,
       },
     });
   } catch (error) {

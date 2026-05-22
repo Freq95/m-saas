@@ -24,47 +24,66 @@ interface DayPanelProps {
   onNavigate: (date: Date) => void;
   onSearchChange?: (query: string) => void;
   onHoverAppointment?: (id: number | null) => void;
-  calendarScopeValue?: string;
+  calendarScopeValues?: string[];
   calendarScopeOptions?: Array<{
     value: string;
     label: string;
     color?: string | null;
-    group?: 'all' | 'own' | 'shared';
+    group?: 'own' | 'shared';
   }>;
   onCalendarScopeChange?: (value: string) => void;
+  calendarColumnMode?: CalendarColumnMode;
+  onCalendarColumnModeChange?: (mode: CalendarColumnMode) => void;
 }
 
 const STATUS_KEYS = ['scheduled', 'completed', 'cancelled', 'no-show'] as const;
+type CalendarColumnMode = 'unified' | 'columns';
 
-function readGroupLabel(group: 'all' | 'own' | 'shared' | undefined): string | null {
+function readGroupLabel(group: 'own' | 'shared' | undefined): string | null {
   if (group === 'own') return 'Calendarele mele';
   if (group === 'shared') return 'Partajate';
   return null;
 }
 
 export function CalendarScopeDropdown({
-  value,
+  selectedValues,
   options,
   onChange,
+  columnMode = 'unified',
+  onColumnModeChange,
   className,
   triggerClassName,
   menuClassName,
 }: {
-  value: string;
+  selectedValues: string[];
   options: Array<{
     value: string;
     label: string;
     color?: string | null;
-    group?: 'all' | 'own' | 'shared';
+    group?: 'own' | 'shared';
   }>;
   onChange: (value: string) => void;
+  columnMode?: CalendarColumnMode;
+  onColumnModeChange?: (mode: CalendarColumnMode) => void;
   className?: string;
   triggerClassName?: string;
   menuClassName?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const selectedOption = options.find((option) => option.value === value) || options[0] || null;
+  const selectedValueSet = useMemo(() => new Set(selectedValues), [selectedValues]);
+  const selectedOptions = useMemo(
+    () => options.filter((option) => selectedValueSet.has(option.value)),
+    [options, selectedValueSet]
+  );
+  const triggerLabel = selectedOptions.length === 0
+    ? 'Niciun calendar'
+    : selectedOptions.length === 1
+      ? selectedOptions[0].label
+      : `${selectedOptions.length} calendare`;
+  const triggerColor = selectedOptions.length === 1
+    ? selectedOptions[0].color
+    : 'var(--color-accent)';
 
   const groupedOptions = useMemo(() => {
     const groups: Array<{
@@ -74,7 +93,7 @@ export function CalendarScopeDropdown({
     }> = [];
 
     for (const option of options) {
-      const key = option.group || 'all';
+      const key = option.group || 'calendars';
       let existingGroup = groups.find((group) => group.key === key);
       if (!existingGroup) {
         existingGroup = {
@@ -126,17 +145,17 @@ export function CalendarScopeDropdown({
           triggerClassName,
         ].filter(Boolean).join(' ')}
         onClick={() => setIsOpen((prev) => !prev)}
-        aria-haspopup="listbox"
+        aria-haspopup="menu"
         aria-expanded={isOpen}
-        aria-label="Selecteaza calendarul afisat"
+        aria-label="Alege calendarele afisate"
       >
         <div className={styles.scopeTriggerLeft}>
           <span
             className={styles.scopeDot}
-            style={{ background: selectedOption?.color || 'var(--color-accent)' }}
+            style={{ background: triggerColor || 'var(--color-accent)' }}
             aria-hidden="true"
           />
-          <span className={styles.scopeLabel}>{selectedOption?.label || 'Calendar'}</span>
+          <span className={styles.scopeLabel}>{triggerLabel}</span>
         </div>
         <svg
           className={`${styles.statusChevron} ${isOpen ? styles.chevronOpen : ''}`}
@@ -157,14 +176,14 @@ export function CalendarScopeDropdown({
       {isOpen && (
         <div
           className={[styles.scopeMenu, menuClassName].filter(Boolean).join(' ')}
-          role="listbox"
+          role="menu"
           aria-label="Lista calendare"
         >
           {groupedOptions.map((group) => (
             <div key={group.key} className={styles.scopeMenuGroup}>
               {group.label && <div className={styles.scopeMenuGroupLabel}>{group.label}</div>}
               {group.items.map((option) => {
-                const isActive = option.value === value;
+                const isActive = selectedValueSet.has(option.value);
                 return (
                   <button
                     key={option.value}
@@ -172,10 +191,9 @@ export function CalendarScopeDropdown({
                     className={`${styles.scopeMenuItem}${isActive ? ` ${styles.scopeMenuItemActive}` : ''}`}
                     onClick={() => {
                       onChange(option.value);
-                      setIsOpen(false);
                     }}
-                    role="option"
-                    aria-selected={isActive}
+                    role="menuitemcheckbox"
+                    aria-checked={isActive}
                   >
                     <span
                       className={styles.scopeMenuDot}
@@ -183,27 +201,50 @@ export function CalendarScopeDropdown({
                       aria-hidden="true"
                     />
                     <span className={styles.scopeMenuLabel}>{option.label}</span>
-                    {isActive && (
-                      <svg
-                        className={styles.scopeMenuCheck}
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
-                      >
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
+                    <span className={styles.scopeMenuCheckbox} aria-hidden="true">
+                      {isActive && (
+                        <svg
+                          width="10"
+                          height="10"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </span>
                   </button>
                 );
               })}
             </div>
           ))}
+          {onColumnModeChange && (
+            <div className={styles.scopeLayoutGroup}>
+              <div className={styles.scopeMenuGroupLabel}>Afisare</div>
+              <div className={styles.scopeLayoutToggle} role="group" aria-label="Mod afisare calendare">
+                <button
+                  type="button"
+                  className={`${styles.scopeLayoutButton} ${columnMode === 'unified' ? styles.scopeLayoutButtonActive : ''}`}
+                  onClick={() => onColumnModeChange('unified')}
+                  aria-pressed={columnMode === 'unified'}
+                >
+                  Lista unificata
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.scopeLayoutButton} ${columnMode === 'columns' ? styles.scopeLayoutButtonActive : ''}`}
+                  onClick={() => onColumnModeChange('columns')}
+                  aria-pressed={columnMode === 'columns'}
+                >
+                  Coloane
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -254,13 +295,32 @@ export function AppointmentCard({
         <div className={styles.colorBar} style={{ background: resolvedColor }} />
         <div className={styles.cardBody}>
 
-          {/* Top row: time · duration · service */}
+          {/* Top row: time · duration · service · recurring badge */}
           <div className={styles.timeRow}>
             <span className={styles.time}>{format(start, 'HH:mm')}</span>
             <span className={styles.timeSep}>·</span>
             <span className={styles.duration}>{durationMin} min</span>
             <span className={styles.timeSep}>·</span>
             <span className={styles.service}>{apt.service_name}</span>
+            {apt.recurrence_group_id !== undefined && apt.recurrence_group_id !== null && (
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-label="Programare recurenta"
+                style={{ marginLeft: 'auto', opacity: 0.55, flexShrink: 0 }}
+              >
+                <polyline points="17 1 21 5 17 9" />
+                <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                <polyline points="7 23 3 19 7 15" />
+                <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+              </svg>
+            )}
           </div>
 
           {/* Client name */}
@@ -377,9 +437,11 @@ export function DayPanel({
   onNavigate,
   onSearchChange,
   onHoverAppointment,
-  calendarScopeValue = 'all',
+  calendarScopeValues = [],
   calendarScopeOptions = [],
   onCalendarScopeChange,
+  calendarColumnMode = 'unified',
+  onCalendarColumnModeChange,
 }: DayPanelProps) {
   type StatusFilter = 'all' | 'scheduled' | 'completed' | 'cancelled';
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -399,6 +461,7 @@ export function DayPanel({
         apt.client_name.toLowerCase().includes(q) ||
         apt.service_name.toLowerCase().includes(q) ||
         apt.category?.toLowerCase().includes(q) ||
+        apt.category_label?.toLowerCase().includes(q) ||
         apt.notes?.toLowerCase().includes(q)
       )
       .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
@@ -575,9 +638,11 @@ export function DayPanel({
               <div className={styles.headerActionRow}>
                 {showCalendarScopeControl ? (
                   <CalendarScopeDropdown
-                    value={calendarScopeValue}
+                    selectedValues={calendarScopeValues}
                     options={calendarScopeOptions}
                     onChange={onCalendarScopeChange as (value: string) => void}
+                    columnMode={calendarColumnMode}
+                    onColumnModeChange={onCalendarColumnModeChange}
                   />
                 ) : (
                   <div />

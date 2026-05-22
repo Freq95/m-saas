@@ -63,6 +63,18 @@ export async function getClientProfileData(clientId: number, tenantId: ObjectId,
   const appointments = await db
     .collection('appointments')
     .find(buildClientAppointmentFilter(clientId, { tenantId, userId }))
+    .project({
+      id: 1,
+      service_id: 1,
+      service_name: 1,
+      start_time: 1,
+      end_time: 1,
+      status: 1,
+      notes: 1,
+      price_at_time: 1,
+      user_id: 1,
+      tenant_id: 1,
+    })
     .sort({ start_time: -1 })
     .toArray();
   const serviceScopeFilter = buildServiceScopeFilter(
@@ -71,11 +83,12 @@ export async function getClientProfileData(clientId: number, tenantId: ObjectId,
 
   const [services, conversations] = await Promise.all([
     serviceScopeFilter
-      ? db.collection('services').find({ ...serviceScopeFilter }).toArray()
+      ? db.collection('services').find({ ...serviceScopeFilter }).project({ id: 1, name: 1, price: 1 }).toArray()
       : Promise.resolve([]),
     db
       .collection('conversations')
       .find({ client_id: clientId, user_id: userId, tenant_id: tenantId })
+      .project({ id: 1, channel: 1, subject: 1, status: 1, updated_at: 1 })
       .sort({ updated_at: -1 })
       .toArray(),
   ]);
@@ -129,12 +142,21 @@ export async function getClientStatsData(clientId: number, tenantId: ObjectId, u
   const appointments = await db
     .collection('appointments')
     .find(buildClientAppointmentFilter(clientId, { tenantId, userId }))
+    .project({
+      id: 1,
+      service_id: 1,
+      start_time: 1,
+      status: 1,
+      price_at_time: 1,
+      user_id: 1,
+      tenant_id: 1,
+    })
     .toArray();
   const serviceScopeFilter = buildServiceScopeFilter(
     collectServiceScopesFromAppointments(appointments, { tenantId, userId })
   );
   const services = serviceScopeFilter
-    ? await db.collection('services').find(serviceScopeFilter).toArray()
+    ? await db.collection('services').find(serviceScopeFilter).project({ id: 1, name: 1, price: 1 }).toArray()
     : [];
 
   const serviceById = new Map<number, any>(

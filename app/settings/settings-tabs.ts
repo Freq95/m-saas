@@ -6,7 +6,7 @@ export const SETTINGS_TABS: Array<{ key: SettingsTabKey; href: string; label: st
   { key: 'services', href: '/settings/services', label: 'Servicii' },
   { key: 'calendars', href: '/settings/calendars', label: 'Calendare' },
   { key: 'email', href: '/settings/email', label: 'Email' },
-  { key: 'team', href: '/settings/team', label: 'Echipă', ownerOnly: true },
+  { key: 'team', href: '/settings/team', label: 'Echipă' },
   { key: 'account', href: '/settings/account', label: 'Cont' },
-  { key: 'gdpr', href: '/settings/gdpr', label: 'GDPR', ownerOnly: true },
+  { key: 'gdpr', href: '/settings/gdpr', label: 'GDPR' },
 ];

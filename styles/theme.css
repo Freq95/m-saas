@@ -149,10 +149,10 @@
 
   /* ── Colors — dark (default) ─────────────────────────────── */
   --color-bg:            #06080d;
-  --color-bg-elevated:   rgba(13, 18, 30, 0.78);
-  --color-surface:       rgba(17, 24, 39, 0.64);
-  --color-surface-strong: rgba(17, 24, 39, 0.86);
-  --color-surface-muted: rgba(30, 41, 59, 0.45);
+  --color-bg-elevated:   #0d121e;
+  --color-surface:       #111827;
+  --color-surface-strong: #111827;
+  --color-surface-muted: #1e293b;
   --color-border:        rgba(148, 163, 184, 0.2);
   --color-border-strong: rgba(148, 163, 184, 0.3);
 
@@ -200,7 +200,7 @@
 
   /* Misc */
   --color-today-badge:      #f97316;
-  --color-calendar-slot-bg: rgba(17, 24, 39, 0.82);
+  --color-calendar-slot-bg: #111827;
 
   /* ── Gradients ───────────────────────────────────────────── */
   --gradient-app: radial-gradient(900px 500px at 10% -5%, rgba(45, 136, 255, 0.2), transparent 65%),
@@ -233,10 +233,10 @@
 /* ── Light theme overrides ───────────────────────────────────── */
 [data-theme="light"] {
   --color-bg:             #f0f4f8;
-  --color-bg-elevated:    rgba(255, 255, 255, 0.94);
-  --color-surface:        rgba(255, 255, 255, 0.82);
-  --color-surface-strong: rgba(255, 255, 255, 0.97);
-  --color-surface-muted:  rgba(226, 232, 240, 0.55);
+  --color-bg-elevated:    #ffffff;
+  --color-surface:        #ffffff;
+  --color-surface-strong: #ffffff;
+  --color-surface-muted:  #e2e8f0;
   --color-border:         rgba(100, 116, 139, 0.2);
   --color-border-strong:  rgba(100, 116, 139, 0.35);
 

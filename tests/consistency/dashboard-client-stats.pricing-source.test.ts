@@ -123,8 +123,14 @@ describe('dashboard/client stats pricing source consistency', () => {
           return {
             find(query: Doc) {
               const rows = appointments.filter((apt) => {
-                if (apt.user_id !== query.user_id) return false;
-                if (String(apt.tenant_id) !== String(query.tenant_id)) return false;
+                const scopeClauses = Array.isArray(query.$or) ? query.$or as Doc[] : [query];
+                const scopeMatches = scopeClauses.some((clause) => (
+                  (clause.user_id === undefined || apt.user_id === clause.user_id) &&
+                  (clause.tenant_id === undefined || String(apt.tenant_id) === String(clause.tenant_id)) &&
+                  (clause.service_owner_user_id === undefined || apt.service_owner_user_id === clause.service_owner_user_id) &&
+                  (clause.service_owner_tenant_id === undefined || String(apt.service_owner_tenant_id) === String(clause.service_owner_tenant_id))
+                ));
+                if (!scopeMatches) return false;
                 if (query.client_id !== undefined && apt.client_id !== query.client_id) return false;
                 if (query.deleted_at && 'deleted_at' in apt) return false;
                 const range = query.start_time as { $gte: string; $lte: string } | undefined;

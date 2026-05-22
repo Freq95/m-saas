@@ -7,6 +7,7 @@ import navStyles from '../../dashboard/page.module.css';
 import { useToast } from '@/lib/useToast';
 import { ToastContainer } from '@/components/Toast';
 import ClientCreateModal from '@/components/ClientCreateModal';
+import { gdprStateOf, GDPR_COLOR, GDPR_FULL_LABEL } from '@/lib/client-gdpr';
 import { logger } from '@/lib/logger';
 
 interface Client {
@@ -75,7 +76,10 @@ export default function ClientProfileClient({
   const [showAddNote, setShowAddNote] = useState(false);
   const [showEditClient, setShowEditClient] = useState(false);
   const [pendingDeleteFileId, setPendingDeleteFileId] = useState<number | null>(null);
+  const [editingNote, setEditingNote] = useState<any | null>(null);
+  const [pendingDeleteNote, setPendingDeleteNote] = useState<any | null>(null);
   const [noteContent, setNoteContent] = useState('');
+  const [editNoteContent, setEditNoteContent] = useState('');
   const [showGdprErase, setShowGdprErase] = useState(false);
   const [showConsentWithdraw, setShowConsentWithdraw] = useState(false);
   const [consentWithdrawing, setConsentWithdrawing] = useState(false);
@@ -83,6 +87,8 @@ export default function ClientProfileClient({
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
   const { toasts, removeToast, error: toastError } = useToast();
   const addNoteBackdropPressStartedRef = useRef(false);
+  const editNoteBackdropPressStartedRef = useRef(false);
+  const deleteNoteBackdropPressStartedRef = useRef(false);
   const deleteFileBackdropPressStartedRef = useRef(false);
   const gdprEraseBackdropRef = useRef(false);
   const consentWithdrawBackdropRef = useRef(false);
@@ -100,7 +106,7 @@ export default function ClientProfileClient({
       setConversations(result.conversations || []);
     } catch (error) {
       logger.error('Client profile: failed to fetch client data', error instanceof Error ? error : new Error(String(error)), { clientId });
-      toastError('Eroare la incarcarea datelor clientului');
+      toastError('Eroare la incarcarea datelor pacientului');
     } finally {
       setLoading(false);
     }
@@ -194,6 +200,63 @@ export default function ClientProfileClient({
     } catch (error) {
       logger.error('Client profile: failed to add note', error instanceof Error ? error : new Error(String(error)), { clientId });
       toastError('Eroare la adaugarea notei');
+    }
+  };
+
+  const handleEditNote = (note: any) => {
+    setEditingNote(note);
+    setEditNoteContent(note.description || note.title || '');
+  };
+
+  const handleUpdateNote = async () => {
+    if (!editingNote || !editNoteContent.trim()) return;
+    try {
+      const response = editingNote.activity_type === 'appointment_note'
+        ? await fetch(`/api/appointments/${editingNote.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes: editNoteContent }),
+          })
+        : await fetch(`/api/clients/${clientId}/notes/${editingNote.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content: editNoteContent,
+              noteCollection: editingNote.note_collection,
+            }),
+          });
+      if (!response.ok) throw new Error('Failed to update note');
+      setEditingNote(null);
+      setEditNoteContent('');
+      fetchNotes();
+    } catch (error) {
+      logger.error('Client profile: failed to update note', error instanceof Error ? error : new Error(String(error)), { clientId, noteId: editingNote.id });
+      toastError('Eroare la actualizarea notei');
+    }
+  };
+
+  const handleDeleteNote = (note: any) => setPendingDeleteNote(note);
+
+  const confirmDeleteNote = async () => {
+    if (!pendingDeleteNote) return;
+    const note = pendingDeleteNote;
+    setPendingDeleteNote(null);
+    try {
+      const response = note.activity_type === 'appointment_note'
+        ? await fetch(`/api/appointments/${note.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes: '' }),
+          })
+        : await fetch(`/api/clients/${clientId}/notes/${note.id}${note.note_collection ? `?noteCollection=${encodeURIComponent(note.note_collection)}` : ''}`, {
+            method: 'DELETE',
+          });
+      if (!response.ok) throw new Error('Failed to delete note');
+      fetchNotes();
+      fetchClientData();
+    } catch (error) {
+      logger.error('Client profile: failed to delete note', error instanceof Error ? error : new Error(String(error)), { clientId, noteId: note.id });
+      toastError('Eroare la stergerea notei');
     }
   };
 
@@ -354,6 +417,23 @@ export default function ClientProfileClient({
     }
     addNoteBackdropPressStartedRef.current = false;
   };
+  const handleEditNoteBackdropPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    editNoteBackdropPressStartedRef.current = e.target === e.currentTarget;
+  };
+  const handleEditNoteBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (editNoteBackdropPressStartedRef.current && e.target === e.currentTarget) {
+      setEditingNote(null);
+      setEditNoteContent('');
+    }
+    editNoteBackdropPressStartedRef.current = false;
+  };
+  const handleDeleteNoteBackdropPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    deleteNoteBackdropPressStartedRef.current = e.target === e.currentTarget;
+  };
+  const handleDeleteNoteBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (deleteNoteBackdropPressStartedRef.current && e.target === e.currentTarget) setPendingDeleteNote(null);
+    deleteNoteBackdropPressStartedRef.current = false;
+  };
   const handleDeleteFileBackdropPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     deleteFileBackdropPressStartedRef.current = e.target === e.currentTarget;
   };
@@ -374,7 +454,7 @@ export default function ClientProfileClient({
     return (
       <div className={navStyles.container}>
         <div className={styles.pageLoading}>
-          <p style={{ marginBottom: '1rem', color: 'var(--color-text-muted)' }}>Clientul nu a fost găsit.</p>
+          <p style={{ marginBottom: '1rem', color: 'var(--color-text-muted)' }}>Pacientul nu a fost gasit.</p>
           <Link href="/clients" className={styles.btnGhost} prefetch>← Înapoi la listă</Link>
         </div>
       </div>
@@ -382,13 +462,35 @@ export default function ClientProfileClient({
   }
 
   return (
-    <div className={navStyles.container}>
+    <div className={`${navStyles.container} ${styles.mobileViewport}`}>
       <div className={styles.page}>
 
         {/* ── Header ─────────────────────────────────────────── */}
         <header className={styles.header}>
           <div className={styles.identity}>
-            <div className={styles.avatar}>{getInitials(client.name)}</div>
+            {(() => {
+              // Avatar tint mirrors the GDPR state used in the patients list
+              // (green=given, orange=withdrawn, red=never asked). Same color
+              // language across list + profile so a quick glance always means
+              // the same thing.
+              const gdprState = gdprStateOf(client);
+              const gdprColor = GDPR_COLOR[gdprState];
+              return (
+                <div
+                  className={styles.avatar}
+                  style={{
+                    background: `linear-gradient(135deg, color-mix(in srgb, ${gdprColor} 24%, transparent) 0%, color-mix(in srgb, ${gdprColor} 14%, transparent) 100%)`,
+                    borderColor: `color-mix(in srgb, ${gdprColor} 45%, transparent)`,
+                    boxShadow: `0 0 0 4px color-mix(in srgb, ${gdprColor} 9%, transparent)`,
+                    color: gdprColor,
+                  }}
+                  aria-label={GDPR_FULL_LABEL[gdprState]}
+                  title={GDPR_FULL_LABEL[gdprState]}
+                >
+                  {getInitials(client.name)}
+                </div>
+              );
+            })()}
             <div className={styles.identityInfo}>
               <div className={styles.nameRow}>
                 <h1 className={styles.name}>{client.name}</h1>
@@ -579,15 +681,42 @@ export default function ClientProfileClient({
                 </div>
               </div>
             ) : (
-              <div className={styles.notesCol}>
-                <div className={styles.timeline}>
-                  {notes.map((note) => (
-                    <div key={note.id} className={styles.timelineItem}>
-                      <span className={styles.timelineDate}>{formatDate(note.activity_date || note.created_at)}</span>
-                      <span className={styles.timelineText}>{note.description || note.title}</span>
+              <div className={styles.rowList}>
+                {notes.map((note) => (
+                  <div key={`${note.activity_type || 'note'}-${note.id}`} className={styles.noteRow}>
+                    <span className={styles.noteDate}>{formatDate(note.activity_date || note.created_at)}</span>
+                    <div className={styles.noteInfo}>
+                      <span className={styles.noteText}>{note.description || note.title}</span>
+                      {note.activity_type === 'appointment_note' && (
+                        <span className={styles.noteMeta}>
+                          {note.appointment_service_name || 'Programare'} - {formatDate(note.appointment_date || note.start_time)}
+                        </span>
+                      )}
                     </div>
-                  ))}
-                </div>
+                    <div className={styles.fileActions}>
+                      <button
+                        className={styles.btnIconSmall}
+                        onClick={() => handleEditNote(note)}
+                        title="Editeaza"
+                        aria-label="Editeaza nota"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                        </svg>
+                      </button>
+                      <button
+                        className={`${styles.btnIconSmall} ${styles.btnIconDanger}`}
+                        onClick={() => handleDeleteNote(note)}
+                        title="Sterge"
+                        aria-label="Sterge nota"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4h6v2" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )
           )}
@@ -742,6 +871,46 @@ export default function ClientProfileClient({
         )}
 
         {/* ── Delete File Confirm ─────────────────────────────── */}
+        {editingNote && (
+          <div className={styles.modalOverlay} onPointerDown={handleEditNoteBackdropPointerDown} onClick={handleEditNoteBackdropClick}>
+            <div className={styles.modal}>
+              <div className={styles.modalHeader}>
+                <h3 className={styles.modalTitle}>Editeaza nota</h3>
+                <button className={styles.modalClose} onClick={() => { setEditingNote(null); setEditNoteContent(''); }} aria-label="Inchide">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                </button>
+              </div>
+              <textarea
+                value={editNoteContent}
+                onChange={(e) => setEditNoteContent(e.target.value)}
+                placeholder="Scrie nota aici..."
+                rows={5}
+                className={styles.modalTextarea}
+                autoFocus
+              />
+              <div className={styles.modalFooter}>
+                <button onClick={() => { setEditingNote(null); setEditNoteContent(''); }} className={styles.btnGhost}>Anuleaza</button>
+                <button onClick={handleUpdateNote} className={styles.btnPrimary} disabled={!editNoteContent.trim()}>Salveaza</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {pendingDeleteNote && (
+          <div className={styles.modalOverlay} onPointerDown={handleDeleteNoteBackdropPointerDown} onClick={handleDeleteNoteBackdropClick}>
+            <div className={styles.modal}>
+              <div className={styles.modalHeader}>
+                <h3 className={styles.modalTitle}>Confirmare stergere</h3>
+              </div>
+              <p className={styles.modalBody}>Sigur vrei sa stergi aceasta nota? Actiunea nu poate fi anulata.</p>
+              <div className={styles.modalFooter}>
+                <button onClick={() => setPendingDeleteNote(null)} className={styles.btnGhost}>Anuleaza</button>
+                <button onClick={confirmDeleteNote} className={styles.btnDanger}>Sterge</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {pendingDeleteFileId && (
           <div className={styles.modalOverlay} onPointerDown={handleDeleteFileBackdropPointerDown} onClick={handleDeleteFileBackdropClick}>
             <div className={styles.modal}>
@@ -828,11 +997,12 @@ export default function ClientProfileClient({
             phone: client.phone,
             notes: client.notes,
             consent_given: client.consent_given,
+            consent_withdrawn: client.consent_withdrawn,
             consent_method: client.consent_method,
             is_minor: client.is_minor,
             parent_guardian_name: client.parent_guardian_name,
           }}
-          title="Editează client"
+          title="Editeaza pacient"
           submitLabel="Salvează modificările"
           onClose={() => setShowEditClient(false)}
           onUpdated={(updatedClient) => {

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { format } from 'date-fns';
 import { ro } from 'date-fns/locale';
 import styles from '../../../../page.module.css';
@@ -26,7 +27,27 @@ function formatReadableRange(date: string, startTime: string, endTime: string): 
   return `${format(dateObj, "EEEE, d MMMM yyyy", { locale: ro })} • ${startTime} – ${endTime}`;
 }
 
-export function TimeSection({
+function openNativeTimePicker(event: { currentTarget: HTMLInputElement }) {
+  const input = event.currentTarget as HTMLInputElement & { showPicker?: () => void };
+  if (typeof input.showPicker !== 'function') return;
+  try {
+    input.showPicker();
+  } catch {
+    // Some browsers only allow showPicker during direct user gestures.
+  }
+}
+
+function openNativeDatePicker(event: { currentTarget: HTMLInputElement }) {
+  const input = event.currentTarget as HTMLInputElement & { showPicker?: () => void };
+  if (typeof input.showPicker !== 'function') return;
+  try {
+    input.showPicker();
+  } catch {
+    // Some browsers only allow showPicker during direct user gestures.
+  }
+}
+
+function TimeSectionBase({
   date,
   startTime,
   endTime,
@@ -57,6 +78,8 @@ export function TimeSection({
             id="appt-date"
             type="date"
             value={date}
+            onClick={openNativeDatePicker}
+            onFocus={openNativeDatePicker}
             onChange={(event) => onChange({ date: event.target.value })}
             disabled={disabled}
           />
@@ -68,6 +91,8 @@ export function TimeSection({
             type="time"
             value={startTime}
             step={900}
+            onClick={openNativeTimePicker}
+            onFocus={openNativeTimePicker}
             onChange={(event) => onChange({ startTime: event.target.value })}
             disabled={disabled}
           />
@@ -79,6 +104,8 @@ export function TimeSection({
             type="time"
             value={endTime}
             step={900}
+            onClick={openNativeTimePicker}
+            onFocus={openNativeTimePicker}
             onChange={(event) => onChange({ endTime: event.target.value })}
             disabled={disabled}
           />
@@ -173,6 +200,8 @@ export function TimeSection({
                     id="appt-rec-end-date"
                     type="date"
                     value={recurrence.endDate}
+                    onClick={openNativeDatePicker}
+                    onFocus={openNativeDatePicker}
                     onChange={(event) => onRecurrenceChange({ endDate: event.target.value })}
                     disabled={disabled}
                   />
@@ -185,3 +214,5 @@ export function TimeSection({
     </>
   );
 }
+
+export const TimeSection = memo(TimeSectionBase);

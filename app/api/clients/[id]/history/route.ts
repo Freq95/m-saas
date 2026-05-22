@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { resolveClientScopeForClient } from '@/lib/client-permissions';
 import {
   buildClientAppointmentFilter,
   buildServiceScopeFilter,
@@ -11,22 +12,18 @@ import {
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
     const db = await getMongoDbOrThrow();
     const clientId = parseInt(params.id);
 
-    const client = await db.collection('clients').findOne({
-      id: clientId,
-      user_id: userId,
-      tenant_id: tenantId,
-      deleted_at: { $exists: false },
-    });
-    if (!client) {
+    const scope = await resolveClientScopeForClient(auth, clientId);
+    if (!scope) {
       return NextResponse.json(
         { error: 'Client not found' },
         { status: 404 }
       );
     }
+    const { userId, tenantId } = scope;
 
     const timeline: any[] = [];
 

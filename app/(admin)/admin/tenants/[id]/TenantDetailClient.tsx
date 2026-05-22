@@ -166,7 +166,7 @@ export default function TenantDetailClient({
       body: JSON.stringify({
         email: String(form.get('email') || ''),
         name: String(form.get('name') || ''),
-        role: String(form.get('role') || 'staff'),
+        role: String(form.get('role') || 'dentist'),
         sendInvite: true,
       }),
     });
@@ -289,8 +289,11 @@ export default function TenantDetailClient({
         <form onSubmit={addUser} style={{ display: 'grid', gap: 8, maxWidth: 420 }}>
           <input name="name" placeholder="Name" required />
           <input type="email" name="email" placeholder="Email" required />
-          <input type="hidden" name="role" value="staff" />
-          <span style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Role: staff (only role available in MVP)</span>
+          <select name="role" defaultValue="dentist">
+            <option value="dentist">dentist</option>
+            <option value="receptionist">receptionist</option>
+            <option value="asistent">asistent</option>
+          </select>
           <button type="submit" disabled={working || atLimit}>Send invite</button>
         </form>
       </section>

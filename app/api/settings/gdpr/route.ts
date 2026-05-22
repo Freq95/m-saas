@@ -27,11 +27,11 @@ export async function GET(_request: NextRequest) {
   }
 }
 
-// PATCH /api/settings/gdpr — update gdpr_privacy_notice_text (owner only)
+// PATCH /api/settings/gdpr — update gdpr_privacy_notice_text (owner + dentist)
 export async function PATCH(request: NextRequest) {
   try {
     const { tenantId, role } = await getAuthUser();
-    if (role !== 'owner') return createErrorResponse('Acces interzis', 403);
+    if (role !== 'owner' && role !== 'dentist') return createErrorResponse('Acces interzis', 403);
 
     const body = await request.json();
     const text = typeof body?.gdpr_privacy_notice_text === 'string'

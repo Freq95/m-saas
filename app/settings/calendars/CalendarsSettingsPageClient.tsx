@@ -21,6 +21,12 @@ import {
   ShareCalendarModal,
 } from '../../calendar/components';
 import type { CalendarFormValues } from '../../calendar/components/modals/CalendarFormModal';
+import {
+  AppointmentCategoriesSection,
+  type AppointmentCategory,
+  type CategoryDentistOption,
+} from './AppointmentCategoriesSection';
+import { AvailabilityBlocksSection } from './AvailabilityBlocksSection';
 
 interface CalendarsSettingsPageClientProps {
   initialRole: string;
@@ -33,6 +39,9 @@ interface CalendarsSettingsPageClientProps {
   initialPendingShareList?: {
     pendingShares: any[];
   } | null;
+  categoryDentists: CategoryDentistOption[];
+  initialCategoryDentistUserId: number | null;
+  initialAppointmentCategories: AppointmentCategory[];
 }
 
 // ── Inline palette color picker ────────────────────────────────────────────
@@ -112,9 +121,12 @@ const IconX = () => (
 
 export default function CalendarsSettingsPageClient({
   initialRole,
-  initialUserId: _initialUserId,
+  initialUserId,
   initialCalendarList,
   initialPendingShareList,
+  categoryDentists,
+  initialCategoryDentistUserId,
+  initialAppointmentCategories,
 }: CalendarsSettingsPageClientProps) {
   const toast = useToast();
   const canManageCalendars = initialRole === 'owner';
@@ -347,7 +359,7 @@ export default function CalendarsSettingsPageClient({
       <div className={sharedStyles.container}>
         <SettingsMobileHeader title="Calendare" />
         <div className={styles.tabRow}>
-          <SettingsTabs activeTab="calendars" />
+          <SettingsTabs activeTab="calendars" isOwner={initialRole === 'owner'} />
           <div className={styles.tabRowRight}>
             {pendingCount > 0 && (
               <span className={styles.pendingNote}>
@@ -426,6 +438,15 @@ export default function CalendarsSettingsPageClient({
                           />
                         </div>
                       )}
+
+                      {calendar.is_default && (
+                        <AppointmentCategoriesSection
+                          dentists={categoryDentists}
+                          initialSelectedDentistUserId={initialCategoryDentistUserId}
+                          initialCategories={initialAppointmentCategories}
+                          embedded
+                        />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -477,6 +498,15 @@ export default function CalendarsSettingsPageClient({
                           }}
                         />
                       </div>
+
+                      {calendar.is_default && (
+                        <AppointmentCategoriesSection
+                          dentists={categoryDentists}
+                          initialSelectedDentistUserId={initialCategoryDentistUserId}
+                          initialCategories={initialAppointmentCategories}
+                          embedded
+                        />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -493,6 +523,17 @@ export default function CalendarsSettingsPageClient({
                 )}
               </div>
             )}
+
+            <AvailabilityBlocksSection
+              calendars={calendars}
+              currentUserId={initialUserId}
+              canManageAvailability={initialRole === 'owner' || initialRole === 'dentist'}
+              notify={{
+                success: toast.success,
+                warning: toast.warning,
+                error: toast.error,
+              }}
+            />
 
             {/* ── Sent invites ── */}
             {sentCount > 0 && (

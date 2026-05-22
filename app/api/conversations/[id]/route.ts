@@ -5,6 +5,7 @@ import { getMongoDbOrThrow, stripMongoId, type FlexDoc } from '@/lib/db/mongo-ut
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getConversationMessagesData } from '@/lib/server/inbox';
 import { getAuthUser } from '@/lib/auth-helpers';
+import { requireInboxAccess } from '@/lib/inbox-access';
 import { logDataAccess } from '@/lib/audit';
 import { checkUpdateRateLimit } from '@/lib/rate-limit';
 
@@ -15,7 +16,9 @@ export async function GET(
 ) {
   try {
     const resolvedParams = await params;
-    const { userId, dbUserId, tenantId, email, role } = await getAuthUser();
+    const auth = await getAuthUser();
+    requireInboxAccess(auth);
+    const { userId, dbUserId, tenantId, email, role } = auth;
     const conversationId = parseInt(resolvedParams.id);
     if (isNaN(conversationId) || conversationId <= 0) {
       return createErrorResponse('Invalid conversation ID', 400);
@@ -77,7 +80,9 @@ export async function PATCH(
 ) {
   try {
     const resolvedParams = await params;
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
+    requireInboxAccess(auth);
+    const { userId, tenantId } = auth;
     const limited = await checkUpdateRateLimit(userId);
     if (limited) return limited;
     const db = await getMongoDbOrThrow();

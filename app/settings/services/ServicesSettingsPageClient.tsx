@@ -10,13 +10,22 @@ import { SettingsMobileHeader } from '../SettingsMobileHeader';
 
 export interface Service {
   id: number;
+  user_id?: number;
   name: string;
   duration_minutes: number;
   price: number | null;
 }
 
+export interface DentistOption {
+  userId: number;
+  name: string;
+}
+
 interface ServicesSettingsPageClientProps {
   initialServices: Service[];
+  role: string;
+  dentists: DentistOption[];
+  initialSelectedDentistUserId: number | null;
 }
 
 interface ServiceFormState {
@@ -65,8 +74,14 @@ function validateForm(form: ServiceFormState): string | null {
   return null;
 }
 
-export default function ServicesSettingsPageClient({ initialServices }: ServicesSettingsPageClientProps) {
+export default function ServicesSettingsPageClient({
+  initialServices,
+  role,
+  dentists,
+  initialSelectedDentistUserId,
+}: ServicesSettingsPageClientProps) {
   const [services, setServices] = useState<Service[]>(initialServices);
+  const [selectedDentistUserId, setSelectedDentistUserId] = useState<number | null>(initialSelectedDentistUserId);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [mobileEditingId, setMobileEditingId] = useState<number | null>(null);
@@ -81,8 +96,36 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
   const deleteBackdropPressRef = useRef(false);
   const editBackdropPressRef = useRef(false);
   const toast = useToast();
+  const isReadOnly = role === 'receptionist';
+  const showDentistSelector = role === 'asistent' && dentists.length > 1;
+  const selectedDentistName = selectedDentistUserId
+    ? dentists.find((dentist) => dentist.userId === selectedDentistUserId)?.name || null
+    : null;
+
+  async function loadServicesForDentist(dentistUserId: number) {
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/services?dentistUserId=${dentistUserId}`);
+      const data = (await response.json()) as { services?: Service[]; error?: string };
+      if (!response.ok || !data.services) {
+        throw new Error(data.error || 'Nu am putut incarca serviciile.');
+      }
+      setServices(data.services);
+      setSelectedDentistUserId(dentistUserId);
+      closeAddForm();
+      cancelEdit();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Nu am putut incarca serviciile.';
+      setError(message);
+      toast.error(message);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   function openAddForm() {
+    if (isReadOnly) return;
     setShowAddForm(true);
     setError(null);
     setConfirmDeleteId(null);
@@ -95,6 +138,7 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
   }
 
   function startEdit(service: Service) {
+    if (isReadOnly) return;
     setEditingId(service.id);
     setMobileEditingId(null);
     setConfirmDeleteId(null);
@@ -114,6 +158,7 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
   }
 
   function openMobileEditor(service: Service) {
+    if (isReadOnly) return;
     setMobileEditingId(service.id);
     setEditingId(null);
     setConfirmDeleteId(null);
@@ -126,6 +171,7 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
   }
 
   function requestDelete(id: number) {
+    if (isReadOnly) return;
     setConfirmDeleteId(id);
     setEditingId(null);
     setMobileEditingId(null);
@@ -145,6 +191,7 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
         name: addForm.name.trim(),
         durationMinutes: Number.parseInt(addForm.durationMinutes, 10),
         ...(addForm.price.trim() !== '' ? { price: Number(addForm.price) } : {}),
+        ...(selectedDentistUserId && selectedDentistUserId !== 0 ? { dentistUserId: selectedDentistUserId } : {}),
       };
 
       const response = await fetch('/api/services', {
@@ -239,21 +286,58 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
     }
   }
 
+  const servicesByDentist = new Map<number, Service[]>();
+  if (isReadOnly) {
+    for (const service of services) {
+      const dentistId = typeof service.user_id === 'number' ? service.user_id : 0;
+      if (!servicesByDentist.has(dentistId)) servicesByDentist.set(dentistId, []);
+      servicesByDentist.get(dentistId)!.push(service);
+    }
+  }
+
+  function dentistNameFor(userId: number): string {
+    return dentists.find((dentist) => dentist.userId === userId)?.name || `Medic ${userId}`;
+  }
+
   return (
     <div className={navStyles.container}>
       <div className={styles.container}>
         <SettingsMobileHeader title="Servicii" />
         <div className={styles.tabRow}>
-          <SettingsTabs activeTab="services" />
-          <button
-            type="button"
-            className={styles.primaryButton}
-            onClick={() => (showAddForm ? closeAddForm() : openAddForm())}
-            disabled={saving}
-          >
-            {showAddForm ? 'Anuleaza' : '+ Manopera'}
-          </button>
+          <SettingsTabs activeTab="services" isOwner={role === 'owner'} />
+          {!isReadOnly && (
+            <button
+              type="button"
+              className={styles.primaryButton}
+              onClick={() => (showAddForm ? closeAddForm() : openAddForm())}
+              disabled={saving || !selectedDentistUserId}
+            >
+              {showAddForm ? 'Anuleaza' : '+ Manopera'}
+            </button>
+          )}
         </div>
+
+        {showDentistSelector && (
+          <label className={styles.selectorRow}>
+            <span>Pentru care medic gestionezi?</span>
+            <select
+              value={selectedDentistUserId ?? ''}
+              onChange={(event) => loadServicesForDentist(Number(event.target.value))}
+              disabled={saving}
+            >
+              {dentists.map((dentist) => (
+                <option key={dentist.userId} value={dentist.userId}>{dentist.name}</option>
+              ))}
+            </select>
+          </label>
+        )}
+
+        {role === 'asistent' && selectedDentistName && (
+          <p className={styles.scopeBanner}>Editezi serviciile lui {selectedDentistName}.</p>
+        )}
+        {isReadOnly && (
+          <p className={styles.scopeBanner}>Lista este read-only pentru receptioneri.</p>
+        )}
 
         {showAddForm && (
           <div className={styles.formCard}>
@@ -304,10 +388,29 @@ export default function ServicesSettingsPageClient({ initialServices }: Services
 
         {error && <p className={styles.error}>{error}</p>}
 
-        {services.length === 0 ? (
+        {isReadOnly ? (
+          <div className={styles.groupedServices}>
+            {Array.from(servicesByDentist.entries()).map(([dentistId, dentistServices]) => (
+              <section key={dentistId} className={styles.serviceGroup}>
+                <h3>{dentistNameFor(dentistId)}</h3>
+                {dentistServices.map((service) => (
+                  <div key={service.id} className={styles.readonlyServiceRow}>
+                    <span>{service.name}</span>
+                    <small>{formatServiceMeta(service)}</small>
+                  </div>
+                ))}
+              </section>
+            ))}
+            {services.length === 0 && (
+              <div className={styles.emptyState}>
+                <p>Niciun serviciu adaugat inca.</p>
+              </div>
+            )}
+          </div>
+        ) : services.length === 0 ? (
           <div className={styles.emptyState}>
             <p>Niciun serviciu adaugat inca.</p>
-            <button type="button" className={styles.primaryButton} onClick={openAddForm} disabled={saving}>
+            <button type="button" className={styles.primaryButton} onClick={openAddForm} disabled={saving || !selectedDentistUserId}>
               + Adauga prima manopera
             </button>
           </div>

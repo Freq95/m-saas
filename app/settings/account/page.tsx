@@ -25,6 +25,7 @@ async function AccountContent() {
     <AccountSettingsPageClient
       initialName={auth.name}
       initialEmail={auth.email}
+      isOwner={auth.role === 'owner'}
     />
   );
 }

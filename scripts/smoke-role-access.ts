@@ -79,7 +79,7 @@ async function ensureStaffUser() {
       email,
       password_hash: passwordHash,
       name: 'Staff A',
-      role: 'staff',
+      role: 'dentist',
       tenant_id: tenant._id,
       status: 'active',
       created_at: nowIso,
@@ -92,7 +92,7 @@ async function ensureStaffUser() {
       {
         $set: {
           password_hash: passwordHash,
-          role: 'staff',
+          role: 'dentist',
           status: 'active',
           tenant_id: tenant._id,
           updated_at: nowIso,
@@ -108,7 +108,7 @@ async function ensureStaffUser() {
         tenant_id: tenant._id,
         user_id: user._id,
         email,
-        role: 'staff',
+        role: 'dentist',
         status: 'active',
         accepted_at: nowIso,
         updated_at: nowIso,

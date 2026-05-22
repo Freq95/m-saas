@@ -202,12 +202,12 @@ export default function DashboardPageClient({ initialDashboard }: DashboardPageC
           </div>
 
           <div className={styles.statCard}>
-            <div className={styles.statLabel}>Total clienti</div>
+            <div className={styles.statLabel}>Total pacienti</div>
             <div className={styles.statValue}>{dashboard.today.totalClients || 0}</div>
           </div>
 
           <div className={styles.statCard}>
-            <div className={styles.statLabel}>Clienti noi (saptamana)</div>
+            <div className={styles.statLabel}>Pacienti noi (saptamana)</div>
             <div className={styles.statValue}>{dashboard.clients.newClientsWeek || 0}</div>
           </div>
 
@@ -248,7 +248,7 @@ export default function DashboardPageClient({ initialDashboard }: DashboardPageC
           </div>
 
           <div className={styles.chartCard}>
-            <h3>Crestere Clienti (7 zile)</h3>
+            <h3>Crestere Pacienti (7 zile)</h3>
             <div className={styles.growthChart}>
               {dashboard.clients.growth.length > 0 ? (
                 dashboard.clients.growth.map((item, idx) => {
@@ -277,7 +277,7 @@ export default function DashboardPageClient({ initialDashboard }: DashboardPageC
         <div className={styles.clientsSection}>
           <div className={styles.clientGrid}>
             <div className={styles.clientCard}>
-              <h4>Top Clienti</h4>
+              <h4>Top Pacienti</h4>
               {dashboard.clients.topClients.length > 0 ? (
                 <div className={styles.clientList}>
                   {dashboard.clients.topClients.map((client) => (
@@ -291,12 +291,12 @@ export default function DashboardPageClient({ initialDashboard }: DashboardPageC
                   ))}
                 </div>
               ) : (
-                <div className={styles.empty}>Nu exista clienti cu cheltuieli</div>
+                <div className={styles.empty}>Nu exista pacienti cu cheltuieli</div>
               )}
             </div>
 
             <div className={styles.clientCard}>
-              <h4>Clienti Inactivi (30+ zile)</h4>
+              <h4>Pacienti Inactivi (30+ zile)</h4>
               {dashboard.clients.inactiveClients.length > 0 ? (
                 <>
                   <div className={styles.clientList}>
@@ -318,7 +318,7 @@ export default function DashboardPageClient({ initialDashboard }: DashboardPageC
                   )}
                 </>
               ) : (
-                <div className={styles.empty}>Toti clientii sunt activi. Felicitari!</div>
+                <div className={styles.empty}>Toti pacientii sunt activi. Felicitari!</div>
               )}
             </div>
 

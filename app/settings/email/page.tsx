@@ -24,5 +24,5 @@ async function EmailContent() {
 
   const integrations = await getUserEmailIntegrations(auth.userId, auth.tenantId);
 
-  return <EmailSettingsPageClient initialIntegrations={integrations} initialUserId={auth.userId} />;
+  return <EmailSettingsPageClient initialIntegrations={integrations} initialUserId={auth.userId} isOwner={auth.role === 'owner'} />;
 }

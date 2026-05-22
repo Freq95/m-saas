@@ -282,6 +282,10 @@ interface Conversation {
   has_unread?: boolean;
 }
 
+function cleanInboxDisplayText(value?: string | null): string {
+  return (value || '').trim().replace(/^[\s"'“”‘’]+|[\s"'“”‘’]+$/g, '').trim();
+}
+
 interface Message {
   id: number;
   direction: string;
@@ -432,6 +436,7 @@ export default function InboxPageClient({
   const [syncError, setSyncError] = useState<string | null>(null);
   const [syncPartiallyFailed, setSyncPartiallyFailed] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [lastSyncLoaded, setLastSyncLoaded] = useState(false);
   const [hasIntegrations, setHasIntegrations] = useState<boolean | null>(null);
   const [attachmentsOnly, setAttachmentsOnly] = useState(false);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
@@ -697,6 +702,7 @@ export default function InboxPageClient({
     try {
       const response = await fetch('/api/settings/email-integrations', { cache: 'no-store' });
       if (!response.ok) {
+        setLastSyncLoaded(true);
         return;
       }
       const payload = await response.json();
@@ -710,19 +716,22 @@ export default function InboxPageClient({
 
       if (syncDates.length === 0) {
         setLastSyncAt(null);
+        setLastSyncLoaded(true);
         return;
       }
 
       syncDates.sort((a: Date, b: Date) => b.getTime() - a.getTime());
       setLastSyncAt(syncDates[0].toISOString());
+      setLastSyncLoaded(true);
     } catch {
       // Ignore sync meta fetch errors to avoid noisy UI.
+      setLastSyncLoaded(true);
     }
   }, []);
 
   useEffect(() => {
     if (sessionStatus !== 'authenticated') return;
-    setTimeout(() => void fetchLatestSyncTimestamp(), 1000);
+    void fetchLatestSyncTimestamp();
   }, [fetchLatestSyncTimestamp, sessionStatus]);
 
   const fetchMessages = async (conversationId: number, isInitial = false, beforeId?: number): Promise<Message[]> => {
@@ -813,6 +822,18 @@ export default function InboxPageClient({
     setSyncError(null);
     setSyncPartiallyFailed(false);
     appendSyncLog('info', 'Sincronizarea inbox a pornit.');
+    // Tell the user up-front that the sync runs in the background so the
+    // 1-3 min Yahoo IMAP/attachment work doesn't feel like a broken click.
+    toast.info('Sincronizare in fundal. Emailurile noi vor aparea automat.');
+
+    // Poll the conversations list during the sync. The sync runners invalidate
+    // the inbox cache every 5 messages they insert, so each tick picks up
+    // partial progress instead of the user waiting for everything at once.
+    const POLL_MS = 15_000;
+    const pollInterval = setInterval(() => {
+      fetchConversations(searchQuery).catch(() => { /* polling is best-effort */ });
+    }, POLL_MS);
+
     try {
       const syncRequests: Array<{ provider: 'Yahoo' | 'Gmail'; request: Promise<Response> }> = [
         {
@@ -895,6 +916,7 @@ export default function InboxPageClient({
         setSyncPartiallyFailed(true);
       } else if (hasAtLeastOneProviderResult) {
         appendSyncLog('success', 'Sincronizarea inbox s-a incheiat.');
+        toast.success('Sincronizare finalizata.');
       } else {
         appendSyncLog('info', 'Niciun provider activ pentru sincronizare.');
       }
@@ -908,6 +930,7 @@ export default function InboxPageClient({
       appendSyncLog('error', `Inbox: ${message}`);
       console.error('Inbox sync error:', error);
     } finally {
+      clearInterval(pollInterval);
       setSyncing(false);
     }
   };
@@ -996,7 +1019,7 @@ export default function InboxPageClient({
       return [];
     }
     const knownName = knownClientNames[selectedTargetClientId];
-    const fallbackName = knownName || `Client #${selectedTargetClientId}`;
+    const fallbackName = knownName || `Pacient #${selectedTargetClientId}`;
     return [{
       id: selectedTargetClientId,
       name: fallbackName,
@@ -1054,7 +1077,7 @@ export default function InboxPageClient({
           .filter((client: any) => typeof client?.id === 'number')
           .map((client: any) => ({
             id: client.id,
-            name: client.name || `Client #${client.id}`,
+            name: client.name || `Pacient #${client.id}`,
             email: client.email || null,
           }));
 
@@ -1270,12 +1293,12 @@ export default function InboxPageClient({
         if (client?.id) {
           setClientOptions([{
             id: client.id,
-            name: client.name || `Client #${client.id}`,
+            name: client.name || `Pacient #${client.id}`,
             email: client.email || null,
           }]);
           setKnownClientNames((prev) => ({
             ...prev,
-            [client.id]: client.name || `Client #${client.id}`,
+            [client.id]: client.name || `Pacient #${client.id}`,
           }));
         }
       } catch (error) {
@@ -1371,7 +1394,7 @@ export default function InboxPageClient({
         const response = await fetch(`/api/clients/${clientId}/files/${fileId}`, { method: 'DELETE' });
         if (!response.ok) {
           const errorMessage = await readErrorMessage(response);
-          throw new Error(errorMessage || 'Nu am putut elimina fisierul de la client.');
+          throw new Error(errorMessage || 'Nu am putut elimina fisierul de la pacient.');
         }
 
         const freshMessages = await fetchMessages(selectedConversation.id, true);
@@ -1641,6 +1664,20 @@ export default function InboxPageClient({
   const showThread = !isMobile || selectedConversation !== null;
   const showList = !isMobile || selectedConversation === null;
 
+  // Keep mobile inbox as a fixed shell: toolbar/thread header stay put, while
+  // the conversation list or message body owns scrolling.
+  useEffect(() => {
+    if (!isMobile) return;
+    const previousOverflow = document.body.style.overflow;
+    const previousOverscroll = document.body.style.overscrollBehavior;
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.overscrollBehavior = previousOverscroll;
+    };
+  }, [isMobile]);
+
   if (loading) {
     return (
       <div className={styles.container}>
@@ -1712,10 +1749,27 @@ export default function InboxPageClient({
               className={styles.syncButton}
               onClick={syncInbox}
               disabled={syncing}
+              aria-label={syncing ? 'Sincronizare inbox' : 'Sincronizeaza Inbox'}
+              title={syncing ? 'Sincronizare inbox' : 'Sincronizeaza Inbox'}
             >
               <span className={styles.syncButtonInner}>
-                {syncing && <span className={styles.syncSpinner} aria-hidden="true" />}
-                <span>{syncing ? 'Sincronizare inbox' : 'Sincronizeaza Inbox'}</span>
+                <span className={styles.syncIcon} aria-hidden="true">
+                  {syncing ? (
+                    <span className={styles.syncSpinner} />
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                      <path
+                        d="M20 6v5h-5M4 18v-5h5M6.1 9A7 7 0 0 1 18 6.4L20 11M4 13l2 4.6A7 7 0 0 0 17.9 15"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  )}
+                </span>
+                <span className={styles.syncLabel}>{syncing ? 'Sincronizare inbox' : 'Sincronizeaza Inbox'}</span>
               </span>
             </button>
             {syncPartiallyFailed && syncError && (
@@ -1731,15 +1785,29 @@ export default function InboxPageClient({
                 type="button"
                 className={`${styles.filterButton}${attachmentsOnly ? ` ${styles.filterButtonActive}` : ''}`}
                 onClick={() => setAttachmentsOnly((prev) => !prev)}
+                aria-label={attachmentsOnly ? 'Arata toate emailurile' : 'Doar cu atasamente'}
+                title={attachmentsOnly ? 'Arata toate emailurile' : 'Doar cu atasamente'}
               >
-                {attachmentsOnly ? 'Arata toate emailurile' : 'Doar cu atasamente'}
+                <span className={styles.filterButtonIcon} aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                    <path
+                      d="M16.5 6.5a4 4 0 0 0-5.66 0L5.31 12a6 6 0 1 0 8.49 8.49l5.18-5.19a3.5 3.5 0 1 0-4.95-4.95L8.5 15.88a1.5 1.5 0 1 0 2.12 2.12l4.6-4.6"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </span>
+                <span className={styles.filterButtonLabel}>
+                  {attachmentsOnly ? 'Arata toate emailurile' : 'Doar cu atasamente'}
+                </span>
               </button>
             </div>
-            {lastSyncAt && (
-              <div className={styles.lastSyncLabel}>
-                Ultima sincronizare: {format(new Date(lastSyncAt), 'dd.MM.yyyy HH:mm')}
-              </div>
-            )}
+            <div className={styles.lastSyncLabel}>
+              Ultima sincronizare: {lastSyncAt ? format(new Date(lastSyncAt), 'dd.MM.yyyy HH:mm') : lastSyncLoaded ? 'niciodata' : 'se incarca...'}
+            </div>
             {syncLogs.length > 0 && (
               <div className={styles.syncLogPanel}>
                 <div className={styles.syncLogHeader}>Jurnal sincronizare</div>
@@ -1780,7 +1848,7 @@ export default function InboxPageClient({
                 onClick={() => handleSelectConversation(conv)}
               >
                 <div className={styles.conversationHeader}>
-                  <div className={styles.contactName}>{conv.contact_name || 'Fără nume'}</div>
+                  <div className={styles.contactName}>{cleanInboxDisplayText(conv.contact_name) || 'Fără nume'}</div>
                   {conv.has_attachments && (
                     <span className={styles.attachmentBadge} title="Contine atasamente" aria-label="Contine atasamente">
                       <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
@@ -1817,6 +1885,11 @@ export default function InboxPageClient({
                     </span>
                   )}
                 </div>
+                {cleanInboxDisplayText(conv.subject) && (
+                  <div className={styles.conversationSubject}>
+                    {cleanInboxDisplayText(conv.subject)}
+                  </div>
+                )}
                 {conv.last_message_preview && (
                   <div className={styles.lastMessagePreview}>
                     {conv.last_message_preview}
@@ -2049,11 +2122,11 @@ export default function InboxPageClient({
             return (
               <span
                 className={`${styles.saveItemStatusPill} ${styles.saveItemStatusPillSaved}`}
-                title={savedNames ? `Salvat la: ${savedNames}` : 'Salvat la alt client'}
+                title={savedNames ? `Salvat la: ${savedNames}` : 'Salvat la alt pacient'}
                 style={{ opacity: 0.75 }}
               >
                 <svg width="9" height="9" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 5.5l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="1.7" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                {item.savedClients.length > 1 ? `Salvat (${item.savedClients.length})` : 'Salvat alt client'}
+                {item.savedClients.length > 1 ? `Salvat (${item.savedClients.length})` : 'Salvat alt pacient'}
               </span>
             );
           }
@@ -2236,7 +2309,7 @@ export default function InboxPageClient({
                 {/* Client section */}
                 <div className={styles.saveModalSection}>
                   <div className={styles.saveModalSectionHeader}>
-                    <div className={styles.saveModalLabel}>Client destinatie</div>
+                    <div className={styles.saveModalLabel}>Pacient destinatie</div>
                   </div>
 
                   {/* If a client is already selected, show chip; otherwise show search */}
@@ -2256,7 +2329,7 @@ export default function InboxPageClient({
                           setSelectedTargetClientId(null);
                           setClientSearch('');
                         }}
-                        aria-label="Sterge selectia clientului"
+                        aria-label="Sterge selectia pacientului"
                         title="Sterge selectia"
                       >
                         ✕
@@ -2279,7 +2352,7 @@ export default function InboxPageClient({
                         onChange={(e) => setClientSearch(e.target.value)}
                         onFocus={() => setHasActivatedClientSearch(true)}
                         className={styles.clientSearchInput}
-                        placeholder="Cauta client dupa nume, email sau telefon..."
+                        placeholder="Cauta pacient dupa nume, email sau telefon..."
                         autoComplete="off"
                       />
                     </div>
@@ -2308,7 +2381,7 @@ export default function InboxPageClient({
                           </button>
                         ))}
                       {!loadingClientOptions && clientOptions.filter((c) => c.id !== selectedTargetClientId).length === 0 && (
-                        <div className={styles.modalHint}>Nu am gasit clienti pentru cautarea curenta.</div>
+                        <div className={styles.modalHint}>Nu am gasit pacienti pentru cautarea curenta.</div>
                       )}
                     </div>
                   )}
@@ -2316,7 +2389,7 @@ export default function InboxPageClient({
                   {!selectedTargetClientId && (
                     <div className={styles.modalHintAutoCreate}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '1px', opacity: 0.7 }}><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
-                      Daca nu alegi un client, sistemul va crea automat unul nou la prima salvare.
+                      Daca nu alegi un pacient, sistemul va crea automat unul nou la prima salvare.
                     </div>
                   )}
                 </div>

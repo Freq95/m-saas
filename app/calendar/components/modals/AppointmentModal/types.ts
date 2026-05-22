@@ -13,6 +13,8 @@ export interface CalendarOption {
   disabled?: boolean;
   /** True when the calendar is owned by the current user (personal). */
   isOwn?: boolean;
+  /** True for the auto-created personal calendar where categories apply. */
+  isDefault?: boolean;
 }
 
 export interface ClientSuggestion {
@@ -56,6 +58,9 @@ export interface AppointmentFormPayload {
   notes: string;
   status?: string;
   category?: string | null;
+  categoryId?: number | null;
+  categoryLabel?: string | null;
+  categoryColor?: string | null;
   color?: string;
   forceNewClient?: boolean;
   clientId?: number | null;

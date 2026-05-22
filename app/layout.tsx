@@ -7,6 +7,7 @@ import AuthSessionProvider from '@/components/AuthSessionProvider'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import { validateServerEnv } from '@/lib/env-validation'
 import { auth } from '@/lib/auth'
+import PreventZoom from '@/components/PreventZoom'
 
 validateServerEnv()
 
@@ -25,6 +26,7 @@ export default async function RootLayout({
   return (
     <html lang="ro" suppressHydrationWarning>
       <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#06080d" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -40,6 +42,7 @@ export default async function RootLayout({
         )}
       </head>
       <body>
+        <PreventZoom />
         <ThemeProvider>
           <AuthSessionProvider session={session}>
             <ErrorBoundary>
