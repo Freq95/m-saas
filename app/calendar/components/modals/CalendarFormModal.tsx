@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import styles from '../../page.module.css';
 import type { CalendarListItem } from '../../hooks';
 import { ConfirmModal } from './ConfirmModal';
+import { useModal } from '@/lib/useModal';
 
 type CalendarFormMode = 'create' | 'edit';
 
@@ -35,7 +36,6 @@ export function CalendarFormModal({
   onSubmit,
   onDelete,
 }: CalendarFormModalProps) {
-  const backdropPressStartedRef = useRef(false);
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,6 +43,12 @@ export function CalendarFormModal({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const isEditMode = mode === 'edit';
+  const busy = isSubmitting || isDeleting;
+  const { overlayProps, dialogProps } = useModal({
+    isOpen,
+    onClose,
+    closeDisabled: busy,
+  });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -53,28 +59,9 @@ export function CalendarFormModal({
     setShowDeleteConfirm(false);
   }, [calendar, isOpen]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !isSubmitting && !isDeleting) onClose();
-    };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [isDeleting, isOpen, isSubmitting, onClose]);
-
   const requestClose = () => {
     if (isSubmitting || isDeleting) return;
     onClose();
-  };
-
-  const handleBackdropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    backdropPressStartedRef.current = event.target === event.currentTarget;
-  };
-
-  const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    const endedOnBackdrop = event.target === event.currentTarget;
-    if (backdropPressStartedRef.current && endedOnBackdrop) requestClose();
-    backdropPressStartedRef.current = false;
   };
 
   const handleSubmit = async () => {
@@ -112,18 +99,16 @@ export function CalendarFormModal({
 
   if (!isOpen) return null;
 
-  const busy = isSubmitting || isDeleting;
   const saveLabel = isSubmitting ? 'Se salveaza...' : isEditMode ? 'Salveaza' : 'Creeaza';
 
   return (
     <div
       className={styles.modalOverlay}
-      onPointerDown={handleBackdropPointerDown}
-      onClick={handleBackdropClick}
+      {...overlayProps}
     >
       <div
         className={`${styles.modal} ${styles.createSheet}`}
-        onClick={(e) => e.stopPropagation()}
+        {...dialogProps}
         role="dialog"
         aria-modal="true"
         aria-label={isEditMode ? 'Redenumeste calendarul' : 'Calendar nou'}

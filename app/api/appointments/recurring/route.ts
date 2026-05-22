@@ -25,6 +25,7 @@ import {
   getAppointmentCategoriesForDentist,
   resolveAppointmentCategoryForWrite,
 } from '@/lib/server/appointment-categories';
+import { attachCalendarDisplayData } from '@/lib/server/calendar';
 
 interface RecurringConflict {
   start: Date;
@@ -309,12 +310,14 @@ export async function POST(request: NextRequest) {
       calendarId: targetCalendarId,
     });
 
+    const decoratedAppointments = await attachCalendarDisplayData(createdAppointments as any[], userId);
+
     return NextResponse.json(
       {
         created: createdAppointments.length,
         created_count: createdAppointments.length,
         skipped: 0,
-        appointments: createdAppointments,
+        appointments: decoratedAppointments,
         conflicts: conflicts.length > 0 ? conflicts : undefined,
         warning: conflicts.length > 0
           ? 'Programarile au fost salvate, dar unele intervale se suprapun cu alte programari.'

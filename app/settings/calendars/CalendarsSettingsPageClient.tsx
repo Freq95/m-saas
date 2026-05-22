@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { ToastContainer } from '@/components/Toast';
+import Spinner from '@/components/Spinner';
 import { useToast } from '@/lib/useToast';
 import navStyles from '../../dashboard/page.module.css';
 import sharedStyles from '../services/page.module.css';
@@ -386,7 +387,7 @@ export default function CalendarsSettingsPageClient({
         )}
 
         {isLoading ? (
-          <p className={styles.loadingText}>Se incarca...</p>
+          <Spinner />
         ) : (
           <>
             {/* ── Own calendars ── */}
@@ -575,7 +576,7 @@ export default function CalendarsSettingsPageClient({
               <section className={styles.section}>
                 <h3 className={styles.sectionTitle}>Invitatii primite</h3>
                 {pendingSharesLoading && pendingShares.length === 0 ? (
-                  <p className={styles.loadingText}>Se incarca...</p>
+                  <Spinner size={20} thickness={2} />
                 ) : (
                   <div className={styles.inviteList}>
                     {pendingShares.map((share) => (

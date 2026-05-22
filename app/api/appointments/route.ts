@@ -15,7 +15,7 @@ import {
 } from '@/lib/calendar-auth';
 import { exportToGoogleCalendar } from '@/lib/google-calendar';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
-import { getAppointmentsData } from '@/lib/server/calendar';
+import { attachCalendarDisplayData, getAppointmentsData } from '@/lib/server/calendar';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { invalidateReadCaches } from '@/lib/cache-keys';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
@@ -328,6 +328,7 @@ export async function POST(request: NextRequest) {
     });
 
     const appointment = stripMongoId(appointmentDoc) as any;
+    const [decoratedAppointment] = await attachCalendarDisplayData([appointment], userId);
 
     // Google Calendar export is fire-and-forget: the appointment is already saved
     // in our DB, so a slow Google API round-trip (often 200-500ms) shouldn't block
@@ -345,7 +346,7 @@ export async function POST(request: NextRequest) {
     const warning = getAppointmentConflictWarning(conflictCheck.conflicts);
     return createSuccessResponse(
       {
-        appointment,
+        appointment: decoratedAppointment || appointment,
         warning,
         conflicts: conflictCheck.conflicts.map(formatAppointmentConflictPayload),
         suggestions: formatAppointmentConflictSuggestions(conflictCheck.suggestions),

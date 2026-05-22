@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import styles from '../../page.module.css';
+import { useModal } from '@/lib/useModal';
+import { useFocusRestore } from '@/lib/useFocusRestore';
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -24,9 +26,14 @@ export function ConfirmModal({
   onClose,
   onConfirm,
 }: ConfirmModalProps) {
-  const backdropPressStartedRef = useRef(false);
   const [isWorking, setIsWorking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { overlayProps, dialogProps } = useModal({
+    isOpen,
+    onClose,
+    closeDisabled: isWorking,
+  });
+  useFocusRestore(isOpen);
 
   useEffect(() => {
     if (!isOpen) {
@@ -34,26 +41,6 @@ export function ConfirmModal({
       setError(null);
     }
   }, [isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !isWorking) onClose();
-    };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [isOpen, isWorking, onClose]);
-
-  const handleBackdropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    backdropPressStartedRef.current = event.target === event.currentTarget;
-  };
-
-  const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (isWorking) return;
-    const endedOnBackdrop = event.target === event.currentTarget;
-    if (backdropPressStartedRef.current && endedOnBackdrop) onClose();
-    backdropPressStartedRef.current = false;
-  };
 
   const handleConfirm = async () => {
     if (isWorking) return;
@@ -73,12 +60,11 @@ export function ConfirmModal({
   return (
     <div
       className={styles.modalOverlay}
-      onPointerDown={handleBackdropPointerDown}
-      onClick={handleBackdropClick}
+      {...overlayProps}
     >
       <div
         className={styles.deleteSheet}
-        onClick={(e) => e.stopPropagation()}
+        {...dialogProps}
         role="dialog"
         aria-modal="true"
         aria-label={title}

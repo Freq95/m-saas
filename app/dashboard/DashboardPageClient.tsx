@@ -1,10 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect } from 'react';
 import useSWR from 'swr';
-import { useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
 import { authFetcher } from '@/lib/fetcher';
 import { format } from 'date-fns';
 import { ro } from 'date-fns/locale';
@@ -71,56 +68,25 @@ const EMPTY_DASHBOARD: DashboardData = {
   },
 };
 
-function DashboardSkeleton() {
-  return (
-    <div className={styles.container}>
-      <main className={styles.main}>
-        <div className="skeleton skeleton-line" style={{ width: '180px', height: '24px', marginBottom: '1.5rem' }} />
-
-        <div className={styles.statsGrid}>
-          {Array.from({ length: 6 }).map((_, idx) => (
-            <div key={idx} className="skeleton skeleton-stat" />
-          ))}
-        </div>
-
-        <div className={styles.charts}>
-          <div className="skeleton skeleton-chart" />
-          <div className="skeleton skeleton-chart" />
-        </div>
-
-        <div className={styles.clientGrid}>
-          <div className="skeleton skeleton-card" style={{ height: '260px' }} />
-          <div className="skeleton skeleton-card" style={{ height: '260px' }} />
-          <div className="skeleton skeleton-card" style={{ height: '260px' }} />
-        </div>
-      </main>
-    </div>
-  );
-}
-
 interface DashboardPageClientProps {
   initialDashboard?: DashboardData | null;
 }
 
 export default function DashboardPageClient({ initialDashboard }: DashboardPageClientProps = {}) {
-  const router = useRouter();
-  const { status } = useSession();
-  const key = status === 'authenticated' ? '/api/dashboard?days=7' : null;
+  const key = '/api/dashboard?days=7';
 
   const { data, error, isLoading, mutate } = useSWR<DashboardData>(key, fetchDashboard, {
     revalidateOnFocus: false,
+    revalidateOnMount: false,
+    revalidateIfStale: false,
     dedupingInterval: 10000,
     fallbackData: initialDashboard ?? undefined,
   });
 
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.replace('/login');
-    }
-  }, [status, router]);
-
-  if (status !== 'authenticated' || (isLoading && !initialDashboard)) {
-    return <DashboardSkeleton />;
+  // Server-side loading.tsx already shows the skeleton during initial RSC fetch.
+  // Avoid a second client-side skeleton flash — render nothing while waiting.
+  if (isLoading && !initialDashboard) {
+    return null;
   }
 
   if (error && !isLoading) {
@@ -281,7 +247,7 @@ export default function DashboardPageClient({ initialDashboard }: DashboardPageC
               {dashboard.clients.topClients.length > 0 ? (
                 <div className={styles.clientList}>
                   {dashboard.clients.topClients.map((client) => (
-                    <Link key={client.id} href={`/clients/${client.id}`} className={styles.clientItem}>
+                    <Link key={client.id} href={`/clients/${client.id}`} prefetch={false} className={styles.clientItem}>
                       <div className={styles.clientName}>{client.name}</div>
                       <div className={styles.clientStats}>
                         <span>{(client.total_spent || 0).toFixed(2)} lei</span>
@@ -301,7 +267,7 @@ export default function DashboardPageClient({ initialDashboard }: DashboardPageC
                 <>
                   <div className={styles.clientList}>
                     {dashboard.clients.inactiveClients.slice(0, 5).map((client) => (
-                      <Link key={client.id} href={`/clients/${client.id}`} className={styles.clientItem}>
+                      <Link key={client.id} href={`/clients/${client.id}`} prefetch={false} className={styles.clientItem}>
                         <div className={styles.clientName}>{client.name}</div>
                         <div className={styles.clientMeta}>
                           {client.last_appointment_date
@@ -312,7 +278,7 @@ export default function DashboardPageClient({ initialDashboard }: DashboardPageC
                     ))}
                   </div>
                   {dashboard.clients.inactiveClients.length > 5 && (
-                    <Link href="/clients?filter=inactive" className={styles.viewAllLink}>
+                    <Link href="/clients?filter=inactive" prefetch={false} className={styles.viewAllLink}>
                       Vezi toti ({dashboard.clients.inactiveClients.length})
                     </Link>
                   )}

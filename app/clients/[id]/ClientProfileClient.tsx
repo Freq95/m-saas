@@ -156,22 +156,27 @@ export default function ClientProfileClient({
     setLoading(false);
   }, [clientId, initialAppointments, initialClient, initialConversations, initialStats]);
 
+  // initialClient being null means the patient wasn't found (or scope check
+  // failed) — the bailout below renders "Pacientul nu a fost gasit". Gate all
+  // initial fetches on it so we don't fire 4 wasted 404 requests and pollute
+  // the console with errors before the empty state shows.
   useEffect(() => {
-    if (!clientId) return;
-    if (!initialClient) void fetchClientData();
+    if (!clientId || !initialClient) return;
     if (!initialStats) void fetchStats();
-  }, [clientId, fetchClientData, fetchStats, initialClient, initialStats]);
+  }, [clientId, fetchStats, initialClient, initialStats]);
 
   useEffect(() => {
-    if (!clientId) return;
-    void fetchFiles();
+    if (!clientId || !initialClient) return;
+    // Notes are shown on the default tab — fetch immediately.
+    // Files load lazily via the activeTab-gated effect below to save ~500ms
+    // on every patient drill-down for users who don't open the Files tab.
     void fetchNotes();
-  }, [clientId, fetchFiles, fetchNotes]);
+  }, [clientId, fetchNotes, initialClient]);
 
   useEffect(() => {
-    if (!clientId) return;
+    if (!clientId || !initialClient) return;
     if (activeTab === 'files') void fetchFiles();
-  }, [activeTab, clientId, fetchFiles]);
+  }, [activeTab, clientId, fetchFiles, initialClient]);
 
   useEffect(() => {
     if (!showOverflowMenu) return;

@@ -6,6 +6,7 @@ import { Drawer } from 'vaul';
 import styles from './ClientCreateModal.module.css';
 import { validatePhoneInput } from '@/lib/phone-validation';
 import { useIsMobile } from '@/lib/useIsMobile';
+import { useFocusRestore } from '@/lib/useFocusRestore';
 
 type ClientPayload = {
   id: number;
@@ -126,6 +127,9 @@ export default function ClientCreateModal({
     window.addEventListener('keydown', onEsc);
     return () => window.removeEventListener('keydown', onEsc);
   }, [isOpen, loading, onClose]);
+
+  // Return focus to the trigger button when the modal closes (a11y).
+  useFocusRestore(isOpen);
 
   useEffect(() => {
     if (!isOpen || !mounted) return;

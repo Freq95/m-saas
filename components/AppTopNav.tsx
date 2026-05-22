@@ -2,11 +2,21 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
 import styles from './AppTopNav.module.css';
 import { useTheme } from './ThemeProvider';
+import { useViewTransitionRouter } from '@/lib/useViewTransitionRouter';
+
+function scrollToTopAndRefresh(refresh: () => void) {
+  // Twitter-style same-tab click: scroll viewport to top, then refetch data.
+  // window.scrollTo handles document-level scrollers; mobile pages with
+  // position:fixed containers can opt in by scrolling their own region.
+  if (typeof window !== 'undefined') {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  refresh();
+}
 
 type NavSection = 'dashboard' | 'inbox' | 'calendar' | 'clients' | 'settings' | null;
 
@@ -16,6 +26,7 @@ interface AppTopNavProps {
   logoClassName?: string;
   navLinksClassName?: string;
   logoText?: string;
+  userRole?: string | null;
 }
 
 interface IndicatorState {
@@ -104,9 +115,11 @@ export default function AppTopNav({
   logoClassName,
   navLinksClassName,
   logoText = 'densa',
+  userRole = null,
 }: AppTopNavProps) {
   const pathname = usePathname();
-  const router = useRouter();
+  const router = useViewTransitionRouter();
+  const [storedUserRole, setStoredUserRole] = useState<string | null>(null);
   const { theme, toggle } = useTheme();
   const navRef = useRef<HTMLElement | null>(null);
   const detectedSection = section ?? detectSection(pathname);
@@ -116,6 +129,26 @@ export default function AppTopNav({
   const [indicator, setIndicator] = useState<IndicatorState>({ x: 0, width: 0, visible: false });
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const logoutBackdropRef = useRef(false);
+
+  // Role-based home: dentists and asistents land on /calendar; everyone else
+  // (receptionist, admin) on /dashboard. The "densa" logo routes here instead
+  // of `/` so logged-in users never end up on the public marketing page.
+  const homePath = useMemo(() => {
+    const role = userRole || storedUserRole;
+    return role === 'dentist' || role === 'asistent' ? '/calendar' : '/dashboard';
+  }, [storedUserRole, userRole]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setStoredUserRole(window.localStorage.getItem('densa:userRole'));
+  }, []);
+
+  // Detect "click on the tab you're already on". With router.push to the
+  // current URL Next.js does nothing, leaving the click feeling broken.
+  // Returns true for both exact match and sub-route match (e.g., clicking
+  // Pacienti while on /clients/123 is still "same tab").
+  const isCurrentSection = (href: string) =>
+    pathname === href || pathname.startsWith(href + '/');
 
   const activeHref = useMemo(() => {
     const match = NAV_ITEMS.find((item) => item.key === activeSection);
@@ -197,46 +230,69 @@ export default function AppTopNav({
 
   return (
     <nav ref={navRef} className={navClassName || styles.nav}>
-      <Link href="/" prefetch>
+      <a
+        href={homePath}
+        onClick={(event) => {
+          if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+          event.preventDefault();
+          if (isCurrentSection(homePath)) {
+            scrollToTopAndRefresh(router.refresh);
+            return;
+          }
+          router.push(homePath);
+        }}
+      >
         <h1 className={logoClassName || styles.logo}>{logoText}</h1>
-      </Link>
+      </a>
       <div ref={linksRef} className={navLinksClassName ? `${navLinksClassName} ${styles.links}` : styles.links}>
         {NAV_ITEMS.map((item) => {
           const isActive = item.key === activeSection;
           return (
-            <Link
+            <a
               key={item.href}
               href={item.href}
-              prefetch
               aria-label={item.label}
               data-nav-key={item.key}
               className={`${styles.link} ${isActive ? styles.activeLink : ''}`}
               onPointerDown={() => setOptimisticActiveSection(item.key)}
-              onClick={() => setOptimisticActiveSection(item.key)}
+              onClick={(event) => {
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+                event.preventDefault();
+                setOptimisticActiveSection(item.key);
+                if (isCurrentSection(item.href)) {
+                  scrollToTopAndRefresh(router.refresh);
+                  return;
+                }
+                router.push(item.href);
+              }}
             >
               <span className={styles.linkLabel}>{item.label}</span>
               <span className={styles.linkCompactLabel}>{item.key === 'dashboard' ? 'Dash' : item.label}</span>
               <span className={styles.linkMobileIcon}><NavItemIcon itemKey={item.key} /></span>
               {item.key === 'calendar' && <span className={styles.linkCompactIcon}><CalendarNavIcon /></span>}
               {item.key === 'clients' && <span className={styles.linkCompactIcon}><ClientsNavIcon /></span>}
-            </Link>
+            </a>
           );
         })}
-        <Link
+        <a
           href="/settings"
-          prefetch={false}
           aria-label="Setari"
           data-nav-key="settings"
           className={`${styles.link} ${styles.mobileSettingsLink} ${activeSection === 'settings' ? styles.activeLink : ''}`}
           onPointerDown={() => setOptimisticActiveSection('settings')}
           onClick={(event) => {
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
             event.preventDefault();
             setOptimisticActiveSection('settings');
+            if (isCurrentSection('/settings')) {
+              scrollToTopAndRefresh(router.refresh);
+              return;
+            }
             router.push('/settings');
           }}
         >
           <span className={styles.linkMobileIcon}><SettingsNavIcon /></span>
-        </Link>
+        </a>
         <span
           className={`${styles.indicator} ${indicator.visible ? styles.indicatorVisible : ''}`}
           style={{
@@ -270,20 +326,24 @@ export default function AppTopNav({
             </svg>
           )}
         </button>
-        <Link
+        <a
           href="/settings"
-          prefetch={false}
           className={`${styles.settingsIcon} ${activeSection === 'settings' ? styles.settingsIconActive : ''}`}
           aria-label="Setări"
           title="Setări"
           onPointerDown={() => setOptimisticActiveSection('settings')}
           onClick={(event) => {
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
             event.preventDefault();
             setOptimisticActiveSection('settings');
             const target =
               typeof window !== 'undefined' && window.innerWidth > MOBILE_SETTINGS_BREAKPOINT
                 ? '/settings/services'
                 : '/settings';
+            if (isCurrentSection('/settings')) {
+              scrollToTopAndRefresh(router.refresh);
+              return;
+            }
             router.push(target);
           }}
         >
@@ -291,7 +351,7 @@ export default function AppTopNav({
             <circle cx="12" cy="12" r="3"/>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
           </svg>
-        </Link>
+        </a>
         <button
           className={styles.powerButton}
           onClick={() => setShowLogoutModal(true)}
@@ -329,7 +389,16 @@ export default function AppTopNav({
               <button type="button" className={styles.btnGhost} autoFocus onClick={() => setShowLogoutModal(false)}>
                 Renunță
               </button>
-              <button type="button" className={styles.btnDanger} onClick={() => signOut({ callbackUrl: '/login' })}>
+              <button
+                type="button"
+                className={styles.btnDanger}
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    window.localStorage.removeItem('densa:userRole');
+                  }
+                  signOut({ callbackUrl: '/login' });
+                }}
+              >
                 Deconectează
               </button>
             </div>

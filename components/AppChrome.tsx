@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import RouteTransition from '@/components/RouteTransition';
 import AppTopNav from '@/components/AppTopNav';
 import { SETTINGS_EXIT_PATH_STORAGE_KEY } from '@/app/settings/settings-tabs';
 
@@ -17,7 +16,13 @@ const HIDDEN_NAV_PREFIXES = [
   '/terms',
 ];
 
-export default function AppChrome({ children }: { children: React.ReactNode }) {
+export default function AppChrome({
+  children,
+  userRole,
+}: {
+  children: React.ReactNode;
+  userRole?: string | null;
+}) {
   const pathname = usePathname();
   const hideNav = HIDDEN_NAV_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 
@@ -37,10 +42,8 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      {!hideNav && <AppTopNav />}
-      <div className="app-shell-content">
-        <RouteTransition>{children}</RouteTransition>
-      </div>
+      {!hideNav && <AppTopNav userRole={userRole} />}
+      <div className="app-shell-content">{children}</div>
     </>
   );
 }

@@ -8,7 +8,7 @@ import { emailSchema } from '@/lib/validation';
 
 const updateMeSchema = z
   .object({
-    name: z.string().min(1, 'Numele nu poate fi gol.').max(100).trim().optional(),
+    name: z.string().max(100).trim().optional(),
     email: emailSchema.optional(),
   })
   .strict()
@@ -43,7 +43,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const $set: Record<string, string> = { updated_at: new Date().toISOString() };
-    if (name) $set.name = name;
+    if (name !== undefined) $set.name = name;
     if (email) $set.email = email;
 
     await db.collection('users').updateOne({ _id: auth.dbUserId }, { $set });

@@ -661,8 +661,11 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     const conflictWarning = getAppointmentConflictWarning(conflictWarningData.conflicts);
     const responseWarning = [warning, conflictWarning].filter(Boolean).join(' ') || null;
 
+    const appointment = stripMongoId(appointmentDoc);
+    const [decoratedAppointment] = await attachCalendarDisplayData([appointment], userId);
+
     return createSuccessResponse({
-      appointment: stripMongoId(appointmentDoc),
+      appointment: decoratedAppointment || appointment,
       warning: responseWarning,
       conflicts: conflictWarningData.conflicts.map(formatAppointmentConflictPayload),
       suggestions: formatAppointmentConflictSuggestions(conflictWarningData.suggestions),

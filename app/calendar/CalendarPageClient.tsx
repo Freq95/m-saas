@@ -29,7 +29,6 @@ import {
   subWeeks,
 } from 'date-fns';
 import { ro } from 'date-fns/locale';
-import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import styles from './page.module.css';
 import { useToast } from '@/lib/useToast';
@@ -40,11 +39,10 @@ import {
   useAppointmentsSWR as useAppointments,
   useAvailabilityBlocks,
   useCalendarList,
-  parseSessionUserId,
-  parseSessionDbUserId,
   type Appointment,
   type AvailabilityBlock,
   type CalendarListItem,
+  type CalendarListResponse,
 } from './hooks';
 import { useDragAndDrop } from './hooks/useDragAndDrop';
 import {
@@ -71,6 +69,11 @@ interface Service {
 interface CalendarPageClientProps {
   initialAppointments: Appointment[];
   initialServices: Service[];
+  initialCalendarList: CalendarListResponse;
+  initialAvailabilityBlocks: AvailabilityBlock[];
+  initialAvailabilityBlocksCacheKey: string;
+  initialSessionUserId: number;
+  initialSessionDbUserId: string;
   initialDate: string;
   initialViewType?: 'week';
   asistentReassignState?: 'empty' | 'inactive' | null;
@@ -267,6 +270,11 @@ function readSavedMobileWorkingHours(): { startHour: number; endHour: number } {
 export default function CalendarPageClient({
   initialAppointments,
   initialServices,
+  initialCalendarList,
+  initialAvailabilityBlocks,
+  initialAvailabilityBlocksCacheKey,
+  initialSessionUserId,
+  initialSessionDbUserId,
   initialDate,
   initialViewType = 'week',
   asistentReassignState = null,
@@ -279,7 +287,6 @@ export default function CalendarPageClient({
   const [availableHeight, setAvailableHeight] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-  const [hasFinishedInitialLoad, setHasFinishedInitialLoad] = useState(initialAppointments.length > 0);
   const [mobileRangeMode, setMobileRangeMode] = useState<MobileRangeMode>(() => {
     if (typeof window === 'undefined') return 'week';
     const savedMode = window.localStorage.getItem(MOBILE_RANGE_STORAGE_KEY);
@@ -297,19 +304,18 @@ export default function CalendarPageClient({
   const [mobileHourHeight, setMobileHourHeightState] = useState<number | null>(() =>
     readSavedDensity(MOBILE_DENSITY_STORAGE_KEY, MOBILE_HOUR_HEIGHT_BOUNDS)
   );
-  const { data: session } = useSession();
-  const sessionUserId = parseSessionUserId(session) ?? undefined;
-  const sessionDbUserId = parseSessionDbUserId(session) ?? undefined;
+  const sessionUserId = initialSessionUserId;
+  const sessionDbUserId = initialSessionDbUserId;
   const { state, actions } = useCalendar(initialDate, initialViewType);
   const {
     ownCalendars,
     sharedCalendars,
     calendars,
     loading: calendarsLoading,
-  } = useCalendarList();
+  } = useCalendarList({ fallbackData: initialCalendarList });
   const visibleCalendarsStorageKey = useMemo(
-    () => `calendar:visibleIds:${session?.user?.dbUserId || String(sessionUserId || 'anonymous')}`,
-    [session?.user?.dbUserId, sessionUserId]
+    () => `calendar:visibleIds:${sessionDbUserId || String(sessionUserId || 'anonymous')}`,
+    [sessionDbUserId, sessionUserId]
   );
   const calendarMap = useMemo(
     () => new Map<number, CalendarListItem>(calendars.map((calendar) => [calendar.id, calendar])),
@@ -529,6 +535,7 @@ export default function CalendarPageClient({
   // the appointment list (the inner list is the only intended scroll surface).
   useEffect(() => {
     if (!isMobile) return;
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     const previousOverflow = document.body.style.overflow;
     const previousOverscroll = document.body.style.overscrollBehavior;
     document.body.style.overflow = 'hidden';
@@ -558,6 +565,8 @@ export default function CalendarPageClient({
     rangeStartDate: appointmentFetchRange?.start,
     rangeEndDate: appointmentFetchRange?.end,
     calendarIds: appointmentsFetchCalendarIds,
+    initialBlocks: initialAvailabilityBlocks,
+    initialBlocksCacheKey: initialAvailabilityBlocksCacheKey,
   });
   const decoratedAppointments = useMemo(
     () => appointments
@@ -578,12 +587,6 @@ export default function CalendarPageClient({
     }),
     [availabilityBlocks, visibleCalendarIdSet, visibleCalendarIdsInitialized]
   );
-
-  useEffect(() => {
-    if (!loading) {
-      setHasFinishedInitialLoad(true);
-    }
-  }, [loading]);
 
   const [selectedDay, setSelectedDay]               = useState<Date>(() => new Date());
   const [pendingCancelAppointment, setPendingCancelAppointment] = useState<Appointment | null>(null);
@@ -1988,6 +1991,7 @@ export default function CalendarPageClient({
               minHourHeightPx={MOBILE_HOUR_HEIGHT_BOUNDS.min}
               maxHourHeightPx={MOBILE_HOUR_HEIGHT_BOUNDS.max}
               onHourHeightChange={setMobileHourHeight}
+              autoScrollToNow={false}
             />
           </div>
         )}
@@ -2099,33 +2103,8 @@ export default function CalendarPageClient({
     </div>
   );
 
-  const showInitialSkeleton = !hasFinishedInitialLoad && loading;
-
-  if (showInitialSkeleton) {
-    return (
-      <div
-        ref={containerRef}
-        className={styles.container}
-        style={
-          // On mobile the container is pinned via `position: fixed` in CSS
-          // (see .container under @media (max-width: 640px)). Setting an inline
-          // height here would override that and re-introduce the scroll bug.
-          isMobile ? undefined : availableHeight ? { height: `${availableHeight}px` } : undefined
-        }
-      >
-        <main className={styles.main}>
-          <div className="skeleton skeleton-line" style={{ width: '220px', height: '18px', marginBottom: '0.9rem' }} />
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 320px', gap: '1rem' }}>
-            <div className="skeleton skeleton-card" style={{ height: '560px' }} />
-            <div className="skeleton-stack">
-              <div className="skeleton skeleton-card" style={{ height: '120px' }} />
-              <div className="skeleton skeleton-card" style={{ height: '430px' }} />
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
+  // Server-side loading.tsx covers the initial RSC fetch window.
+  // No client-side skeleton fallback — avoids the cascaded skeleton flash.
 
   if (asistentReassignState) {
     return (
@@ -2157,7 +2136,7 @@ export default function CalendarPageClient({
       }
     >
       <main className={styles.main}>
-        <RoleMigrationBanner userId={session?.user?.id} />
+        <RoleMigrationBanner userId={sessionUserId} />
         {isMobile ? mobileCalendarView : desktopCalendarView}
       </main>
 

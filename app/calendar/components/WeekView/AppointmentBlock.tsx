@@ -105,7 +105,10 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
           <div className={`${styles.appointmentTitle} ${statusCfg.strikethrough ? styles.appointmentStrike : ''}`}>
             <span className={styles.appointmentName}>{appointment.client_name}</span>
             {!nameFirst && (
-              <span className={styles.appointmentTime}> · {startLabel}-{endLabel}</span>
+              // suppressHydrationWarning: format() of an ISO timestamp resolves
+              // in the renderer's local timezone. Server (UTC) and client
+              // (Europe/Bucharest) render different HH:mm. Client wins.
+              <span className={styles.appointmentTime} suppressHydrationWarning> · {startLabel}-{endLabel}</span>
             )}
           </div>
           {appointment.recurrence_group_id !== undefined && appointment.recurrence_group_id !== null && (

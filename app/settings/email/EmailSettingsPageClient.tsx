@@ -490,7 +490,10 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId, isOwner 
               <span className={styles.tabStatusDot} />
               {activeIntegrations.map((i) => i.provider).join(', ')}
               {latestSyncAt && (
-                <span className={styles.tabStatusSync}>
+                // suppressHydrationWarning: format() resolves in the renderer's
+                // local timezone, so server (UTC) and client (Europe/Bucharest)
+                // can disagree. Client value wins after hydration.
+                <span className={styles.tabStatusSync} suppressHydrationWarning>
                   · {format(new Date(latestSyncAt), 'dd MMM HH:mm', { locale: ro })}
                 </span>
               )}
@@ -538,7 +541,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId, isOwner 
                 </td>
                 <td className={styles.colSync}>
                   {yahooIntegration?.last_sync_at
-                    ? <span className={styles.cellMuted}>{format(new Date(yahooIntegration.last_sync_at), 'dd MMM HH:mm', { locale: ro })}</span>
+                    ? <span className={styles.cellMuted} suppressHydrationWarning>{format(new Date(yahooIntegration.last_sync_at), 'dd MMM HH:mm', { locale: ro })}</span>
                     : <span className={styles.cellEmpty}>—</span>
                   }
                 </td>
@@ -615,7 +618,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId, isOwner 
                 </td>
                 <td className={styles.colSync}>
                   {gmailIntegration?.last_sync_at
-                    ? <span className={styles.cellMuted}>{format(new Date(gmailIntegration.last_sync_at), 'dd MMM HH:mm', { locale: ro })}</span>
+                    ? <span className={styles.cellMuted} suppressHydrationWarning>{format(new Date(gmailIntegration.last_sync_at), 'dd MMM HH:mm', { locale: ro })}</span>
                     : <span className={styles.cellEmpty}>—</span>
                   }
                 </td>

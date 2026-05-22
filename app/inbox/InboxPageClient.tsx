@@ -1,14 +1,83 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useSession } from 'next-auth/react';
+import { useSearchParams } from 'next/navigation';
 import createDOMPurify from 'dompurify';
 import { format, isSameDay, isToday, isYesterday } from 'date-fns';
 import styles from './page.module.css';
 import { useToast } from '@/lib/useToast';
 import { useIsMobile } from '@/lib/useIsMobile';
 import { ToastContainer } from '@/components/Toast';
+
+// 1×1 transparent GIF, used to replace external img src values that the
+// parent CSP would block. Keeps email layout stable (no broken-image icons)
+// and stops the browser from logging a CSP violation per tracking pixel.
+const BLOCKED_IMG_PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+
+// Domains we let through. Anything else gets neutralized.
+function isAllowedResourceUrl(url: string): boolean {
+  if (url.startsWith('data:') || url.startsWith('blob:') || url.startsWith('cid:')) return true;
+  if (url.startsWith('/') && !url.startsWith('//')) return true;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    if (parsed.origin === window.location.origin) return true;
+    if (/(^|\.)r2\.cloudflarestorage\.com$/i.test(parsed.hostname)) return true;
+  } catch {
+    return false;
+  }
+  return false;
+}
+
+/**
+ * Strip / neutralize external resources from sanitized email HTML so the
+ * browser never attempts to load them. The parent CSP would block them
+ * anyway, but each blocked fetch surfaces as a console error from inside the
+ * email iframe (which is same-origin via sandbox="allow-same-origin"). For a
+ * marketing email full of tracking pixels and Google Fonts, that's 20+
+ * errors per open. Pre-emptively neutralizing the URLs keeps the console
+ * usable for actual debugging.
+ *
+ * Strategy:
+ *  - <link rel="stylesheet"> with external href → drop the tag
+ *  - <img src="https://external"> → replace src with transparent placeholder;
+ *    preserve original in data-blocked-src for potential "load remote images"
+ *    UX later
+ *  - @import url(...) inside <style> blocks → drop the import statement
+ *  - <script> tags → DOMPurify already strips these, no work needed here
+ */
+function neutralizeBlockedEmailResources(html: string): string {
+  if (typeof window === 'undefined' || typeof DOMParser === 'undefined') return html;
+
+  let doc: Document;
+  try {
+    doc = new DOMParser().parseFromString(html, 'text/html');
+  } catch {
+    return html;
+  }
+
+  doc.querySelectorAll('link[rel*="stylesheet" i][href]').forEach((link) => {
+    const href = link.getAttribute('href') || '';
+    if (!isAllowedResourceUrl(href)) link.remove();
+  });
+
+  doc.querySelectorAll('img[src]').forEach((img) => {
+    const src = img.getAttribute('src') || '';
+    if (!isAllowedResourceUrl(src)) {
+      img.setAttribute('data-blocked-src', src);
+      img.setAttribute('src', BLOCKED_IMG_PLACEHOLDER);
+    }
+  });
+
+  doc.querySelectorAll('style').forEach((style) => {
+    const text = style.textContent || '';
+    if (text.includes('@import')) {
+      style.textContent = text.replace(/@import\s+url\s*\(\s*["']?([^"')]+)["']?\s*\)\s*;?/gi,
+        (_match, url) => (isAllowedResourceUrl(url) ? _match : ''));
+    }
+  });
+
+  return doc.documentElement.outerHTML;
+}
 
 /**
  * Email HTML content component using iframe for complete style isolation
@@ -44,12 +113,17 @@ function EmailHtmlContent({ html }: { html: string }) {
   };
 
   // On server render, skip DOMPurify; sanitize safely in browser where window exists.
+  // After sanitization, we also neutralize external image/stylesheet URLs that the
+  // parent CSP will block anyway. Doing it here means the browser never even
+  // attempts the fetch, which keeps the console clean — tracking pixels and
+  // remote fonts in marketing emails would otherwise log a CSP violation each.
   const sanitized = useMemo(() => {
     if (typeof window === 'undefined') {
       return html;
     }
     const purifier = createDOMPurify(window);
-    return purifier.sanitize(html, sanitizeConfig);
+    const purified = purifier.sanitize(html, sanitizeConfig);
+    return neutralizeBlockedEmailResources(purified);
   }, [html]);
 
   // Extract body content from sanitized HTML
@@ -361,6 +435,7 @@ interface InboxPageClientProps {
   initialMessages: Message[] | null;
   initialHasMoreMessages?: boolean;
   initialOldestMessageId?: number | null;
+  initialSessionUserId: number;
 }
 
 function getChannelLabel(channel: string, emailProvider?: 'yahoo' | 'gmail' | null): string {
@@ -399,14 +474,10 @@ export default function InboxPageClient({
   initialMessages,
   initialHasMoreMessages = false,
   initialOldestMessageId = null,
+  initialSessionUserId,
 }: InboxPageClientProps) {
   const toast = useToast();
-  const router = useRouter();
-  const { data: session, status: sessionStatus } = useSession();
-  const sessionUserId =
-    session?.user?.id && /^[1-9]\d*$/.test(session.user.id)
-      ? Number.parseInt(session.user.id, 10)
-      : null;
+  const sessionUserId = initialSessionUserId;
   const searchParams = useSearchParams();
   const conversationParam = searchParams.get('conversation');
   const isMobile = useIsMobile();
@@ -425,7 +496,7 @@ export default function InboxPageClient({
   const [messages, setMessages] = useState<Message[]>(initialMessages ?? []);
   const [newMessage, setNewMessage] = useState('');
   const [suggestedResponse, setSuggestedResponse] = useState<string | null>(null);
-  const [loading, setLoading] = useState(initialConversations.length === 0);
+  const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [leftWidth, setLeftWidth] = useState(380);
   const [isResizing, setIsResizing] = useState(false);
@@ -454,6 +525,7 @@ export default function InboxPageClient({
   const [updatingReadState, setUpdatingReadState] = useState(false);
   const clientSearchRequestSeqRef = useRef(0);
   const inboxSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previousInboxSearchRef = useRef('');
   const lastApiErrorToastRef = useRef<{ key: string; at: number } | null>(null);
   const saveModalBackdropPressStartedRef = useRef(false);
   const hasManualMobileSelectionRef = useRef(false);
@@ -510,32 +582,6 @@ export default function InboxPageClient({
   );
 
   useEffect(() => {
-    if (sessionStatus === 'unauthenticated') {
-      router.replace('/login');
-    }
-  }, [sessionStatus, router]);
-
-  useEffect(() => {
-    if (sessionStatus !== 'authenticated') {
-      return;
-    }
-    // Disabled auto-load to allow manual Yahoo sync testing.
-    const AUTO_LOAD_CONVERSATIONS = true;
-    if (AUTO_LOAD_CONVERSATIONS) {
-      if (initialConversations.length > 0) {
-        setLoading(false);
-        return;
-      }
-      fetchConversations();
-      return;
-    }
-    setLoading(false);
-    setAllConversations([]);
-    setConversations([]);
-    setSelectedConversation(null);
-  }, [sessionStatus, initialConversations]);
-
-  useEffect(() => {
     if (!conversationParam || allConversations.length === 0 || selectedConversation) return;
     const id = parseInt(conversationParam, 10);
     if (Number.isNaN(id)) return;
@@ -569,16 +615,18 @@ export default function InboxPageClient({
   }, [isMobile, conversationParam, selectedConversation]);
 
   useEffect(() => {
-    if (sessionStatus !== 'authenticated') return;
     if (loading) return;
-    if (!searchQuery.trim() && allConversations.length > 0) return;
+    const trimmedSearch = searchQuery.trim();
+    const shouldFetch = Boolean(trimmedSearch) || previousInboxSearchRef.current !== '';
+    if (!shouldFetch) return;
 
     if (inboxSearchDebounceRef.current) {
       clearTimeout(inboxSearchDebounceRef.current);
     }
 
     inboxSearchDebounceRef.current = setTimeout(() => {
-      fetchConversations(searchQuery.trim());
+      previousInboxSearchRef.current = trimmedSearch;
+      fetchConversations(trimmedSearch);
     }, 250);
 
     return () => {
@@ -586,7 +634,7 @@ export default function InboxPageClient({
         clearTimeout(inboxSearchDebounceRef.current);
       }
     };
-  }, [searchQuery, loading, sessionStatus]);
+  }, [searchQuery, loading]);
 
   useEffect(() => {
     if (!selectedConversation) return;
@@ -730,9 +778,8 @@ export default function InboxPageClient({
   }, []);
 
   useEffect(() => {
-    if (sessionStatus !== 'authenticated') return;
     void fetchLatestSyncTimestamp();
-  }, [fetchLatestSyncTimestamp, sessionStatus]);
+  }, [fetchLatestSyncTimestamp]);
 
   const fetchMessages = async (conversationId: number, isInitial = false, beforeId?: number): Promise<Message[]> => {
     try {
@@ -1043,7 +1090,7 @@ export default function InboxPageClient({
 
   const loadClientOptions = useCallback(
     async (query: string) => {
-      if (!sessionUserId && sessionStatus !== 'loading') {
+      if (!sessionUserId) {
         setLoadingClientOptions(false);
         setClientOptions(buildSelectedClientOption());
         return;
@@ -1115,7 +1162,7 @@ export default function InboxPageClient({
         }
       }
     },
-    [buildSelectedClientOption, sessionStatus, sessionUserId]
+    [buildSelectedClientOption, sessionUserId]
   );
 
   useEffect(() => {
@@ -1866,7 +1913,12 @@ export default function InboxPageClient({
                 <div className={styles.conversationMeta}>
                   <span className={getChannelClassName(styles, conv.channel, conv.email_provider)}>{getChannelLabel(conv.channel, conv.email_provider)}</span>
                   {conv.last_message_at && (
-                    <span className={styles.lastMessageTime}>
+                    // Suppress hydration warning: format(), isToday(), and
+                    // isYesterday() resolve in the renderer's local timezone.
+                    // Server (UTC) and client (Europe/Bucharest) can disagree
+                    // — the client value is the source of truth, so we let
+                    // React quietly adopt it after hydration.
+                    <span className={styles.lastMessageTime} suppressHydrationWarning>
                       {(() => {
                         try {
                           const date = new Date(conv.last_message_at);

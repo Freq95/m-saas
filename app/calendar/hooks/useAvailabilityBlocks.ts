@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import useSWR from 'swr';
 import { addDays, endOfDay, endOfMonth, startOfDay, startOfMonth, startOfWeek } from 'date-fns';
 import type { AvailabilityBlock, CalendarViewType } from './useCalendar';
+import { buildAvailabilityBlocksCacheKey } from '../lib/availability-blocks-cache';
 
 interface UseAvailabilityBlocksOptions {
   currentDate: Date;
@@ -9,6 +10,8 @@ interface UseAvailabilityBlocksOptions {
   rangeStartDate?: Date;
   rangeEndDate?: Date;
   calendarIds?: number[];
+  initialBlocks?: AvailabilityBlock[];
+  initialBlocksCacheKey?: string | null;
 }
 
 interface AvailabilityBlockInput {
@@ -52,6 +55,8 @@ export function useAvailabilityBlocks({
   rangeStartDate,
   rangeEndDate,
   calendarIds,
+  initialBlocks,
+  initialBlocksCacheKey,
 }: UseAvailabilityBlocksOptions) {
   const normalizedCalendarIds = normalizeCalendarIds(calendarIds);
   const skipFetchBecauseNoVisibleCalendars = Array.isArray(calendarIds) && (normalizedCalendarIds?.length || 0) === 0;
@@ -73,20 +78,16 @@ export function useAvailabilityBlocks({
     endDate = endOfDay(endOfMonth(currentDate));
   }
 
-  const queryParams = new URLSearchParams({
-    startDate: startDate.toISOString(),
-    endDate: endDate.toISOString(),
-  });
-  if (normalizedCalendarIds && normalizedCalendarIds.length > 0) {
-    queryParams.set('calendarIds', normalizedCalendarIds.join(','));
-  }
-
-  const url = !skipFetchBecauseNoVisibleCalendars ? `/api/availability-blocks?${queryParams.toString()}` : null;
+  const computedUrl = buildAvailabilityBlocksCacheKey({ startDate, endDate, calendarIds: normalizedCalendarIds });
+  const url = !skipFetchBecauseNoVisibleCalendars ? computedUrl : null;
+  const hasMatchingInitialBlocks = Boolean(url && initialBlocksCacheKey === url && initialBlocks);
   const { data = [], error, isLoading, mutate } = useSWR<AvailabilityBlock[]>(url, fetcher, {
     keepPreviousData: true,
     revalidateOnFocus: true,
     dedupingInterval: 30_000,
-    refreshInterval: 60_000,
+    fallbackData: hasMatchingInitialBlocks ? initialBlocks : undefined,
+    revalidateOnMount: !hasMatchingInitialBlocks,
+    revalidateIfStale: !hasMatchingInitialBlocks,
   });
 
   const createBlock = useCallback(async (input: AvailabilityBlockInput): Promise<AvailabilityBlockResult> => {

@@ -22,6 +22,8 @@ import { useAppointmentSubmit } from './useAppointmentSubmit';
 import { useClientSuggestions } from './useClientSuggestions';
 import { useDentistServices } from './useDentistServices';
 import { useIsMobile } from '@/lib/useIsMobile';
+import { useModal } from '@/lib/useModal';
+import { useFocusRestore } from '@/lib/useFocusRestore';
 import type {
   AppointmentFormPayload,
   AppointmentInitialData,
@@ -91,6 +93,9 @@ export function AppointmentModal({
         fallbackCalendarId: activeCalendarId ?? null,
       })
   );
+
+  // Return focus to the trigger element when the modal closes (a11y).
+  useFocusRestore(isOpen);
 
   // Reset form whenever the modal opens, the mode changes, or the target appointment changes.
   const lastOpenKeyRef = useRef<string>('');
@@ -196,29 +201,12 @@ export function AppointmentModal({
   // calendars keep using dentist colors.
   const showCategoryPicker = Boolean(selectedCalendarOption?.isDefault && selectedCalendarOption?.isOwn !== false);
 
-  const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (isSubmitting) return;
-    if (event.target === event.currentTarget) onClose();
-  };
-  const handleModalClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    event.stopPropagation();
-  }, []);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.key !== 'Escape' || isSubmitting) return;
-      if (clientDropdownOpen) {
-        return;
-      }
-
-      onClose();
-    };
-
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [clientDropdownOpen, isOpen, isSubmitting, onClose]);
+  const { overlayProps, dialogProps } = useModal({
+    isOpen,
+    onClose,
+    closeDisabled: isSubmitting,
+    shouldCloseOnEscape: () => !clientDropdownOpen,
+  });
 
   useEffect(() => {
     if (isOpen) return;
@@ -375,14 +363,14 @@ export function AppointmentModal({
   return (
     <div
       className={styles.modalOverlay}
-      onClick={handleBackdropClick}
-      role="dialog"
-      aria-modal="true"
-      aria-label={resolvedTitle}
+      {...overlayProps}
     >
       <div
         className={`${styles.modal} ${styles.modalWide}`}
-        onClick={handleModalClick}
+        {...dialogProps}
+        role="dialog"
+        aria-modal="true"
+        aria-label={resolvedTitle}
       >
         <div className={styles.modalHeader}>
           <h3>{resolvedTitle}</h3>

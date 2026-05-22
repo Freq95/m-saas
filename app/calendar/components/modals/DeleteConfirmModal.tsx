@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import styles from '../../page.module.css';
 import type { Appointment } from '../../hooks/useCalendar';
+import { useModal } from '@/lib/useModal';
 
 interface DeleteConfirmModalProps {
   isOpen: boolean;
@@ -19,30 +20,21 @@ export function DeleteConfirmModal({
   onClose,
   onConfirm,
 }: DeleteConfirmModalProps) {
-  const backdropPressStartedRef = useRef(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const isRecurring = Boolean(appointment?.recurrence_group_id);
   const [scope, setScope] = useState<'single' | 'series'>('single');
+  const { overlayProps, dialogProps } = useModal({
+    isOpen,
+    onClose,
+    closeDisabled: isDeleting,
+  });
 
   // Reset choice each time the modal opens — otherwise a previous "series"
   // pick would silently carry over to a different appointment.
   useEffect(() => {
     if (isOpen) setScope('single');
   }, [isOpen]);
-
-  const handleBackdropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    backdropPressStartedRef.current = event.target === event.currentTarget;
-  };
-
-  const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (isDeleting) return;
-    const endedOnBackdrop = event.target === event.currentTarget;
-    if (backdropPressStartedRef.current && endedOnBackdrop) {
-      onClose();
-    }
-    backdropPressStartedRef.current = false;
-  };
 
   const handleConfirmClick = async () => {
     if (isDeleting) return;
@@ -62,12 +54,11 @@ export function DeleteConfirmModal({
   return (
     <div
       className={styles.modalOverlay}
-      onPointerDown={handleBackdropPointerDown}
-      onClick={handleBackdropClick}
+      {...overlayProps}
     >
       <div
         className={styles.deleteSheet}
-        onClick={(e) => e.stopPropagation()}
+        {...dialogProps}
         role="dialog"
         aria-modal="true"
         aria-label="Confirmare stergere"

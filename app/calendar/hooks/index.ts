@@ -8,6 +8,6 @@ export { parseSessionUserId } from './sessionUser';
 export { parseSessionDbUserId } from './sessionUser';
 export type { Appointment, AvailabilityBlock, CalendarState, CalendarPermissions } from './useCalendar';
 export type { CreateAppointmentInput, UpdateAppointmentInput } from './useAppointmentsSWR';
-export type { CalendarListItem, SentPendingShare } from './useCalendarList';
+export type { CalendarListItem, CalendarListResponse, SentPendingShare } from './useCalendarList';
 export type { PendingCalendarShare } from './usePendingShares';
 export type { AppointmentCategoryOption } from './useAppointmentCategories';

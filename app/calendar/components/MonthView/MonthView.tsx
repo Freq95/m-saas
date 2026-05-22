@@ -140,7 +140,7 @@ export function MonthView({
                         style={{ background: statusCfg.dot }}
                         aria-label={statusCfg.label}
                       />
-                      <span className={statusCfg.strikethrough ? styles.appointmentStrike : undefined}>
+                      <span className={statusCfg.strikethrough ? styles.appointmentStrike : undefined} suppressHydrationWarning>
                         {format(new Date(apt.start_time), 'HH:mm', { locale: ro })} {apt.client_name}
                       </span>
                     </div>

@@ -1,10 +1,8 @@
 import { useCallback } from 'react';
 import useSWR from 'swr';
 import { startOfWeek, addDays, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
-import { useSession } from 'next-auth/react';
 import type { Appointment, CalendarViewType } from './useCalendar';
 import { logger } from '@/lib/logger';
-import { parseSessionUserId } from './sessionUser';
 
 interface UseAppointmentsOptions {
   currentDate: Date;
@@ -170,9 +168,7 @@ export function useAppointmentsSWR({
   search,
   initialAppointments = [],
 }: UseAppointmentsOptions): UseAppointmentsResult {
-  const { data: session, status } = useSession();
-  const sessionUserId = parseSessionUserId(session);
-  const effectiveUserId = userId ?? sessionUserId;
+  const effectiveUserId = userId;
   const normalizedCalendarIds = normalizeCalendarIds(calendarIds);
   const skipFetchBecauseNoVisibleCalendars = Array.isArray(calendarIds) && (normalizedCalendarIds?.length || 0) === 0;
 
@@ -211,14 +207,10 @@ export function useAppointmentsSWR({
     queryParams.append('search', trimmedSearch);
   }
 
-  const isReady = status !== 'loading' && Boolean(effectiveUserId);
+  const isReady = Boolean(effectiveUserId);
   const url = isReady && !skipFetchBecauseNoVisibleCalendars
     ? `/api/appointments?${queryParams.toString()}`
     : null;
-  const refreshInterval = !isReady || isGlobalSearch || skipFetchBecauseNoVisibleCalendars
-    ? 0
-    : 60_000;
-
   const {
     data: appointments = [],
     error,
@@ -237,7 +229,6 @@ export function useAppointmentsSWR({
     revalidateOnReconnect: true,
     refreshWhenHidden: false,
     refreshWhenOffline: false,
-    refreshInterval,
   });
 
   const refetch = useCallback(async () => {
@@ -300,7 +291,7 @@ export function useAppointmentsSWR({
         if (newAppointment && typeof newAppointment.id === 'number') {
           mutate(
             (current) => {
-              const existing = current ?? [];
+              const existing = current ?? appointments;
               if (existing.some((apt) => apt.id === newAppointment.id)) return existing;
               return [...existing, newAppointment];
             },
@@ -310,7 +301,7 @@ export function useAppointmentsSWR({
           // revalidateTag from POST may not have propagated yet, so an
           // immediate /api/appointments fetch can return stale data without
           // our new appointment and visibly drop it from the calendar.
-          // The next natural SWR cycle (60s polling) will reconcile.
+          // The next explicit revalidation or navigation will reconcile.
         } else {
           // Fallback: server response missing the appointment payload, refetch to be safe.
           await mutate();
@@ -328,7 +319,7 @@ export function useAppointmentsSWR({
         return { ok: false, status: 0, error: 'Eroare de retea la crearea programarii.' };
       }
     },
-    [effectiveUserId, mutate]
+    [appointments, effectiveUserId, mutate]
   );
 
   const updateAppointment = useCallback(
@@ -433,12 +424,12 @@ export function useAppointmentsSWR({
         // return the previous cached payload for several seconds after the
         // freshly-issued revalidateTag (the tag invalidation is eventually
         // consistent). That stale payload then overwrites the optimistic
-        // update and the appointment visibly "bounces back". The next natural
-        // SWR cycle (60s polling) will reconcile any unrelated changes.
+        // update and the appointment visibly "bounces back". The next explicit
+        // revalidation or navigation will reconcile any unrelated changes.
         const updatedAppointment = resultData?.appointment as Appointment | undefined;
         if (updatedAppointment && typeof updatedAppointment.id === 'number') {
           mutate(
-            (current) => (current ?? []).map((apt) =>
+            (current) => (current ?? appointments).map((apt) =>
               apt.id === updatedAppointment.id ? { ...apt, ...updatedAppointment } : apt
             ),
             { revalidate: false }
@@ -532,7 +523,7 @@ export function useAppointmentsSWR({
 
   return {
     appointments,
-    loading: status === 'loading' || isLoading,
+    loading: isLoading,
     error: error ? error.message : null,
     refetch,
     createAppointment,

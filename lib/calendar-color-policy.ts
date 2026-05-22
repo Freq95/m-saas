@@ -151,8 +151,7 @@ export function resolveAppointmentColor(
 }
 
 /**
- * Teams-style block styling: solid light body + darker left border + text
- * color chosen by relative luminance of the body color.
+ * Appointment block styling: calendar entries use solid category/dentist colors.
  *
  * The body and border are returned as CSS `color-mix()` expressions — the
  * browser computes them against the live `--color-bg` token so the block
@@ -166,22 +165,12 @@ export interface AppointmentBlockStyle {
 
 export function getAppointmentBlockStyle(
   baseColor: string,
-  theme: 'dark' | 'light' = 'dark',
-  variant: 'default' | 'shared' = 'default'
+  _theme: 'dark' | 'light' = 'dark',
+  _variant: 'default' | 'shared' = 'default'
 ): AppointmentBlockStyle {
-  if (variant === 'shared') {
-    const borderColor = `color-mix(in srgb, ${baseColor} 80%, black 20%)`;
-    const bodyColor = baseColor;
-    const textColor = isColorLight(baseColor) ? '#0f172a' : '#ffffff';
-    return { borderColor, bodyColor, textColor };
-  }
-
-  const borderColor = `color-mix(in srgb, ${baseColor} 85%, black 15%)`;
-  const bodyColor = `color-mix(in srgb, ${baseColor} 15%, var(--color-bg) 85%)`;
-  // `--color-bg` is #06080d on dark and #f0f4f8 on light. Pre-compute the
-  // blended body color in JS using those hex values to pick readable text.
-  const bgHex = theme === 'light' ? '#f0f4f8' : '#06080d';
-  const textColor = isBlendLight(baseColor, bgHex) ? '#0f172a' : '#e6edf8';
+  const borderColor = `color-mix(in srgb, ${baseColor} 80%, black 20%)`;
+  const bodyColor = baseColor;
+  const textColor = isColorLight(baseColor) ? '#0f172a' : '#ffffff';
   return { borderColor, bodyColor, textColor };
 }
 

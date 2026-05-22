@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import styles from '../../page.module.css';
 import type { CalendarListItem, CalendarPermissions } from '../../hooks';
 import { ConfirmModal } from './ConfirmModal';
+import Spinner from '@/components/Spinner';
+import { useFocusRestore } from '@/lib/useFocusRestore';
 
 interface CalendarShareItem {
   id: number;
@@ -124,6 +126,7 @@ export function ShareCalendarModal({
   onClose,
   onChanged,
 }: ShareCalendarModalProps) {
+  useFocusRestore(isOpen);
   const backdropPressStartedRef = useRef(false);
   const [shares, setShares] = useState<CalendarShareItem[]>([]);
   const [loadingShares, setLoadingShares] = useState(false);
@@ -401,7 +404,7 @@ export function ShareCalendarModal({
             </div>
 
             {loadingShares ? (
-              <div className={styles.emptyStateCard}>Se incarca...</div>
+              <div className={styles.emptyStateCard}><Spinner size={20} thickness={2} /></div>
             ) : shares.length === 0 ? (
               <div className={styles.emptyStateCard}>
                 Nicio partajare inca.

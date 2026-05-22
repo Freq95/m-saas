@@ -40,6 +40,7 @@ export default async function InboxPage() {
         initialMessages={null}
         initialHasMoreMessages={false}
         initialOldestMessageId={null}
+        initialSessionUserId={auth.userId}
       />
     </Suspense>
   );

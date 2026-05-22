@@ -5,6 +5,8 @@ import CalendarPageClient from './CalendarPageClient';
 import { getAuthUser, redirectToLogin } from '@/lib/auth-helpers';
 import { getAppointmentsData, getServicesData } from '@/lib/server/calendar';
 import { getCalendarListForUser } from '@/lib/server/calendars-list';
+import { listAvailabilityBlocks } from '@/lib/availability-blocks';
+import { buildAvailabilityBlocksCacheKey } from './lib/availability-blocks-cache';
 
 export const revalidate = 0;
 
@@ -27,7 +29,12 @@ export default async function CalendarPage() {
   const initialServiceUserId = auth.role === 'asistent'
     ? auth.assigned_dentist_user_ids?.[0] ?? auth.userId
     : auth.userId;
-  const [initialAppointments, initialServices] = await Promise.all([
+  const initialAvailabilityBlocksCacheKey = buildAvailabilityBlocksCacheKey({
+    startDate: weekStart,
+    endDate: weekEnd,
+    calendarIds: visibleCalendarIds.length > 0 ? visibleCalendarIds : undefined,
+  });
+  const [initialAppointments, initialServices, initialAvailabilityBlocks] = await Promise.all([
     getAppointmentsData({
       userId: auth.userId,
       tenantId: auth.tenantId,
@@ -36,6 +43,12 @@ export default async function CalendarPage() {
       endDate: weekEnd,
     }).catch(() => []),
     getServicesData(initialServiceUserId, auth.tenantId).catch(() => []),
+    listAvailabilityBlocks({
+      auth,
+      calendarIds: visibleCalendarIds,
+      startTime: weekStart,
+      endTime: weekEnd,
+    }).catch(() => []),
   ]);
   const asistentReassignState = auth.role === 'asistent'
     ? (auth.assigned_dentist_user_ids?.length ? (visibleCalendarIds.length === 0 ? 'inactive' : null) : 'empty')
@@ -46,6 +59,11 @@ export default async function CalendarPage() {
       <CalendarPageClient
         initialAppointments={initialAppointments as any}
         initialServices={initialServices as any}
+        initialCalendarList={calendarList}
+        initialAvailabilityBlocks={initialAvailabilityBlocks as any}
+        initialAvailabilityBlocksCacheKey={initialAvailabilityBlocksCacheKey}
+        initialSessionUserId={auth.userId}
+        initialSessionDbUserId={auth.dbUserId.toString()}
         initialDate={now.toISOString()}
         initialViewType="week"
         asistentReassignState={asistentReassignState}

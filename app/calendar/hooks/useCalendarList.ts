@@ -32,7 +32,7 @@ export interface SentPendingShare {
   created_at: string | null;
 }
 
-interface CalendarListResponse {
+export interface CalendarListResponse {
   ownCalendars?: CalendarListItem[];
   sharedCalendars?: CalendarListItem[];
   sentPendingShares?: SentPendingShare[];
@@ -62,6 +62,7 @@ export function useCalendarList(options: UseCalendarListOptions = {}): UseCalend
       focusThrottleInterval: 60_000,
       dedupingInterval: 60_000,
       revalidateOnMount: !options.fallbackData,
+      revalidateIfStale: !options.fallbackData,
       fallbackData: options.fallbackData ?? undefined,
     }
   );

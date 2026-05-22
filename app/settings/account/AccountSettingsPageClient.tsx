@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { ToastContainer } from '@/components/Toast';
 import { useToast } from '@/lib/useToast';
 import navStyles from '../../dashboard/page.module.css';
@@ -15,9 +15,8 @@ interface AccountSettingsPageClientProps {
 
 export default function AccountSettingsPageClient({ initialName, initialEmail, isOwner }: AccountSettingsPageClientProps) {
   const [name, setName] = useState(initialName);
-  const [email, setEmail] = useState(initialEmail);
+  const [savedName, setSavedName] = useState(initialName.trim());
   const [savingProfile, setSavingProfile] = useState(false);
-  const [profileDirty, setProfileDirty] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -25,31 +24,23 @@ export default function AccountSettingsPageClient({ initialName, initialEmail, i
   const [savingPassword, setSavingPassword] = useState(false);
 
   const toast = useToast();
-
-  const handleProfileChange = (field: 'name' | 'email', value: string) => {
-    if (field === 'name') setName(value);
-    if (field === 'email') setEmail(value);
-    setProfileDirty(true);
-  };
+  const normalizedName = name.trim();
+  const profileDirty = normalizedName !== savedName;
 
   async function saveProfile() {
-    if (!name.trim()) {
-      toast.error('Numele nu poate fi gol.');
-      return;
-    }
     setSavingProfile(true);
     try {
       const res = await fetch('/api/user/me', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), email: email.trim() }),
+        body: JSON.stringify({ name: normalizedName }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         throw new Error(data?.error || 'Nu am putut salva profilul.');
       }
       toast.success('Profil actualizat.');
-      setProfileDirty(false);
+      setSavedName(normalizedName);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Nu am putut salva profilul.');
     } finally {
@@ -110,7 +101,7 @@ export default function AccountSettingsPageClient({ initialName, initialEmail, i
                 type="text"
                 maxLength={100}
                 value={name}
-                onChange={(e) => handleProfileChange('name', e.target.value)}
+                onChange={(e) => setName(e.target.value)}
                 disabled={savingProfile}
                 placeholder="Numele tau"
               />
@@ -120,10 +111,9 @@ export default function AccountSettingsPageClient({ initialName, initialEmail, i
               <input
                 type="email"
                 maxLength={255}
-                value={email}
-                onChange={(e) => handleProfileChange('email', e.target.value)}
-                disabled={savingProfile}
-                placeholder="email@clinica.ro"
+                value={initialEmail}
+                readOnly
+                aria-readonly="true"
               />
             </label>
           </div>

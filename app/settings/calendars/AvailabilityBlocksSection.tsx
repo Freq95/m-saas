@@ -13,6 +13,7 @@ import {
   type AvailabilityBlockFormData,
 } from '../../calendar/components';
 import styles from './page.module.css';
+import Spinner from '@/components/Spinner';
 
 interface AvailabilityBlocksSectionProps {
   calendars: CalendarListItem[];
@@ -155,7 +156,7 @@ export function AvailabilityBlocksSection({
 
       <div className={styles.availabilityList}>
         {loading && sortedBlocks.length === 0 ? (
-          <p className={styles.categoryEmpty}>Se incarca...</p>
+          <Spinner size={20} thickness={2} />
         ) : sortedBlocks.length === 0 ? (
           <p className={styles.categoryEmpty}>Nu exista blocaje pentru urmatoarele 6 luni.</p>
         ) : (

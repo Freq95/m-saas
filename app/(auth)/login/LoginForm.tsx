@@ -2,8 +2,10 @@
 
 import { FormEvent, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { signIn, getSession } from 'next-auth/react';
 import styles from '../auth.module.css';
+import { LoginRedirectOverlay } from './LoginRedirectOverlay';
 
 type LoginFormProps = {
   successMessage?: string;
@@ -20,10 +22,12 @@ function normalizeRedirectPath(value?: string): string | null {
 }
 
 export default function LoginForm({ successMessage, redirectPath, forcedLogout }: LoginFormProps) {
+  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showOverlay, setShowOverlay] = useState(false);
 
   function getLoginErrorMessage(result: Awaited<ReturnType<typeof signIn>>): string {
     if (result?.code === 'database_connection_failed') {
@@ -38,6 +42,7 @@ export default function LoginForm({ successMessage, redirectPath, forcedLogout }
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     setSubmitting(true);
+    setShowOverlay(true);
     setError(null);
 
     const result = await signIn('credentials', {
@@ -48,16 +53,18 @@ export default function LoginForm({ successMessage, redirectPath, forcedLogout }
 
     if (!result || result.error) {
       setSubmitting(false);
+      setShowOverlay(false);
       setError(getLoginErrorMessage(result));
       return;
     }
 
-    // Read role from the freshly minted JWT instead of a server round-trip to
-    // /api/user/landing. getSession() decodes the cookie locally — no DB call.
     let roleLandingPath = '/dashboard';
     try {
       const session = await getSession();
       const role = session?.user?.role;
+      if (role && typeof window !== 'undefined') {
+        window.localStorage.setItem('densa:userRole', role);
+      }
       if (role === 'dentist' || role === 'asistent') {
         roleLandingPath = '/calendar';
       }
@@ -65,74 +72,83 @@ export default function LoginForm({ successMessage, redirectPath, forcedLogout }
       roleLandingPath = '/dashboard';
     }
 
-    // Use a hard navigation so the fresh auth cookie is guaranteed to ship
-    // with the next request. SPA navigation (router.replace) has shown
-    // intermittent hangs in dev after a failed-then-successful login.
     const target = normalizeRedirectPath(redirectPath) || roleLandingPath;
-    window.location.assign(target);
+    router.replace(target);
+  }
+
+  function handleRedirectTimeout() {
+    setShowOverlay(false);
+    setSubmitting(false);
+    setError('Ceva nu a mers bine. Te rog incearca din nou.');
   }
 
   return (
-    <section className={styles.card} aria-labelledby="auth-login-title">
-      <header className={styles.header}>
-        <h1 id="auth-login-title" className={styles.title}>Conecteaza-te</h1>
-        <p className={styles.subtitle}>Acceseaza programarile, mesajele si datele clinicii tale.</p>
-      </header>
+    <>
+      <section className={styles.card} aria-labelledby="auth-login-title">
+        <header className={styles.header}>
+          <h1 id="auth-login-title" className={styles.title}>Conecteaza-te</h1>
+          <p className={styles.subtitle}>Acceseaza programarile, mesajele si datele clinicii tale.</p>
+        </header>
 
-      {forcedLogout && (
-        <p className={`${styles.message} ${styles.messageInfo}`}>
-          Sesiunea ta a fost inchisa automat. Te rog autentifica-te din nou.
-        </p>
-      )}
-      {successMessage && (
-        <p className={`${styles.message} ${styles.messageSuccess}`}>{successMessage}</p>
-      )}
-      {error && (
-        <p className={`${styles.message} ${styles.messageError}`} role="alert">{error}</p>
-      )}
+        {forcedLogout && (
+          <p className={`${styles.message} ${styles.messageInfo}`}>
+            Sesiunea ta a fost inchisa automat. Te rog autentifica-te din nou.
+          </p>
+        )}
+        {successMessage && (
+          <p className={`${styles.message} ${styles.messageSuccess}`}>{successMessage}</p>
+        )}
+        {error && (
+          <p className={`${styles.message} ${styles.messageError}`} role="alert">{error}</p>
+        )}
 
-      <form onSubmit={handleSubmit} className={styles.form}>
-        <div className={styles.field}>
-          <label htmlFor="auth-email" className={styles.label}>Email</label>
-          <input
-            id="auth-email"
-            type="email"
-            className={styles.input}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="email@clinica.ro"
-            autoComplete="email"
-            required
-          />
+        <form onSubmit={handleSubmit} className={styles.form}>
+          <div className={styles.field}>
+            <label htmlFor="auth-email" className={styles.label}>Email</label>
+            <input
+              id="auth-email"
+              type="email"
+              className={styles.input}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="email@clinica.ro"
+              autoComplete="email"
+              required
+              disabled={submitting}
+            />
+          </div>
+
+          <div className={styles.field}>
+            <label htmlFor="auth-password" className={styles.label}>Parola</label>
+            <input
+              id="auth-password"
+              type="password"
+              className={styles.input}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Introdu parola"
+              autoComplete="current-password"
+              required
+              disabled={submitting}
+            />
+          </div>
+
+          <Link href="/forgot-password" className={styles.inlineLink}>
+            Ai uitat parola?
+          </Link>
+
+          <button type="submit" className={styles.primaryButton} disabled={submitting}>
+            {submitting ? 'Se autentifica...' : 'Conecteaza-te'}
+          </button>
+        </form>
+
+        <div className={styles.footer}>
+          <Link href="/privacy" className={styles.footerLink}>Politica de confidentialitate</Link>
+          <Link href="/terms" className={styles.footerLink}>Termeni si conditii</Link>
         </div>
+      </section>
 
-        <div className={styles.field}>
-          <label htmlFor="auth-password" className={styles.label}>Parola</label>
-          <input
-            id="auth-password"
-            type="password"
-            className={styles.input}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Introdu parola"
-            autoComplete="current-password"
-            required
-          />
-        </div>
-
-        <Link href="/forgot-password" className={styles.inlineLink}>
-          Ai uitat parola?
-        </Link>
-
-        <button type="submit" className={styles.primaryButton} disabled={submitting}>
-          {submitting ? 'Se autentifica...' : 'Conecteaza-te'}
-        </button>
-      </form>
-
-      <div className={styles.footer}>
-        <Link href="/privacy" className={styles.footerLink}>Politica de confidentialitate</Link>
-        <Link href="/terms" className={styles.footerLink}>Termeni si conditii</Link>
-      </div>
-    </section>
+      {showOverlay && <LoginRedirectOverlay onTimeout={handleRedirectTimeout} />}
+    </>
   );
 }

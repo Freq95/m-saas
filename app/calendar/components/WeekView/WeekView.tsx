@@ -43,6 +43,7 @@ interface WeekViewProps {
   minHourHeightPx?: number;
   maxHourHeightPx?: number;
   onHourHeightChange?: (heightPx: number) => void;
+  autoScrollToNow?: boolean;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -204,6 +205,7 @@ export function WeekView({
   minHourHeightPx = compact ? 48 : 40,
   maxHourHeightPx = compact ? 96 : 120,
   onHourHeightChange,
+  autoScrollToNow = true,
 }: WeekViewProps) {
   const SLOT_HEIGHT = clamp(hourHeightPx ?? (compact ? 60 : 96), minHourHeightPx, maxHourHeightPx);
   const columnHeightPx = hours.length * SLOT_HEIGHT;
@@ -331,6 +333,7 @@ export function WeekView({
   }, [SLOT_HEIGHT]);
 
   useEffect(() => {
+    if (!autoScrollToNow) return;
     if (hasAutoScrolledToNowRef.current) return;
     if (!todayIsVisible || currentTimeTopPx === null) return;
     const el = weekBodyRef.current;
@@ -338,7 +341,7 @@ export function WeekView({
     const targetScroll = Math.max(0, currentTimeTopPx - el.clientHeight / 2);
     el.scrollTo({ top: targetScroll, behavior: 'auto' });
     hasAutoScrolledToNowRef.current = true;
-  }, [todayIsVisible, currentTimeTopPx]);
+  }, [autoScrollToNow, todayIsVisible, currentTimeTopPx]);
 
   // Compensate header width for the body's scrollbar so column lines align
   useEffect(() => {
@@ -642,15 +645,7 @@ export function WeekView({
                         setDragOverSlot(null);
                         onDrop(day, hour, minute);
                       }}
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`Creeaza programare ${format(day, 'd MMM', { locale: ro })} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          onSlotClick(day, hour, minute, slotContext);
-                        }
-                      }}
+                      aria-hidden="true"
                     />
                   );
                 })}

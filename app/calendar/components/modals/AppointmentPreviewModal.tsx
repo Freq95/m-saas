@@ -2,10 +2,10 @@
 
 import { format } from 'date-fns';
 import { ro } from 'date-fns/locale';
-import { useRef } from 'react';
 import styles from '../../page.module.css';
 import type { Appointment } from '../../hooks/useCalendar';
 import { getStatusConfig, normalizeStatus } from '@/lib/calendar-color-policy';
+import { useModal } from '@/lib/useModal';
 
 interface AppointmentPreviewModalProps {
   isOpen: boolean;
@@ -22,33 +22,20 @@ export function AppointmentPreviewModal({
   onEdit,
   onDelete,
 }: AppointmentPreviewModalProps) {
-  const backdropPressStartedRef = useRef(false);
+  const { overlayProps, dialogProps } = useModal({ isOpen, onClose });
   const currentStatus = normalizeStatus(appointment?.status);
   const statusCfg = getStatusConfig(currentStatus);
-
-  const handleBackdropPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    backdropPressStartedRef.current = event.target === event.currentTarget;
-  };
-
-  const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    const endedOnBackdrop = event.target === event.currentTarget;
-    if (backdropPressStartedRef.current && endedOnBackdrop) {
-      onClose();
-    }
-    backdropPressStartedRef.current = false;
-  };
 
   if (!isOpen || !appointment) return null;
 
   return (
     <div
       className={styles.modalOverlay}
-      onPointerDown={handleBackdropPointerDown}
-      onClick={handleBackdropClick}
+      {...overlayProps}
     >
       <div
         className={styles.previewModal}
-        onClick={(e) => e.stopPropagation()}
+        {...dialogProps}
         role="dialog"
         aria-modal="true"
         aria-label="Detalii programare"

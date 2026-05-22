@@ -2,6 +2,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": ".next-build",
   "framework": "nextjs",
+  "regions": ["fra1"],
   "crons": [
     { "path": "/api/cron/email-sync", "schedule": "0 7 * * *" }
   ],
