@@ -21,7 +21,7 @@ import { logger } from '@/lib/logger';
 import { resolveAppointmentCategoryForWrite } from '@/lib/server/appointment-categories';
 import { checkUpdateRateLimit } from '@/lib/rate-limit';
 import { generateRecurringInstances } from '@/lib/recurring-utils';
-import { attachCalendarDisplayData } from '@/lib/server/calendar';
+import { attachCalendarDisplayData, projectMultiServiceFields } from '@/lib/server/calendar';
 import { updateAppointmentSchema } from '@/lib/validation';
 import { ExplicitClientSelectionError, resolveAppointmentClientLink } from '../client-linking';
 
@@ -142,8 +142,11 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       service_name: serviceDoc?.name || (appointmentDoc.service_name as string | null) || null,
     };
     const [decoratedAppointment] = await attachCalendarDisplayData([appointment], auth.userId);
+    const finalAppointment = decoratedAppointment
+      ? projectMultiServiceFields(decoratedAppointment)
+      : projectMultiServiceFields(appointment);
 
-    return createSuccessResponse({ appointment: decoratedAppointment || appointment });
+    return createSuccessResponse({ appointment: finalAppointment });
   } catch (error) {
     return handleApiError(error, 'Failed to fetch appointment');
   }
@@ -180,6 +183,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       notes,
       dentistUserId,
       serviceId,
+      serviceIds: serviceIdsInput,
       clientId,
       clientName,
       clientEmail,
@@ -188,9 +192,24 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       category,
       categoryId,
       color,
-      isRecurring,
-      recurrence,
+      isRecurring: isRecurringInput,
+      recurrence: recurrenceInput,
+      scope: scopeInput,
     } = validationResult.data;
+
+    // Normalize multi-service input. If neither serviceIds nor serviceId is
+    // supplied, keep current values (no service change requested). When the
+    // legacy singular `serviceId` is supplied alone, wrap it in a 1-element
+    // array so all downstream code sees the same shape.
+    const serviceIdsForUpdate: number[] | undefined =
+      Array.isArray(serviceIdsInput) && serviceIdsInput.length > 0
+        ? Array.from(new Set(serviceIdsInput))
+        : typeof serviceId === 'number'
+          ? [serviceId]
+          : undefined;
+
+    // Default scope is 'this' (only this occurrence). 'series' is opt-in.
+    const scope: 'this' | 'series' = scopeInput === 'series' ? 'series' : 'this';
 
     // Get existing appointment
     const existingAppointment = await db.collection('appointments').findOne({
@@ -200,6 +219,20 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     if (!existingAppointment) {
       return createErrorResponse('Appointment not found', 404);
     }
+
+    // Defense against an old client that still ships `isRecurring + recurrence`
+    // in PATCH bodies for existing recurring instances. With those fields
+    // present the request looks like "regenerate the series from this anchor"
+    // — which on scope='this' clobbers siblings + spawns a ghost tail
+    // occurrence, and on scope='series' DELETES the existing siblings and
+    // replaces them with brand-new occurrences inheriting the anchor's time
+    // (so the whole schedule shifts and IDs change). Neither is ever what
+    // the user wants when editing an existing instance — the recurrence rule
+    // itself isn't meant to be reshaped here. Strip in both scopes; if the
+    // user really needs to reshape the series, they can delete and recreate.
+    const isExistingRecurringInstance = Boolean(existingAppointment.recurrence_group_id);
+    const isRecurring = isExistingRecurringInstance ? undefined : isRecurringInput;
+    const recurrence = isExistingRecurringInstance ? undefined : recurrenceInput;
 
     let isSharedCalendar = false;
     if (typeof existingAppointment.calendar_id === 'number') {
@@ -236,6 +269,9 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     const mutationFilter = appointmentMutationFilter(appointmentId, existingAppointment);
 
     const updates: Record<string, unknown> = {};
+    // Captured when the caller changes serviceIds — used by the scope='series'
+    // fan-out below to recompute each sibling's end_time from its own start.
+    let newTotalDurationMin = 0;
     const shouldCreateRecurringInstances =
       isRecurring === true &&
       recurrence !== undefined &&
@@ -328,22 +364,55 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       );
     }
 
-    if (serviceId !== undefined) {
+    if (serviceIdsForUpdate !== undefined) {
       if (!effectiveServiceOwnerScope) {
         return createErrorResponse('Assigned dentist context is missing for this appointment', 400);
       }
-      const serviceDoc = await db.collection('services').findOne({
-        id: serviceId,
+      const serviceDocs = await db.collection('services').find({
+        id: { $in: serviceIdsForUpdate },
         user_id: effectiveServiceOwnerScope.serviceOwnerUserId,
         tenant_id: effectiveServiceOwnerScope.serviceOwnerTenantId,
         deleted_at: { $exists: false },
-      });
-      if (!serviceDoc) {
+      }).toArray();
+      if (serviceDocs.length !== serviceIdsForUpdate.length) {
         return createErrorResponse('Selected service was not found for the assigned dentist', 400);
       }
-      updates.service_id = serviceId;
-      updates.service_name = serviceDoc.name || null;
-      updates.price_at_time = typeof serviceDoc.price === 'number' ? serviceDoc.price : null;
+      const serviceById = new Map<number, any>(serviceDocs.map((s: any) => [s.id, s]));
+      const orderedServices = serviceIdsForUpdate.map((id) => serviceById.get(id)).filter(Boolean) as any[];
+      const pricesAtTime = orderedServices.map((s: any) =>
+        typeof s.price === 'number' ? s.price : 0
+      );
+      const totalPrice = pricesAtTime.reduce((sum: number, p: number) => sum + p, 0);
+      const totalDurationMin = orderedServices.reduce(
+        (sum: number, s: any) => sum + (typeof s.duration_minutes === 'number' ? s.duration_minutes : 0),
+        0
+      );
+      const serviceNamesSnapshot = orderedServices.map((s: any) => s.name as string);
+      // Write all four shapes — both new (arrays) and legacy (singular).
+      updates.service_ids = serviceIdsForUpdate;
+      updates.service_names_snapshot = serviceNamesSnapshot;
+      updates.prices_at_time = pricesAtTime;
+      updates.service_id = serviceIdsForUpdate[0];
+      updates.service_name = serviceNamesSnapshot[0] || null;
+      updates.price_at_time = totalPrice > 0 ? totalPrice : null;
+
+      // Re-derive end_time from start + new total duration when the caller
+      // didn't supply endTime explicitly. Without this a service change that
+      // shifts duration (e.g. 30min → 60min) leaves the card visually 30min
+      // wide on the calendar even though the patient is booked for 60min.
+      // The UI form sends endTime in the same patch so this is mostly a
+      // safety net for direct API consumers and the series fan-out below.
+      if (totalDurationMin > 0 && endTime === undefined) {
+        const baseStart = startTime
+          ? (typeof startTime === 'string' ? new Date(startTime) : startTime)
+          : new Date(existingAppointment.start_time);
+        if (!Number.isNaN(baseStart.getTime())) {
+          updates.end_time = new Date(baseStart.getTime() + totalDurationMin * 60_000).toISOString();
+        }
+      }
+      // Captured for the series fan-out further down. Kept on a local
+      // variable so we don't leak a synthetic field into the Mongo doc.
+      newTotalDurationMin = totalDurationMin;
     }
 
     const shouldUpdateClient =
@@ -653,19 +722,98 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         )
       );
     }
+    // ── Series-wide fan-out for recurring appointments ────────────────────
+    //
+    // When the user picked "Intreaga serie" in the scope modal, propagate
+    // the non-time updates to every sibling appointment in the same
+    // recurrence_group_id. Some fields stay per-instance because they
+    // describe an event that happened (or hasn't) at a specific point in
+    // time — fanning them out makes the schedule incoherent:
+    //   - start_time / end_time / date: applying the anchor's slot to every
+    //     occurrence would pile them on a single day
+    //   - status: a future occurrence can't be `completed`/`no-show` yet,
+    //     and marking it so erases the record of which actually happened
+    //   - reminder_sent: tracking is per-occurrence
+    //   - recurrence / recurrence_group_id: per-instance metadata
+    // We surface a warning when the user tried to change one of these
+    // per-instance fields with scope=series so they aren't left wondering
+    // why siblings didn't update.
+    let seriesFanOutWarning: string | null = null;
+    const groupId = existingAppointment.recurrence_group_id;
+    if (scope === 'series' && typeof groupId === 'number') {
+      const seriesUpdates: Record<string, unknown> = { ...updates };
+      delete seriesUpdates.start_time;
+      delete seriesUpdates.end_time;
+      delete seriesUpdates.status;
+      delete seriesUpdates.reminder_sent;
+      delete seriesUpdates.recurrence;
+      delete seriesUpdates.recurrence_group_id;
+      // updated_at stamp stays.
+
+      if (Object.keys(seriesUpdates).length > 0) {
+        await db.collection('appointments').updateMany(
+          {
+            recurrence_group_id: groupId,
+            tenant_id: appointmentTenantId,
+            deleted_at: { $exists: false },
+            // Exclude the anchor we just patched to avoid double-write.
+            id: { $ne: appointmentId },
+          },
+          { $set: seriesUpdates }
+        );
+
+        // When services changed, each sibling's end_time is now wrong
+        // (still anchored to its old duration). Loop and recompute from
+        // each sibling's own start_time + new total duration. A series
+        // is capped at 52 occurrences in validation, so this is bounded.
+        if (newTotalDurationMin > 0) {
+          const siblings = await db.collection('appointments').find(
+            {
+              recurrence_group_id: groupId,
+              tenant_id: appointmentTenantId,
+              deleted_at: { $exists: false },
+              id: { $ne: appointmentId },
+            },
+            { projection: { id: 1, start_time: 1 } }
+          ).toArray();
+          await Promise.all(siblings.map((sib: any) => {
+            const sibStart = new Date(sib.start_time);
+            if (Number.isNaN(sibStart.getTime())) return Promise.resolve();
+            const sibEnd = new Date(sibStart.getTime() + newTotalDurationMin * 60_000);
+            return db.collection('appointments').updateOne(
+              { id: sib.id },
+              { $set: { end_time: sibEnd.toISOString() } }
+            );
+          }));
+        }
+      }
+
+      const changedPerInstanceFields: string[] = [];
+      if (startTime !== undefined || endTime !== undefined) changedPerInstanceFields.push('data/ora');
+      if (status !== undefined) changedPerInstanceFields.push('statusul');
+      if (changedPerInstanceFields.length > 0) {
+        const list = changedPerInstanceFields.join(' si ');
+        seriesFanOutWarning = `Modificarile pentru ${list} s-au aplicat doar acestei aparitii.`;
+      }
+    }
+
     await invalidateReadCaches({
       tenantId: appointmentTenantId,
       userId: appointmentUserId,
       calendarId: appointmentCalendarId,
     });
     const conflictWarning = getAppointmentConflictWarning(conflictWarningData.conflicts);
-    const responseWarning = [warning, conflictWarning].filter(Boolean).join(' ') || null;
+    const responseWarning =
+      [warning, conflictWarning, seriesFanOutWarning].filter(Boolean).join(' ') || null;
 
     const appointment = stripMongoId(appointmentDoc);
     const [decoratedAppointment] = await attachCalendarDisplayData([appointment], userId);
+    const finalAppointment = decoratedAppointment
+      ? projectMultiServiceFields(decoratedAppointment)
+      : projectMultiServiceFields(appointment);
 
     return createSuccessResponse({
-      appointment: decoratedAppointment || appointment,
+      appointment: finalAppointment,
       warning: responseWarning,
       conflicts: conflictWarningData.conflicts.map(formatAppointmentConflictPayload),
       suggestions: formatAppointmentConflictSuggestions(conflictWarningData.suggestions),

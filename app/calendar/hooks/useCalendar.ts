@@ -14,13 +14,20 @@ export interface CalendarPermissions {
 
 export interface Appointment {
   id: number;
+  /** Legacy single-service field (kept for back-compat with old read paths). */
   service_id?: number;
+  /** Multi-service: ordered list of service IDs. Server emits both this and
+   *  `service_id` so old code keeps working. */
+  service_ids?: number[];
   service_owner_user_id?: number;
   client_id?: number;
   client_name: string;
   client_email?: string;
   client_phone?: string;
+  /** Legacy single-service display name. */
   service_name: string;
+  /** Multi-service: parallel array of names, same order as `service_ids`. */
+  service_names?: string[];
   start_time: string;
   end_time: string;
   status: string;

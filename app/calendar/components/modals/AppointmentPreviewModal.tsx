@@ -28,6 +28,21 @@ export function AppointmentPreviewModal({
 
   if (!isOpen || !appointment) return null;
 
+  // Multi-service: prefer the array shape, fall back to the legacy singular
+  // `service_name`. Older appointments only carry `service_name`.
+  const serviceNames: string[] =
+    Array.isArray(appointment.service_names) && appointment.service_names.length > 0
+      ? appointment.service_names
+      : appointment.service_name
+        ? [appointment.service_name]
+        : [];
+  const subtitleText =
+    serviceNames.length === 0
+      ? ''
+      : serviceNames.length === 1
+        ? serviceNames[0]
+        : `${serviceNames.length} servicii: ${serviceNames.join(', ')}`;
+
   return (
     <div
       className={styles.modalOverlay}
@@ -43,7 +58,7 @@ export function AppointmentPreviewModal({
         <div className={styles.previewHeader}>
           <div>
             <h2 className={styles.previewTitle}>{appointment.client_name}</h2>
-            <p className={styles.previewSubtitle}>{appointment.service_name}</p>
+            {subtitleText && <p className={styles.previewSubtitle}>{subtitleText}</p>}
           </div>
           <button className={styles.closeButton} onClick={onClose}>
             x

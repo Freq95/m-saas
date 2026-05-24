@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { ro } from 'date-fns/locale';
 import styles from '../../../../page.module.css';
 import type { RecurrenceForm } from '../types';
+import NumberStepper from '@/components/NumberStepper';
 
 interface TimeSectionProps {
   date: string;
@@ -146,17 +147,14 @@ function TimeSectionBase({
 
               <div className={styles.modalField}>
                 <label htmlFor="appt-rec-interval">La fiecare</label>
-                <input
+                <NumberStepper
                   id="appt-rec-interval"
-                  type="number"
-                  min={1}
                   value={recurrence.interval}
-                  onChange={(event) =>
-                    onRecurrenceChange({
-                      interval: Math.max(1, Number.parseInt(event.target.value, 10) || 1),
-                    })
-                  }
+                  min={1}
+                  max={52}
                   disabled={disabled}
+                  ariaLabel="Interval recurenta"
+                  onChange={(next) => onRecurrenceChange({ interval: next })}
                 />
               </div>
 
@@ -180,17 +178,14 @@ function TimeSectionBase({
               {recurrence.endType === 'count' ? (
                 <div className={styles.modalField}>
                   <label htmlFor="appt-rec-count">Numar repetari</label>
-                  <input
+                  <NumberStepper
                     id="appt-rec-count"
-                    type="number"
-                    min={1}
                     value={recurrence.count}
-                    onChange={(event) =>
-                      onRecurrenceChange({
-                        count: Math.max(1, Number.parseInt(event.target.value, 10) || 1),
-                      })
-                    }
+                    min={1}
+                    max={52}
                     disabled={disabled}
+                    ariaLabel="Numar repetari recurenta"
+                    onChange={(next) => onRecurrenceChange({ count: next })}
                   />
                 </div>
               ) : (

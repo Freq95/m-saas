@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import useSWR from 'swr';
+import useSWR, { useSWRConfig } from 'swr';
 import { startOfWeek, addDays, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns';
 import type { Appointment, CalendarViewType } from './useCalendar';
 import { logger } from '@/lib/logger';
@@ -27,7 +27,11 @@ interface UseAppointmentsResult {
 
 export interface CreateAppointmentInput {
   dentistUserId?: number;
-  serviceId: number;
+  /** Legacy single-service input (back-compat). Prefer `serviceIds`. */
+  serviceId?: number;
+  /** Multi-service: ordered array of service IDs. At least one of
+   *  `serviceId` / `serviceIds` must be provided. */
+  serviceIds?: number[];
   clientId?: number | null;
   clientName: string;
   clientEmail?: string;
@@ -46,7 +50,10 @@ export interface UpdateAppointmentInput {
   startTime?: string;
   endTime?: string;
   dentistUserId?: number;
+  /** Legacy single-service input (back-compat). Prefer `serviceIds`. */
   serviceId?: number;
+  /** Multi-service: ordered array of service IDs. Replaces the existing set. */
+  serviceIds?: number[];
   clientId?: number | null;
   clientName?: string;
   clientEmail?: string;
@@ -57,6 +64,8 @@ export interface UpdateAppointmentInput {
   category?: string | null;
   categoryId?: number | null;
   color?: string | null;
+  /** Scope of an edit when this appointment belongs to a recurring series. */
+  scope?: 'this' | 'series';
 }
 
 interface ConflictItem {
@@ -231,9 +240,24 @@ export function useAppointmentsSWR({
     refreshWhenOffline: false,
   });
 
+  // Global SWR mutator so we can invalidate every `/api/appointments` key,
+  // not just the current week's. Required for series edits: when the user
+  // picks scope='series' on a multi-week series, the bound `mutate()`
+  // refreshes only the visible week. Siblings on other weeks stay stale in
+  // the SWR cache and flash old data the next time the user navigates to
+  // them. Hitting every appointments key keeps things coherent across views.
+  const { mutate: globalMutate } = useSWRConfig();
+
   const refetch = useCallback(async () => {
-    await mutate();
-  }, [mutate]);
+    await Promise.all([
+      mutate(),
+      globalMutate(
+        (key) => typeof key === 'string' && key.startsWith('/api/appointments'),
+        undefined,
+        { revalidate: true }
+      ),
+    ]);
+  }, [mutate, globalMutate]);
 
   const createAppointment = useCallback(
     async (data: CreateAppointmentInput): Promise<CreateAppointmentResult> => {

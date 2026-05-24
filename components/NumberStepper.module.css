@@ -1,0 +1,75 @@
+/* Compact +/− stepper. The 44×44 touch target on the buttons matches
+ * Apple HIG; the input in between is whatever width fits the parent. */
+.stepper {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  overflow: hidden;
+  background: var(--color-surface);
+  min-height: 44px;
+}
+
+.stepperButton {
+  /* 44×44 minimum — Apple HIG recommendation for touch targets. */
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 0.5rem;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.stepperButton:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+.stepperButton:active:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+}
+
+.stepperButton:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.stepperInput {
+  width: 3.5rem;
+  flex: 0 0 auto;
+  padding: 0 0.35rem;
+  border: none;
+  border-left: 1px solid var(--color-border);
+  border-right: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+  font-size: 1rem;
+  font-weight: 600;
+  text-align: center;
+  /* Hide native spinner UI — our +/− buttons replace it. */
+  -moz-appearance: textfield;
+}
+
+.stepperInput::-webkit-outer-spin-button,
+.stepperInput::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.stepperInput:focus {
+  outline: none;
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+.stepperInput:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

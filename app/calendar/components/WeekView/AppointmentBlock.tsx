@@ -99,7 +99,14 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
         }}
         role="button"
         tabIndex={0}
-        aria-label={`Programare ${appointment.client_name}, ${appointment.service_name}`}
+        aria-label={`Programare ${appointment.client_name}, ${
+          // Read multi-service first (post-deploy data), fall back to legacy
+          // `service_name` for older appointments. Screen-reader users still
+          // get the full list even though the card itself only shows a count.
+          Array.isArray(appointment.service_names) && appointment.service_names.length > 0
+            ? appointment.service_names.join(', ')
+            : appointment.service_name
+        }`}
       >
         <div className={styles.appointmentHeader}>
           <div className={`${styles.appointmentTitle} ${statusCfg.strikethrough ? styles.appointmentStrike : ''}`}>
@@ -110,6 +117,13 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
               // (Europe/Bucharest) render different HH:mm. Client wins.
               <span className={styles.appointmentTime} suppressHydrationWarning> · {startLabel}-{endLabel}</span>
             )}
+            {!nameFirst &&
+              Array.isArray(appointment.service_names) &&
+              appointment.service_names.length > 1 && (
+                <span className={styles.appointmentServiceCount}>
+                  {' '}· {appointment.service_names.length} servicii
+                </span>
+              )}
           </div>
           {appointment.recurrence_group_id !== undefined && appointment.recurrence_group_id !== null && (
             <svg
@@ -136,11 +150,13 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
             aria-label={statusCfg.label}
           />
         </div>
-        {!nameFirst && (
-          <div className={styles.appointmentService}>
-            {appointment.service_name}
-            {appointment.dentist_display_name ? ` · ${appointment.dentist_display_name}` : ''}
-          </div>
+        {!nameFirst && appointment.dentist_display_name && (
+          // User chose to drop the service name from the card to reduce noise.
+          // We keep the dentist line because it's the only signal that
+          // identifies whose calendar the appointment belongs to on a shared
+          // calendar. Service names are still in the aria-label for screen
+          // readers and visible inside the appointment detail modal.
+          <div className={styles.appointmentService}>{appointment.dentist_display_name}</div>
         )}
       </div>
     );

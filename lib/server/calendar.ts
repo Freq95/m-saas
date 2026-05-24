@@ -274,6 +274,49 @@ async function loadCalendarDisplayMaps(
   };
 }
 
+/**
+ * Mirror multi-service snapshot fields to the alias shape that client code
+ * reads (`service_names`, `duration_minutes`, `service_price`). Used by POST
+ * and PATCH responses so the immediate API result matches what GET returns —
+ * otherwise calendar cards momentarily render in single-service form (no
+ * count badge, aria-label = first service only) until a page refresh.
+ *
+ * No DB calls: relies entirely on fields already written to the doc.
+ */
+export function projectMultiServiceFields<T extends Record<string, any>>(appointment: T): T {
+  const ids: number[] =
+    Array.isArray(appointment.service_ids) && appointment.service_ids.length > 0
+      ? appointment.service_ids.filter((id: unknown): id is number => typeof id === 'number')
+      : typeof appointment.service_id === 'number'
+        ? [appointment.service_id]
+        : [];
+
+  const serviceNames: string[] =
+    Array.isArray(appointment.service_names_snapshot) && appointment.service_names_snapshot.length > 0
+      ? (appointment.service_names_snapshot as string[])
+      : appointment.service_name
+        ? [appointment.service_name as string]
+        : [];
+
+  const totalPrice =
+    Array.isArray(appointment.prices_at_time) && appointment.prices_at_time.length > 0
+      ? (appointment.prices_at_time as number[]).reduce(
+          (sum, p) => sum + (typeof p === 'number' ? p : 0),
+          0
+        )
+      : typeof appointment.price_at_time === 'number'
+        ? appointment.price_at_time
+        : 0;
+
+  return {
+    ...appointment,
+    service_ids: ids,
+    service_names: serviceNames,
+    service_name: appointment.service_name || serviceNames[0] || '',
+    service_price: totalPrice,
+  };
+}
+
 export async function attachCalendarDisplayData<T extends CalendarDisplayAppointment>(
   appointments: T[],
   _viewerUserId?: number | null,
@@ -414,6 +457,11 @@ export async function getAppointmentsData(query: AppointmentQuery) {
       user_id: 1,
       conversation_id: 1,
       service_id: 1,
+      // Multi-service fields (new). Backward-compat: docs without service_ids
+      // are treated as [service_id] in the hydration step below.
+      service_ids: 1,
+      service_names_snapshot: 1,
+      prices_at_time: 1,
       service_owner_user_id: 1,
       service_owner_tenant_id: 1,
       dentist_db_user_id: 1,
@@ -435,6 +483,11 @@ export async function getAppointmentsData(query: AppointmentQuery) {
       reminder_sent: 1,
       service_name: 1,
       price_at_time: 1,
+      // Recurrence metadata: needed by the calendar card to show the loop
+      // icon and by the edit form to populate the recurrence section
+      // without a separate single-appointment fetch.
+      recurrence: 1,
+      recurrence_group_id: 1,
       created_at: 1,
       updated_at: 1,
     })
@@ -443,11 +496,20 @@ export async function getAppointmentsData(query: AppointmentQuery) {
     .then((docs: any[]) => docs.map(stripMongoId));
 
   const appointmentServiceScopes = buildServiceScopesFromAppointments(appointments);
+  // Collect every service id referenced across appointments. Each appointment
+  // contributes either its `service_ids[]` array (new multi-service format) or
+  // a single `service_id` (legacy single-service docs).
   const appointmentServiceIds = Array.from(
     new Set(
-      appointments
-        .map((appointment: any) => appointment.service_id)
-        .filter((serviceId: unknown): serviceId is number => typeof serviceId === 'number')
+      appointments.flatMap((appointment: any): number[] => {
+        if (Array.isArray(appointment.service_ids) && appointment.service_ids.length > 0) {
+          return appointment.service_ids.filter(
+            (id: unknown): id is number => typeof id === 'number'
+          );
+        }
+        if (typeof appointment.service_id === 'number') return [appointment.service_id];
+        return [];
+      })
     )
   );
   const servicesFilter = buildServiceScopeFilter(appointmentServiceScopes);
@@ -469,12 +531,60 @@ export async function getAppointmentsData(query: AppointmentQuery) {
   );
 
   const hydratedAppointments = appointments.map((appointment: any) => {
-    const service = serviceById.get(appointment.service_id);
+    // Normalize to the multi-service shape: if the doc only has the legacy
+    // singular `service_id`, treat it as a 1-element array. The caller can
+    // safely read `service_ids` / `service_names` arrays without checking.
+    const ids: number[] =
+      Array.isArray(appointment.service_ids) && appointment.service_ids.length > 0
+        ? appointment.service_ids.filter(
+            (id: unknown): id is number => typeof id === 'number'
+          )
+        : typeof appointment.service_id === 'number'
+          ? [appointment.service_id]
+          : [];
+
+    const resolvedServices = ids.map((id) => serviceById.get(id)).filter(Boolean) as Array<{
+      id: number;
+      name: string;
+      duration_minutes?: number;
+      price?: number;
+    }>;
+
+    const serviceNames = resolvedServices.length > 0
+      ? resolvedServices.map((s) => s.name)
+      : Array.isArray(appointment.service_names_snapshot) && appointment.service_names_snapshot.length > 0
+        ? (appointment.service_names_snapshot as string[])
+        : appointment.service_name
+          ? [appointment.service_name as string]
+          : [];
+
+    const totalDurationMinutes = resolvedServices.reduce(
+      (sum, s) => sum + (typeof s.duration_minutes === 'number' ? s.duration_minutes : 0),
+      0
+    );
+
+    const totalPrice =
+      Array.isArray(appointment.prices_at_time) && appointment.prices_at_time.length > 0
+        ? (appointment.prices_at_time as number[]).reduce(
+            (sum, p) => sum + (typeof p === 'number' ? p : 0),
+            0
+          )
+        : typeof appointment.price_at_time === 'number'
+          ? appointment.price_at_time
+          : resolvedServices.reduce(
+              (sum, s) => sum + (typeof s.price === 'number' ? s.price : 0),
+              0
+            );
+
     return {
       ...appointment,
-      service_name: service?.name || (appointment.service_name as string | undefined) || '',
-      duration_minutes: service?.duration_minutes,
-      service_price: typeof appointment.price_at_time === 'number' ? appointment.price_at_time : service?.price,
+      // Keep legacy singular fields for back-compat with old client code.
+      service_name: serviceNames[0] || '',
+      // Multi-service fields exposed to the client.
+      service_ids: ids,
+      service_names: serviceNames,
+      duration_minutes: totalDurationMinutes > 0 ? totalDurationMinutes : resolvedServices[0]?.duration_minutes,
+      service_price: totalPrice,
     };
   });
 

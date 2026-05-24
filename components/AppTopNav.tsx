@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { usePathname } from 'next/navigation';
 import { signOut } from 'next-auth/react';
@@ -125,6 +125,30 @@ export default function AppTopNav({
   const detectedSection = section ?? detectSection(pathname);
   const [optimisticActiveSection, setOptimisticActiveSection] = useState<NavSection>(detectedSection);
   const activeSection = optimisticActiveSection ?? detectedSection;
+  // Safety net for "button changes color but page never loads": if the
+  // optimistic state diverges from the actual pathname for more than ~1.6s
+  // after a click, router.push silently lost the navigation (queued behind
+  // a stuck Server Action / pending fetch / etc). Fall back to a hard
+  // window.location.assign so the user is never trapped on the old page.
+  const pendingNavRef = useRef<{ href: string; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const cancelPendingNav = () => {
+    if (pendingNavRef.current) {
+      clearTimeout(pendingNavRef.current.timer);
+      pendingNavRef.current = null;
+    }
+  };
+  const scheduleNavFallback = useCallback((href: string) => {
+    cancelPendingNav();
+    if (typeof window === 'undefined') return;
+    pendingNavRef.current = {
+      href,
+      timer: setTimeout(() => {
+        if (pendingNavRef.current?.href === href && window.location.pathname !== href) {
+          window.location.assign(href);
+        }
+      }, 1600),
+    };
+  }, []);
   const linksRef = useRef<HTMLDivElement | null>(null);
   const [indicator, setIndicator] = useState<IndicatorState>({ x: 0, width: 0, visible: false });
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -157,7 +181,13 @@ export default function AppTopNav({
 
   useEffect(() => {
     setOptimisticActiveSection(detectedSection);
+    // Pathname changed — router.push succeeded, cancel the safety-net.
+    cancelPendingNav();
   }, [detectedSection]);
+
+  // Cleanup pending fallback on unmount so we never trigger a hard nav
+  // after the component (and the user's intent) is gone.
+  useEffect(() => () => cancelPendingNav(), []);
 
   useEffect(() => {
     const navElement = navRef.current;
@@ -239,6 +269,7 @@ export default function AppTopNav({
             scrollToTopAndRefresh(router.refresh);
             return;
           }
+          scheduleNavFallback(homePath);
           router.push(homePath);
         }}
       >
@@ -263,6 +294,7 @@ export default function AppTopNav({
                   scrollToTopAndRefresh(router.refresh);
                   return;
                 }
+                scheduleNavFallback(item.href);
                 router.push(item.href);
               }}
             >
@@ -288,6 +320,7 @@ export default function AppTopNav({
               scrollToTopAndRefresh(router.refresh);
               return;
             }
+            scheduleNavFallback('/settings');
             router.push('/settings');
           }}
         >
@@ -344,6 +377,7 @@ export default function AppTopNav({
               scrollToTopAndRefresh(router.refresh);
               return;
             }
+            scheduleNavFallback(target);
             router.push(target);
           }}
         >

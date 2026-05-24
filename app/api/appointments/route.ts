@@ -15,7 +15,7 @@ import {
 } from '@/lib/calendar-auth';
 import { exportToGoogleCalendar } from '@/lib/google-calendar';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
-import { attachCalendarDisplayData, getAppointmentsData } from '@/lib/server/calendar';
+import { attachCalendarDisplayData, getAppointmentsData, projectMultiServiceFields } from '@/lib/server/calendar';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { invalidateReadCaches } from '@/lib/cache-keys';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
@@ -137,6 +137,7 @@ export async function POST(request: NextRequest) {
       calendarId,
       dentistUserId,
       serviceId,
+      serviceIds: serviceIdsInput,
       clientId,
       clientName,
       clientEmail,
@@ -151,6 +152,15 @@ export async function POST(request: NextRequest) {
       exportToGoogle,
       googleAccessToken,
     } = validationResult.data;
+
+    // Normalize legacy single-service input into the multi-service array.
+    // The Zod refine() guaranteed at least one of {serviceId, serviceIds} is present.
+    const serviceIds: number[] =
+      Array.isArray(serviceIdsInput) && serviceIdsInput.length > 0
+        ? Array.from(new Set(serviceIdsInput))
+        : typeof serviceId === 'number'
+          ? [serviceId]
+          : [];
 
     let targetCalendarId: number;
     let appointmentUserId: number;
@@ -173,19 +183,26 @@ export async function POST(request: NextRequest) {
 
     const dentistAssignment = await resolveAppointmentDentistAssignment(auth, targetCalendarId, dentistUserId);
 
-    // Services belong to the assigned dentist's catalog.
-    const serviceDoc = await db.collection('services').findOne({
-      id: serviceId,
+    // Services belong to the assigned dentist's catalog. Multi-service:
+    // every id in serviceIds must resolve in the same catalog. We preserve
+    // the user-selected order in `serviceDocs` so the UI display order
+    // matches what they picked.
+    const serviceDocs = await db.collection('services').find({
+      id: { $in: serviceIds },
       user_id: dentistAssignment.assignedDentistUserId,
       tenant_id: dentistAssignment.assignedDentistTenantId,
       deleted_at: { $exists: false },
-    });
-    if (!serviceDoc) {
+    }).toArray();
+    if (serviceDocs.length !== serviceIds.length) {
       return NextResponse.json(
         { error: 'Selected service was not found for the chosen dentist' },
         { status: 400 }
       );
     }
+    const serviceById = new Map<number, any>(serviceDocs.map((s: any) => [s.id, s]));
+    const orderedServices = serviceIds.map((id) => serviceById.get(id)).filter(Boolean) as any[];
+    // Primary service = first selected (used for legacy singular fields).
+    const serviceDoc = orderedServices[0];
 
     // Only the dentist themselves can create new patients in their own account.
     if (!dentistAssignment.isCurrentUser && (typeof clientId !== 'number' || forceNewClient)) {
@@ -197,12 +214,18 @@ export async function POST(request: NextRequest) {
 
     const start = typeof startTime === 'string' ? new Date(startTime) : startTime;
 
-    // Calculate end time if not provided
+    // Calculate end time if not provided. With multi-service we sum the
+    // durations of all selected services (matches how the form computes it
+    // client-side via SET_SERVICES). Falls back to 60 if no duration data.
     let end: Date;
     if (endTime) {
       end = typeof endTime === 'string' ? new Date(endTime) : endTime;
     } else {
-      const durationMinutes = serviceDoc.duration_minutes || 60;
+      const totalDurationMinutes = orderedServices.reduce(
+        (sum: number, s: any) => sum + (typeof s.duration_minutes === 'number' ? s.duration_minutes : 0),
+        0
+      );
+      const durationMinutes = totalDurationMinutes > 0 ? totalDurationMinutes : 60;
       end = new Date(start);
       end.setMinutes(end.getMinutes() + durationMinutes);
     }
@@ -283,6 +306,14 @@ export async function POST(request: NextRequest) {
 
     const now = new Date().toISOString();
     const appointmentId = await getNextNumericId('appointments');
+    // Per-service price snapshots so revenue reports work correctly even
+    // after a service's catalog price changes. Sum is duplicated into
+    // `price_at_time` for back-compat with old read paths.
+    const pricesAtTime = orderedServices.map((s: any) =>
+      typeof s.price === 'number' ? s.price : 0
+    );
+    const totalPrice = pricesAtTime.reduce((sum: number, p: number) => sum + p, 0);
+    const serviceNamesSnapshot = orderedServices.map((s: any) => s.name as string);
     const appointmentDoc = {
       _id: appointmentId,
       id: appointmentId,
@@ -292,8 +323,13 @@ export async function POST(request: NextRequest) {
       created_by_user_id: createdByUserId,
       ...buildAppointmentDentistFields(dentistAssignment),
       conversation_id: conversationId || null,
-      service_id: serviceId,
-      service_name: serviceDoc.name,
+      // Multi-service fields (new source of truth)
+      service_ids: serviceIds,
+      service_names_snapshot: serviceNamesSnapshot,
+      prices_at_time: pricesAtTime,
+      // Legacy singular fields kept for back-compat with older read paths.
+      service_id: serviceIds[0],
+      service_name: serviceNamesSnapshot[0] || '',
       client_id: client.id,
       client_name: client.name || clientName,
       client_email: client.email || clientEmail || null,
@@ -306,7 +342,7 @@ export async function POST(request: NextRequest) {
       category_color: isDefaultPersonalCalendar ? (resolvedCategory?.color || null) : null,
       color: color || null,
       notes: notes || null,
-      price_at_time: typeof serviceDoc.price === 'number' ? serviceDoc.price : null,
+      price_at_time: totalPrice > 0 ? totalPrice : null,
       reminder_sent: false,
       created_at: now,
       updated_at: now,
@@ -329,6 +365,9 @@ export async function POST(request: NextRequest) {
 
     const appointment = stripMongoId(appointmentDoc) as any;
     const [decoratedAppointment] = await attachCalendarDisplayData([appointment], userId);
+    const finalAppointment = decoratedAppointment
+      ? projectMultiServiceFields(decoratedAppointment)
+      : projectMultiServiceFields(appointment);
 
     // Google Calendar export is fire-and-forget: the appointment is already saved
     // in our DB, so a slow Google API round-trip (often 200-500ms) shouldn't block
@@ -346,7 +385,7 @@ export async function POST(request: NextRequest) {
     const warning = getAppointmentConflictWarning(conflictCheck.conflicts);
     return createSuccessResponse(
       {
-        appointment: decoratedAppointment || appointment,
+        appointment: finalAppointment,
         warning,
         conflicts: conflictCheck.conflicts.map(formatAppointmentConflictPayload),
         suggestions: formatAppointmentConflictSuggestions(conflictCheck.suggestions),

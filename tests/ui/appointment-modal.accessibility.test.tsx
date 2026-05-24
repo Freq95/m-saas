@@ -198,7 +198,7 @@ describe('appointmentFormReducer', () => {
         clientEmail: 'ana@example.com',
         clientPhone: '0700 000 001',
         dentistUserId: 7,
-        serviceId: '3',
+        serviceIds: ['3'],
         startTime: '2026-04-10T09:00:00.000Z',
         endTime: '2026-04-10T09:30:00.000Z',
         notes: '',
@@ -209,7 +209,7 @@ describe('appointmentFormReducer', () => {
 
     expect(next.calendarId).toBe('2');
     expect(next.dentistUserId).toBe('');
-    expect(next.serviceId).toBe('');
+    expect(next.serviceIds).toEqual([]);
     expect(next.clientName).toBe('');
     expect(next.clientEmail).toBe('');
     expect(next.clientPhone).toBe('');
@@ -226,7 +226,7 @@ describe('appointmentFormReducer', () => {
         clientEmail: 'ana@example.com',
         clientPhone: '0700 000 001',
         dentistUserId: 7,
-        serviceId: '3',
+        serviceIds: ['3'],
         startTime: '2026-04-10T09:00:00.000Z',
         endTime: '2026-04-10T09:30:00.000Z',
         notes: '',
@@ -237,7 +237,7 @@ describe('appointmentFormReducer', () => {
 
     expect(next.calendarId).toBe('1');
     expect(next.dentistUserId).toBe('8');
-    expect(next.serviceId).toBe('');
+    expect(next.serviceIds).toEqual([]);
     expect(next.clientName).toBe('');
     expect(next.clientEmail).toBe('');
     expect(next.clientPhone).toBe('');

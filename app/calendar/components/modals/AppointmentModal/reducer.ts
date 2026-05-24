@@ -10,7 +10,12 @@ export interface AppointmentFormState {
   selectedClientId: number | null;
   /** User has explicitly decided to ignore any matches and create a new record. */
   forceNewClient: boolean;
-  serviceId: string;
+  /**
+   * Multi-service: ordered array of service IDs (as strings). Empty array
+   * means no services selected yet. The order is the display order in the
+   * service chips list.
+   */
+  serviceIds: string[];
   category: string;
   categoryId: number | null;
   date: string;
@@ -38,8 +43,14 @@ export type AppointmentFormAction =
   | { type: 'SET_FIELD'; field: keyof AppointmentFormState; value: string | boolean }
   | { type: 'SET_CALENDAR'; calendarId: string }
   | { type: 'SET_DENTIST'; dentistUserId: string }
-  | { type: 'RESET_SERVICE' }
-  | { type: 'SET_SERVICE'; serviceId: string; durationMinutes?: number }
+  | { type: 'RESET_SERVICES' }
+  /**
+   * Replace the entire selected-service array. `totalDurationMinutes` is
+   * the sum of each service's duration, computed by the caller (the form
+   * has access to the live services catalog). When > 0 and we have a
+   * startTime, endTime is auto-recomputed.
+   */
+  | { type: 'SET_SERVICES'; serviceIds: string[]; totalDurationMinutes?: number }
   | { type: 'SET_CATEGORY'; category: string; categoryId: number | null }
   | { type: 'SET_CLIENT_NAME'; value: string }
   | { type: 'APPLY_CLIENT_SUGGESTION'; clientId: number; name: string; email: string | null; phone: string | null }
@@ -77,7 +88,7 @@ export function appointmentFormReducer(
         ...state,
         calendarId: action.calendarId,
         dentistUserId: '',
-        serviceId: '',
+        serviceIds: [],
         category: '',
         categoryId: null,
         clientName: '',
@@ -88,11 +99,11 @@ export function appointmentFormReducer(
       };
 
     case 'SET_DENTIST':
-      // Changing dentist resets service and client — both are dentist-scoped
+      // Changing dentist resets services and client — both are dentist-scoped
       return {
         ...state,
         dentistUserId: action.dentistUserId,
-        serviceId: '',
+        serviceIds: [],
         category: '',
         categoryId: null,
         clientName: '',
@@ -102,13 +113,13 @@ export function appointmentFormReducer(
         forceNewClient: false,
       };
 
-    case 'RESET_SERVICE':
-      return { ...state, serviceId: '' };
+    case 'RESET_SERVICES':
+      return { ...state, serviceIds: [] };
 
-    case 'SET_SERVICE': {
-      const next: AppointmentFormState = { ...state, serviceId: action.serviceId };
-      if (action.durationMinutes && state.startTime) {
-        next.endTime = addMinutesToTime(state.startTime, action.durationMinutes);
+    case 'SET_SERVICES': {
+      const next: AppointmentFormState = { ...state, serviceIds: action.serviceIds };
+      if (action.totalDurationMinutes && action.totalDurationMinutes > 0 && state.startTime) {
+        next.endTime = addMinutesToTime(state.startTime, action.totalDurationMinutes);
       }
       return next;
     }
@@ -178,7 +189,10 @@ export function buildInitialState(args: {
     clientEmail: string;
     clientPhone: string;
     clientId?: number | null;
-    serviceId: string;
+    /** New: multi-service array. */
+    serviceIds?: string[];
+    /** Legacy: single-service field, accepted for back-compat. */
+    serviceId?: string;
     category?: string | null;
     categoryId?: number | null;
     startTime: string;
@@ -220,6 +234,14 @@ export function buildInitialState(args: {
         ? String(fallbackCalendarId)
         : '';
 
+  // Normalize legacy single-service input into the array shape.
+  const initialServiceIds: string[] =
+    Array.isArray(initialData?.serviceIds) && initialData.serviceIds.length > 0
+      ? initialData.serviceIds
+      : initialData?.serviceId
+        ? [initialData.serviceId]
+        : [];
+
   return {
     calendarId,
     dentistUserId:
@@ -230,7 +252,7 @@ export function buildInitialState(args: {
     selectedClientId:
       typeof initialData?.clientId === 'number' ? initialData.clientId : null,
     forceNewClient: false,
-    serviceId: initialData?.serviceId || '',
+    serviceIds: initialServiceIds,
     category: initialData?.category || '',
     categoryId: typeof initialData?.categoryId === 'number' ? initialData.categoryId : null,
     date: toDateStr(startDate),
@@ -266,7 +288,7 @@ export function computeDurationMinutes(startTime: string, endTime: string): numb
 export function validate(state: AppointmentFormState): string | null {
   if (!state.calendarId) return 'Selecteaza un calendar.';
   if (!state.clientName.trim()) return 'Completeaza numele pacientului.';
-  if (!state.serviceId) return 'Selecteaza un serviciu.';
+  if (state.serviceIds.length === 0) return 'Selecteaza cel putin un serviciu.';
   if (!state.date || !state.startTime || !state.endTime) return 'Completeaza data si ora.';
   if (state.startTime >= state.endTime) return 'Ora de final trebuie sa fie dupa ora de inceput.';
   if (state.isRecurring) {

@@ -52,11 +52,18 @@ export const createMessageSchema = z.object({
 });
 
 // Appointment schemas
+//
+// `serviceIds: number[]` is the source of truth (length >= 1). `serviceId`
+// (singular) is accepted as a back-compat alias from older clients — the
+// route handlers normalize it to `[serviceId]` before further processing.
+const serviceIdsArraySchema = z.array(z.number().int().positive()).min(1).max(10);
+
 export const createAppointmentSchema = z.object({
   conversationId: z.number().int().positive().optional(),
   calendarId: z.number().int().positive().optional(),
   dentistUserId: z.number().int().positive().optional(),
-  serviceId: z.number().int().positive(),
+  serviceId: z.number().int().positive().optional(),
+  serviceIds: serviceIdsArraySchema.optional(),
   clientId: z.number().int().positive().nullable().optional(),
   clientName: z.string().min(1, 'Client name is required').max(255),
   clientEmail: emailSchema.optional(),
@@ -70,13 +77,17 @@ export const createAppointmentSchema = z.object({
   notes: z.string().max(2000).optional(),
   exportToGoogle: z.boolean().optional().default(false),
   googleAccessToken: z.string().optional(),
-}).strict();
+}).strict().refine(
+  (data) => data.serviceId !== undefined || (data.serviceIds && data.serviceIds.length > 0),
+  { message: 'Cel putin un serviciu este obligatoriu', path: ['serviceIds'] }
+);
 
 export const updateAppointmentSchema = z.object({
   startTime: dateTimeSchema.optional(),
   endTime: dateTimeSchema.optional(),
   dentistUserId: z.number().int().positive().optional(),
   serviceId: z.number().int().positive().optional(),
+  serviceIds: serviceIdsArraySchema.optional(),
   clientId: z.number().int().positive().nullable().optional(),
   clientName: z.string().min(1).max(255).optional(),
   clientEmail: emailSchema.optional(),
@@ -95,6 +106,15 @@ export const updateAppointmentSchema = z.object({
   }).strict().optional().nullable(),
   status: z.enum(['scheduled', 'completed', 'cancelled', 'no-show']).optional(),
   notes: z.string().max(2000).optional(),
+  /**
+   * Scope of the edit when this appointment belongs to a recurring series.
+   * - 'this'   (default): only this occurrence is updated
+   * - 'series': all occurrences in the same recurrence_group_id are updated
+   *   for non-time fields (serviceIds, notes, category, status, client info).
+   *   Time fields (startTime/endTime) always stay per-instance — the server
+   *   ignores them for series-wide updates and returns a warning.
+   */
+  scope: z.enum(['this', 'series']).optional(),
 }).strict();
 
 const calendarPermissionsSchema = z
@@ -175,7 +195,8 @@ export const createRecurringAppointmentSchema = z
   .object({
     calendarId: z.number().int().positive().optional(),
     dentistUserId: z.number().int().positive().optional(),
-    serviceId: z.number().int().positive(),
+    serviceId: z.number().int().positive().optional(),
+    serviceIds: serviceIdsArraySchema.optional(),
     clientId: z.number().int().positive().nullable().optional(),
     clientName: z.string().min(1, 'Client name is required').max(255),
     clientEmail: emailSchema.optional(),
@@ -189,7 +210,11 @@ export const createRecurringAppointmentSchema = z
     recurrence: recurrenceSchema,
     forceNewClient: z.boolean().optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (data) => data.serviceId !== undefined || (data.serviceIds && data.serviceIds.length > 0),
+    { message: 'Cel putin un serviciu este obligatoriu', path: ['serviceIds'] }
+  );
 
 // Client schemas
 const consentMethodEnum = z.enum(['digital_signature', 'scanned_document', 'paper_on_file']);

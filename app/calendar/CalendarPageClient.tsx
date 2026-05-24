@@ -103,8 +103,10 @@ type AppointmentModalData = {
   calendarName?: string;
   dentistUserId?: number;
   dentistDisplayName?: string;
-  serviceName?: string;
-  serviceId: string;
+  /** Multi-service: ordered list of selected service IDs (as strings). */
+  serviceIds: string[];
+  /** Denormalized service names in selection order for display/aria. */
+  serviceNames?: string[];
   startTime: string;
   endTime: string;
   durationMinutes: number;
@@ -123,6 +125,8 @@ type AppointmentModalData = {
     endDate?: string;
     count?: number;
   };
+  /** When editing a recurring appointment: 'this' (default) or 'series'. */
+  scope?: 'this' | 'series';
 };
 
 type MobileRangeMode = '3days' | '5days' | '7days' | 'workweek' | 'week';
@@ -774,7 +778,7 @@ export default function CalendarPageClient({
       calendarName: defaultCreateCalendar?.name,
       dentistUserId: undefined,
       dentistDisplayName: undefined,
-      serviceId: '',
+      serviceIds: [],
       startTime: slot.start.toISOString(),
           endTime: slot.end.toISOString(),
           durationMinutes: Math.max(15, Math.round((slot.end.getTime() - slot.start.getTime()) / 60_000)),
@@ -921,7 +925,7 @@ export default function CalendarPageClient({
       calendarName: createCalendar.name,
       dentistUserId: createCalendar.owner_user_id,
       dentistDisplayName: undefined,
-      serviceId: '',
+      serviceIds: [],
       startTime: start.toISOString(),
       endTime: end.toISOString(),
       durationMinutes: duration,
@@ -958,8 +962,16 @@ export default function CalendarPageClient({
       calendarName: appointment.calendar_name || calendarMap.get(appointment.calendar_id || -1)?.name || undefined,
       dentistUserId: appointment.dentist_id ?? appointment.service_owner_user_id,
       dentistDisplayName: appointment.dentist_display_name || undefined,
-      serviceName: appointment.service_name || '',
-      serviceId: appointment.service_id ? String(appointment.service_id) : '',
+      serviceNames: Array.isArray(appointment.service_names) && appointment.service_names.length > 0
+        ? appointment.service_names
+        : appointment.service_name
+          ? [appointment.service_name]
+          : [],
+      serviceIds: Array.isArray(appointment.service_ids) && appointment.service_ids.length > 0
+        ? appointment.service_ids.map((id: number) => String(id))
+        : appointment.service_id
+          ? [String(appointment.service_id)]
+          : [],
       startTime: start.toISOString(),
       endTime: end.toISOString(),
       durationMinutes: Math.max(15, Math.round((end.getTime() - start.getTime()) / 60_000)),
@@ -1071,10 +1083,11 @@ export default function CalendarPageClient({
   });
 
   const handleCreateAppointment = async (formData: AppointmentModalData) => {
-    if (!formData.clientName.trim() || !formData.serviceId || !formData.startTime || !formData.endTime) {
+    if (!formData.clientName.trim() || formData.serviceIds.length === 0 || !formData.startTime || !formData.endTime) {
       toast.warning('Completeaza toate campurile obligatorii (nume pacient si serviciu).');
       return;
     }
+    const serviceIdsNum = formData.serviceIds.map((id) => parseInt(id, 10)).filter((n) => Number.isFinite(n));
     const targetCalendarId = formData.calendarId || defaultCreateCalendar?.id;
     if (!targetCalendarId) {
       toast.warning('Selecteaza un calendar pe care poti crea programari.');
@@ -1088,7 +1101,7 @@ export default function CalendarPageClient({
           body: JSON.stringify({
             calendarId: targetCalendarId,
             dentistUserId: formData.dentistUserId,
-            serviceId: parseInt(formData.serviceId),
+            serviceIds: serviceIdsNum,
             clientName: formData.clientName.trim(),
             clientId: formData.clientId,
             clientEmail: formData.clientEmail || undefined,
@@ -1137,7 +1150,7 @@ export default function CalendarPageClient({
       const ok = await createAppointment({
         calendarId: targetCalendarId,
         dentistUserId: formData.dentistUserId,
-        serviceId: parseInt(formData.serviceId),
+        serviceIds: serviceIdsNum,
         clientName: formData.clientName.trim(),
         clientId: formData.clientId,
         clientEmail: formData.clientEmail || undefined,
@@ -1199,10 +1212,27 @@ export default function CalendarPageClient({
 
     const newStart = new Date(formData.startTime);
     const newEnd = new Date(formData.endTime);
-    const selectedServiceId = state.selectedAppointment.service_id
-      ? String(state.selectedAppointment.service_id)
-      : '';
-    const didChangeService = Boolean(formData.serviceId) && formData.serviceId !== selectedServiceId;
+    // Compare arrays as JSON to detect any reorder / add / remove. Only send
+    // serviceIds in the patch when the user actually changed something —
+    // avoids a redundant DB write + service-validation round-trip.
+    const existingServiceIds: string[] = Array.isArray(state.selectedAppointment.service_ids) &&
+      state.selectedAppointment.service_ids.length > 0
+        ? state.selectedAppointment.service_ids.map((id: number) => String(id))
+        : state.selectedAppointment.service_id
+          ? [String(state.selectedAppointment.service_id)]
+          : [];
+    const formServiceIds = formData.serviceIds;
+    const didChangeService =
+      formServiceIds.length > 0 && JSON.stringify(formServiceIds) !== JSON.stringify(existingServiceIds);
+    const serviceIdsNum = formServiceIds.map((id) => parseInt(id, 10)).filter((n) => Number.isFinite(n));
+
+    // Editing an existing recurring instance must NOT include recurrence config
+    // in the payload. If we send `recurrence: {count: 4}` the backend treats
+    // the request as a series regeneration anchored to this instance — which
+    // ignores `scope: 'this'` and clobbers sibling occurrences (and can spawn
+    // a phantom extra occurrence at the tail). Recurrence config is only
+    // valid on initial create or when converting a non-recurring appointment.
+    const isExistingRecurringInstance = Boolean(state.selectedAppointment.recurrence_group_id);
 
     try {
       const res = await fetch(`/api/appointments/${state.selectedAppointment.id}`, {
@@ -1212,7 +1242,7 @@ export default function CalendarPageClient({
           startTime: newStart.toISOString(),
           endTime: newEnd.toISOString(),
           dentistUserId: formData.dentistUserId,
-          ...(didChangeService ? { serviceId: parseInt(formData.serviceId, 10) } : {}),
+          ...(didChangeService ? { serviceIds: serviceIdsNum } : {}),
           clientId: formData.clientId,
           clientName: formData.clientName.trim(),
           clientEmail: formData.clientEmail || undefined,
@@ -1223,16 +1253,23 @@ export default function CalendarPageClient({
           categoryId: formData.categoryId,
           color: formData.color,
           status: formData.status,
-          isRecurring: formData.isRecurring,
-          recurrence: formData.isRecurring && formData.recurrence
-            ? {
-              frequency: formData.recurrence.frequency,
-              interval: formData.recurrence.interval,
-              ...(formData.recurrence.endType === 'count'
-                ? { count: formData.recurrence.count }
-                : { endDate: formData.recurrence.endDate }),
-            }
-            : null,
+          ...(isExistingRecurringInstance
+            ? {}
+            : {
+                isRecurring: formData.isRecurring,
+                recurrence: formData.isRecurring && formData.recurrence
+                  ? {
+                    frequency: formData.recurrence.frequency,
+                    interval: formData.recurrence.interval,
+                    ...(formData.recurrence.endType === 'count'
+                      ? { count: formData.recurrence.count }
+                      : { endDate: formData.recurrence.endDate }),
+                  }
+                  : null,
+              }),
+          // Recurrence edit scope: 'this' (default) or 'series'.
+          // The modal's RecurrenceScopeModal sets this before submitting.
+          ...(formData.scope ? { scope: formData.scope } : {}),
         }),
       });
       const result = await res.json();

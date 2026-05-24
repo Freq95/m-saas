@@ -297,11 +297,26 @@ export function AppointmentCard({
 
           {/* Top row: time · duration · service · recurring badge */}
           <div className={styles.timeRow}>
-            <span className={styles.time}>{format(start, 'HH:mm')}</span>
+            {/* suppressHydrationWarning: format() resolves in renderer-local
+                timezone. Server (UTC) and client (Europe/Bucharest) render
+                different HH:mm. Client wins. */}
+            <span className={styles.time} suppressHydrationWarning>{format(start, 'HH:mm')}</span>
             <span className={styles.timeSep}>·</span>
             <span className={styles.duration}>{durationMin} min</span>
             <span className={styles.timeSep}>·</span>
-            <span className={styles.service}>{apt.service_name}</span>
+            <span className={styles.service}>
+              {/* Show first service + "+N" when multi. Falls back to legacy
+                  service_name for appointments stored before the multi-service
+                  schema landed. Full list is in aria-label and the detail modal. */}
+              {Array.isArray(apt.service_names) && apt.service_names.length > 0
+                ? apt.service_names[0]
+                : apt.service_name}
+              {Array.isArray(apt.service_names) && apt.service_names.length > 1 && (
+                <span style={{ marginLeft: '0.25rem', opacity: 0.65 }}>
+                  +{apt.service_names.length - 1}
+                </span>
+              )}
+            </span>
             {apt.recurrence_group_id !== undefined && apt.recurrence_group_id !== null && (
               <svg
                 width="12"
@@ -457,13 +472,20 @@ export function DayPanel({
     if (!isSearching) return [];
     const q = searchQuery.toLowerCase();
     return [...appointments]
-      .filter((apt) =>
-        apt.client_name.toLowerCase().includes(q) ||
-        apt.service_name.toLowerCase().includes(q) ||
-        apt.category?.toLowerCase().includes(q) ||
-        apt.category_label?.toLowerCase().includes(q) ||
-        apt.notes?.toLowerCase().includes(q)
-      )
+      .filter((apt) => {
+        // Match against every service name on multi-service appointments,
+        // not just the first/legacy singular.
+        const services = Array.isArray(apt.service_names) && apt.service_names.length > 0
+          ? apt.service_names
+          : apt.service_name ? [apt.service_name] : [];
+        return (
+          apt.client_name.toLowerCase().includes(q) ||
+          services.some((s) => s.toLowerCase().includes(q)) ||
+          apt.category?.toLowerCase().includes(q) ||
+          apt.category_label?.toLowerCase().includes(q) ||
+          apt.notes?.toLowerCase().includes(q)
+        );
+      })
       .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
   }, [appointments, searchQuery]);
 
@@ -628,7 +650,11 @@ export function DayPanel({
           ) : (
             <>
               <header className={styles.header}>
-                <h3 className={styles.headerDate}>
+                {/* suppressHydrationWarning: isToday() and format() resolve
+                    against the renderer's local clock/timezone, so server
+                    (UTC) and client (Europe/Bucharest) can disagree near
+                    midnight. Client wins. */}
+                <h3 className={styles.headerDate} suppressHydrationWarning>
                   {isToday(selectedDay)
                     ? `Astazi, ${format(selectedDay, 'd MMMM', { locale: ro })}`
                     : format(selectedDay, 'EEEE, d MMMM', { locale: ro })}

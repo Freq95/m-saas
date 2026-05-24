@@ -50,8 +50,10 @@ export interface AppointmentFormPayload {
   calendarName?: string;
   dentistUserId?: number;
   dentistDisplayName?: string;
-  serviceId: string;
-  serviceName?: string;
+  /** Multi-service: array of service IDs (as strings — they're rendered in form state). */
+  serviceIds: string[];
+  /** Denormalized list of service names in selection order, used for display/aria. */
+  serviceNames?: string[];
   startTime: string;
   endTime: string;
   durationMinutes: number;
@@ -72,6 +74,19 @@ export interface AppointmentFormPayload {
     endDate?: string;
     count?: number;
   };
+  /** When editing a recurring appointment: 'this' (default) or 'series'. */
+  scope?: 'this' | 'series';
 }
 
-export interface AppointmentInitialData extends Partial<AppointmentFormPayload> {}
+/**
+ * Initial-data shape received from the server when editing/viewing an
+ * appointment. Accepts either the new `serviceIds: string[]` array or the
+ * legacy single `serviceId: string` (older API responses) — the form
+ * normalizes both via `buildInitialState`.
+ */
+export interface AppointmentInitialData
+  extends Partial<Omit<AppointmentFormPayload, 'serviceIds'>> {
+  serviceIds?: string[];
+  /** Legacy single-service field, kept for back-compat with old payloads. */
+  serviceId?: string;
+}

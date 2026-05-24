@@ -1074,6 +1074,100 @@
   opacity: 0.8;
 }
 
+/* Multi-service count badge in the appointment card. Kept compact and
+ * lower-opacity so it doesn't crowd the client name. Shown only when the
+ * appointment has 2+ services. */
+.appointmentServiceCount {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  font-weight: 500;
+  opacity: 0.78;
+}
+
+/* ── Multi-service chips inside AppointmentModal / ServiceSection ──────── */
+.serviceChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.35rem;
+}
+
+.serviceChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-accent) 32%, var(--color-border));
+  color: var(--color-text);
+  font-size: 0.85rem;
+  line-height: 1.2;
+  max-width: 100%;
+}
+
+.serviceChipReadOnly {
+  background: var(--color-surface-muted, var(--color-surface));
+  border-color: var(--color-border);
+}
+
+.serviceChipLabel {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.serviceChipMeta {
+  font-size: 0.78rem;
+  color: var(--color-text-soft);
+  font-weight: 500;
+}
+
+.serviceChipRemove {
+  /* 28×28 hit target — large enough for touch on mobile chips. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  margin-right: -0.25rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-soft);
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.serviceChipRemove:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-danger) 18%, transparent);
+  color: var(--color-danger);
+}
+
+.serviceChipRemove:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.serviceAddPicker {
+  margin-top: 0.55rem;
+  /* native <select> styling reuses whatever the modalField pattern uses. */
+  width: 100%;
+}
+
+.serviceTotal {
+  margin-top: 0.55rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-soft);
+}
+
 .appointmentNameFirst {
   display: flex;
   align-items: center;

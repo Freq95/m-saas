@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
       calendarId,
       dentistUserId,
       serviceId,
+      serviceIds: serviceIdsInput,
       clientId,
       clientName,
       clientEmail,
@@ -68,7 +69,14 @@ export async function POST(request: NextRequest) {
     } = validationResult.data;
 
     const db = await getMongoDbOrThrow();
-    const normalizedServiceId = Number(serviceId);
+    // Normalize legacy single-service input. The Zod refine() guaranteed at
+    // least one of {serviceId, serviceIds} is present.
+    const normalizedServiceIds: number[] =
+      Array.isArray(serviceIdsInput) && serviceIdsInput.length > 0
+        ? Array.from(new Set(serviceIdsInput))
+        : typeof serviceId === 'number'
+          ? [serviceId]
+          : [];
 
     let appointmentUserId: number;
     let appointmentTenantId = tenantId;
@@ -91,7 +99,7 @@ export async function POST(request: NextRequest) {
 
     const dentistAssignment = await resolveAppointmentDentistAssignment(auth, targetCalendarId, dentistUserId);
 
-    if (Number.isNaN(normalizedServiceId)) {
+    if (normalizedServiceIds.length === 0 || normalizedServiceIds.some((id) => !Number.isFinite(id))) {
       return NextResponse.json({ error: 'Invalid numeric fields' }, { status: 400 });
     }
 
@@ -147,18 +155,29 @@ export async function POST(request: NextRequest) {
     const conflicts: RecurringConflict[] = [];
 
     // Get service details — services belong to the assigned dentist's catalog.
-    const service = await db.collection('services').findOne({
-      id: normalizedServiceId,
+    // Multi-service: every id must resolve in the same catalog; user-selected
+    // order is preserved via the orderedServices array below.
+    const serviceDocs = await db.collection('services').find({
+      id: { $in: normalizedServiceIds },
       user_id: dentistAssignment.assignedDentistUserId,
       tenant_id: dentistAssignment.assignedDentistTenantId,
       deleted_at: { $exists: false },
-    });
-    if (!service) {
+    }).toArray();
+    if (serviceDocs.length !== normalizedServiceIds.length) {
       return NextResponse.json(
         { error: 'Selected service was not found for the chosen dentist' },
         { status: 400 }
       );
     }
+    const serviceById = new Map<number, any>(serviceDocs.map((s: any) => [s.id, s]));
+    const orderedServices = normalizedServiceIds.map((id) => serviceById.get(id)).filter(Boolean) as any[];
+    const pricesAtTime = orderedServices.map((s: any) =>
+      typeof s.price === 'number' ? s.price : 0
+    );
+    const totalPriceAtTime = pricesAtTime.reduce((sum: number, p: number) => sum + p, 0);
+    const serviceNamesSnapshot = orderedServices.map((s: any) => s.name as string);
+    // Primary service for the legacy singular fields.
+    const service = orderedServices[0];
     const serviceName = service.name;
 
     const calendarDoc = await db.collection('calendars').findOne(
@@ -264,7 +283,12 @@ export async function POST(request: NextRequest) {
         calendar_id: targetCalendarId,
         created_by_user_id: createdByUserId,
         ...buildAppointmentDentistFields(dentistAssignment),
-        service_id: normalizedServiceId,
+        // Multi-service fields (new source of truth)
+        service_ids: normalizedServiceIds,
+        service_names_snapshot: serviceNamesSnapshot,
+        prices_at_time: pricesAtTime,
+        // Legacy singular fields kept for back-compat with old read paths.
+        service_id: normalizedServiceIds[0],
         service_name: serviceName,
         client_id: client.id,
         client_name: client.name || clientName,
@@ -276,7 +300,7 @@ export async function POST(request: NextRequest) {
         recurrence: recurrenceRule,
         recurrence_group_id: recurrenceGroupId,
         reminder_sent: false,
-        price_at_time: typeof service.price === 'number' ? service.price : null,
+        price_at_time: totalPriceAtTime > 0 ? totalPriceAtTime : null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
