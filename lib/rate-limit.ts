@@ -32,9 +32,13 @@ export async function checkUpdateRateLimit(userId: number | string): Promise<Nex
     return null;
   }
   if (existing.count >= UPDATE_LIMIT) {
+    const retryAfterSec = Math.max(1, Math.ceil((existing.resetAt - now) / 1000));
     return NextResponse.json(
-      { error: 'Too many requests. Please try again in a moment.' },
-      { status: 429 }
+      {
+        error: `Prea multe modificari. Reincearca in ${retryAfterSec} secunde.`,
+        retryAfterSeconds: retryAfterSec,
+      },
+      { status: 429, headers: { 'Retry-After': String(retryAfterSec) } }
     );
   }
   existing.count += 1;
@@ -60,9 +64,13 @@ export async function checkWriteRateLimit(userId: number | string): Promise<Next
     return null;
   }
   if (existing.count >= WRITE_LIMIT) {
+    const retryAfterSec = Math.max(1, Math.ceil((existing.resetAt - now) / 1000));
     return NextResponse.json(
-      { error: 'Too many requests. Please try again in a moment.' },
-      { status: 429 }
+      {
+        error: `Prea multe cereri. Reincearca in ${retryAfterSec} secunde.`,
+        retryAfterSeconds: retryAfterSec,
+      },
+      { status: 429, headers: { 'Retry-After': String(retryAfterSec) } }
     );
   }
   existing.count += 1;

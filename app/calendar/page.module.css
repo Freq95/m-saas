@@ -121,51 +121,6 @@
   color: color-mix(in srgb, var(--color-text-soft) 78%, white);
 }
 
-.densityToolbarWrap {
-  position: relative;
-  flex: 0 0 auto;
-}
-
-.densityToolbarButton {
-  height: 36px;
-  min-height: unset;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.42rem;
-  padding: 0 0.58rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-muted);
-  color: var(--color-text);
-  font-size: 0.78rem;
-  font-weight: 680;
-  cursor: pointer;
-}
-
-.densityToolbarButton span:last-child {
-  color: var(--color-text-soft);
-  font-size: 0.7rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.densityToolbarButton:hover {
-  background: var(--color-surface-strong);
-  border-color: var(--color-border-strong);
-}
-
-.densityToolbarPopover {
-  position: absolute;
-  top: calc(100% + 0.5rem);
-  right: 0;
-  z-index: 95;
-  width: min(320px, calc(100vw - 2rem));
-}
-
-.densityToolbarPopover .desktopDensityControl {
-  box-shadow: var(--shadow-md);
-  background: var(--color-surface);
-}
-
 .dateDropdown {
   position: absolute;
   top: calc(100% + 0.5rem);
@@ -219,23 +174,41 @@
 }
 
 .dateDropdownControls {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
+  display: flex;
+  flex-direction: column;
   gap: 0.55rem;
+}
+
+.desktopControlRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
 }
 
 .desktopRangeSelector {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 0.25rem;
   padding: 0.2rem;
   border: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
   border-radius: var(--radius-md);
   background: var(--color-surface-muted);
+  min-width: 0;
+}
+
+.desktopViewSelector {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  flex: 0 0 9rem;
+}
+
+.desktopDaySelector {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  flex: 1 1 15rem;
 }
 
 .desktopSlotSelector {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  flex: 0 0 11.5rem;
 }
 
 .desktopRangeOption {
@@ -264,7 +237,6 @@
 }
 
 .desktopWorkingHours {
-  grid-column: 1 / -1;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem;
@@ -645,8 +617,15 @@
     min-width: 0;
   }
 
-  .dateDropdownControls {
-    grid-template-columns: 1fr;
+  .desktopControlRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .desktopViewSelector,
+  .desktopDaySelector,
+  .desktopSlotSelector {
+    flex-basis: auto;
   }
 
   .dateDropdownCalendar {
@@ -1042,17 +1021,16 @@
 .appointmentHeader {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.3rem;
   margin-bottom: 0.15rem;
 }
 
 .appointmentTitle {
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-weight: 500;
-  font-size: 0.7rem;
+  display: block;
+  font-weight: 650;
+  font-size: 0.64rem;
+  line-height: 1.12;
   flex: 1;
   min-width: 0;
 }
@@ -1064,24 +1042,66 @@
 }
 
 .appointmentTime {
-  flex-shrink: 0;
-  font-size: 0.65rem;
-  font-weight: 600;
+  font-size: 0.62rem;
+  font-weight: 650;
 }
 
 .appointmentService {
   font-size: 0.64rem;
-  opacity: 0.8;
+  font-weight: 500;
+  line-height: 1.12;
+  opacity: 0.86;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* Multi-service count badge in the appointment card. Kept compact and
- * lower-opacity so it doesn't crowd the client name. Shown only when the
- * appointment has 2+ services. */
-.appointmentServiceCount {
-  flex-shrink: 0;
-  font-size: 0.62rem;
+.appointmentServiceInline {
+  display: block;
+  margin-top: 0.12rem;
+  font-size: 0.58rem;
   font-weight: 500;
-  opacity: 0.78;
+  line-height: 1.05;
+  opacity: 0.86;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appointmentServiceLine {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appointmentPillService {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  opacity: 0.86;
+}
+
+.appointmentPillName {
+  display: block;
+  flex: 0 1 auto;
+  max-width: 65%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.appointmentPillName:only-child {
+  flex: 1 1 auto;
+  max-width: 100%;
+}
+
+.appointmentPillService::before {
+  content: "- ";
 }
 
 /* ── Multi-service chips inside AppointmentModal / ServiceSection ──────── */
@@ -1155,6 +1175,52 @@
   opacity: 0.4;
 }
 
+.servicePickerSurface {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  min-height: 46px;
+  padding: 0.34rem 0.42rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.servicePickerSurface:focus-within {
+  border-color: var(--color-accent);
+  background: var(--color-surface-strong);
+  box-shadow: var(--focus-ring);
+}
+
+.servicePickerSurfaceDisabled {
+  opacity: 0.72;
+}
+
+.servicePickerSurface .serviceChips {
+  display: contents;
+  margin: 0;
+}
+
+.serviceInlinePicker {
+  flex: 1 1 10rem;
+  min-width: 9rem;
+  min-height: 32px;
+  padding: 0.2rem 0.25rem !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--color-text);
+}
+
+.serviceInlinePicker:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
 .serviceAddPicker {
   margin-top: 0.55rem;
   /* native <select> styling reuses whatever the modalField pattern uses. */
@@ -1169,8 +1235,7 @@
 }
 
 .appointmentNameFirst {
-  display: flex;
-  align-items: center;
+  display: block;
 }
 
 .appointmentNameFirst .appointmentHeader {
@@ -1182,9 +1247,9 @@
 .appointmentNameFirst .appointmentTitle {
   display: block;
   min-width: 0;
-  font-size: 0.68rem;
-  font-weight: 720;
-  line-height: 1.15;
+  font-size: 0.64rem;
+  font-weight: 650;
+  line-height: 1.12;
 }
 
 .appointmentNameFirst .appointmentName {
@@ -1194,6 +1259,67 @@
 
 .appointmentNameFirst .statusDot {
   display: none;
+}
+
+.appointmentPill {
+  display: block;
+}
+
+.appointmentPill .appointmentHeader {
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  margin-bottom: 0;
+  gap: 0.22rem;
+}
+
+.appointmentPill .appointmentTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.16rem;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.6rem;
+  font-weight: 650;
+  line-height: 1;
+}
+
+.appointmentPill .appointmentPillService {
+  flex: 1 1 auto;
+  font-size: 0.58rem;
+  line-height: 1;
+}
+
+.appointmentWebShort .appointmentHeader {
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  margin-bottom: 0;
+  gap: 0.18rem;
+}
+
+.appointmentWebShort .appointmentTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.16rem;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.6rem;
+  font-weight: 650;
+  line-height: 1;
+}
+
+.appointmentWebShort .appointmentPillService {
+  flex: 1 1 auto;
+  font-size: 0.58rem;
+  font-weight: 500;
+  line-height: 1;
 }
 
 .appointmentNarrow {
@@ -1312,6 +1438,23 @@
 .availabilityBlockCompact {
   padding-top: 0.16rem;
   padding-bottom: 0.16rem;
+}
+
+/* No-show (Absent) variant — overlays red diagonal stripes on top of the
+   appointment's normal background, so the patient name and service stay
+   readable but the slot reads as "patient didn't show up". Mirrors the
+   .availabilityBlock stripe pattern with the danger color tokens. */
+.appointmentNoShow {
+  border-color: color-mix(in srgb, var(--color-danger-text) 65%, transparent) !important;
+  border-left-color: var(--color-danger-text) !important;
+  background-image:
+    repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-danger-text) 30%, transparent) 0,
+      color-mix(in srgb, var(--color-danger-text) 30%, transparent) 6px,
+      transparent 6px,
+      transparent 13px
+    );
 }
 
 .mobileAvailabilityBlockCard {
@@ -1608,6 +1751,11 @@
   transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
 
+.modalIconButton svg {
+  display: block;
+  flex: 0 0 auto;
+}
+
 .modalIconButton:hover {
   background: var(--color-surface-strong);
   border-color: var(--color-border-strong);
@@ -1616,14 +1764,14 @@
 }
 
 .modalIconButtonDanger {
-  color: color-mix(in srgb, var(--color-danger) 76%, white);
+  color: var(--color-danger);
   border-color: color-mix(in srgb, var(--color-danger) 36%, transparent);
 }
 
 .modalIconButtonDanger:hover {
   background: color-mix(in srgb, var(--color-danger) 14%, transparent);
   border-color: color-mix(in srgb, var(--color-danger) 55%, transparent);
-  color: color-mix(in srgb, var(--color-danger) 86%, white);
+  color: var(--color-danger);
 }
 
 .modalContent {
@@ -1714,6 +1862,10 @@
   gap: 0.75rem;
 }
 
+.timeFieldRow {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.9fr) minmax(0, 0.9fr);
+}
+
 .modalField label {
   font-size: 0.78rem;
   font-weight: 400;
@@ -1727,11 +1879,165 @@
   gap: 0.75rem;
 }
 
+.recurringToggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  cursor: pointer;
+}
+
+.recurringToggleText {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.recurringToggleTitle {
+  color: var(--color-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.recurringToggleHint {
+  color: var(--color-text-soft);
+  font-size: 0.76rem;
+  font-weight: 400;
+}
+
+.recurringToggleSwitch {
+  position: relative;
+  display: inline-flex;
+  width: 46px;
+  height: 28px;
+  flex: 0 0 auto;
+}
+
+.recurringToggleSwitch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.recurringToggleSwitch input:disabled {
+  cursor: not-allowed;
+}
+
+.recurringToggleTrack {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-text-soft) 30%, var(--color-border));
+  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.recurringToggleThumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--color-text) 22%, transparent);
+  transition: transform var(--transition-fast);
+}
+
+.recurringToggleSwitch input:checked + .recurringToggleTrack {
+  background: var(--color-accent);
+}
+
+.recurringToggleSwitch input:checked + .recurringToggleTrack .recurringToggleThumb {
+  transform: translateX(18px);
+}
+
+.recurringToggleSwitch input:focus-visible + .recurringToggleTrack {
+  box-shadow: var(--focus-ring);
+}
+
+.recurrenceStepper {
+  width: fit-content;
+  max-width: 100%;
+  align-self: flex-start;
+}
+
+.recurrenceStepper button {
+  flex: 0 0 44px;
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  padding: 0 !important;
+}
+
+.recurrenceStepper input {
+  flex: 0 0 3.5rem !important;
+  width: 3.5rem !important;
+  min-height: 44px;
+  padding: 0 0.35rem !important;
+  border-top: 0 !important;
+  border-bottom: 0 !important;
+  border-left: 1px solid var(--color-border) !important;
+  border-right: 1px solid var(--color-border) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  text-align: center;
+}
+
 .fieldHint {
   margin: 0;
   font-size: 0.75rem;
   color: var(--color-text-soft);
   line-height: 1.45;
+}
+
+.requiredMark {
+  color: var(--color-danger, #ef4444);
+  font-weight: 700;
+}
+
+.fieldErrorText {
+  margin: 0.12rem 0 0;
+  font-size: 0.76rem;
+  line-height: 1.35;
+  color: var(--color-danger, #ef4444);
+  font-weight: 600;
+}
+
+.fieldControlError {
+  border-color: var(--color-danger, #ef4444) !important;
+  background:
+    linear-gradient(
+      0deg,
+      color-mix(in srgb, var(--color-danger, #ef4444) 7%, transparent),
+      color-mix(in srgb, var(--color-danger, #ef4444) 7%, transparent)
+    ),
+    var(--color-surface-muted) !important;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-danger, #ef4444) 38%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--color-danger, #ef4444) 12%, transparent) !important;
+}
+
+.fieldControlError:focus,
+.fieldControlError:focus-within {
+  border-color: var(--color-danger, #ef4444) !important;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-danger, #ef4444) 52%, transparent),
+    0 0 0 4px color-mix(in srgb, var(--color-danger, #ef4444) 18%, transparent) !important;
 }
 
 .fieldHintLink {
@@ -1770,7 +2076,56 @@
 ───────────────────────────────────────────────────────── */
 .clientAutocomplete {
   position: relative;
+  width: min(100%, 13.5rem);
 }
+
+.clientAutocomplete input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.clientNameInputLinked {
+  padding-right: 2.5rem !important;
+  border-color: color-mix(in srgb, var(--color-success, #16a34a) 52%, var(--color-border)) !important;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--color-success, #16a34a) 12%, transparent),
+      var(--color-surface-muted) 42%
+    ) !important;
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--color-success, #16a34a) 82%, white 18%);
+}
+
+.clientNameClearButton {
+  position: absolute;
+  top: 50%;
+  right: 0.42rem;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-soft);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.clientNameClearButton:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-danger) 14%, transparent);
+  color: var(--color-danger);
+}
+
+.clientNameClearButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .clientSuggestionsDropdown {
   position: absolute;
   top: calc(100% + 4px);
@@ -3165,9 +3520,27 @@
   box-shadow: 0 3px 8px color-mix(in srgb, var(--chip-color, transparent) 25%, transparent);
 }
 .categoryChipActive {
-  background: color-mix(in srgb, var(--chip-color, var(--color-accent)) 22%, var(--color-surface)) !important;
+  background: color-mix(in srgb, var(--chip-color, var(--color-accent)) 30%, var(--color-surface)) !important;
   border-color: var(--chip-color, var(--color-accent)) !important;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--chip-color, var(--color-accent)) 30%, transparent);
+  color: color-mix(in srgb, var(--chip-color, var(--color-accent)) 78%, var(--color-text));
+  font-weight: 760;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--chip-color, var(--color-accent)) 34%, transparent),
+    inset 0 0 0 1px color-mix(in srgb, var(--chip-color, var(--color-accent)) 36%, transparent);
+}
+
+.categoryChipActive::after {
+  content: "\2713";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: var(--chip-color, var(--color-accent));
+  color: var(--color-surface);
+  font-size: 0.68rem;
+  font-weight: 800;
 }
 
 .categoryDot {
@@ -3199,7 +3572,8 @@
   .editButton, .deleteButton { width: 100%; justify-content: center; }
   .previewTitle { font-size: 1.1rem; }
   .statusSegmentButton { padding: 0.55rem 0.5rem; font-size: 0.8rem; }
-  .modalFieldRow { grid-template-columns: 1fr; gap: 1rem; }
+  .modalFieldRow,
+  .timeFieldRow { grid-template-columns: 1fr; gap: 1rem; }
   .modalSectionHeader, .shareCardHeader { flex-direction: column; }
   .permissionGrid { grid-template-columns: 1fr; }
   .shareCardActions { flex-direction: column; }
@@ -3718,6 +4092,10 @@
     box-shadow: none;
   }
 
+  .mobileViewPanel .appointmentPill {
+    padding: 0.12rem 0.24rem !important;
+  }
+
   .mobileViewPanel .appointmentHeader {
     margin-bottom: 0;
     gap: 0;
@@ -3725,24 +4103,63 @@
 
   .mobileViewPanel .appointmentTitle {
     display: block;
-    font-size: 0.62rem;
-    line-height: 1.15;
+    font-size: 0.58rem;
+    font-weight: 650;
+    line-height: 1.1;
   }
 
   .mobileViewPanel .appointmentNameFirst .appointmentTitle {
-    font-size: 0.64rem;
-    font-weight: 720;
-    line-height: 1.12;
+    font-size: 0.58rem;
+    font-weight: 650;
+    line-height: 1.1;
   }
 
   .mobileViewPanel .appointmentName {
     display: block;
   }
 
+  .mobileViewPanel .appointmentPill .appointmentTitle {
+    display: flex;
+    align-items: center;
+    gap: 0.14rem;
+    font-size: 0.56rem;
+    line-height: 1;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .mobileViewPanel .appointmentPill .appointmentPillService {
+    font-size: 0.5rem;
+    font-weight: 500;
+    line-height: 1;
+    opacity: 0.86;
+  }
+
   .mobileViewPanel .appointmentTime,
-  .mobileViewPanel .appointmentService,
   .mobileViewPanel .statusDot {
     display: none;
+  }
+
+  .mobileViewPanel .appointmentServiceInline {
+    margin-top: 0.08rem;
+    font-size: 0.5rem;
+    font-weight: 500;
+    line-height: 1.05;
+  }
+
+  .mobileViewPanel .appointmentService {
+    display: block;
+    font-size: 0.5rem;
+    font-weight: 500;
+    line-height: 1.05;
+    white-space: normal;
+  }
+
+  .mobileViewPanel .appointmentServiceLine {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   /* ── FAB ─────────────────────────────────────────────────────

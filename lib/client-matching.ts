@@ -57,6 +57,88 @@ function normalizeNameForCompare(name: string): string {
 }
 
 /**
+ * Read-only duplicate lookup using the same matching rules as findOrCreateClient.
+ * This lets UI flows ask "does this patient already exist?" without accidentally
+ * creating or updating a client before the user confirms what they want.
+ */
+export async function findMatchingClient(
+  userId: number,
+  tenantId: ObjectId,
+  name: string,
+  email?: string,
+  phone?: string
+): Promise<Client | null> {
+  const db = await getMongoDbOrThrow();
+  const normalizedEmail = email?.toLowerCase().trim() || null;
+  const normalizedPhone = normalizePhone(phone);
+  const normalizedName = name.trim();
+  const normalizedNameKey = normalizeNameForCompare(name);
+
+  if (!normalizedNameKey) return null;
+
+  const pickMatch = (matches: any[]): Client | null => {
+    if (matches.length === 1) {
+      const match = matches[0];
+      const matchEmail = typeof match.email === 'string' ? match.email.trim().toLowerCase() : null;
+      const emailConflict = Boolean(normalizedEmail && matchEmail && matchEmail !== normalizedEmail);
+      return emailConflict ? null : normalizeClientDoc(match);
+    }
+
+    if (matches.length > 1) {
+      if (normalizedEmail) {
+        const emailMatch = matches.find((client: any) =>
+          typeof client.email === 'string' &&
+          client.email.trim().toLowerCase() === normalizedEmail
+        );
+        if (emailMatch) return normalizeClientDoc(emailMatch);
+      }
+
+      if (normalizedPhone) {
+        const phoneMatch = matches.find((client: any) =>
+          typeof client.phone === 'string' &&
+          normalizePhone(client.phone) === normalizedPhone
+        );
+        if (phoneMatch) return normalizeClientDoc(phoneMatch);
+      }
+    }
+
+    return null;
+  };
+
+  const nameMatches = await db.collection('clients').find(
+    {
+      tenant_id: tenantId,
+      user_id: userId,
+      deleted_at: { $exists: false },
+      name: { $type: 'string' },
+      $expr: {
+        $eq: [
+          { $trim: { input: { $toLower: '$name' } } },
+          normalizedNameKey,
+        ],
+      },
+    },
+  ).sort({ last_activity_date: -1, updated_at: -1, created_at: -1 }).toArray();
+
+  const directMatch = pickMatch(nameMatches);
+  if (directMatch) return directMatch;
+  if (nameMatches.length > 0) return null;
+
+  // Defensive fallback for Mongo variants where $expr + $trim can miss matches.
+  const escaped = normalizedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regexMatches = await db.collection('clients').find(
+    {
+      tenant_id: tenantId,
+      user_id: userId,
+      deleted_at: { $exists: false },
+      name: { $regex: `^\\s*${escaped}\\s*$`, $options: 'i' },
+    },
+  ).sort({ last_activity_date: -1, updated_at: -1, created_at: -1 }).toArray();
+
+  return pickMatch(regexMatches);
+}
+
+/**
  * Find or create a client based on contact information
  * Matching strategy:
  * 1. Name match (case-insensitive, trimmed)
@@ -76,97 +158,10 @@ export async function findOrCreateClient(
   const normalizedEmail = email?.toLowerCase().trim() || null;
   const normalizedPhone = normalizePhone(phone);
   const normalizedName = name.trim();
-  const normalizedNameKey = normalizeNameForCompare(name);
 
-  let existingClient: Client | null = null;
-
-  if (!forceNew && normalizedNameKey) {
-    const nameMatches = await db.collection('clients').find(
-      {
-        tenant_id: tenantId,
-        user_id: userId,
-        deleted_at: { $exists: false },
-        name: { $type: 'string' },
-        $expr: {
-          $eq: [
-            { $trim: { input: { $toLower: '$name' } } },
-            normalizedNameKey,
-          ],
-        },
-      },
-    ).sort({ last_activity_date: -1, updated_at: -1, created_at: -1 }).toArray();
-
-    if (nameMatches.length === 1) {
-      const match = nameMatches[0];
-      const matchEmail = typeof match.email === 'string' ? match.email.trim().toLowerCase() : null;
-      const emailConflict = Boolean(normalizedEmail && matchEmail && matchEmail !== normalizedEmail);
-      if (!emailConflict) {
-        existingClient = normalizeClientDoc(match);
-      }
-    } else if (nameMatches.length > 1) {
-      // Disambiguate same-name clients by email/phone when possible.
-      if (normalizedEmail) {
-        const emailMatch = nameMatches.find((client: any) =>
-          typeof client.email === 'string' &&
-          client.email.trim().toLowerCase() === normalizedEmail
-        );
-        if (emailMatch) {
-          existingClient = normalizeClientDoc(emailMatch);
-        }
-      }
-
-      if (!existingClient && normalizedPhone) {
-        const phoneMatch = nameMatches.find((client: any) =>
-          typeof client.phone === 'string' &&
-          normalizePhone(client.phone) === normalizedPhone
-        );
-        if (phoneMatch) {
-          existingClient = normalizeClientDoc(phoneMatch);
-        }
-      }
-      // If still ambiguous, we intentionally create a new client below.
-    } else {
-      // Defensive fallback for Mongo variants where $expr + $trim can miss matches.
-      const escaped = normalizedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const regexMatches = await db.collection('clients').find(
-        {
-          tenant_id: tenantId,
-          user_id: userId,
-          deleted_at: { $exists: false },
-          name: { $regex: `^\\s*${escaped}\\s*$`, $options: 'i' },
-        },
-      ).sort({ last_activity_date: -1, updated_at: -1, created_at: -1 }).toArray();
-
-      if (regexMatches.length === 1) {
-        const match = regexMatches[0];
-        const matchEmail = typeof match.email === 'string' ? match.email.trim().toLowerCase() : null;
-        const emailConflict = Boolean(normalizedEmail && matchEmail && matchEmail !== normalizedEmail);
-        if (!emailConflict) {
-          existingClient = normalizeClientDoc(match);
-        }
-      } else if (regexMatches.length > 1) {
-        if (normalizedEmail) {
-          const emailMatch = regexMatches.find((client: any) =>
-            typeof client.email === 'string' &&
-            client.email.trim().toLowerCase() === normalizedEmail
-          );
-          if (emailMatch) {
-            existingClient = normalizeClientDoc(emailMatch);
-          }
-        }
-
-        if (!existingClient && normalizedPhone) {
-          const phoneMatch = regexMatches.find((client: any) =>
-            typeof client.phone === 'string' &&
-            normalizePhone(client.phone) === normalizedPhone
-          );
-          if (phoneMatch) {
-            existingClient = normalizeClientDoc(phoneMatch);
-          }
-        }
-      }
-    }
-  }
+  let existingClient: Client | null = forceNew
+    ? null
+    : await findMatchingClient(userId, tenantId, name, email, phone);
 
   if (existingClient) {
     const updates: Record<string, unknown> = {};
@@ -284,6 +279,16 @@ export async function updateClientStats(clientId: number, tenantId: ObjectId): P
     .filter(Boolean)
     .sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime())[0] || null;
 
+  // Earliest future appointment that's still on the books. Used by the
+  // dashboard "Pacienti Inactivi" filter so a patient with upcoming
+  // bookings doesn't show up as inactive even if their last completed
+  // visit was 30+ days ago.
+  const nowIso = new Date().toISOString();
+  const nextScheduledDate = appointments
+    .filter((apt: any) => apt.status === 'scheduled' && typeof apt.start_time === 'string' && apt.start_time >= nowIso)
+    .map((apt: any) => apt.start_time as string)
+    .sort((a: string, b: string) => new Date(a).getTime() - new Date(b).getTime())[0] || null;
+
   const lastConversationDate = conversations
     .map((conv: any) => conv.updated_at || conv.created_at)
     .filter(Boolean)
@@ -303,6 +308,7 @@ export async function updateClientStats(clientId: number, tenantId: ObjectId): P
         last_appointment_date: lastAppointmentDate,
         last_conversation_date: lastConversationDate,
         last_activity_date: lastActivityDate,
+        next_scheduled_date: nextScheduledDate,
         updated_at: new Date().toISOString(),
       },
     }

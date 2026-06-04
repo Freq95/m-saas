@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import ClientCreateModal from '@/components/ClientCreateModal';
 
-export default function NewClientPageClient() {
+export default function NewClientPageClient({ dentistUserId }: { dentistUserId?: number | null }) {
   const router = useRouter();
 
   return (
@@ -11,6 +11,7 @@ export default function NewClientPageClient() {
       isOpen
       onClose={() => router.push('/clients')}
       onCreated={(client) => router.push(`/clients/${client.id}`)}
+      dentistUserId={dentistUserId ?? undefined}
     />
   );
 }

@@ -48,6 +48,7 @@ import { useDragAndDrop } from './hooks/useDragAndDrop';
 import {
   CalendarDatePickerDropdown,
   WeekView,
+  MonthView,
   DayPanel,
   AppointmentModal,
   DeleteConfirmModal,
@@ -71,7 +72,7 @@ interface CalendarPageClientProps {
   initialServices: Service[];
   initialCalendarList: CalendarListResponse;
   initialAvailabilityBlocks: AvailabilityBlock[];
-  initialAvailabilityBlocksCacheKey: string;
+  initialAvailabilityBlocksCacheKey: string | null;
   initialSessionUserId: number;
   initialSessionDbUserId: string;
   initialDate: string;
@@ -154,6 +155,9 @@ const MOBILE_SLOT_INTERVAL_STORAGE_KEY = 'calendar:mobile-slot-interval';
 const MOBILE_WORKING_HOURS_STORAGE_KEY = 'calendar:mobile-working-hours';
 const MOBILE_VIEW_STORAGE_KEY = 'calendar:mobile-view';
 const CALENDAR_COLUMN_MODE_STORAGE_KEY = 'calendar:column-mode';
+const DESKTOP_VIEW_STORAGE_KEY = 'calendar:desktop-view';
+
+type DesktopView = 'week' | 'month';
 const MOBILE_RANGE_OPTIONS: Array<{ value: MobileRangeMode; label: string }> = [
   { value: '3days', label: '3 zile' },
   { value: '5days', label: '5 zile' },
@@ -214,6 +218,35 @@ function readSavedDensity(
   if (!raw) return null;
   const parsed = Number.parseFloat(raw);
   return Number.isFinite(parsed) ? clampDensity(parsed, bounds) : null;
+}
+
+/**
+ * Returns a soft-warning string for appointments scheduled outside the
+ * configured working hours or on Sunday. The save still proceeds — this is
+ * purely informational so the user can correct an accidental off-hours
+ * booking without the system blocking them (some clinics work nights /
+ * Sundays intentionally, so a hard reject would be wrong).
+ *
+ * Returns null when the booking is within normal hours and not on Sunday.
+ */
+function getOffHoursWarning(
+  startIso: string | undefined,
+  endIso: string | undefined,
+  workingHours: { startHour: number; endHour: number }
+): string | null {
+  if (!startIso || !endIso) return null;
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  const isSunday = start.getDay() === 0;
+  const startsBefore = start.getHours() < workingHours.startHour;
+  // endHour is exclusive: an end_time exactly at endHour:00 is fine.
+  const endsAfter =
+    end.getHours() > workingHours.endHour ||
+    (end.getHours() === workingHours.endHour && end.getMinutes() > 0);
+  if (!isSunday && !startsBefore && !endsAfter) return null;
+  if (isSunday) return 'Programarea este in zi de duminica.';
+  return 'Programarea este in afara orelor de lucru.';
 }
 
 function computeFitHourHeight(
@@ -285,6 +318,7 @@ export default function CalendarPageClient({
 }: CalendarPageClientProps) {
   const toast = useToast();
   const showErrorToast = toast.error;
+  const showInfoToast = toast.info;
   const isMobile = useIsMobile();
   const searchParams = useSearchParams();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -332,6 +366,19 @@ export default function CalendarPageClient({
   const allCalendarIdsKey = allCalendarIds.join(',');
   const [visibleCalendarIds, setVisibleCalendarIds] = useState<number[]>([]);
   const [visibleCalendarIdsInitialized, setVisibleCalendarIdsInitialized] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('inbox') !== 'blocked') return;
+    showInfoToast('Inbox-ul este disponibil doar pentru medici.');
+    // Strip the marker so a refresh / back-button doesn't re-fire the toast.
+    // We touch history directly (rather than router.replace) to keep this a
+    // one-line side effect without pulling in the navigation hook.
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('inbox');
+      window.history.replaceState(null, '', url.pathname + (url.search ? `?${url.searchParams.toString()}` : ''));
+    }
+  }, [searchParams, showInfoToast]);
 
   useEffect(() => {
     if (calendarsLoading) return;
@@ -460,6 +507,17 @@ export default function CalendarPageClient({
   }, [mobileRangeMode, mobileRangeStartDate, state.currentDate, weekDays]);
   const mobileHours = visibleHours;
   const mobileWeekDays = visibleWeekDays;
+
+  // Month grid days for the desktop month view. Covers the calendar weeks
+  // that intersect the current month (so the grid is always a clean 5- or
+  // 6-row rectangle starting Monday).
+  const monthDays = useMemo(() => {
+    const monthStart = startOfMonth(state.currentDate);
+    const monthEnd = endOfMonth(state.currentDate);
+    const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+    const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+    return eachDayOfInterval({ start: gridStart, end: gridEnd });
+  }, [state.currentDate]);
   const fitDesktopHourHeight = useMemo(
     () => computeFitHourHeight(
       availableHeight,
@@ -496,13 +554,31 @@ export default function CalendarPageClient({
   };
   const fitDesktopDensity = () => setDesktopHourHeight(fitDesktopHourHeight);
   const resetDesktopDensity = () => setDesktopHourHeight(DESKTOP_HOUR_HEIGHT_BOUNDS.fallback);
+
+  // Desktop view mode (week | month). Persisted so the user keeps their
+  // last choice across sessions; mobile keeps its own week/day toggle.
+  // Declared up here because `appointmentFetchRange` needs to widen its
+  // window to the full month grid when month view is active.
+  const [desktopView, setDesktopView] = useState<DesktopView>(() => {
+    if (typeof window === 'undefined') return 'week';
+    const saved = window.localStorage.getItem(DESKTOP_VIEW_STORAGE_KEY);
+    return saved === 'month' ? 'month' : 'week';
+  });
+
   const appointmentFetchRange = useMemo(() => {
+    // Month view widens the fetch window to the full month grid so the
+    // calendar shows appointments for every visible day. Week view stays
+    // tight to the visible week to keep the DB query small.
+    if (desktopView === 'month' && !isMobile) {
+      if (monthDays.length === 0) return null;
+      return { start: monthDays[0], end: monthDays[monthDays.length - 1] };
+    }
     if (visibleWeekDays.length === 0) return null;
     return {
       start: visibleWeekDays[0],
       end: visibleWeekDays[visibleWeekDays.length - 1],
     };
-  }, [visibleWeekDays]);
+  }, [desktopView, isMobile, monthDays, visibleWeekDays]);
 
   const isTodayInMobileRange = useMemo(() => {
     if (!isMobile || mobileWeekDays.length === 0) return false;
@@ -560,6 +636,7 @@ export default function CalendarPageClient({
       calendarIds: appointmentsFetchCalendarIds,
       search: debouncedSearchQuery,
       initialAppointments,
+      initialAppointmentsAreFresh: !(desktopView === 'month' && !isMobile),
     });
   const {
     blocks: availabilityBlocks,
@@ -574,6 +651,10 @@ export default function CalendarPageClient({
   });
   const decoratedAppointments = useMemo(
     () => appointments
+      // Cancelled appointments are hidden from the calendar entirely. The
+      // dentist who cancelled them can still find them via search/history;
+      // they just don't clutter the time grid.
+      .filter((appointment) => appointment.status !== 'cancelled')
       .filter((appointment) => {
         if (!visibleCalendarIdsInitialized) return true;
         return typeof appointment.calendar_id === 'number' && visibleCalendarIdSet.has(appointment.calendar_id);
@@ -607,7 +688,6 @@ export default function CalendarPageClient({
     suggestions: [],
   });
   const [showDateDropdown, setShowDateDropdown] = useState(false);
-  const [showDensityDropdown, setShowDensityDropdown] = useState(false);
   const [pickerDate, setPickerDate] = useState<Date>(state.currentDate);
   const dateDropdownRef = useRef<HTMLDivElement>(null);
   const justDroppedRef = useRef(false);
@@ -718,6 +798,11 @@ export default function CalendarPageClient({
   useEffect(() => {
     window.localStorage.setItem(MOBILE_VIEW_STORAGE_KEY, mobileView);
   }, [mobileView]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(DESKTOP_VIEW_STORAGE_KEY, desktopView);
+  }, [desktopView]);
 
   useEffect(() => {
     window.localStorage.setItem(CALENDAR_COLUMN_MODE_STORAGE_KEY, calendarColumnMode);
@@ -848,10 +933,6 @@ export default function CalendarPageClient({
         setShowDateDropdown(false);
         return;
       }
-      if (showDensityDropdown) {
-        setShowDensityDropdown(false);
-        return;
-      }
       if (showDeleteConfirm) {
         setShowDeleteConfirm(false);
         return;
@@ -863,7 +944,7 @@ export default function CalendarPageClient({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [showConflictModal, showDateDropdown, showDensityDropdown, showDeleteConfirm]);
+  }, [showConflictModal, showDateDropdown, showDeleteConfirm]);
 
   useEffect(() => {
     return () => {
@@ -874,17 +955,16 @@ export default function CalendarPageClient({
   }, []);
 
   useEffect(() => {
-    if (!showDateDropdown && !showDensityDropdown) return;
+    if (!showDateDropdown) return;
     const handleClickOutside = (event: MouseEvent) => {
       if (!dateDropdownRef.current) return;
       if (!dateDropdownRef.current.contains(event.target as Node)) {
         setShowDateDropdown(false);
-        setShowDensityDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showDateDropdown, showDensityDropdown]);
+  }, [showDateDropdown]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -1167,6 +1247,8 @@ export default function CalendarPageClient({
         if ((ok.conflicts?.length || 0) > 0 || (ok.suggestions?.length || 0) > 0) {
           toast.warning(ok.warning || 'Programarea a fost creata, dar intervalul se suprapune.');
         }
+        const offHours = getOffHoursWarning(formData.startTime, formData.endTime, mobileWorkingHours);
+        if (offHours) toast.warning(offHours);
         toast.success('Programarea a fost creata.');
       } else {
         // Re-open the modal so the user can retry without re-entering everything.
@@ -1280,6 +1362,8 @@ export default function CalendarPageClient({
         if (result.warning) {
           toast.warning(result.warning);
         }
+        const offHours = getOffHoursWarning(formData.startTime, formData.endTime, mobileWorkingHours);
+        if (offHours) toast.warning(offHours);
         toast.success('Programarea a fost actualizata.');
       } else if (res.status === 409) {
         let conflicts = result.conflicts || [];
@@ -1521,32 +1605,54 @@ export default function CalendarPageClient({
     <div className={showCalendarControls ? styles.dateDropdownWithControls : undefined}>
       {showCalendarControls && (
         <div className={styles.dateDropdownControls}>
-          <div className={styles.desktopRangeSelector} aria-label="Interval calendar">
-            {MOBILE_RANGE_OPTIONS.map((option) => (
+          <div className={styles.desktopControlRow}>
+            <div className={`${styles.desktopRangeSelector} ${styles.desktopViewSelector}`} aria-label="Mod afisare calendar">
               <button
-                key={option.value}
                 type="button"
-                className={`${styles.desktopRangeOption} ${mobileRangeMode === option.value ? styles.desktopRangeOptionActive : ''}`}
-                onClick={() => handleMobileRangeModeChange(option.value)}
-                aria-pressed={mobileRangeMode === option.value}
+                className={`${styles.desktopRangeOption} ${desktopView === 'week' ? styles.desktopRangeOptionActive : ''}`}
+                onClick={() => setDesktopView('week')}
+                aria-pressed={desktopView === 'week'}
               >
-                {option.label}
+                Saptamana
               </button>
-            ))}
-          </div>
+              <button
+                type="button"
+                className={`${styles.desktopRangeOption} ${desktopView === 'month' ? styles.desktopRangeOptionActive : ''}`}
+                onClick={() => setDesktopView('month')}
+                aria-pressed={desktopView === 'month'}
+              >
+                Luna
+              </button>
+            </div>
 
-          <div className={`${styles.desktopRangeSelector} ${styles.desktopSlotSelector}`} aria-label="Granularitate sloturi">
-            {MOBILE_SLOT_INTERVAL_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className={`${styles.desktopRangeOption} ${mobileSlotInterval === option.value ? styles.desktopRangeOptionActive : ''}`}
-                onClick={() => setMobileSlotInterval(option.value)}
-                aria-pressed={mobileSlotInterval === option.value}
-              >
-                {option.label}
-              </button>
-            ))}
+            <div className={`${styles.desktopRangeSelector} ${styles.desktopDaySelector}`} aria-label="Interval calendar">
+              {MOBILE_RANGE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`${styles.desktopRangeOption} ${mobileRangeMode === option.value ? styles.desktopRangeOptionActive : ''}`}
+                  onClick={() => handleMobileRangeModeChange(option.value)}
+                  aria-pressed={mobileRangeMode === option.value}
+                  disabled={desktopView === 'month'}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            <div className={`${styles.desktopRangeSelector} ${styles.desktopSlotSelector}`} aria-label="Granularitate sloturi">
+              {MOBILE_SLOT_INTERVAL_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`${styles.desktopRangeOption} ${mobileSlotInterval === option.value ? styles.desktopRangeOptionActive : ''}`}
+                  onClick={() => setMobileSlotInterval(option.value)}
+                  aria-pressed={mobileSlotInterval === option.value}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className={styles.desktopWorkingHours} aria-label="Program de lucru dentist">
@@ -1652,63 +1758,11 @@ export default function CalendarPageClient({
         type="button"
         className={styles.rangeButton}
         aria-expanded={showDateDropdown}
-        onClick={() => {
-          setShowDensityDropdown(false);
-          setShowDateDropdown((prev) => !prev);
-        }}
+        onClick={() => setShowDateDropdown((prev) => !prev)}
       >
         <span>{weekRangeLabel}</span>
         <span className={styles.rangeChevron}>{showDateDropdown ? '\u25b2' : '\u25bc'}</span>
       </button>
-
-      <div className={styles.densityToolbarWrap}>
-        <button
-          type="button"
-          className={styles.densityToolbarButton}
-          aria-expanded={showDensityDropdown}
-          onClick={() => {
-            setShowDateDropdown(false);
-            setShowDensityDropdown((prev) => !prev);
-          }}
-        >
-          <span>Densitate</span>
-          <span>{effectiveDesktopHourHeight}px</span>
-        </button>
-        {showDensityDropdown && (
-          <div className={styles.densityToolbarPopover}>
-            <div className={styles.desktopDensityControl} aria-label="Densitate calendar">
-              <div className={styles.desktopDensityHeader}>
-                <span>Densitate</span>
-                <span>{effectiveDesktopHourHeight}px / ora</span>
-              </div>
-              <input
-                className={styles.desktopDensitySlider}
-                type="range"
-                min={DESKTOP_HOUR_HEIGHT_BOUNDS.min}
-                max={DESKTOP_HOUR_HEIGHT_BOUNDS.max}
-                step={1}
-                value={effectiveDesktopHourHeight}
-                onChange={(event) => setDesktopHourHeight(Number(event.target.value))}
-                aria-label="Ajusteaza densitatea calendarului"
-              />
-              <div className={styles.desktopDensityActions}>
-                <button type="button" onClick={() => setDesktopHourHeight(DESKTOP_HOUR_HEIGHT_BOUNDS.min)}>
-                  Compact
-                </button>
-                <button type="button" onClick={fitDesktopDensity}>
-                  Incadreaza
-                </button>
-                <button type="button" onClick={resetDesktopDensity}>
-                  Normal
-                </button>
-                <button type="button" onClick={() => setDesktopHourHeight(DESKTOP_HOUR_HEIGHT_BOUNDS.max)}>
-                  Extins
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
 
       {showDateDropdown && renderDateDropdown({ showCalendarControls: true })}
     </div>
@@ -1717,30 +1771,49 @@ export default function CalendarPageClient({
   // ── Render ─────────────────────────────────────────────────────────────────
   const calendarWithPanel = (
     <div className={styles.calendarWithPanel}>
-      <WeekView
-        weekDays={visibleWeekDays}
-        hours={visibleHours}
-        appointments={decoratedAppointments}
-        availabilityBlocks={decoratedAvailabilityBlocks}
-        viewerUserId={sessionUserId ?? null}
-        selectedDay={selectedDay}
-        calendarColumns={weekCalendarColumns}
-        onSlotClick={handleSlotClick}
-        onDayHeaderClick={handleDayHeaderClick}
-        onAppointmentClick={handleAppointmentClick}
-        onAvailabilityBlockClick={handleAvailabilityBlockClick}
-        enableDragDrop
-        hoveredAppointmentId={hoveredAppointmentId}
-        draggedAppointment={draggedAppointment}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-        onDrop={handleDropStable}
-        slotIntervalMinutes={mobileSlotInterval}
-        hourHeightPx={effectiveDesktopHourHeight}
-        minHourHeightPx={DESKTOP_HOUR_HEIGHT_BOUNDS.min}
-        maxHourHeightPx={DESKTOP_HOUR_HEIGHT_BOUNDS.max}
-        onHourHeightChange={setDesktopHourHeight}
-      />
+      {desktopView === 'month' ? (
+        <MonthView
+          monthDays={monthDays}
+          currentDate={state.currentDate}
+          appointments={decoratedAppointments}
+          availabilityBlocks={decoratedAvailabilityBlocks}
+          selectedDay={selectedDay}
+          viewerUserId={sessionUserId ?? null}
+          onDayClick={(day) => {
+            // Picking a day from the month grid drops the user into that
+            // day's week view — same convention as Google / Apple Calendar.
+            handleNavigateStable(day);
+            setDesktopView('week');
+          }}
+          onAppointmentClick={handleAppointmentClick}
+          onAvailabilityBlockClick={handleAvailabilityBlockClick}
+        />
+      ) : (
+        <WeekView
+          weekDays={visibleWeekDays}
+          hours={visibleHours}
+          appointments={decoratedAppointments}
+          availabilityBlocks={decoratedAvailabilityBlocks}
+          viewerUserId={sessionUserId ?? null}
+          selectedDay={selectedDay}
+          calendarColumns={weekCalendarColumns}
+          onSlotClick={handleSlotClick}
+          onDayHeaderClick={handleDayHeaderClick}
+          onAppointmentClick={handleAppointmentClick}
+          onAvailabilityBlockClick={handleAvailabilityBlockClick}
+          enableDragDrop
+          hoveredAppointmentId={hoveredAppointmentId}
+          draggedAppointment={draggedAppointment}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          onDrop={handleDropStable}
+          slotIntervalMinutes={mobileSlotInterval}
+          hourHeightPx={effectiveDesktopHourHeight}
+          minHourHeightPx={DESKTOP_HOUR_HEIGHT_BOUNDS.min}
+          maxHourHeightPx={DESKTOP_HOUR_HEIGHT_BOUNDS.max}
+          onHourHeightChange={setDesktopHourHeight}
+        />
+      )}
 
       <DayPanel
         topControls={weekToolbarControls}
@@ -2199,6 +2272,9 @@ export default function CalendarPageClient({
         initialData={editInitialData}
         onModeChange={setAppointmentModalMode}
         appointmentStatus={editInitialData?.status || state.selectedAppointment?.status}
+        appointmentId={state.selectedAppointment?.id}
+        canChangeStatus={state.selectedAppointment?.can_change_status !== false}
+        onStatusChange={handlePanelStatusChange}
         canEdit={state.selectedAppointment?.can_edit !== false}
         canDelete={state.selectedAppointment?.can_delete !== false}
         isRecurringInstance={Boolean(state.selectedAppointment?.recurrence_group_id)}

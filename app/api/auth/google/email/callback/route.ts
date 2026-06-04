@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 import { NextRequest, NextResponse } from 'next/server';
-import { getAuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, isClinicalRole } from '@/lib/auth-helpers';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { saveEmailIntegration } from '@/lib/email-integrations';
 import { initGmailOAuthClient } from '@/lib/gmail';
@@ -23,6 +23,10 @@ export async function GET(request: NextRequest) {
   let tenantId: import('mongodb').ObjectId | undefined;
   try {
     const user = await getAuthUser();
+    // Email integrations are clinic-config — owner + dentists only.
+    if (!isClinicalRole(user.role)) {
+      return redirectTo('/settings');
+    }
     userId = user.userId;
     tenantId = user.tenantId;
   } catch {

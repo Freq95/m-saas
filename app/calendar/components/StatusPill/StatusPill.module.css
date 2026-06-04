@@ -1,0 +1,124 @@
+/* Status pill (color-coded badge + dropdown). Shared between the
+   appointment modal (web preview/edit) and any other surface that wants
+   the same status widget. DayPanel still uses its own inline copy for
+   now — that one is tightly integrated into the card layout. */
+
+.root {
+  position: relative;
+  display: inline-block;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--status-color, var(--color-text-soft)) 40%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--status-color, var(--color-text-soft)) 12%, transparent);
+  color: var(--color-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  line-height: 1;
+}
+
+.pill:hover {
+  background: color-mix(in srgb, var(--status-color, var(--color-text-soft)) 20%, transparent);
+}
+
+.pill:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--status-color, var(--color-accent)) 70%, transparent);
+  outline-offset: 2px;
+}
+
+.pillStatic {
+  cursor: default;
+}
+
+.pillStatic:hover {
+  background: color-mix(in srgb, var(--status-color, var(--color-text-soft)) 12%, transparent);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.label {
+  white-space: nowrap;
+}
+
+.chevron {
+  transition: transform 0.18s ease;
+  opacity: 0.7;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  min-width: 180px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 0.3rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  animation: menuIn 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes menuIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.6rem;
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  font-size: 0.86rem;
+  font-weight: 500;
+  text-align: left;
+  border-radius: 6px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.menuItem:hover {
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+
+.menuItemActive {
+  font-weight: 600;
+}
+
+.menuDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.menuLabel {
+  flex: 1;
+}
+
+.menuCheck {
+  color: var(--color-accent-strong);
+  flex-shrink: 0;
+}

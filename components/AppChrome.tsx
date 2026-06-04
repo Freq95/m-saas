@@ -11,6 +11,7 @@ const HIDDEN_NAV_PREFIXES = [
   '/reset-password',
   '/invite',
   '/calendar-invite',
+  '/launch',
   '/admin',
   '/privacy',
   '/terms',

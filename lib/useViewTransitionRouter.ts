@@ -6,6 +6,7 @@ import { useCallback } from 'react';
 interface AppRouter {
   push: (href: string) => void;
   replace: (href: string) => void;
+  prefetch: (href: string) => void;
   refresh: () => void;
 }
 
@@ -23,7 +24,8 @@ export function useViewTransitionRouter(): AppRouter {
 
   const push = useCallback((href: string) => router.push(href), [router]);
   const replace = useCallback((href: string) => router.replace(href), [router]);
+  const prefetch = useCallback((href: string) => router.prefetch(href), [router]);
   const refresh = useCallback(() => router.refresh(), [router]);
 
-  return { push, replace, refresh };
+  return { push, replace, prefetch, refresh };
 }

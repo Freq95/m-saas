@@ -148,7 +148,14 @@ export function appointmentFormReducer(
       };
 
     case 'CLEAR_CLIENT_LINK':
-      return { ...state, selectedClientId: null, forceNewClient: false };
+      return {
+        ...state,
+        clientName: '',
+        clientEmail: '',
+        clientPhone: '',
+        selectedClientId: null,
+        forceNewClient: false,
+      };
 
     case 'SET_TIME': {
       const next = { ...state };

@@ -1,0 +1,207 @@
+{
+  "baseUrl": "http://127.0.0.1:3000",
+  "summary": {
+    "runs": 2,
+    "successfulCalendarRuns": 0,
+    "launchToRouteMs": {
+      "p50": 50.2,
+      "p75": 212.4,
+      "p95": 212.4
+    },
+    "responseToDomCompleteMs": {
+      "p50": 65.1,
+      "p75": 114.7,
+      "p95": 114.7
+    }
+  },
+  "results": [
+    {
+      "run": 1,
+      "finalUrl": "http://127.0.0.1:3000/login",
+      "wallMs": 916,
+      "launchToRouteMs": 212.4,
+      "responseToDomCompleteMs": 114.7,
+      "snapshot": {
+        "events": [
+          {
+            "name": "densa:app-hydrated",
+            "path": "/launch",
+            "at": 127.20000004768372
+          },
+          {
+            "name": "densa:launch-visible",
+            "path": "/launch",
+            "at": 127.29999995231628
+          },
+          {
+            "name": "densa:launch-prefetch-calendar",
+            "path": "/launch",
+            "href": "/calendar",
+            "at": 127.5
+          },
+          {
+            "name": "densa:route-ready",
+            "path": "/launch",
+            "at": 243.90000009536743
+          },
+          {
+            "name": "densa:launch-redirect",
+            "path": "/launch",
+            "href": "/calendar",
+            "at": 243.90000009536743
+          },
+          {
+            "name": "densa:navigation-start",
+            "path": "/launch",
+            "href": "/calendar",
+            "at": 244
+          },
+          {
+            "name": "densa:navigation-complete",
+            "path": "/login",
+            "at": 339.7000000476837
+          },
+          {
+            "name": "densa:navigation-duration",
+            "path": "/login",
+            "at": 339.7000000476837,
+            "duration": 95.59999990463257
+          }
+        ],
+        "marks": [
+          {
+            "name": "densa:app-hydrated",
+            "startTime": 127.09999990463257
+          },
+          {
+            "name": "densa:launch-visible",
+            "startTime": 127.29999995231628
+          },
+          {
+            "name": "densa:launch-prefetch-calendar",
+            "startTime": 127.5
+          },
+          {
+            "name": "densa:route-ready",
+            "startTime": 243.90000009536743
+          },
+          {
+            "name": "densa:launch-redirect",
+            "startTime": 243.90000009536743
+          },
+          {
+            "name": "densa:navigation-start",
+            "startTime": 244
+          },
+          {
+            "name": "densa:navigation-complete",
+            "startTime": 339.7000000476837
+          }
+        ],
+        "measures": [],
+        "navigation": {
+          "startTime": 0,
+          "domInteractive": 27.299999952316284,
+          "domComplete": 121,
+          "responseStart": 6.299999952316284,
+          "responseEnd": 6.900000095367432,
+          "loadEventEnd": 121
+        }
+      }
+    },
+    {
+      "run": 2,
+      "finalUrl": "http://127.0.0.1:3000/login",
+      "wallMs": 712,
+      "launchToRouteMs": 50.2,
+      "responseToDomCompleteMs": 65.1,
+      "snapshot": {
+        "events": [
+          {
+            "name": "densa:app-hydrated",
+            "path": "/launch",
+            "at": 84.09999990463257
+          },
+          {
+            "name": "densa:launch-visible",
+            "path": "/launch",
+            "at": 84.09999990463257
+          },
+          {
+            "name": "densa:launch-prefetch-calendar",
+            "path": "/launch",
+            "href": "/calendar",
+            "at": 84.40000009536743
+          },
+          {
+            "name": "densa:route-ready",
+            "path": "/launch",
+            "at": 91.20000004768372
+          },
+          {
+            "name": "densa:launch-redirect",
+            "path": "/launch",
+            "href": "/calendar",
+            "at": 91.29999995231628
+          },
+          {
+            "name": "densa:navigation-start",
+            "path": "/launch",
+            "href": "/calendar",
+            "at": 91.40000009536743
+          },
+          {
+            "name": "densa:navigation-complete",
+            "path": "/login",
+            "at": 134.29999995231628
+          },
+          {
+            "name": "densa:navigation-duration",
+            "path": "/login",
+            "at": 134.29999995231628,
+            "duration": 42.799999952316284
+          }
+        ],
+        "marks": [
+          {
+            "name": "densa:app-hydrated",
+            "startTime": 84
+          },
+          {
+            "name": "densa:launch-visible",
+            "startTime": 84.09999990463257
+          },
+          {
+            "name": "densa:launch-prefetch-calendar",
+            "startTime": 84.40000009536743
+          },
+          {
+            "name": "densa:route-ready",
+            "startTime": 91.20000004768372
+          },
+          {
+            "name": "densa:launch-redirect",
+            "startTime": 91.29999995231628
+          },
+          {
+            "name": "densa:navigation-start",
+            "startTime": 91.40000009536743
+          },
+          {
+            "name": "densa:navigation-complete",
+            "startTime": 134.20000004768372
+          }
+        ],
+        "measures": [],
+        "navigation": {
+          "startTime": 0,
+          "domInteractive": 19.299999952316284,
+          "domComplete": 68.70000004768372,
+          "responseStart": 3.5999999046325684,
+          "responseEnd": 4,
+          "loadEventEnd": 68.70000004768372
+        }
+      }
+    }
+  ]
+}

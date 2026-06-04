@@ -85,7 +85,7 @@ const MENU_GROUPS = [
             <polyline points="22,6 12,13 2,6"/>
           </svg>
         ),
-        ownerOnly: false,
+        clinicalOnly: true,
       },
     ],
   },
@@ -125,6 +125,10 @@ export default function SettingsMenuClient({ role, accountLabel }: SettingsMenuC
   const router = useRouter();
   const { theme, toggle } = useTheme();
   const isOwner = role === 'owner';
+  // Clinical staff = owner + dentist (+ super_admin). Used to gate the
+  // Email tab so non-clinical roles (asistent / receptioner) can't
+  // configure clinic-wide email integrations.
+  const isClinical = isOwner || role === 'dentist' || role === 'super_admin';
   const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
   const exitTimerRef = useRef<number | null>(null);
   const [isExiting, setIsExiting] = useState(false);
@@ -222,7 +226,11 @@ export default function SettingsMenuClient({ role, accountLabel }: SettingsMenuC
         </div>
         <div className={styles.groups}>
           {MENU_GROUPS.map((group) => {
-            const visibleItems = group.items.filter((item) => !item.ownerOnly || isOwner);
+            const visibleItems = group.items.filter((item) => {
+              if (item.ownerOnly && !isOwner) return false;
+              if ((item as { clinicalOnly?: boolean }).clinicalOnly && !isClinical) return false;
+              return true;
+            });
             if (visibleItems.length === 0) return null;
             return (
               <section key={group.label} className={styles.group}>

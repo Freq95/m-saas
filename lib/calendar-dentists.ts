@@ -172,5 +172,15 @@ export async function resolveBookableDentistForCalendar(
     throw new AuthError('Selected dentist is not available for the chosen calendar', 400);
   }
 
+  // Asistents can only act for dentists they're explicitly assigned to.
+  // Without this gate, a calendar share + ?dentistUserId= would let an
+  // asistent read/create rows for any dentist who shares that calendar.
+  if (authContext.role === 'asistent') {
+    const assigned = authContext.assigned_dentist_user_ids ?? [];
+    if (!assigned.includes(dentist.userId)) {
+      throw new AuthError('Selected dentist is not available for the chosen calendar', 400);
+    }
+  }
+
   return dentist;
 }

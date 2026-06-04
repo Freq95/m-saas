@@ -1,13 +1,13 @@
 import { Suspense } from 'react';
 import { getAuthUser, redirectToLogin } from '@/lib/auth-helpers';
-import { SettingsSkeleton } from '../SettingsSkeleton';
+import PageLoading from '@/components/PageLoading';
 import AccountSettingsPageClient from './AccountSettingsPageClient';
 
 export const revalidate = 30;
 
 export default function AccountSettingsPage() {
   return (
-    <Suspense fallback={<SettingsSkeleton activeTab="account" />}>
+    <Suspense fallback={<PageLoading />}>
       <AccountContent />
     </Suspense>
   );

@@ -4,10 +4,11 @@ import '../styles/theme.css'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import AppChrome from '@/components/AppChrome'
 import AuthSessionProvider from '@/components/AuthSessionProvider'
+import NavigationProgress from '@/components/NavigationProgress'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import { validateServerEnv } from '@/lib/env-validation'
-import { auth } from '@/lib/auth'
 import PreventZoom from '@/components/PreventZoom'
+import ServiceWorkerRegister from '@/components/ServiceWorkerRegister'
 
 validateServerEnv()
 
@@ -21,8 +22,6 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode
 }) {
-  const session = await auth()
-
   return (
     <html lang="ro" suppressHydrationWarning>
       <head>
@@ -44,10 +43,12 @@ export default async function RootLayout({
       </head>
       <body>
         <PreventZoom />
+        <ServiceWorkerRegister />
+        <NavigationProgress />
         <ThemeProvider>
-          <AuthSessionProvider session={session}>
+          <AuthSessionProvider>
             <ErrorBoundary>
-              <AppChrome userRole={session?.user?.role ?? null}>{children}</AppChrome>
+              <AppChrome>{children}</AppChrome>
             </ErrorBoundary>
           </AuthSessionProvider>
         </ThemeProvider>

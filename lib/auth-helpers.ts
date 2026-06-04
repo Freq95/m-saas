@@ -31,6 +31,14 @@ export function redirectToLogin(err?: unknown): never {
 
 export type UserRole = 'super_admin' | 'owner' | 'dentist' | 'receptionist' | 'asistent';
 
+// Roles allowed to manage clinical infrastructure (delete patients,
+// configure clinic-wide email integrations, etc). Receptionists and
+// asistents can read and edit, but not perform destructive or
+// configuration-level actions.
+export function isClinicalRole(role: UserRole | string | null | undefined): boolean {
+  return role === 'owner' || role === 'dentist' || role === 'super_admin';
+}
+
 export interface AuthContext {
   userId: number;
   userIdRaw: string;

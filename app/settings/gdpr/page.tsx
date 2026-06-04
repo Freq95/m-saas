@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { getAuthUser, redirectToLogin } from '@/lib/auth-helpers';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
-import { SettingsSkeleton } from '../SettingsSkeleton';
+import PageLoading from '@/components/PageLoading';
 import GdprSettingsPageClient from './GdprSettingsPageClient';
 
 export const revalidate = 30;
@@ -16,7 +16,7 @@ const EDIT_ROLES = new Set(['owner', 'dentist']);
 
 export default function GdprSettingsPage() {
   return (
-    <Suspense fallback={<SettingsSkeleton activeTab="gdpr" />}>
+    <Suspense fallback={<PageLoading />}>
       <GdprContent />
     </Suspense>
   );

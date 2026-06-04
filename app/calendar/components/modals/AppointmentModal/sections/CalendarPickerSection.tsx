@@ -14,6 +14,7 @@ interface CalendarPickerSectionProps {
   lockCalendar: boolean;
   disabled: boolean;
   readOnly: boolean;
+  calendarError?: string;
 }
 
 function CalendarPickerSectionBase({
@@ -28,6 +29,7 @@ function CalendarPickerSectionBase({
   lockCalendar,
   disabled,
   readOnly,
+  calendarError,
 }: CalendarPickerSectionProps) {
   const selected = calendarOptions.find((calendar) => String(calendar.id) === calendarId) || null;
   const selectedDentist = dentists.find((dentist) => String(dentist.userId) === dentistUserId) || null;
@@ -48,12 +50,15 @@ function CalendarPickerSectionBase({
   return (
     <>
       <div className={styles.modalField}>
-        <label htmlFor="appt-calendar">Calendar *</label>
+        <label htmlFor="appt-calendar">Calendar <span className={styles.requiredMark}>*</span></label>
         <select
           id="appt-calendar"
           value={calendarId}
           onChange={(event) => onCalendarChange(event.target.value)}
           disabled={disabled || lockCalendar || hasNoWritableCalendars}
+          className={calendarError ? styles.fieldControlError : undefined}
+          aria-invalid={Boolean(calendarError)}
+          aria-describedby={calendarError ? 'appt-calendar-error' : undefined}
         >
           {hasNoWritableCalendars && <option value="">(niciun calendar disponibil)</option>}
           {calendarOptions.map((option) => (
@@ -66,6 +71,11 @@ function CalendarPickerSectionBase({
         {hasNoWritableCalendars && (
           <p className={styles.fieldHint} role="alert">
             Nu exista calendare disponibile pentru creare.
+          </p>
+        )}
+        {calendarError && (
+          <p id="appt-calendar-error" className={styles.fieldErrorText} role="alert">
+            {calendarError}
           </p>
         )}
       </div>

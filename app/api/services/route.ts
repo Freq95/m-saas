@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
       }
       await assertTenantDentist(auth, dentistUserId);
       if (!canReadServicesFor(auth, dentistUserId)) {
-        return NextResponse.json({ error: 'Not authorized to read services for this dentist' }, { status: 403 });
+        return NextResponse.json({ error: 'Nu ai acces la serviciile acestui medic.' }, { status: 403 });
       }
       targetUserId = dentistUserId;
       targetTenantId = auth.tenantId;

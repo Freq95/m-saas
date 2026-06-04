@@ -2,7 +2,7 @@
   "name": "densa",
   "short_name": "densa",
   "description": "Gestionare centralizata pentru mesaje, programari si automatizari",
-  "start_url": "/dashboard",
+  "start_url": "/launch",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#06080d",

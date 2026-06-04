@@ -658,7 +658,8 @@ export function WeekView({
                     const topPercent = ((aptStart - dayStart.getTime()) / dayDuration) * 100;
                     const naturalHeightPercent = ((aptEnd - aptStart) / dayDuration) * 100;
                     const halfSlotPercent = (SLOT_HEIGHT / 2 / columnHeightPx) * 100;
-                    const isCompact = naturalHeightPercent < halfSlotPercent;
+                    const durationMinutes = (aptEnd - aptStart) / 60_000;
+                    const isCompact = durationMinutes < 30;
                     const isNarrow = width < 56;
                     const finalHeightPercent = isCompact
                       ? naturalHeightPercent
@@ -677,6 +678,7 @@ export function WeekView({
                         }}
                         compact={isCompact}
                         narrow={isNarrow}
+                        phoneView={compact}
                         onClick={onAppointmentClick}
                         enableDragDrop={enableDragDrop}
                         onDragStart={onDragStart ? (a) => onDragStart(a, day) : undefined}

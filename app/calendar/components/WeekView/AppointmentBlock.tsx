@@ -4,7 +4,7 @@ import React from 'react';
 import { format } from 'date-fns';
 import styles from '../../page.module.css';
 import type { Appointment } from '../../hooks/useCalendar';
-import { getAppointmentBlockStyle, getStatusConfig, resolveAppointmentColor } from '@/lib/calendar-color-policy';
+import { getAppointmentBlockStyle, getStatusConfig, normalizeStatus, resolveAppointmentColor } from '@/lib/calendar-color-policy';
 import { useTheme } from '@/components/ThemeProvider';
 
 interface AppointmentBlockProps {
@@ -12,6 +12,7 @@ interface AppointmentBlockProps {
   style: React.CSSProperties;
   compact?: boolean;
   narrow?: boolean;
+  phoneView?: boolean;
   viewerUserId: number | null;
   onClick: (appointment: Appointment) => void;
   onDragStart?: (appointment: Appointment) => void;
@@ -21,12 +22,20 @@ interface AppointmentBlockProps {
   enableDragDrop?: boolean;
 }
 
+function getServiceNames(appointment: Appointment): string[] {
+  if (Array.isArray(appointment.service_names) && appointment.service_names.length > 0) {
+    return appointment.service_names.filter((name) => typeof name === 'string' && name.trim().length > 0);
+  }
+  return appointment.service_name ? [appointment.service_name] : [];
+}
+
 export const AppointmentBlock = React.memo<AppointmentBlockProps>(
   ({
     appointment,
     style,
     compact = false,
     narrow = false,
+    phoneView = false,
     viewerUserId,
     onClick,
     onDragStart,
@@ -37,17 +46,34 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
   }) => {
     const { theme } = useTheme();
     const statusCfg = getStatusConfig(appointment.status);
+    const isNoShow = normalizeStatus(appointment.status) === 'no-show';
     const resolvedColor = resolveAppointmentColor(appointment, viewerUserId);
     const blockStyle = getAppointmentBlockStyle(
       resolvedColor,
       theme,
       appointment.is_shared_calendar ? 'shared' : 'default'
     );
-    const isPast = new Date(appointment.end_time).getTime() < Date.now();
-    const startLabel = format(new Date(appointment.start_time), 'HH:mm');
-    const endLabel = format(new Date(appointment.end_time), 'HH:mm');
+    const startDate = new Date(appointment.start_time);
+    const endDate = new Date(appointment.end_time);
+    const isPast = endDate.getTime() < Date.now();
+    const startLabel = format(startDate, 'HH:mm');
+    const endLabel = format(endDate, 'HH:mm');
+    const durationMinutes = (endDate.getTime() - startDate.getTime()) / 60_000;
     const canDrag = enableDragDrop && appointment.status === 'scheduled' && appointment.can_drag !== false;
     const nameFirst = compact || narrow;
+    const serviceNames = getServiceNames(appointment);
+    const serviceSummary = serviceNames.join(' + ');
+    const ariaServiceSummary = serviceSummary || appointment.service_name || 'fara serviciu';
+    const compactServiceSummary = serviceNames.length > 1
+      ? `${serviceNames[0]} (+${serviceNames.length - 1})`
+      : serviceNames[0] || '';
+    const isPill = compact;
+    const isWebShort = !phoneView && !isPill && durationMinutes <= 30;
+    const isSingleLineSummary = isPill || isWebShort;
+    const showInlineServices = nameFirst && serviceSummary && !isSingleLineSummary;
+    const showPhoneStackedServices = !nameFirst && phoneView && serviceNames.length > 0;
+    const showDesktopServiceLine = !nameFirst && !phoneView && !isWebShort && (serviceSummary || appointment.dentist_display_name);
+    const showTime = !nameFirst && !isWebShort;
 
     const handleDragStart = (event: React.DragEvent) => {
       event.stopPropagation();
@@ -61,16 +87,22 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
       onDragEnd?.();
     };
 
+    // No-show keeps near-full opacity so the red diagonal stripes (applied
+    // via .appointmentNoShow CSS) remain clearly visible. The default
+    // statusCfg.opacity for 'no-show' is 0.45, which would wash the
+    // stripes out.
+    const baseOpacity = isNoShow ? 0.92 : statusCfg.opacity;
     const appointmentStyle: React.CSSProperties = {
       ...style,
-      opacity: isPast ? Math.min(statusCfg.opacity, 0.55) : statusCfg.opacity,
+      opacity: isPast ? Math.min(baseOpacity, 0.78) : baseOpacity,
       borderLeft: `5px solid ${blockStyle.borderColor}`,
       background: blockStyle.bodyColor,
       color: blockStyle.textColor,
     };
     const containerStyle: React.CSSProperties = {
       ...appointmentStyle,
-      ...(compact && { padding: '0.18rem 0.34rem' }),
+      ...(compact && { padding: '0.12rem 0.28rem' }),
+      ...(isWebShort && { padding: '0.18rem 0.38rem' }),
     };
 
     return (
@@ -79,9 +111,12 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
           styles.appointment,
           nameFirst ? styles.appointmentNameFirst : '',
           compact ? styles.appointmentCompact : '',
+          isPill ? styles.appointmentPill : '',
+          isWebShort ? styles.appointmentWebShort : '',
           narrow ? styles.appointmentNarrow : '',
           isDragging ? styles.dragging : '',
           isHighlighted ? styles.appointmentHighlighted : '',
+          isNoShow ? styles.appointmentNoShow : '',
         ].filter(Boolean).join(' ')}
         style={containerStyle}
         draggable={canDrag}
@@ -99,31 +134,27 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
         }}
         role="button"
         tabIndex={0}
-        aria-label={`Programare ${appointment.client_name}, ${
-          // Read multi-service first (post-deploy data), fall back to legacy
-          // `service_name` for older appointments. Screen-reader users still
-          // get the full list even though the card itself only shows a count.
-          Array.isArray(appointment.service_names) && appointment.service_names.length > 0
-            ? appointment.service_names.join(', ')
-            : appointment.service_name
-        }`}
+        aria-label={`Programare ${appointment.client_name}, ${ariaServiceSummary}`}
       >
         <div className={styles.appointmentHeader}>
           <div className={`${styles.appointmentTitle} ${statusCfg.strikethrough ? styles.appointmentStrike : ''}`}>
-            <span className={styles.appointmentName}>{appointment.client_name}</span>
-            {!nameFirst && (
+            <span className={isSingleLineSummary ? styles.appointmentPillName : styles.appointmentName}>
+              {appointment.client_name}
+            </span>
+            {isSingleLineSummary && compactServiceSummary && (
+              <span className={styles.appointmentPillService}>{compactServiceSummary}</span>
+            )}
+            {showInlineServices && (
+              <span className={styles.appointmentServiceInline}>
+                {phoneView ? compactServiceSummary : serviceSummary}
+              </span>
+            )}
+            {showTime && (
               // suppressHydrationWarning: format() of an ISO timestamp resolves
               // in the renderer's local timezone. Server (UTC) and client
               // (Europe/Bucharest) render different HH:mm. Client wins.
-              <span className={styles.appointmentTime} suppressHydrationWarning> · {startLabel}-{endLabel}</span>
+              <span className={styles.appointmentTime} suppressHydrationWarning> - {startLabel}-{endLabel}</span>
             )}
-            {!nameFirst &&
-              Array.isArray(appointment.service_names) &&
-              appointment.service_names.length > 1 && (
-                <span className={styles.appointmentServiceCount}>
-                  {' '}· {appointment.service_names.length} servicii
-                </span>
-              )}
           </div>
           {appointment.recurrence_group_id !== undefined && appointment.recurrence_group_id !== null && (
             <svg
@@ -150,13 +181,19 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
             aria-label={statusCfg.label}
           />
         </div>
-        {!nameFirst && appointment.dentist_display_name && (
-          // User chose to drop the service name from the card to reduce noise.
-          // We keep the dentist line because it's the only signal that
-          // identifies whose calendar the appointment belongs to on a shared
-          // calendar. Service names are still in the aria-label for screen
-          // readers and visible inside the appointment detail modal.
-          <div className={styles.appointmentService}>{appointment.dentist_display_name}</div>
+        {showPhoneStackedServices && (
+          <div className={styles.appointmentService}>
+            {serviceNames.map((name) => (
+              <span key={name} className={styles.appointmentServiceLine}>{name}</span>
+            ))}
+          </div>
+        )}
+        {showDesktopServiceLine && (
+          <div className={styles.appointmentService}>
+            {serviceSummary}
+            {serviceSummary && appointment.dentist_display_name ? ' - ' : ''}
+            {appointment.dentist_display_name || ''}
+          </div>
         )}
       </div>
     );
@@ -166,6 +203,9 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
     prev.appointment.status === next.appointment.status &&
     prev.appointment.client_name === next.appointment.client_name &&
     prev.appointment.service_name === next.appointment.service_name &&
+    (prev.appointment.service_names || []).join('|') === (next.appointment.service_names || []).join('|') &&
+    prev.appointment.dentist_display_name === next.appointment.dentist_display_name &&
+    prev.appointment.dentist_color === next.appointment.dentist_color &&
     prev.appointment.start_time === next.appointment.start_time &&
     prev.appointment.end_time === next.appointment.end_time &&
     prev.appointment.category === next.appointment.category &&
@@ -177,6 +217,7 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
     prev.appointment.is_shared_calendar === next.appointment.is_shared_calendar &&
     prev.appointment.recurrence_group_id === next.appointment.recurrence_group_id &&
     prev.appointment.dentist_id === next.appointment.dentist_id &&
+    prev.appointment.can_drag === next.appointment.can_drag &&
     prev.viewerUserId === next.viewerUserId &&
     prev.style.top === next.style.top &&
     prev.style.left === next.style.left &&
@@ -184,6 +225,7 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
     prev.style.height === next.style.height &&
     prev.compact === next.compact &&
     prev.narrow === next.narrow &&
+    prev.phoneView === next.phoneView &&
     prev.isDragging === next.isDragging &&
     prev.isHighlighted === next.isHighlighted &&
     prev.enableDragDrop === next.enableDragDrop &&

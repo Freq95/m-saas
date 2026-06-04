@@ -166,11 +166,11 @@ export interface AppointmentBlockStyle {
 export function getAppointmentBlockStyle(
   baseColor: string,
   _theme: 'dark' | 'light' = 'dark',
-  _variant: 'default' | 'shared' = 'default'
+  variant: 'default' | 'shared' = 'default'
 ): AppointmentBlockStyle {
   const borderColor = `color-mix(in srgb, ${baseColor} 80%, black 20%)`;
   const bodyColor = baseColor;
-  const textColor = isColorLight(baseColor) ? '#0f172a' : '#ffffff';
+  const textColor = variant === 'shared' ? '#ffffff' : '#0f172a';
   return { borderColor, bodyColor, textColor };
 }
 

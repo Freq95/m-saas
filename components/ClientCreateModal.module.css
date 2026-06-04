@@ -441,3 +441,75 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Duplicate-patient confirmation slot. Surfaces when the server signals
+ * a same-name match instead of silently merging records. */
+.duplicateNotice {
+  margin: 0.75rem 0;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md, 8px);
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.duplicateTitle {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--color-text);
+}
+
+.duplicateBody {
+  font-size: 0.85rem;
+  color: var(--color-text-soft);
+  line-height: 1.4;
+}
+
+.duplicateActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.duplicatePrimary,
+.duplicateSecondary,
+.duplicateGhost {
+  padding: 0.5rem 0.9rem;
+  border-radius: var(--radius-sm, 6px);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.duplicatePrimary {
+  background: var(--color-accent);
+  color: var(--color-on-accent, white);
+  border-color: var(--color-accent);
+}
+
+.duplicatePrimary:hover {
+  background: color-mix(in srgb, var(--color-accent) 88%, black);
+}
+
+.duplicateSecondary {
+  background: transparent;
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.duplicateSecondary:hover {
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+
+.duplicateGhost {
+  background: transparent;
+  color: var(--color-text-soft);
+  border-color: transparent;
+}
+
+.duplicateGhost:hover {
+  color: var(--color-text);
+}

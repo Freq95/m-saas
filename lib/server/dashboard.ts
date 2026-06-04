@@ -30,22 +30,28 @@ type DashboardData = {
 };
 
 type ScopeFilter = {
-  user_id: number;
+  user_id: number | { $in: number[] };
   tenant_id?: ObjectId;
 };
 
-function buildScopeFilter(userId: number, tenantId?: ObjectId): ScopeFilter {
+function buildScopeFilter(userIdOrIds: number | number[], tenantId?: ObjectId): ScopeFilter {
+  const ids = Array.isArray(userIdOrIds)
+    ? Array.from(new Set(userIdOrIds)).sort((a, b) => a - b)
+    : [userIdOrIds];
+  const user_id = ids.length === 1 ? ids[0] : { $in: ids };
+
   if (tenantId) {
-    return { user_id: userId, tenant_id: tenantId };
+    return { user_id, tenant_id: tenantId };
   }
-  return { user_id: userId };
+  return { user_id };
 }
 
 export async function getDashboardData(
   userId: number,
   tenantIdOrDays?: ObjectId | number,
   days: number = 7,
-  visibleCalendarIds?: number[]
+  visibleCalendarIds?: number[],
+  visibleClientUserIds?: number[]
 ): Promise<DashboardData> {
   const tenantId = typeof tenantIdOrDays === 'number' || tenantIdOrDays === undefined
     ? undefined
@@ -70,9 +76,20 @@ export async function getDashboardData(
     const weekStartIso = weekStart.toISOString();
     const growthStartIso = growthStart.toISOString();
     const thirtyDaysAgoIso = thirtyDaysAgo.toISOString();
+    // Used by the "Pacienti Inactivi" filter so a patient with an upcoming
+    // appointment never shows as inactive, regardless of how long ago
+    // their last completed visit was.
+    const nowIsoForInactive = now.toISOString();
     const todayStr = format(now, 'yyyy-MM-dd');
 
-    const scopeFilter = buildScopeFilter(userId, tenantId);
+    const scopedUserIds = visibleClientUserIds && visibleClientUserIds.length > 0
+      ? Array.from(new Set(visibleClientUserIds)).sort((a, b) => a - b)
+      : [userId];
+    const serviceScopeUserIds = scopedUserIds.length > 0 ? scopedUserIds : [userId];
+    const serviceUserFilter = serviceScopeUserIds.length === 1
+      ? serviceScopeUserIds[0]
+      : { $in: serviceScopeUserIds };
+    const scopeFilter = buildScopeFilter(scopedUserIds, tenantId);
     const appointmentScopeFilter =
       visibleCalendarIds && visibleCalendarIds.length > 0
         ? { calendar_id: { $in: visibleCalendarIds } }
@@ -150,6 +167,15 @@ export async function getDashboardData(
             $and: [
               { $lt: [{ $ifNull: ['$last_appointment_date', '1970-01-01T00:00:00.000Z'] }, thirtyDaysAgoIso] },
               { $lt: [{ $ifNull: ['$last_conversation_date', '1970-01-01T00:00:00.000Z'] }, thirtyDaysAgoIso] },
+              // A future scheduled appointment counts as "still engaged".
+              // next_scheduled_date is null when none exists; the $ifNull
+              // fallback to a past sentinel means the inequality fails and
+              // the client stays in the inactive list.
+              { $lt: [{ $ifNull: ['$next_scheduled_date', '1970-01-01T00:00:00.000Z'] }, nowIsoForInactive] },
+              // Brand-new patients haven't had time to be "active" yet; if
+              // they were added in the last 30 days, don't flag them as
+              // inactive just because they have no appointment history.
+              { $lt: ['$created_at', thirtyDaysAgoIso] },
             ],
           },
         },
@@ -294,8 +320,8 @@ export async function getDashboardData(
     const servicesQuery = db.collection('services')
       .find(
         tenantId
-          ? { tenant_id: tenantId, user_id: userId, id: { $in: serviceIds } }
-          : { user_id: userId, id: { $in: serviceIds } }
+          ? { tenant_id: tenantId, user_id: serviceUserFilter, id: { $in: serviceIds } }
+          : { user_id: serviceUserFilter, id: { $in: serviceIds } }
       )
       .project({ id: 1, name: 1, price: 1 });
     const services = serviceIds.length > 0 ? await servicesQuery.toArray() : [];

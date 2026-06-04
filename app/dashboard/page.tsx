@@ -23,10 +23,13 @@ export default async function DashboardPage() {
   ]
     .map((calendar: any) => calendar.id)
     .filter((id: unknown): id is number => typeof id === 'number');
+  const dashboardUserIds = auth.role === 'asistent' && auth.assigned_dentist_user_ids?.length
+    ? auth.assigned_dentist_user_ids
+    : [auth.userId];
   const initialDashboard = await getCached(
     dashboardVisibleCalendarsCacheKey({ tenantId: auth.tenantId, userId: auth.userId }, days, visibleCalendarIds),
     900,
-    () => getDashboardData(auth.userId, auth.tenantId, days, visibleCalendarIds)
+    () => getDashboardData(auth.userId, auth.tenantId, days, visibleCalendarIds, dashboardUserIds)
   ).catch(() => null);
 
   return <DashboardPageClient initialDashboard={initialDashboard} />;

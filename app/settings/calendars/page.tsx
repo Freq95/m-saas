@@ -9,14 +9,14 @@ import {
   getManagedCategoryDentists,
   type AppointmentCategory,
 } from '@/lib/server/appointment-categories';
-import { SettingsSkeleton } from '../SettingsSkeleton';
+import PageLoading from '@/components/PageLoading';
 import CalendarsSettingsPageClient from './CalendarsSettingsPageClient';
 
 export const revalidate = 30;
 
 export default function CalendarsSettingsPage() {
   return (
-    <Suspense fallback={<SettingsSkeleton activeTab="calendars" />}>
+    <Suspense fallback={<PageLoading />}>
       <CalendarsContent />
     </Suspense>
   );

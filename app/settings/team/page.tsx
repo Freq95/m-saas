@@ -1,14 +1,14 @@
 import { Suspense } from 'react';
 import { getAuthUser, redirectToLogin } from '@/lib/auth-helpers';
 import { getTeamData } from '@/lib/server/team';
-import { SettingsSkeleton } from '../SettingsSkeleton';
+import PageLoading from '@/components/PageLoading';
 import TeamSettingsPageClient from './TeamSettingsPageClient';
 
 export const revalidate = 30;
 
 export default function TeamSettingsPage() {
   return (
-    <Suspense fallback={<SettingsSkeleton activeTab="team" />}>
+    <Suspense fallback={<PageLoading />}>
       <TeamContent />
     </Suspense>
   );

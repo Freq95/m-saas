@@ -23,6 +23,7 @@ interface AppointmentCategoriesSectionProps {
   initialSelectedDentistUserId: number | null;
   initialCategories: AppointmentCategory[];
   embedded?: boolean;
+  role?: string;
 }
 
 interface CategoryFormState {
@@ -94,6 +95,7 @@ export function AppointmentCategoriesSection({
   initialSelectedDentistUserId,
   initialCategories,
   embedded = false,
+  role,
 }: AppointmentCategoriesSectionProps) {
   const [categories, setCategories] = useState<AppointmentCategory[]>(initialCategories);
   const [selectedDentistUserId, setSelectedDentistUserId] = useState<number | null>(initialSelectedDentistUserId);
@@ -225,7 +227,9 @@ export function AppointmentCategoriesSection({
         <div>
           <h3 className={styles.sectionTitle}>Categorii programari</h3>
           <p className={styles.sectionCaption}>
-            Etichete colorate care apar pe programarile din calendarul tau personal.
+            {role === 'asistent'
+              ? 'Etichete colorate care apar pe programarile medicului selectat.'
+              : 'Etichete colorate care apar pe programarile din calendarul tau personal.'}
           </p>
         </div>
         <button

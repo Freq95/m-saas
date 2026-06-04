@@ -17,6 +17,7 @@ interface ServiceSectionProps {
   error: string | null;
   disabled: boolean;
   readOnly: boolean;
+  validationError?: string;
   /** Names from the saved appointment, shown in read-only mode if `services`
    *  hasn't yet loaded (or the selected service was deleted from the catalog). */
   readOnlyNames?: string[];
@@ -49,6 +50,7 @@ function ServiceSectionBase({
   error,
   disabled,
   readOnly,
+  validationError,
   readOnlyNames,
 }: ServiceSectionProps) {
   // Pick-from-dropdown anchor. Empty string = "no service is being picked
@@ -138,9 +140,16 @@ function ServiceSectionBase({
   // ── Editable render ──────────────────────────────────────────────
   return (
     <div className={styles.modalField}>
-      <label htmlFor="appt-service-picker">Servicii *</label>
+      <label htmlFor="appt-service-picker">Servicii <span className={styles.requiredMark}>*</span></label>
 
-      {selectedServices.length > 0 && (
+      <div
+        className={`${styles.servicePickerSurface} ${
+          disabled || loading
+            ? styles.servicePickerSurfaceDisabled
+            : ''
+        } ${validationError ? styles.fieldControlError : ''}`}
+      >
+        {selectedServices.length > 0 && (
         <div className={styles.serviceChips}>
           {selectedServices.map((service) => (
             <span key={service.id} className={styles.serviceChip}>
@@ -167,7 +176,9 @@ function ServiceSectionBase({
         value={pendingPick}
         onChange={(event) => handleAdd(event.target.value)}
         disabled={disabled || loading || availableServices.length === 0}
-        className={styles.serviceAddPicker}
+        className={styles.serviceInlinePicker}
+        aria-invalid={Boolean(validationError)}
+        aria-describedby={validationError ? 'appt-service-picker-error' : undefined}
       >
         <option value="">
           {loading
@@ -186,6 +197,13 @@ function ServiceSectionBase({
           </option>
         ))}
       </select>
+      </div>
+
+      {validationError && (
+        <p id="appt-service-picker-error" className={styles.fieldErrorText} role="alert">
+          {validationError}
+        </p>
+      )}
 
       {selectedServices.length > 0 && (
         <div className={styles.serviceTotal}>

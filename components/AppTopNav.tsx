@@ -154,12 +154,14 @@ export default function AppTopNav({
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const logoutBackdropRef = useRef(false);
 
-  // Role-based home: dentists and asistents land on /calendar; everyone else
-  // (receptionist, admin) on /dashboard. The "densa" logo routes here instead
-  // of `/` so logged-in users never end up on the public marketing page.
-  const homePath = useMemo(() => {
+  // The "densa" logo routes to the calendar so logged-in users land on the
+  // operational surface instead of the public marketing page.
+  const homePath = '/calendar';
+  const visibleNavItems = useMemo(() => {
     const role = userRole || storedUserRole;
-    return role === 'dentist' || role === 'asistent' ? '/calendar' : '/dashboard';
+    return role === 'asistent'
+      ? NAV_ITEMS.filter((item) => item.key !== 'inbox')
+      : NAV_ITEMS;
   }, [storedUserRole, userRole]);
 
   useEffect(() => {
@@ -173,11 +175,15 @@ export default function AppTopNav({
   // Pacienti while on /clients/123 is still "same tab").
   const isCurrentSection = (href: string) =>
     pathname === href || pathname.startsWith(href + '/');
+  const prefetchRoute = (href: string) => {
+    if (isCurrentSection(href)) return;
+    router.prefetch(href);
+  };
 
   const activeHref = useMemo(() => {
-    const match = NAV_ITEMS.find((item) => item.key === activeSection);
+    const match = visibleNavItems.find((item) => item.key === activeSection);
     return match?.href ?? null;
-  }, [activeSection]);
+  }, [activeSection, visibleNavItems]);
 
   useEffect(() => {
     setOptimisticActiveSection(detectedSection);
@@ -262,6 +268,8 @@ export default function AppTopNav({
     <nav ref={navRef} className={navClassName || styles.nav}>
       <a
         href={homePath}
+        onPointerEnter={() => prefetchRoute(homePath)}
+        onTouchStart={() => prefetchRoute(homePath)}
         onClick={(event) => {
           if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
           event.preventDefault();
@@ -276,7 +284,7 @@ export default function AppTopNav({
         <h1 className={logoClassName || styles.logo}>{logoText}</h1>
       </a>
       <div ref={linksRef} className={navLinksClassName ? `${navLinksClassName} ${styles.links}` : styles.links}>
-        {NAV_ITEMS.map((item) => {
+        {visibleNavItems.map((item) => {
           const isActive = item.key === activeSection;
           return (
             <a
@@ -285,6 +293,8 @@ export default function AppTopNav({
               aria-label={item.label}
               data-nav-key={item.key}
               className={`${styles.link} ${isActive ? styles.activeLink : ''}`}
+              onPointerEnter={() => prefetchRoute(item.href)}
+              onTouchStart={() => prefetchRoute(item.href)}
               onPointerDown={() => setOptimisticActiveSection(item.key)}
               onClick={(event) => {
                 if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
@@ -311,6 +321,8 @@ export default function AppTopNav({
           aria-label="Setari"
           data-nav-key="settings"
           className={`${styles.link} ${styles.mobileSettingsLink} ${activeSection === 'settings' ? styles.activeLink : ''}`}
+          onPointerEnter={() => prefetchRoute('/settings')}
+          onTouchStart={() => prefetchRoute('/settings')}
           onPointerDown={() => setOptimisticActiveSection('settings')}
           onClick={(event) => {
             if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
@@ -365,6 +377,8 @@ export default function AppTopNav({
           aria-label="Setări"
           title="Setări"
           onPointerDown={() => setOptimisticActiveSection('settings')}
+          onPointerEnter={() => prefetchRoute('/settings/services')}
+          onTouchStart={() => prefetchRoute('/settings/services')}
           onClick={(event) => {
             if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
             event.preventDefault();

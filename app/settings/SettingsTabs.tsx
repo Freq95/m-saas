@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import styles from './SettingsTabs.module.css';
 import {
@@ -22,9 +23,14 @@ interface SettingsTabsProps {
 
 export default function SettingsTabs({ activeTab, isOwner: isOwnerProp }: SettingsTabsProps) {
   const { data: session } = useSession();
+  const router = useRouter();
+  const role = session?.user?.role;
   const isOwner = typeof isOwnerProp === 'boolean'
     ? isOwnerProp
-    : session?.user?.role === 'owner';
+    : role === 'owner';
+  // Clinical staff includes owner + dentists (plus super_admin). Used to
+  // gate clinic-config tabs like Email from non-clinical roles.
+  const isClinical = isOwner || role === 'dentist' || role === 'super_admin';
   const navRef = useRef<HTMLElement>(null);
   const [optimisticActiveTab, setOptimisticActiveTab] = useState<SettingsTabKey>(activeTab);
 
@@ -41,7 +47,11 @@ export default function SettingsTabs({ activeTab, isOwner: isOwnerProp }: Settin
     }
   }, [optimisticActiveTab]);
 
-  const visibleTabs = SETTINGS_TABS.filter((tab) => !tab.ownerOnly || isOwner);
+  const visibleTabs = SETTINGS_TABS.filter((tab) => {
+    if (tab.ownerOnly && !isOwner) return false;
+    if (tab.clinicalOnly && !isClinical) return false;
+    return true;
+  });
 
   return (
     <>
@@ -52,6 +62,9 @@ export default function SettingsTabs({ activeTab, isOwner: isOwnerProp }: Settin
           <Link
             key={tab.key}
             href={tab.href}
+            prefetch
+            onPointerEnter={() => router.prefetch(tab.href)}
+            onTouchStart={() => router.prefetch(tab.href)}
             onPointerDown={() => {
               setOptimisticActiveTab(tab.key);
             }}

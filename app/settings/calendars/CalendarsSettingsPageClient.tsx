@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { ToastContainer } from '@/components/Toast';
 import Spinner from '@/components/Spinner';
+import PageLoading from '@/components/PageLoading';
 import { useToast } from '@/lib/useToast';
 import navStyles from '../../dashboard/page.module.css';
 import sharedStyles from '../services/page.module.css';
@@ -28,6 +29,7 @@ import {
   type CategoryDentistOption,
 } from './AppointmentCategoriesSection';
 import { AvailabilityBlocksSection } from './AvailabilityBlocksSection';
+import { CalendarImportSection } from './CalendarImportSection';
 
 interface CalendarsSettingsPageClientProps {
   initialRole: string;
@@ -355,6 +357,10 @@ export default function CalendarsSettingsPageClient({
   const pendingCount = pendingShares.length;
   const sentCount = sentShares.length;
 
+  // Initial-load: show a uniform full-viewport loading overlay rather
+  // than the half-rendered chrome (tabs + buttons) with an empty body.
+  if (isLoading) return <PageLoading />;
+
   return (
     <div className={navStyles.container}>
       <div className={sharedStyles.container}>
@@ -386,11 +392,7 @@ export default function CalendarsSettingsPageClient({
           </div>
         )}
 
-        {isLoading ? (
-          <Spinner />
-        ) : (
-          <>
-            {/* ── Own calendars ── */}
+        {/* ── Own calendars ── */}
             {ownCalendars.length > 0 && (
               <section className={styles.section}>
                 <h3 className={styles.sectionTitle}>Calendarele mele</h3>
@@ -445,6 +447,7 @@ export default function CalendarsSettingsPageClient({
                           dentists={categoryDentists}
                           initialSelectedDentistUserId={initialCategoryDentistUserId}
                           initialCategories={initialAppointmentCategories}
+                          role={initialRole}
                           embedded
                         />
                       )}
@@ -505,6 +508,7 @@ export default function CalendarsSettingsPageClient({
                           dentists={categoryDentists}
                           initialSelectedDentistUserId={initialCategoryDentistUserId}
                           initialCategories={initialAppointmentCategories}
+                          role={initialRole}
                           embedded
                         />
                       )}
@@ -529,6 +533,16 @@ export default function CalendarsSettingsPageClient({
               calendars={calendars}
               currentUserId={initialUserId}
               canManageAvailability={initialRole === 'owner' || initialRole === 'dentist'}
+              notify={{
+                success: toast.success,
+                warning: toast.warning,
+                error: toast.error,
+              }}
+            />
+
+            <CalendarImportSection
+              role={initialRole}
+              calendars={calendars}
               notify={{
                 success: toast.success,
                 warning: toast.warning,
@@ -615,8 +629,6 @@ export default function CalendarsSettingsPageClient({
                 )}
               </section>
             )}
-          </>
-        )}
       </div>
 
       <CalendarFormModal

@@ -1,8 +1,8 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { deleteEmailIntegration, getEmailIntegrationById } from '@/lib/email-integrations';
 import { integrationIdParamSchema } from '@/lib/validation';
-import { getAuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, isClinicalRole } from '@/lib/auth-helpers';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { checkUpdateRateLimit } from '@/lib/rate-limit';
 import { logger } from '@/lib/logger';
@@ -12,7 +12,14 @@ import { getStorageProvider } from '@/lib/storage';
 export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    const { userId, tenantId, email: actorEmail } = await getAuthUser();
+    const auth = await getAuthUser();
+
+    // Email integrations are clinic-config — owner + dentists only.
+    if (!isClinicalRole(auth.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const { userId, tenantId, email: actorEmail } = auth;
     const limited = await checkUpdateRateLimit(userId);
     if (limited) return limited;
     // Validate route parameter

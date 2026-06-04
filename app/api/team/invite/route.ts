@@ -60,10 +60,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Look up ANY existing team_members row for this email (including 'removed').
+    // We deliberately do NOT filter by status here: the team_members collection
+    // has a unique index on (tenant_id, user_id), so if a previously-removed
+    // member's row still exists, inserting a new row for the same user blows
+    // up with E11000. Reviving the existing row in place avoids the conflict.
     const existingMember = await db.collection('team_members').findOne({
       tenant_id: tenantId,
       email,
-      status: { $ne: 'removed' },
     });
 
     // Active members can't be re-invited — that's an error.
@@ -71,13 +75,39 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Acest utilizator este deja membru activ al clinicii.', 409);
     }
 
-    // Pending invite for this email = idempotent resend path.
-    const isResend = !!(existingMember && existingMember.status === 'pending');
+    // Both 'pending' (idempotent resend) and 'removed' (revive a previously-removed
+    // member) take the same in-place update path. Treating these together keeps
+    // us from ever attempting a duplicate insert against the unique index.
+    const isReinvite = !!(existingMember && (existingMember.status === 'pending' || existingMember.status === 'removed'));
+    const isReviveFromRemoved = !!(existingMember && existingMember.status === 'removed');
+
+    // Reviving a removed member re-claims a seat, so it must pass the seat
+    // limit check. Plain resends of an already-pending invite skip this since
+    // the seat is already counted.
+    if (isReviveFromRemoved) {
+      const activeMembers = await db.collection('team_members').countDocuments({
+        tenant_id: tenantId,
+        status: { $ne: 'removed' },
+      });
+      const maxSeats = Number(tenant.max_seats || 0);
+      if (maxSeats <= 0) {
+        return createErrorResponse(
+          'Tenant has no seat allocation. Ask platform admin to set seat limit.',
+          403,
+        );
+      }
+      if (activeMembers >= maxSeats) {
+        return createErrorResponse(
+          `Seat limit reached (${activeMembers}/${maxSeats}). Remove a member or ask platform admin to increase seat limit.`,
+          403,
+        );
+      }
+    }
 
     const nowIso = new Date().toISOString();
     let userObjectId: ObjectId;
 
-    if (isResend && existingMember) {
+    if (isReinvite && existingMember) {
       // Find the user row that already backs this pending invite.
       const existingUserDoc = await db.collection('users').findOne(
         { _id: existingMember.user_id, tenant_id: tenantId },
@@ -108,6 +138,11 @@ export async function POST(request: NextRequest) {
               invited_by: dbUserId,
               invited_at: nowIso,
               updated_at: nowIso,
+              // Revive a removed member back to pending and clear the old
+              // acceptance timestamp; harmless no-ops on rows that were
+              // already pending.
+              status: 'pending',
+              accepted_at: null,
             },
             ...(assignmentIds.length === 0 && existingMember.assigned_dentist_user_ids
               ? { $unset: { assigned_dentist_user_ids: '' } }
@@ -135,6 +170,11 @@ export async function POST(request: NextRequest) {
           invited_by: dbUserId,
           invited_at: nowIso,
           updated_at: nowIso,
+          // Revive a removed member back to pending and clear the old
+          // acceptance timestamp; harmless no-ops on rows that were
+          // already pending.
+          status: 'pending',
+          accepted_at: null,
         };
         if (assignmentIds.length > 0) memberSet.assigned_dentist_user_ids = assignmentIds;
         const memberUpdate: Record<string, unknown> = { $set: memberSet };
@@ -248,8 +288,8 @@ export async function POST(request: NextRequest) {
     }
 
     return createSuccessResponse(
-      { message: isResend ? 'Invitatia a fost retrimisa' : 'Invitatia a fost trimisa', resent: isResend },
-      isResend ? 200 : 201,
+      { message: isReinvite ? 'Invitatia a fost retrimisa' : 'Invitatia a fost trimisa', resent: isReinvite },
+      isReinvite ? 200 : 201,
     );
   } catch (error) {
     return handleApiError(error, 'Failed to invite team member');

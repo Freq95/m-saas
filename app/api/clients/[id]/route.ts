@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getClientProfileData } from '@/lib/server/client-profile';
-import { getAuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, isClinicalRole } from '@/lib/auth-helpers';
 import { resolveClientScopeForClient } from '@/lib/client-permissions';
 import { invalidateReadCaches } from '@/lib/cache-keys';
 import { logDataAccess } from '@/lib/audit';
@@ -151,9 +151,38 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
     const limited = await checkUpdateRateLimit(userId);
     if (limited) return limited;
 
+    // Patient deletion is destructive — only clinical staff (clinic owner
+    // and dentists) may remove a patient record. Asistents and
+    // receptionists can still edit patient details but cannot delete.
+    if (!isClinicalRole(auth.role)) {
+      return createErrorResponse('Pacientii pot fi stersi doar de medici.', 403);
+    }
+
     const targetScope = await resolveClientScopeForClient(auth, clientId);
     if (!targetScope) {
       return createErrorResponse('Not found or not authorized', 404);
+    }
+
+    // Block deletion when the patient still has future scheduled
+    // appointments. Forces the user to handle them explicitly instead of
+    // silently orphaning rows on the calendar.
+    const nowIso = new Date().toISOString();
+    const futureAppointment = await db.collection('appointments').findOne(
+      {
+        client_id: clientId,
+        tenant_id: targetScope.tenantId,
+        user_id: targetScope.userId,
+        status: 'scheduled',
+        start_time: { $gte: nowIso },
+        deleted_at: { $exists: false },
+      },
+      { projection: { id: 1 } }
+    );
+    if (futureAppointment) {
+      return createErrorResponse(
+        'Pacientul are programari viitoare. Anuleaza sau muta-le inainte de stergere.',
+        409
+      );
     }
 
     // Soft delete using timestamp and cleanup legacy fields

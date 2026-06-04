@@ -13,6 +13,7 @@ interface UseAppointmentsOptions {
   calendarIds?: number[];
   search?: string;
   initialAppointments?: Appointment[];
+  initialAppointmentsAreFresh?: boolean;
 }
 
 interface UseAppointmentsResult {
@@ -176,6 +177,7 @@ export function useAppointmentsSWR({
   calendarIds,
   search,
   initialAppointments = [],
+  initialAppointmentsAreFresh = true,
 }: UseAppointmentsOptions): UseAppointmentsResult {
   const effectiveUserId = userId;
   const normalizedCalendarIds = normalizeCalendarIds(calendarIds);
@@ -226,15 +228,19 @@ export function useAppointmentsSWR({
     isLoading,
     mutate,
   } = useSWR<Appointment[]>(url, fetcher, {
-    fallbackData: isGlobalSearch || skipFetchBecauseNoVisibleCalendars ? [] : initialAppointments,
+    fallbackData: isGlobalSearch || skipFetchBecauseNoVisibleCalendars
+      ? []
+      : initialAppointmentsAreFresh
+        ? initialAppointments
+        : undefined,
     keepPreviousData: true,
     revalidateOnFocus: true,
     focusThrottleInterval: 300_000,
     dedupingInterval: 60_000,
-    // Skip mount revalidation when SSR returned fresh data (initialAppointments
-    // is always an array from the server page). Only re-fetch on mount for
-    // global search, where results aren't pre-fetched server-side.
-    revalidateOnMount: isGlobalSearch,
+    // Skip mount revalidation only when SSR returned data for this exact range.
+    // Month view can restore from localStorage while the server preloaded only
+    // the week, so callers mark that fallback as stale and we fetch on mount.
+    revalidateOnMount: isGlobalSearch || !initialAppointmentsAreFresh,
     revalidateOnReconnect: true,
     refreshWhenHidden: false,
     refreshWhenOffline: false,

@@ -1,0 +1,22 @@
+.offline {
+  min-height: 100dvh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg, #06080d);
+  color: var(--color-text, #e6edf8);
+}
+
+.brand {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-5);
+}
+
+.wordmark {
+  font-family: var(--font-brand);
+  font-size: 2rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}

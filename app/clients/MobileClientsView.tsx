@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Drawer } from 'vaul';
 import m from './MobileClientsView.module.css';
 import { gdprStateOf, GDPR_COLOR, GDPR_FULL_LABEL } from '@/lib/client-gdpr';
+import PageLoading from '@/components/PageLoading';
 
 // Public shape — kept loose because the parent already validates server payloads.
 interface Client {
@@ -209,17 +210,7 @@ export default function MobileClientsView(props: MobileClientsViewProps) {
       {/* ── Scrollable list ── */}
       <div className={m.list}>
         {loading && !hasFinishedInitialLoad ? (
-          <div className={m.loadingSkeletons}>
-            {Array.from({ length: 8 }).map((_, idx) => (
-              <div key={idx} className={m.skeletonRow}>
-                <div className={`skeleton ${m.skeletonAvatar}`} />
-                <div className={m.skeletonLines}>
-                  <div className="skeleton skeleton-line" style={{ width: '55%', height: '14px' }} />
-                  <div className="skeleton skeleton-line" style={{ width: '40%', height: '12px' }} />
-                </div>
-              </div>
-            ))}
-          </div>
+          <PageLoading />
         ) : clients.length === 0 ? (
           <div className={m.empty}>
             <div className={m.emptyTitle}>

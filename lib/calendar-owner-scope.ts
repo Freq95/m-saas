@@ -1,5 +1,5 @@
 import type { ObjectId } from 'mongodb';
-import type { AuthContext } from '@/lib/auth-helpers';
+import { AuthError, type AuthContext } from '@/lib/auth-helpers';
 import { getCalendarAuth, type CalendarAuthContext } from '@/lib/calendar-auth';
 
 export interface CalendarOwnerScope {
@@ -13,6 +13,16 @@ export async function resolveCalendarOwnerScope(
   calendarId: number
 ): Promise<CalendarOwnerScope> {
   const calendarAuth = await getCalendarAuth(auth, calendarId);
+
+  // Asistents reaching a shared calendar must still be assigned to its
+  // owner to read that owner's clients / services / categories. Otherwise
+  // a calendar share alone would expose data the asistent shouldn't see.
+  if (auth.role === 'asistent') {
+    const assigned = auth.assigned_dentist_user_ids ?? [];
+    if (!assigned.includes(calendarAuth.calendarOwnerId)) {
+      throw new AuthError('Calendar not found', 404);
+    }
+  }
 
   return {
     userId: calendarAuth.calendarOwnerId,

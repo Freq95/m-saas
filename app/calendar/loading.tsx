@@ -1,10 +1,5 @@
-import styles from './page.module.css';
-import Spinner from '@/components/Spinner';
+import PageLoading from '@/components/PageLoading';
 
 export default function Loading() {
-  return (
-    <div className={styles.container}>
-      <Spinner />
-    </div>
-  );
+  return <PageLoading />;
 }

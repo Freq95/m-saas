@@ -98,7 +98,7 @@ describe('ClientSection', () => {
 
     render(<ClientSectionHarness initialName="Ana" />);
 
-    const input = screen.getByLabelText('Nume client *');
+    const input = screen.getByLabelText('Nume pacient *');
     fireEvent.focus(input);
 
     fireEvent.keyDown(input, { key: 'ArrowDown' });
@@ -106,7 +106,7 @@ describe('ClientSection', () => {
 
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
-    expect(screen.getByText(/Client existent:/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Sterge pacientul selectat')).toBeInTheDocument();
   });
 
   it('loads recent patients on focus with an empty query', () => {
@@ -121,7 +121,7 @@ describe('ClientSection', () => {
 
     render(<ClientSectionHarness initialName="" />);
 
-    const input = screen.getByLabelText('Nume client *');
+    const input = screen.getByLabelText('Nume pacient *');
     fireEvent.focus(input);
 
     expect(mockUseClientSuggestions).toHaveBeenLastCalledWith(expect.objectContaining({
@@ -146,9 +146,9 @@ describe('ClientSection', () => {
       <ClientSectionHarness initialName="Ana Popescu" initialSelectedClientId={1} />
     );
 
-    fireEvent.click(screen.getByLabelText('Deconecteaza clientul existent'));
+    fireEvent.click(screen.getByLabelText('Sterge pacientul selectat'));
 
-    const input = screen.getByLabelText('Nume client *');
+    const input = screen.getByLabelText('Nume pacient *');
     expect(document.activeElement).toBe(input);
     expect(screen.getByRole('listbox')).toBeInTheDocument();
   });
@@ -179,12 +179,12 @@ describe('ClientSection', () => {
 
     render(<ClientSectionHarness initialName="Ana" />);
 
-    expect(screen.getByText('Client nou — va fi creat la salvare')).toBeInTheDocument();
+    expect(screen.getByText('Pacient nou — va fi creat la salvare')).toBeInTheDocument();
 
-    const input = screen.getByLabelText('Nume client *');
+    const input = screen.getByLabelText('Nume pacient *');
     fireEvent.change(input, { target: { value: 'Anamaria' } });
 
-    expect(screen.queryByText('Client nou — va fi creat la salvare')).not.toBeInTheDocument();
+    expect(screen.queryByText('Pacient nou — va fi creat la salvare')).not.toBeInTheDocument();
   });
 });
 
@@ -300,7 +300,7 @@ describe('AppointmentModal', () => {
       />
     );
 
-    const input = screen.getByLabelText('Nume client *');
+    const input = screen.getByLabelText('Nume pacient *');
     fireEvent.focus(input);
 
     expect(screen.getByRole('listbox')).toBeInTheDocument();
@@ -391,6 +391,6 @@ describe('AppointmentModal', () => {
       calendarId: 2,
       query: '',
     }));
-    expect(screen.getByLabelText('Nume client *')).toHaveValue('');
+    expect(screen.getByLabelText('Nume pacient *')).toHaveValue('');
   });
 });

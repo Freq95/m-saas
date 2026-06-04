@@ -17,6 +17,7 @@ interface ClientSectionProps {
   onDropdownOpenChange?: (isOpen: boolean) => void;
   disabled: boolean;
   readOnly: boolean;
+  nameError?: string;
   /** Calendar context — used for permission validation in the API call. */
   calendarId?: number | null;
   /** Scopes patient suggestions to this specific dentist's client list. */
@@ -39,6 +40,7 @@ function ClientSectionBase({
   onDropdownOpenChange,
   disabled,
   readOnly,
+  nameError,
   calendarId,
   dentistUserId,
   isOwnDentist = true,
@@ -193,12 +195,13 @@ function ClientSectionBase({
   return (
     <>
       <div className={styles.modalField}>
-        <label htmlFor="appt-client-name">Nume pacient *</label>
+        <label htmlFor="appt-client-name">Nume pacient <span className={styles.requiredMark}>*</span></label>
         <div className={styles.clientAutocomplete} ref={wrapperRef}>
           <input
             ref={inputRef}
             id="appt-client-name"
             type="text"
+            className={`${hasLinked ? styles.clientNameInputLinked : ''} ${nameError ? styles.fieldControlError : ''}`}
             value={clientName}
             onChange={(event) => onNameChange(event.target.value)}
             onFocus={() => setIsFocused(true)}
@@ -213,10 +216,30 @@ function ClientSectionBase({
             aria-autocomplete="list"
             aria-expanded={showDropdown}
             aria-controls={listboxId}
+            aria-invalid={Boolean(nameError)}
+            aria-describedby={nameError ? 'appt-client-name-error' : undefined}
             aria-activedescendant={
               activeSuggestion ? `${listboxId}-option-${activeSuggestion.id}` : undefined
             }
           />
+          {hasLinked && (
+            <button
+              type="button"
+              className={styles.clientNameClearButton}
+              onClick={() => {
+                onClearLink();
+                setActiveIndex(-1);
+                setIsFocused(true);
+                window.requestAnimationFrame(() => {
+                  inputRef.current?.focus();
+                });
+              }}
+              aria-label="Sterge pacientul selectat"
+              disabled={disabled}
+            >
+              x
+            </button>
+          )}
           {showDropdown && (
             <div
               id={listboxId}
@@ -257,29 +280,10 @@ function ClientSectionBase({
             {error}
           </p>
         )}
-        {hasLinked && (
-          <div
-            className={`${styles.clientStatusBadge} ${styles.clientStatusBadgeExists}`}
-            role="status"
-          >
-            <span>✓ Pacient existent: {clientName}</span>
-            <button
-              type="button"
-              className={styles.clientStatusBadgeClear}
-              onClick={() => {
-                onClearLink();
-                setActiveIndex(-1);
-                setIsFocused(true);
-                window.requestAnimationFrame(() => {
-                  inputRef.current?.focus();
-                });
-              }}
-              aria-label="Deconecteaza pacientul existent"
-              disabled={disabled}
-            >
-              ×
-            </button>
-          </div>
+        {nameError && (
+          <p id="appt-client-name-error" className={styles.fieldErrorText} role="alert">
+            {nameError}
+          </p>
         )}
         {showNewClientBadge && isOwnDentist && (
           <div

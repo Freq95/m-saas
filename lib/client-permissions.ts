@@ -11,6 +11,11 @@ export type ClientScope = {
 export function canAccessClientsFor(auth: AuthContext, targetUserId: number): boolean {
   if (auth.userId === targetUserId) return true;
   if (auth.role === 'owner') return true;
+  // Receptionists handle front-desk operations for the whole clinic
+  // (booking, check-in, patient lookup) and therefore need tenant-wide
+  // read access. Their tenant scope is enforced one level up by
+  // assertTenantClientDentist / the auth context.
+  if (auth.role === 'receptionist') return true;
   if (auth.role === 'asistent' && auth.assigned_dentist_user_ids?.includes(targetUserId)) return true;
   return false;
 }
@@ -41,6 +46,26 @@ export async function resolveClientScopeForDentist(auth: AuthContext, targetUser
     await assertTenantClientDentist(auth, targetUserId);
   }
   return { userId: targetUserId, tenantId: auth.tenantId };
+}
+
+export async function resolveClientCreateScope(
+  auth: AuthContext,
+  requestedDentistUserId?: number
+): Promise<ClientScope> {
+  // Receptionists must pick a dentist explicitly — they don't own
+  // patient records themselves, so there's no sensible default.
+  if (auth.role === 'receptionist' && !requestedDentistUserId) {
+    throw new AuthError('Selecteaza medicul pentru care creezi pacientul.', 400);
+  }
+
+  const targetUserId = requestedDentistUserId
+    ?? (auth.role === 'asistent' ? auth.assigned_dentist_user_ids?.[0] : auth.userId);
+
+  if (!targetUserId) {
+    throw new AuthError('Nu exista un medic asociat pentru acest asistent.', 403);
+  }
+
+  return resolveClientScopeForDentist(auth, targetUserId);
 }
 
 export async function resolveClientScopeForClient(auth: AuthContext, clientId: number): Promise<ClientScope | null> {

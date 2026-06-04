@@ -45,6 +45,13 @@ function readGroupLabel(group: 'own' | 'shared' | undefined): string | null {
   return null;
 }
 
+function getServiceNames(appointment: Appointment): string[] {
+  if (Array.isArray(appointment.service_names) && appointment.service_names.length > 0) {
+    return appointment.service_names.filter((name) => typeof name === 'string' && name.trim().length > 0);
+  }
+  return appointment.service_name ? [appointment.service_name] : [];
+}
+
 export function CalendarScopeDropdown({
   selectedValues,
   options,
@@ -274,9 +281,11 @@ export function AppointmentCard({
   const isPast        = end.getTime() < Date.now();
   const status        = normalizeStatus(apt.status);
   const statusCfg     = getStatusConfig(status);
+  const isNoShow      = status === 'no-show';
   const resolvedColor = resolveAppointmentColor(apt, viewerUserId);
   const durationMin   = Math.round((end.getTime() - start.getTime()) / 60_000);
   const canChangeStatus = apt.can_change_status !== false;
+  const serviceSummary = getServiceNames(apt).join(' + ');
 
   return (
     <div className={styles.cardWrapper}>
@@ -284,7 +293,7 @@ export function AppointmentCard({
         <div className={styles.cardDateLabel}>{dateLabel}</div>
       )}
       <div
-        className={`${styles.card} ${isPast ? styles.cardPast : ''}`}
+        className={`${styles.card} ${isPast ? styles.cardPast : ''} ${isNoShow ? styles.cardNoShow : ''}`.trim()}
         onClick={() => {
           if (statusMenuOpen) { setStatusMenuOpen(false); return; }
           onClick(apt);
@@ -305,17 +314,7 @@ export function AppointmentCard({
             <span className={styles.duration}>{durationMin} min</span>
             <span className={styles.timeSep}>·</span>
             <span className={styles.service}>
-              {/* Show first service + "+N" when multi. Falls back to legacy
-                  service_name for appointments stored before the multi-service
-                  schema landed. Full list is in aria-label and the detail modal. */}
-              {Array.isArray(apt.service_names) && apt.service_names.length > 0
-                ? apt.service_names[0]
-                : apt.service_name}
-              {Array.isArray(apt.service_names) && apt.service_names.length > 1 && (
-                <span style={{ marginLeft: '0.25rem', opacity: 0.65 }}>
-                  +{apt.service_names.length - 1}
-                </span>
-              )}
+              {serviceSummary || apt.service_name}
             </span>
             {apt.recurrence_group_id !== undefined && apt.recurrence_group_id !== null && (
               <svg

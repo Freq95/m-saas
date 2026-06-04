@@ -10,7 +10,7 @@ import {
   getAppointmentConflictWarning,
   hasAvailabilityBlockConflict,
 } from '@/lib/appointment-conflict-response';
-import { getAuthUser, type AuthContext } from '@/lib/auth-helpers';
+import { AuthError, getAuthUser, type AuthContext } from '@/lib/auth-helpers';
 import {
   buildAppointmentDentistFields,
   getServiceOwnerScopeFromAppointment,
@@ -148,6 +148,9 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
 
     return createSuccessResponse({ appointment: finalAppointment });
   } catch (error) {
+    if (error instanceof AuthError && error.status === 403) {
+      return createErrorResponse('Appointment not found', 404);
+    }
     return handleApiError(error, 'Failed to fetch appointment');
   }
 }
@@ -238,11 +241,13 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     if (typeof existingAppointment.calendar_id === 'number') {
       const calendarAuth = await getCalendarAuth(auth, existingAppointment.calendar_id);
       if (!canEditAppointment(calendarAuth, existingAppointment as any, dbUserId)) {
-        return createErrorResponse('Not authorized to edit this appointment', 403);
+        // 404 (not 403) so we don't confirm the appointment exists to a
+        // caller who shouldn't see it.
+        return createErrorResponse('Appointment not found', 404);
       }
       isSharedCalendar = !calendarAuth.isOwner;
     } else if (!matchesLegacyAppointmentOwner(existingAppointment, auth)) {
-      return createErrorResponse('Not found or not authorized', 404);
+      return createErrorResponse('Appointment not found', 404);
     }
 
     const appointmentTenantId = existingAppointment.tenant_id;
@@ -1047,10 +1052,12 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
     if (typeof existingAppointment.calendar_id === 'number') {
       const calendarAuth = await getCalendarAuth(auth, existingAppointment.calendar_id);
       if (!canDeleteAppointment(calendarAuth, existingAppointment as any, dbUserId)) {
-        return createErrorResponse('Not authorized to delete this appointment', 403);
+        // 404 (not 403) so we don't confirm the appointment exists to a
+        // caller who shouldn't see it.
+        return createErrorResponse('Appointment not found', 404);
       }
     } else if (!matchesLegacyAppointmentOwner(existingAppointment, auth)) {
-      return createErrorResponse('Not found or not authorized', 404);
+      return createErrorResponse('Appointment not found', 404);
     }
 
     const result = await db.collection('appointments').updateOne(

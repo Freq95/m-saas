@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getEmailIntegrationById } from '@/lib/email-integrations';
 import { fetchYahooEmails } from '@/lib/yahoo-mail';
@@ -6,13 +6,20 @@ import { fetchGmailMessages, getValidAccessToken } from '@/lib/gmail';
 import { logger } from '@/lib/logger';
 import { decrypt } from '@/lib/encryption';
 import { integrationIdParamSchema } from '@/lib/validation';
-import { getAuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, isClinicalRole } from '@/lib/auth-helpers';
 
 // POST /api/settings/email-integrations/[id]/fetch-last-email
 export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
+
+    // Email integrations are clinic-config — owner + dentists only.
+    if (!isClinicalRole(auth.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const { userId, tenantId } = auth;
     // Validate route parameter
     const paramValidation = integrationIdParamSchema.safeParse({ id: params.id });
     if (!paramValidation.success) {

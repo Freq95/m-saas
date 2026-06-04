@@ -34,9 +34,12 @@ export async function GET(request: NextRequest) {
     ]
       .map((calendar: any) => calendar.id)
       .filter((id: unknown): id is number => typeof id === 'number');
+    const dashboardUserIds = role === 'asistent' && auth.assigned_dentist_user_ids?.length
+      ? auth.assigned_dentist_user_ids
+      : [userId];
     const cacheKey = dashboardVisibleCalendarsCacheKey({ tenantId, userId }, numericDays, visibleCalendarIds);
     const data = await getCached(cacheKey, 900, async () =>
-      getDashboardData(userId, tenantId, numericDays, visibleCalendarIds)
+      getDashboardData(userId, tenantId, numericDays, visibleCalendarIds, dashboardUserIds)
     );
 
     await logDataAccess({

@@ -1,16 +1,23 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { saveEmailIntegration } from '@/lib/email-integrations';
 import { testYahooConnection } from '@/lib/yahoo-mail';
 import { createYahooIntegrationSchema } from '@/lib/validation';
 import { logger } from '@/lib/logger';
-import { getAuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, isClinicalRole } from '@/lib/auth-helpers';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 
 // POST /api/settings/email-integrations/yahoo
 export async function POST(request: NextRequest) {
   try {
-    const { userId, tenantId, email: actorEmail } = await getAuthUser();
+    const auth = await getAuthUser();
+
+    // Email integrations are clinic-config — owner + dentists only.
+    if (!isClinicalRole(auth.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const { userId, tenantId, email: actorEmail } = auth;
     const body = await request.json();
     
     const validationResult = createYahooIntegrationSchema.safeParse(body);

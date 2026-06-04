@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getClientsData } from '@/lib/server/clients';
-import { findOrCreateClient } from '@/lib/client-matching';
+import { findMatchingClient, findOrCreateClient } from '@/lib/client-matching';
 import { handleApiError, createSuccessResponse } from '@/lib/error-handler';
 import { getAuthUser } from '@/lib/auth-helpers';
 import { resolveCalendarOwnerScope } from '@/lib/calendar-owner-scope';
 import { resolveBookableDentistForCalendar } from '@/lib/calendar-dentists';
-import { resolveClientScopeForDentist } from '@/lib/client-permissions';
+import { resolveClientCreateScope, resolveClientScopeForDentist } from '@/lib/client-permissions';
 import { getCached } from '@/lib/redis';
 import { clientsListCacheKey, invalidateReadCaches } from '@/lib/cache-keys';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
@@ -107,9 +107,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/clients - Create a new client (always in caller's own tenant)
-// Share recipients cannot create clients in the calendar owner's tenant via
-// this endpoint — patient creation in shared calendars must be done by the owner.
+// POST /api/clients - Create a new client in the selected/managed dentist scope.
 export async function POST(request: NextRequest) {
   try {
     const auth = await getAuthUser();
@@ -130,18 +128,38 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    const { name, email, phone, notes, consent_given, consent_date, consent_method, is_minor, parent_guardian_name, dentistUserId } = validationResult.data;
-    const targetScope = await resolveClientScopeForDentist(auth, dentistUserId ?? userId);
+    const { name, email, phone, notes, consent_given, consent_date, consent_method, is_minor, parent_guardian_name, dentistUserId, forceNew } = validationResult.data;
+    const targetScope = await resolveClientCreateScope(auth, dentistUserId);
 
-    // Use findOrCreateClient to avoid duplicates
+    // Use a read-only duplicate lookup before any write. `forceNew` lets the
+    // /clients/new flow bypass this prompt after the user explicitly confirms
+    // they want a duplicate despite a same-name match.
     let client;
+    let matched = false;
     try {
+      if (!forceNew) {
+        const existingClient = await findMatchingClient(
+          targetScope.userId,
+          targetScope.tenantId,
+          name,
+          email,
+          phone
+        );
+        if (existingClient) {
+          return createSuccessResponse({
+            client: existingClient,
+            matched: true,
+          }, 200);
+        }
+      }
+
       client = await findOrCreateClient(
         targetScope.userId,
         targetScope.tenantId,
         name,
         email,
-        phone
+        phone,
+        forceNew === true,
       );
     } catch (error: any) {
       logger.error('Error in findOrCreateClient', error instanceof Error ? error : new Error(String(error)), { name, email, phone });
@@ -180,6 +198,10 @@ export async function POST(request: NextRequest) {
     });
     return createSuccessResponse({
       client: responseClient,
+      // True when the server reused an existing same-name record instead of
+      // creating a fresh one. Lets the UI surface a "Foloseste / Creeaza
+      // duplicat / Anuleaza" prompt rather than silently merging.
+      matched,
     }, 201);
   } catch (error) {
     return handleApiError(error, 'Failed to create client');

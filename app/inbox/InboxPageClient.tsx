@@ -8,6 +8,7 @@ import styles from './page.module.css';
 import { useToast } from '@/lib/useToast';
 import { useIsMobile } from '@/lib/useIsMobile';
 import { ToastContainer } from '@/components/Toast';
+import PageLoading from '@/components/PageLoading';
 
 // 1×1 transparent GIF, used to replace external img src values that the
 // parent CSP would block. Keeps email layout stable (no broken-image icons)
@@ -1726,53 +1727,9 @@ export default function InboxPageClient({
   }, [isMobile]);
 
   if (loading) {
-    return (
-      <div className={styles.container}>
-        <div className={styles.inbox}>
-          <div className={styles.conversationList} style={{ width: '380px' }}>
-            <div className={styles.searchContainer}>
-              <div className="skeleton skeleton-line" style={{ height: '38px', width: '100%', marginBottom: '0.5rem' }} />
-              <div className="skeleton skeleton-line" style={{ height: '36px', width: '100%' }} />
-            </div>
-            <div className={styles.conversationListContent} style={{ padding: '0.4rem' }}>
-              <div className="skeleton-stack">
-                {Array.from({ length: 8 }).map((_, idx) => (
-                  <div key={idx} className="skeleton skeleton-card" style={{ height: '72px' }} />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.divider} />
-
-          <div className={styles.thread}>
-            <div className={styles.threadHeader}>
-              <div className="skeleton-stack" style={{ width: '280px' }}>
-                <div className="skeleton skeleton-line" style={{ height: '16px', width: '58%' }} />
-                <div className="skeleton skeleton-line" style={{ height: '12px', width: '86%' }} />
-              </div>
-            </div>
-
-            <div className={styles.messages} style={{ padding: '0.8rem' }}>
-              <div className="skeleton-stack">
-                {Array.from({ length: 6 }).map((_, idx) => (
-                  <div
-                    key={idx}
-                    className="skeleton skeleton-card"
-                    style={{ height: idx % 2 === 0 ? '56px' : '92px', width: idx % 2 === 0 ? '64%' : '84%' }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className={styles.messageInput}>
-              <div className="skeleton skeleton-line" style={{ height: '42px', width: '100%' }} />
-              <div className="skeleton skeleton-line" style={{ height: '42px', width: '110px' }} />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    // Unified loading appearance — full-viewport spinner overlay on a
+    // solid theme background, no skeleton bars.
+    return <PageLoading />;
   }
 
   return (

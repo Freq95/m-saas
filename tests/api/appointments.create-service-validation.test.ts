@@ -84,6 +84,12 @@ vi.mock('@/lib/client-matching', () => ({
   linkAppointmentToClient: mockLinkAppointmentToClient,
 }));
 
+vi.mock('@/lib/server/calendar', () => ({
+  attachCalendarDisplayData: vi.fn(async (appointments: any[]) => appointments),
+  getAppointmentsData: vi.fn(),
+  projectMultiServiceFields: vi.fn((appointment: any) => appointment),
+}));
+
 import { POST } from '@/app/api/appointments/route';
 
 describe('POST /api/appointments service validation', () => {
@@ -146,7 +152,12 @@ describe('POST /api/appointments service validation', () => {
       collection(name: string) {
         if (name === 'services') {
           return {
-            findOne: serviceFindOne,
+            find: (query: Doc) => ({
+              toArray: async () => {
+                const doc = await serviceFindOne(query);
+                return doc ? [doc] : [];
+              },
+            }),
           };
         }
 
@@ -196,7 +207,7 @@ describe('POST /api/appointments service validation', () => {
     expect(res.status).toBe(400);
     expect(json.error).toBe('Selected service was not found for the chosen dentist');
     expect(serviceFindOne).toHaveBeenCalledWith(expect.objectContaining({
-      id: 999,
+      id: { $in: [999] },
       user_id: 13,
       tenant_id: tenantId,
       deleted_at: { $exists: false },
@@ -283,7 +294,7 @@ describe('POST /api/appointments service validation', () => {
 
     expect(res.status).toBe(201);
     expect(serviceFindOne).toHaveBeenCalledWith(expect.objectContaining({
-      id: 222,
+      id: { $in: [222] },
       user_id: 13,
       tenant_id: tenantId,
       deleted_at: { $exists: false },
@@ -401,7 +412,7 @@ describe('POST /api/appointments service validation', () => {
 
     expect(res.status).toBe(201);
     expect(serviceFindOne).toHaveBeenCalledWith(expect.objectContaining({
-      id: 333,
+      id: { $in: [333] },
       user_id: 99,
       tenant_id: tenantId,
       deleted_at: { $exists: false },
@@ -417,7 +428,7 @@ describe('POST /api/appointments service validation', () => {
     }));
   });
 
-  it('links the explicitly selected client when clientId is provided', async () => {
+  it('links the explicitly selected client when clientId is provided without a redundant clientName', async () => {
     serviceFindOne.mockResolvedValue({
       id: 222,
       name: 'Consultatie initiala',
@@ -438,7 +449,6 @@ describe('POST /api/appointments service validation', () => {
         calendarId: 11,
         serviceId: 222,
         clientId,
-        clientName: 'Alice Example',
         startTime: '2026-04-09T09:00:00.000Z',
         endTime: '2026-04-09T09:30:00.000Z',
       }),

@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import ClientCreateModal from '@/components/ClientCreateModal';
 import MobileClientsView from './MobileClientsView';
 import { useIsMobile } from '@/lib/useIsMobile';
 import { logger } from '@/lib/logger';
 import styles from './page.module.css';
 import navStyles from '../dashboard/page.module.css';
+import PageLoading from '@/components/PageLoading';
 
 interface Client {
   id: number;
@@ -52,7 +52,6 @@ export default function ClientsPageClient({
   const [consentFilter, setConsentFilter] = useState<'all' | 'consented' | 'not_consented' | 'withdrawn'>('all');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState<PaginationInfo | null>(initialPagination);
-  const [showCreateModal, setShowCreateModal] = useState(false);
   const [hasFinishedInitialLoad, setHasFinishedInitialLoad] = useState(initialClients.length > 0);
   const [selectedDentistUserId, setSelectedDentistUserId] = useState<number | undefined>(initialDentistUserId);
   const skipInitialFetch = useRef(true);
@@ -162,6 +161,10 @@ export default function ClientsPageClient({
   // tappable rows + FAB). Desktop keeps the current table layout below.
   const isMobile = useIsMobile();
   const exportHref = `/api/clients/export${selectedDentistUserId ? `?dentistUserId=${selectedDentistUserId}` : ''}`;
+  const openCreateClient = () => {
+    const suffix = selectedDentistUserId ? `?dentistUserId=${selectedDentistUserId}` : '';
+    router.push(`/clients/new${suffix}`);
+  };
 
   if (isMobile) {
     return (
@@ -199,19 +202,10 @@ export default function ClientsPageClient({
             }}
             showDentistSelector={showDentistSelector}
             exportHref={exportHref}
-            onAddClient={() => setShowCreateModal(true)}
+            onAddClient={openCreateClient}
           />
         </div>
 
-        <ClientCreateModal
-          isOpen={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-          dentistUserId={selectedDentistUserId}
-          onCreated={(client) => {
-            setShowCreateModal(false);
-            router.push(`/clients/${client.id}`);
-          }}
-        />
       </div>
     );
   }
@@ -296,7 +290,7 @@ export default function ClientsPageClient({
             </a>
             <button
               type="button"
-              onClick={() => setShowCreateModal(true)}
+              onClick={openCreateClient}
               className={styles.addButton}
             >
               + Adauga pacient
@@ -305,19 +299,13 @@ export default function ClientsPageClient({
         </div>
 
         {loading && !hasFinishedInitialLoad ? (
-          <div className={styles.tableContainer} style={{ padding: '1rem' }}>
-            <div className="skeleton-stack">
-              {Array.from({ length: 8 }).map((_, index) => (
-                <div key={index} className="skeleton skeleton-line" style={{ height: '20px', width: '100%' }} />
-              ))}
-            </div>
-          </div>
+          <PageLoading />
         ) : clients.length === 0 ? (
           <div className={styles.empty}>
             <p>Nu exista pacienti inregistrati. Apasa 'Adauga primul pacient' pentru a adauga primul pacient.</p>
             <button
               type="button"
-              onClick={() => setShowCreateModal(true)}
+              onClick={openCreateClient}
               className={styles.addButton}
             >
               Adauga primul pacient
@@ -419,15 +407,6 @@ export default function ClientsPageClient({
           </div>
         )}
 
-        <ClientCreateModal
-          isOpen={showCreateModal}
-          onClose={() => setShowCreateModal(false)}
-          dentistUserId={selectedDentistUserId}
-          onCreated={(client) => {
-            setShowCreateModal(false);
-            router.push(`/clients/${client.id}`);
-          }}
-        />
       </div>
     </div>
   );

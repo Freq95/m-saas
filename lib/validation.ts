@@ -65,7 +65,7 @@ export const createAppointmentSchema = z.object({
   serviceId: z.number().int().positive().optional(),
   serviceIds: serviceIdsArraySchema.optional(),
   clientId: z.number().int().positive().nullable().optional(),
-  clientName: z.string().min(1, 'Client name is required').max(255),
+  clientName: z.string().min(1, 'Client name is required').max(255).optional(),
   clientEmail: emailSchema.optional(),
   clientPhone: phoneSchema,
   forceNewClient: z.boolean().optional(),
@@ -80,6 +80,9 @@ export const createAppointmentSchema = z.object({
 }).strict().refine(
   (data) => data.serviceId !== undefined || (data.serviceIds && data.serviceIds.length > 0),
   { message: 'Cel putin un serviciu este obligatoriu', path: ['serviceIds'] }
+).refine(
+  (data) => typeof data.clientId === 'number' || Boolean(data.clientName?.trim()),
+  { message: 'Client name is required when clientId is not provided', path: ['clientName'] }
 );
 
 export const updateAppointmentSchema = z.object({
@@ -198,7 +201,7 @@ export const createRecurringAppointmentSchema = z
     serviceId: z.number().int().positive().optional(),
     serviceIds: serviceIdsArraySchema.optional(),
     clientId: z.number().int().positive().nullable().optional(),
-    clientName: z.string().min(1, 'Client name is required').max(255),
+    clientName: z.string().min(1, 'Client name is required').max(255).optional(),
     clientEmail: emailSchema.optional(),
     clientPhone: phoneSchema,
     startTime: dateTimeSchema,
@@ -214,6 +217,10 @@ export const createRecurringAppointmentSchema = z
   .refine(
     (data) => data.serviceId !== undefined || (data.serviceIds && data.serviceIds.length > 0),
     { message: 'Cel putin un serviciu este obligatoriu', path: ['serviceIds'] }
+  )
+  .refine(
+    (data) => typeof data.clientId === 'number' || Boolean(data.clientName?.trim()),
+    { message: 'Client name is required when clientId is not provided', path: ['clientName'] }
   );
 
 // Client schemas
@@ -230,6 +237,10 @@ export const createClientSchema = z.object({
   is_minor: z.boolean().optional(),
   parent_guardian_name: z.string().max(255).optional(),
   dentistUserId: z.number().int().positive().optional(),
+  // When true, skip the existing-by-name match in findOrCreateClient and
+  // always insert a new record. Used by the /clients/new flow after the
+  // user confirms they want a duplicate despite a same-name match.
+  forceNew: z.boolean().optional(),
 });
 
 export const updateClientSchema = z.object({

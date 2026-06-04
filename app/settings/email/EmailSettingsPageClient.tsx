@@ -9,6 +9,8 @@ import { fetchWithRetry } from '@/lib/retry';
 import { useToast } from '@/lib/useToast';
 import { ToastContainer } from '@/components/Toast';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import Spinner from '@/components/Spinner';
+import PageLoading from '@/components/PageLoading';
 import styles from './page.module.css';
 import navStyles from '../../dashboard/page.module.css';
 import SettingsTabs from '../SettingsTabs';
@@ -408,17 +410,10 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId, isOwner 
     : null;
 
   if (loading) {
-    return (
-      <div className={navStyles.container}>
-        <div className={styles.container}>
-          <SettingsMobileHeader title="Email" />
-          <div className={styles.tabRow}>
-            <SettingsTabs activeTab="email" isOwner={isOwner} />
-          </div>
-          <div role="status" aria-live="polite">Încărcare...</div>
-        </div>
-      </div>
-    );
+    // Uniform initial-load state — PageLoading paints a solid overlay
+    // so the user doesn't see half-rendered tabs/chrome with empty body
+    // bars during the brief fetch window.
+    return <PageLoading />;
   }
 
   const sanitizeHtml = (html: string): string => {

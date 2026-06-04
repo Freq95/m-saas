@@ -20,11 +20,19 @@ export default async function ServicesSettingsPage() {
   let selectedDentistUserId: number | null = auth.userId;
   try {
     const db = await getMongoDbOrThrow();
-    const dentistDocs = await db.collection('users').find({
+    const dentistFilter: Record<string, unknown> = {
       tenant_id: auth.tenantId,
       role: { $in: ['owner', 'dentist'] },
       status: { $ne: 'deleted' },
-    }).project({ id: 1, name: 1, email: 1 }).sort({ name: 1 }).toArray();
+    };
+    if (auth.role === 'asistent') {
+      dentistFilter.id = { $in: auth.assigned_dentist_user_ids ?? [] };
+    }
+
+    const dentistDocs = await db.collection('users').find(dentistFilter)
+      .project({ id: 1, name: 1, email: 1 })
+      .sort({ name: 1 })
+      .toArray();
     dentists = dentistDocs
       .filter((dentist: any) => typeof dentist.id === 'number')
       .map((dentist: any) => ({

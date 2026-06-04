@@ -26,6 +26,7 @@ import { useModal } from '@/lib/useModal';
 import { useFocusRestore } from '@/lib/useFocusRestore';
 import NumberStepper from '@/components/NumberStepper';
 import { RecurrenceScopeModal } from '../RecurrenceScopeModal';
+import { StatusPill } from '../../StatusPill/StatusPill';
 import type {
   AppointmentFormPayload,
   AppointmentInitialData,
@@ -33,6 +34,11 @@ import type {
   AppointmentService,
   CalendarOption,
 } from './types';
+
+type DesktopFieldErrors = Partial<Record<
+  'calendarId' | 'serviceIds' | 'clientName' | 'date' | 'startTime' | 'endTime' | 'recurrenceInterval' | 'recurrenceCount' | 'recurrenceEndDate',
+  string
+>>;
 
 interface AppointmentModalProps {
   isOpen: boolean;
@@ -49,6 +55,13 @@ interface AppointmentModalProps {
   initialData?: AppointmentInitialData | null;
   allowRecurring?: boolean;
   appointmentStatus?: string;
+  /** Numeric ID of the appointment being viewed/edited. Used by the status
+   *  pill to fire a status-change PATCH without going through the full save. */
+  appointmentId?: number;
+  /** Fired when the user picks a new status from the pill dropdown. */
+  onStatusChange?: (id: number, status: string) => void;
+  /** When false, the status pill renders as a static badge with no dropdown. */
+  canChangeStatus?: boolean;
   canEdit?: boolean;
   canDelete?: boolean;
   /** True when this specific appointment is one occurrence in a recurring series.
@@ -75,6 +88,9 @@ export function AppointmentModal({
   initialData,
   allowRecurring = true,
   appointmentStatus,
+  appointmentId,
+  onStatusChange,
+  canChangeStatus = true,
   canEdit = true,
   canDelete = true,
   isRecurringInstance = false,
@@ -194,6 +210,7 @@ export function AppointmentModal({
   const { submit } = useAppointmentSubmit(onSubmit);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [clientDropdownOpen, setClientDropdownOpen] = useState(false);
+  const [desktopFieldErrors, setDesktopFieldErrors] = useState<DesktopFieldErrors>({});
   // When editing a recurring appointment we ask the user to pick scope
   // ('this' or 'series') BEFORE actually firing the save. The pending
   // payload is buffered here while the RecurrenceScopeModal is open.
@@ -217,17 +234,84 @@ export function AppointmentModal({
   useEffect(() => {
     if (isOpen) return;
     setClientDropdownOpen(false);
+    setDesktopFieldErrors({});
   }, [isOpen]);
+
+  const clearDesktopFieldError = useCallback((field: keyof DesktopFieldErrors) => {
+    setDesktopFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  }, []);
+
+  const focusDesktopField = useCallback((field: keyof DesktopFieldErrors) => {
+    const idByField: Record<keyof DesktopFieldErrors, string> = {
+      calendarId: 'appt-calendar',
+      serviceIds: 'appt-service-picker',
+      clientName: 'appt-client-name',
+      date: 'appt-date',
+      startTime: 'appt-start-time',
+      endTime: 'appt-end-time',
+      recurrenceInterval: 'appt-rec-interval',
+      recurrenceCount: 'appt-rec-count',
+      recurrenceEndDate: 'appt-rec-end-date',
+    };
+    window.requestAnimationFrame(() => {
+      document.getElementById(idByField[field])?.focus();
+    });
+  }, []);
+
+  const getDesktopFieldErrors = useCallback((): DesktopFieldErrors => {
+    const next: DesktopFieldErrors = {};
+    if (!state.calendarId) next.calendarId = 'Selecteaza un calendar.';
+    if (state.serviceIds.length === 0) next.serviceIds = 'Selecteaza cel putin un serviciu.';
+    if (!state.clientName.trim()) next.clientName = 'Completeaza numele pacientului.';
+    if (!state.date) next.date = 'Selecteaza data.';
+    if (!state.startTime) next.startTime = 'Selecteaza ora de inceput.';
+    if (!state.endTime) next.endTime = 'Selecteaza ora de final.';
+    if (state.startTime && state.endTime && state.startTime >= state.endTime) {
+      next.endTime = 'Ora de final trebuie sa fie dupa ora de inceput.';
+    }
+    if (state.isRecurring) {
+      if (state.recurrence.interval < 1) next.recurrenceInterval = 'Minim 1.';
+      if (state.recurrence.endType === 'count' && state.recurrence.count < 1) {
+        next.recurrenceCount = 'Minim 1 repetare.';
+      }
+      if (state.recurrence.endType === 'date' && !state.recurrence.endDate) {
+        next.recurrenceEndDate = 'Selecteaza data finala.';
+      }
+    }
+    return next;
+  }, [state]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (readOnly || isSubmitting) return;
     if (noWritableCalendars) {
+      if (!isMobile) {
+        setDesktopFieldErrors({ calendarId: 'Nu exista calendare disponibile pentru creare.' });
+        dispatch({ type: 'SET_ERROR', error: null });
+        focusDesktopField('calendarId');
+        return;
+      }
       dispatch({
         type: 'SET_ERROR',
         error: 'Nu exista calendare disponibile pentru creare.',
       });
       return;
+    }
+    if (!isMobile) {
+      const nextFieldErrors = getDesktopFieldErrors();
+      const firstField = Object.keys(nextFieldErrors)[0] as keyof DesktopFieldErrors | undefined;
+      if (firstField) {
+        setDesktopFieldErrors(nextFieldErrors);
+        dispatch({ type: 'SET_ERROR', error: null });
+        focusDesktopField(firstField);
+        return;
+      }
+      setDesktopFieldErrors({});
     }
     const error = validate(state);
     if (error) {
@@ -239,6 +323,11 @@ export function AppointmentModal({
     const startIso = composeIso(state.date, state.startTime);
     const endIso = composeIso(state.date, state.endTime);
     if (!startIso || !endIso) {
+      if (!isMobile) {
+        setDesktopFieldErrors({ date: 'Data si ora nu sunt valide.' });
+        focusDesktopField('date');
+        return;
+      }
       dispatch({ type: 'SET_ERROR', error: 'Data si ora nu sunt valide.' });
       return;
     }
@@ -380,6 +469,9 @@ export function AppointmentModal({
           isSubmitting={isSubmitting}
           noWritableCalendars={noWritableCalendars}
           appointmentStatus={appointmentStatus}
+          appointmentId={appointmentId}
+          onStatusChange={onStatusChange}
+          canChangeStatus={canChangeStatus}
           canEdit={canEdit}
           canDelete={canDelete}
           isRecurringInstance={isRecurringInstance}
@@ -439,7 +531,20 @@ export function AppointmentModal({
                 aria-label="Editeaza"
                 title="Editeaza"
               >
-                ✎
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
               </button>
             )}
             {mode === 'view' && canDelete && onDelete && (
@@ -450,7 +555,23 @@ export function AppointmentModal({
                 aria-label="Sterge"
                 title="Sterge"
               >
-                ✕
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14H6L5 6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                  <path d="M9 6V4h6v2" />
+                </svg>
               </button>
             )}
             <button
@@ -472,7 +593,15 @@ export function AppointmentModal({
               {appointmentStatus && readOnly && (
                 <div className={styles.modalField}>
                   <label>Status</label>
-                  <div className={styles.previewValue}>{appointmentStatus}</div>
+                  <div className={styles.previewValue}>
+                    <StatusPill
+                      status={appointmentStatus}
+                      canChange={Boolean(appointmentId && onStatusChange && canChangeStatus)}
+                      onChange={(next) => {
+                        if (appointmentId && onStatusChange) onStatusChange(appointmentId, next);
+                      }}
+                    />
+                  </div>
                 </div>
               )}
 
@@ -481,9 +610,10 @@ export function AppointmentModal({
                   <CalendarPickerSection
                     calendarOptions={calendarOptions}
                     calendarId={state.calendarId}
-                    onCalendarChange={(id) =>
-                      dispatch({ type: 'SET_CALENDAR', calendarId: id })
-                    }
+                    onCalendarChange={(id) => {
+                      clearDesktopFieldError('calendarId');
+                      dispatch({ type: 'SET_CALENDAR', calendarId: id });
+                    }}
                     dentists={dentists}
                     dentistUserId={state.dentistUserId}
                     onDentistChange={(id) =>
@@ -494,16 +624,19 @@ export function AppointmentModal({
                     lockCalendar={lockCalendarSelection}
                     disabled={isSubmitting}
                     readOnly={readOnly}
+                    calendarError={desktopFieldErrors.calendarId}
                   />
 
                   <ServiceSection
                     services={effectiveServices}
                     serviceIds={state.serviceIds}
-                    onChange={(serviceIds, totalDurationMinutes) =>
-                      dispatch({ type: 'SET_SERVICES', serviceIds, totalDurationMinutes })
-                    }
+                    onChange={(serviceIds, totalDurationMinutes) => {
+                      clearDesktopFieldError('serviceIds');
+                      dispatch({ type: 'SET_SERVICES', serviceIds, totalDurationMinutes });
+                    }}
                     loading={loadingServices}
                     error={servicesError}
+                    validationError={desktopFieldErrors.serviceIds}
                     disabled={isSubmitting}
                     readOnly={readOnly}
                     readOnlyNames={initialData?.serviceNames}
@@ -513,18 +646,34 @@ export function AppointmentModal({
                     date={state.date}
                     startTime={state.startTime}
                     endTime={state.endTime}
-                    onChange={(patch) => dispatch({ type: 'SET_TIME', ...patch })}
+                    onChange={(patch) => {
+                      if (patch.date !== undefined) clearDesktopFieldError('date');
+                      if (patch.startTime !== undefined) clearDesktopFieldError('startTime');
+                      if (patch.endTime !== undefined) clearDesktopFieldError('endTime');
+                      dispatch({ type: 'SET_TIME', ...patch });
+                    }}
                     allowRecurring={allowRecurring}
                     isRecurring={state.isRecurring}
                     onRecurringToggle={(value) =>
                       dispatch({ type: 'SET_IS_RECURRING', value })
                     }
                     recurrence={state.recurrence}
-                    onRecurrenceChange={(patch) =>
-                      dispatch({ type: 'SET_RECURRENCE', patch })
-                    }
+                    onRecurrenceChange={(patch) => {
+                      if (patch.interval !== undefined) clearDesktopFieldError('recurrenceInterval');
+                      if (patch.count !== undefined) clearDesktopFieldError('recurrenceCount');
+                      if (patch.endDate !== undefined) clearDesktopFieldError('recurrenceEndDate');
+                      dispatch({ type: 'SET_RECURRENCE', patch });
+                    }}
                     disabled={isSubmitting}
                     readOnly={readOnly}
+                    errors={{
+                      date: desktopFieldErrors.date,
+                      startTime: desktopFieldErrors.startTime,
+                      endTime: desktopFieldErrors.endTime,
+                      recurrenceInterval: desktopFieldErrors.recurrenceInterval,
+                      recurrenceCount: desktopFieldErrors.recurrenceCount,
+                      recurrenceEndDate: desktopFieldErrors.recurrenceEndDate,
+                    }}
                   />
                 </div>
 
@@ -539,25 +688,28 @@ export function AppointmentModal({
                     calendarId={numericCalendarId}
                     dentistUserId={numericDentistUserId}
                     isOwnDentist={isOwnDentist}
-                    onNameChange={(value) =>
-                      dispatch({ type: 'SET_CLIENT_NAME', value })
-                    }
+                    onNameChange={(value) => {
+                      clearDesktopFieldError('clientName');
+                      dispatch({ type: 'SET_CLIENT_NAME', value });
+                    }}
                     onFieldChange={(field, value) =>
                       dispatch({ type: 'SET_FIELD', field, value })
                     }
-                    onApplySuggestion={(suggestion) =>
+                    onApplySuggestion={(suggestion) => {
+                      clearDesktopFieldError('clientName');
                       dispatch({
                         type: 'APPLY_CLIENT_SUGGESTION',
                         clientId: suggestion.id,
                         name: suggestion.name,
                         email: suggestion.email,
                         phone: suggestion.phone,
-                      })
-                    }
+                      });
+                    }}
                     onClearLink={() => dispatch({ type: 'CLEAR_CLIENT_LINK' })}
                     onDropdownOpenChange={setClientDropdownOpen}
                     disabled={isSubmitting}
                     readOnly={readOnly}
+                    nameError={desktopFieldErrors.clientName}
                   />
 
                   {showCategoryPicker && (
@@ -629,6 +781,9 @@ interface MobileSheetProps {
   isSubmitting: boolean;
   noWritableCalendars: boolean;
   appointmentStatus?: string;
+  appointmentId?: number;
+  onStatusChange?: (id: number, status: string) => void;
+  canChangeStatus: boolean;
   canEdit: boolean;
   canDelete: boolean;
   isRecurringInstance: boolean;
@@ -663,7 +818,8 @@ interface MobileSheetProps {
 function MobileAppointmentSheet(props: MobileSheetProps) {
   const {
     mode, readOnly, title, isSubmitting, noWritableCalendars,
-    appointmentStatus, canEdit, canDelete, isRecurringInstance, allowRecurring, initialData,
+    appointmentStatus, appointmentId, onStatusChange, canChangeStatus,
+    canEdit, canDelete, isRecurringInstance, allowRecurring, initialData,
     state, dispatch, calendarOptions, selectedCalendarOption,
     dentists, selectedDentist, loadingDentists, dentistError,
     effectiveServices, loadingServices, servicesError,
@@ -824,7 +980,15 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
                     <span className={m.rowIcon}><StatusIcon /></span>
                     <div className={m.rowMain}>
                       <div className={m.rowLabel}>Status</div>
-                      <div className={m.rowValue}>{appointmentStatus}</div>
+                      <div className={`${m.rowValue} ${m.rowValueInteractive}`}>
+                        <StatusPill
+                          status={appointmentStatus}
+                          canChange={Boolean(appointmentId && onStatusChange && canChangeStatus)}
+                          onChange={(next) => {
+                            if (appointmentId && onStatusChange) onStatusChange(appointmentId, next);
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -875,6 +1039,127 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
                 </div>
               </div>
 
+              {/* ── Calendar (when multiple options) ── */}
+              {calendarOptions.length > 1 && (
+                <div className={m.section}>
+                  <button
+                    type="button"
+                    className={m.row}
+                    onClick={() => !calendarRowDisabled && toggleExpanded('calendar')}
+                    disabled={calendarRowDisabled}
+                  >
+                    <span className={m.rowIcon}><CalendarIcon /></span>
+                    <div className={m.rowMain}>
+                      <div className={m.rowLabel}>Calendar</div>
+                      <div className={m.rowValue}>
+                        {selectedCalendarOption?.name || 'Selecteaza calendar'}
+                      </div>
+                    </div>
+                    {!calendarRowDisabled && (
+                      <span className={`${m.rowChevron} ${expandedRow === 'calendar' ? m.rowChevronOpen : ''}`}>
+                        <ChevronRightIcon />
+                      </span>
+                    )}
+                  </button>
+                  {!calendarRowDisabled && expandedRow === 'calendar' && (
+                    <div className={m.expanded}>
+                      {calendarOptions.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          className={`${m.option} ${String(c.id) === state.calendarId ? m.optionSelected : ''}`}
+                          disabled={c.disabled}
+                          onClick={() => {
+                            dispatch({ type: 'SET_CALENDAR', calendarId: String(c.id) });
+                            toggleExpanded('calendar');
+                          }}
+                        >
+                          <span>{c.name}</span>
+                          {c.isOwn === false && <span className={m.optionMeta}>Partajat</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Services (multi-select) ── */}
+              <div className={m.section}>
+                <button
+                  type="button"
+                  className={m.row}
+                  onClick={() => !readOnly && toggleExpanded('service')}
+                  disabled={readOnly && selectedServices.length === 0}
+                >
+                  <span className={m.rowIcon}><BriefcaseIcon /></span>
+                  <div className={m.rowMain}>
+                    <div className={m.rowLabel}>
+                      Servicii{selectedServices.length > 1 ? ` (${selectedServices.length})` : ''}
+                    </div>
+                    <div className={m.rowValue}>
+                      {selectedServices.length > 0
+                        ? selectedServices.map((s) => s.name).join(', ')
+                        : initialData?.serviceNames?.join(', ') || (readOnly ? 'â€”' : 'Selecteaza un serviciu')}
+                    </div>
+                  </div>
+                  {!readOnly && (
+                    <span className={`${m.rowChevron} ${expandedRow === 'service' ? m.rowChevronOpen : ''}`}>
+                      <ChevronRightIcon />
+                    </span>
+                  )}
+                </button>
+                {!readOnly && expandedRow === 'service' && (
+                  <div className={m.expanded}>
+                    {loadingServices ? (
+                      <div className={m.autocompleteEmpty}>Se incarca serviciile...</div>
+                    ) : servicesError ? (
+                      <div className={m.autocompleteEmpty}>{servicesError}</div>
+                    ) : effectiveServices.length === 0 ? (
+                      <div className={m.autocompleteEmpty}>Nu sunt servicii disponibile</div>
+                    ) : (
+                      <>
+                        {effectiveServices.map((s) => {
+                          const sid = String(s.id);
+                          const isSelected = state.serviceIds.includes(sid);
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              className={`${m.option} ${isSelected ? m.optionSelected : ''}`}
+                              aria-pressed={isSelected}
+                              onClick={() => {
+                                const nextIds = isSelected
+                                  ? state.serviceIds.filter((id) => id !== sid)
+                                  : [...state.serviceIds, sid];
+                                const byId = new Map(effectiveServices.map((svc) => [String(svc.id), svc]));
+                                const totalDurationMinutes = nextIds.reduce(
+                                  (sum, id) => sum + (byId.get(id)?.duration_minutes || 0),
+                                  0
+                                );
+                                dispatch({ type: 'SET_SERVICES', serviceIds: nextIds, totalDurationMinutes });
+                              }}
+                            >
+                              <span>{s.name}</span>
+                              {s.duration_minutes ? (
+                                <span className={m.optionMeta}>{s.duration_minutes} min</span>
+                              ) : null}
+                            </button>
+                          );
+                        })}
+                        {selectedServices.length > 0 && (
+                          <div className={m.optionMeta} style={{ padding: '0.6rem 0.75rem 0' }}>
+                            Total: {selectedServices.reduce(
+                              (sum, s) => sum + (typeof s.duration_minutes === 'number' ? s.duration_minutes : 0),
+                              0
+                            )} min
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* ── Patient name + autocomplete ── */}
               <div className={m.section} ref={wrapperRef}>
                 <div className={m.inputRowWithLabel}>
@@ -886,32 +1171,32 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
                         <div style={{ fontSize: '0.98rem', color: 'var(--color-text)' }}>
                           {state.clientName || '—'}
                         </div>
-                      ) : hasLinkedClient ? (
-                        <div className={m.linkedBadge}>
-                          <span>✓ {state.clientName}</span>
-                          <button
-                            type="button"
-                            className={m.linkedBadgeClear}
-                            onClick={() => dispatch({ type: 'CLEAR_CLIENT_LINK' })}
-                            aria-label="Deconecteaza pacientul existent"
-                          >
-                            ×
-                          </button>
-                        </div>
                       ) : (
                         <>
-                          <input
-                            type="text"
-                            className={m.inputBare}
-                            value={state.clientName}
-                            placeholder="Ion Popescu"
-                            onChange={(e) => dispatch({ type: 'SET_CLIENT_NAME', value: e.target.value })}
-                            onFocus={() => { isFocusedNameRef.current = true; setNameFocused(true); }}
-                            onBlur={handleNameBlur}
-                            maxLength={255}
-                            autoComplete="off"
-                            disabled={readOnly}
-                          />
+                          <div className={`${m.patientInputShell} ${hasLinkedClient ? m.patientInputShellLinked : ''}`}>
+                            <input
+                              type="text"
+                              className={`${m.inputBare} ${hasLinkedClient ? m.inputBareLinked : ''}`}
+                              value={state.clientName}
+                              placeholder="Ion Popescu"
+                              onChange={(e) => dispatch({ type: 'SET_CLIENT_NAME', value: e.target.value })}
+                              onFocus={() => { isFocusedNameRef.current = true; setNameFocused(true); }}
+                              onBlur={handleNameBlur}
+                              maxLength={255}
+                              autoComplete="off"
+                              disabled={readOnly}
+                            />
+                            {hasLinkedClient && (
+                              <button
+                                type="button"
+                                className={m.patientClearButton}
+                                onClick={() => dispatch({ type: 'CLEAR_CLIENT_LINK' })}
+                                aria-label="Sterge pacientul selectat"
+                              >
+                                x
+                              </button>
+                            )}
+                          </div>
                           {showSuggestions && (
                             <div className={m.autocomplete} role="listbox">
                               {loadingSuggestions && suggestions.length === 0 ? (
@@ -1000,136 +1285,6 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
                   </div>
                 </div>
               </div>
-
-              {/* ── Services (multi-select) ── */}
-              <div className={m.section}>
-                <button
-                  type="button"
-                  className={m.row}
-                  onClick={() => !readOnly && toggleExpanded('service')}
-                  disabled={readOnly && selectedServices.length === 0}
-                >
-                  <span className={m.rowIcon}><BriefcaseIcon /></span>
-                  <div className={m.rowMain}>
-                    <div className={m.rowLabel}>
-                      Servicii{selectedServices.length > 1 ? ` (${selectedServices.length})` : ''}
-                    </div>
-                    <div className={m.rowValue}>
-                      {selectedServices.length > 0
-                        ? selectedServices.map((s) => s.name).join(', ')
-                        : initialData?.serviceNames?.join(', ') || (readOnly ? '—' : 'Selecteaza un serviciu')}
-                    </div>
-                  </div>
-                  {!readOnly && (
-                    <span className={`${m.rowChevron} ${expandedRow === 'service' ? m.rowChevronOpen : ''}`}>
-                      <ChevronRightIcon />
-                    </span>
-                  )}
-                </button>
-                {!readOnly && expandedRow === 'service' && (
-                  <div className={m.expanded}>
-                    {/*
-                      Tap-to-toggle pattern: tapping a service adds it (if not
-                      yet selected) or removes it (if already selected). Mirror
-                      of the desktop "chips + add picker" pattern but optimized
-                      for a single-column mobile list. Total duration shown at
-                      the bottom updates as the user adds/removes services.
-                    */}
-                    {loadingServices ? (
-                      <div className={m.autocompleteEmpty}>Se incarca serviciile...</div>
-                    ) : servicesError ? (
-                      <div className={m.autocompleteEmpty}>{servicesError}</div>
-                    ) : effectiveServices.length === 0 ? (
-                      <div className={m.autocompleteEmpty}>Nu sunt servicii disponibile</div>
-                    ) : (
-                      <>
-                        {effectiveServices.map((s) => {
-                          const sid = String(s.id);
-                          const isSelected = state.serviceIds.includes(sid);
-                          return (
-                            <button
-                              key={s.id}
-                              type="button"
-                              className={`${m.option} ${isSelected ? m.optionSelected : ''}`}
-                              aria-pressed={isSelected}
-                              onClick={() => {
-                                const nextIds = isSelected
-                                  ? state.serviceIds.filter((id) => id !== sid)
-                                  : [...state.serviceIds, sid];
-                                // Total duration = sum of all selected services.
-                                // The reducer uses this to push endTime forward.
-                                const byId = new Map(effectiveServices.map((svc) => [String(svc.id), svc]));
-                                const totalDurationMinutes = nextIds.reduce(
-                                  (sum, id) => sum + (byId.get(id)?.duration_minutes || 0),
-                                  0
-                                );
-                                dispatch({ type: 'SET_SERVICES', serviceIds: nextIds, totalDurationMinutes });
-                              }}
-                            >
-                              <span>{s.name}</span>
-                              {s.duration_minutes ? (
-                                <span className={m.optionMeta}>{s.duration_minutes} min</span>
-                              ) : null}
-                            </button>
-                          );
-                        })}
-                        {selectedServices.length > 0 && (
-                          <div className={m.optionMeta} style={{ padding: '0.6rem 0.75rem 0' }}>
-                            Total: {selectedServices.reduce(
-                              (sum, s) => sum + (typeof s.duration_minutes === 'number' ? s.duration_minutes : 0),
-                              0
-                            )} min
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* ── Calendar (when multiple options) ── */}
-              {calendarOptions.length > 1 && (
-                <div className={m.section}>
-                  <button
-                    type="button"
-                    className={m.row}
-                    onClick={() => !calendarRowDisabled && toggleExpanded('calendar')}
-                    disabled={calendarRowDisabled}
-                  >
-                    <span className={m.rowIcon}><CalendarIcon /></span>
-                    <div className={m.rowMain}>
-                      <div className={m.rowLabel}>Calendar</div>
-                      <div className={m.rowValue}>
-                        {selectedCalendarOption?.name || 'Selecteaza calendar'}
-                      </div>
-                    </div>
-                    {!calendarRowDisabled && (
-                      <span className={`${m.rowChevron} ${expandedRow === 'calendar' ? m.rowChevronOpen : ''}`}>
-                        <ChevronRightIcon />
-                      </span>
-                    )}
-                  </button>
-                  {!calendarRowDisabled && expandedRow === 'calendar' && (
-                    <div className={m.expanded}>
-                      {calendarOptions.map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          className={`${m.option} ${String(c.id) === state.calendarId ? m.optionSelected : ''}`}
-                          disabled={c.disabled}
-                          onClick={() => {
-                            dispatch({ type: 'SET_CALENDAR', calendarId: String(c.id) });
-                            toggleExpanded('calendar');
-                          }}
-                        >
-                          <span>{c.name}</span>
-                          {c.isOwn === false && <span className={m.optionMeta}>Partajat</span>}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
 
               {/* ── Dentist (when shared calendar with multiple dentists) ── */}
               {dentistRowVisible && (

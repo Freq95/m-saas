@@ -64,6 +64,11 @@ export default function ClientCreateModal({
   const [phoneError, setPhoneError] = useState('');
   const [privacyNoticeText, setPrivacyNoticeText] = useState<string | null>(null);
   const [backdropPressStarted, setBackdropPressStarted] = useState(false);
+  // When the server says "an existing same-name patient was reused instead
+  // of creating a new one", we surface this match to the user so they can
+  // decide: use the existing record, force a duplicate, or cancel. Stays
+  // null on the happy path (no match) — no extra UI rendered then.
+  const [duplicateMatch, setDuplicateMatch] = useState<ClientPayload | null>(null);
   const initialHasValidConsent = Boolean(initialData?.consent_given && !initialData?.consent_withdrawn);
   const [formData, setFormData] = useState<ClientFormData>({
     name: initialData?.name || '',
@@ -176,8 +181,7 @@ export default function ClientCreateModal({
     onClose();
   };
 
-  const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault();
+  const submitCreate = async (forceNew = false) => {
     if (!formData.name.trim()) {
       setErrorMessage('Numele este obligatoriu.');
       return;
@@ -202,6 +206,10 @@ export default function ClientCreateModal({
         phone: formData.phone || undefined,
         notes: formData.notes || undefined,
         consent_method: formData.consent_method || undefined,
+        // Forwarded to /api/clients POST: bypass the silent dedupe and
+        // always insert when the user explicitly confirmed they want a
+        // duplicate. The server validates and ignores it in edit mode.
+        forceNew: !isEditMode && forceNew ? true : undefined,
         is_minor: formData.is_minor || undefined,
         parent_guardian_name: formData.parent_guardian_name || undefined,
         dentistUserId: !isEditMode ? dentistUserId : undefined,
@@ -239,6 +247,15 @@ export default function ClientCreateModal({
         return;
       }
 
+      // Create mode: server tells us when an existing same-name client was
+      // returned instead of inserting a new one. Pause the close flow and
+      // ask the user how to proceed — preserves the explicit intent the
+      // original report flagged as a silent data-loss bug.
+      if (result?.matched === true && savedClient) {
+        setDuplicateMatch(savedClient);
+        return;
+      }
+
       setFormData({ name: '', email: '', phone: '', notes: '', consent_given: false, consent_method: '', is_minor: false, parent_guardian_name: '' });
       setPhoneError('');
       if (savedClient && onCreated) {
@@ -253,6 +270,37 @@ export default function ClientCreateModal({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
+    void submitCreate(false);
+  };
+
+  // Called from the duplicate-confirmation prompt when the user picks
+  // "Foloseste" — finalize with the matched record. The fetch already
+  // returned it, so we just hand it to the parent and close.
+  const handleUseMatched = () => {
+    if (!duplicateMatch) return;
+    const matched = duplicateMatch;
+    setDuplicateMatch(null);
+    setFormData({ name: '', email: '', phone: '', notes: '', consent_given: false, consent_method: '', is_minor: false, parent_guardian_name: '' });
+    setPhoneError('');
+    if (onCreated) onCreated(matched);
+    onClose();
+  };
+
+  // "Creeaza duplicat" — resubmit with forceNew=true so the server skips
+  // its dedupe and inserts a fresh record despite the same-name match.
+  const handleForceDuplicate = () => {
+    setDuplicateMatch(null);
+    void submitCreate(true);
+  };
+
+  // "Anuleaza" — user changed their mind; close the prompt and stay on the
+  // form so they can edit the name/contact info before retrying.
+  const handleCancelDuplicate = () => {
+    setDuplicateMatch(null);
   };
 
   const setField = <Key extends keyof ClientFormData>(field: Key, value: ClientFormData[Key]) => {
@@ -295,6 +343,27 @@ export default function ClientCreateModal({
 
               <div className={styles.mobileBody}>
                 {errorMessage && <div className={styles.mobileError}>{errorMessage}</div>}
+                {duplicateMatch && (
+                  <div className={styles.duplicateNotice} role="alert">
+                    <div className={styles.duplicateTitle}>Pacient existent gasit</div>
+                    <div className={styles.duplicateBody}>
+                      Exista deja un pacient <strong>{duplicateMatch.name}</strong>
+                      {duplicateMatch.phone ? <> (<span>{duplicateMatch.phone}</span>)</> : null}.
+                      Foloseste-l sau creeaza un duplicat?
+                    </div>
+                    <div className={styles.duplicateActions}>
+                      <button type="button" className={styles.duplicatePrimary} onClick={handleUseMatched}>
+                        Foloseste pacientul existent
+                      </button>
+                      <button type="button" className={styles.duplicateSecondary} onClick={handleForceDuplicate}>
+                        Creeaza duplicat
+                      </button>
+                      <button type="button" className={styles.duplicateGhost} onClick={handleCancelDuplicate}>
+                        Anuleaza
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 <section className={styles.mobileSection}>
                   <label className={styles.mobileInputRow}>
@@ -584,6 +653,27 @@ export default function ClientCreateModal({
           </div>
 
           {errorMessage && <div className={styles.error}>{errorMessage}</div>}
+          {duplicateMatch && (
+            <div className={styles.duplicateNotice} role="alert">
+              <div className={styles.duplicateTitle}>Pacient existent gasit</div>
+              <div className={styles.duplicateBody}>
+                Exista deja un pacient <strong>{duplicateMatch.name}</strong>
+                {duplicateMatch.phone ? <> (<span>{duplicateMatch.phone}</span>)</> : null}.
+                Foloseste-l sau creeaza un duplicat?
+              </div>
+              <div className={styles.duplicateActions}>
+                <button type="button" className={styles.duplicatePrimary} onClick={handleUseMatched}>
+                  Foloseste pacientul existent
+                </button>
+                <button type="button" className={styles.duplicateSecondary} onClick={handleForceDuplicate}>
+                  Creeaza duplicat
+                </button>
+                <button type="button" className={styles.duplicateGhost} onClick={handleCancelDuplicate}>
+                  Anuleaza
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className={styles.actions}>
             <button type="button" className={styles.cancelButton} onClick={resetAndClose}>

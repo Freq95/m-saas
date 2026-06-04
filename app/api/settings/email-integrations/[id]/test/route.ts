@@ -1,10 +1,10 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { Ratelimit } from '@upstash/ratelimit';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { getEmailIntegrationById } from '@/lib/email-integrations';
 import { logger } from '@/lib/logger';
 import { integrationIdParamSchema } from '@/lib/validation';
-import { getAuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, isClinicalRole } from '@/lib/auth-helpers';
 import { getRedis } from '@/lib/redis';
 import { withRedisPrefix } from '@/lib/redis-prefix';
 import { decrypt } from '@/lib/encryption';
@@ -52,7 +52,14 @@ async function isTestRateLimited(identifier: string): Promise<boolean> {
 export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    const { userId, tenantId } = await getAuthUser();
+    const auth = await getAuthUser();
+
+    // Email integrations are clinic-config — owner + dentists only.
+    if (!isClinicalRole(auth.role)) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const { userId, tenantId } = auth;
     const ip =
       request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
       request.headers.get('x-real-ip') ||

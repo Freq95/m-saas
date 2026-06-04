@@ -413,6 +413,25 @@
   opacity: 0.78;
 }
 
+/* No-show (Absent) variant — diagonal red stripes overlay the card
+   background so it reads as "patient didn't show up". Text stays
+   readable on top of the stripes. */
+.cardNoShow {
+  border-color: color-mix(in srgb, var(--color-danger-text) 65%, transparent);
+  background-image:
+    repeating-linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-danger-text) 26%, transparent) 0,
+      color-mix(in srgb, var(--color-danger-text) 26%, transparent) 6px,
+      transparent 6px,
+      transparent 13px
+    );
+}
+
+.cardNoShow .colorBar {
+  background: var(--color-danger-text) !important;
+}
+
 .colorBar {
   width: 4px;
   flex-shrink: 0;

@@ -1,13 +1,3 @@
-const withPWA = require('next-pwa')({
-  dest: 'public',
-  disable: process.env.NODE_ENV === 'development',
-  register: true,
-  skipWaiting: true,
-  // Do not let the SW cache API calls — always hit the network for live data.
-  // Static assets (JS/CSS/images) are still precached for fast repeat loads.
-  runtimeCaching: [],
-});
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -44,4 +34,4 @@ const nextConfig = {
   },
 };
 
-module.exports = withPWA(nextConfig);
+module.exports = nextConfig;

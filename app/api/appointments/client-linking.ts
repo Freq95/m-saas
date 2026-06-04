@@ -13,7 +13,7 @@ interface ResolveAppointmentClientLinkArgs {
   userId: number;
   tenantId: ObjectId;
   clientId?: number | null;
-  name: string;
+  name?: string | null;
   email?: string | null;
   phone?: string | null;
   forceNewClient?: boolean;
@@ -54,7 +54,7 @@ export async function resolveAppointmentClientLink({
   return findOrCreateClient(
     userId,
     tenantId,
-    name,
+    name || '',
     email || undefined,
     phone || undefined,
     forceNewClient,
