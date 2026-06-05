@@ -12,8 +12,8 @@ export default function AdminSignOutButton() {
         width: '100%',
         padding: '8px 10px',
         borderRadius: 8,
-        border: '1px solid #334155',
-        background: '#0f172a',
+        border: '1px solid var(--color-border)',
+        background: 'var(--color-surface)',
         color: 'var(--color-text-muted)',
       }}
     >

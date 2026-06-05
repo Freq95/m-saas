@@ -10,6 +10,9 @@ type AppointmentQuery = {
   startDate?: string | Date;
   endDate?: string | Date;
   status?: string;
+  // When true, do not auto-exclude cancelled appointments. The calendar
+  // right-side panel uses this to render cancelled rows strikethrough.
+  includeCancelled?: boolean;
   search?: string;
 };
 
@@ -403,11 +406,16 @@ export async function getAppointmentsData(query: AppointmentQuery) {
   const startDate = query.startDate instanceof Date ? query.startDate.toISOString() : query.startDate;
   const endDate = query.endDate instanceof Date ? query.endDate.toISOString() : query.endDate;
   const status = query.status;
+  const includeCancelled = query.includeCancelled === true;
   const search = query.search?.trim();
 
   const filter: Record<string, unknown> = {
     deleted_at: { $exists: false },
-    ...(status ? {} : { status: { $ne: 'cancelled' } }),
+    // Exclude cancelled rows by default. Callers that want them
+    // (the calendar right-side panel) pass `includeCancelled: true`.
+    // When a specific `status` filter is set, the caller is asking
+    // for that exact status and we respect it as-is.
+    ...(status || includeCancelled ? {} : { status: { $ne: 'cancelled' } }),
   };
 
   if (hasCalendarScope) {

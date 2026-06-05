@@ -103,7 +103,7 @@
   padding: 0 0.75rem;
   border-radius: var(--radius-md);
   border: none;
-  background: var(--color-today-badge);
+  background: var(--color-accent);
   color: var(--color-text-on-accent);
   font-size: 0.8rem;
   font-weight: 600;
@@ -160,7 +160,7 @@
 
 .scopeTrigger:focus-visible {
   border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  background: var(--color-neutral-bg);
 }
 
 .scopeTriggerLeft {
@@ -277,7 +277,7 @@
 
 .scopeMenuItemActive .scopeMenuCheckbox {
   border-color: color-mix(in srgb, var(--color-accent) 65%, var(--color-border));
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  background: var(--color-neutral-bg);
 }
 
 /* ── Stats strip ── */
@@ -313,7 +313,7 @@
 .scopeLayoutButtonActive {
   color: var(--color-text);
   border-color: color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
-  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface));
+  background: var(--color-surface);
 }
 
 .statsGrid {
@@ -432,6 +432,20 @@
   background: var(--color-danger-text) !important;
 }
 
+/* Cancelled (Anulat) — dimmed + strikethrough on patient name. Cancelled
+   appointments only appear in this right-side panel (not in the grid),
+   so the visual must make it obvious at a glance that this slot is
+   "off the books". */
+.cardCancelled {
+  opacity: 0.5;
+  filter: saturate(0.7);
+}
+
+.cardCancelled .clientName {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+
 .colorBar {
   width: 4px;
   flex-shrink: 0;
@@ -541,7 +555,7 @@
 
 .statusLine:focus-visible {
   border-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  background: var(--color-neutral-bg);
 }
 
 .statusLineLeft {
@@ -721,7 +735,7 @@
   min-width: 24px;
   height: 22px;
   padding: 0 0.5rem;
-  background: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  background: var(--color-neutral-bg);
   color: var(--color-accent);
   border: 1px solid color-mix(in srgb, var(--color-accent) 36%, transparent);
   border-radius: 20px;

@@ -30,11 +30,11 @@
 }
 
 .stepperButton:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  background: var(--color-neutral-bg);
 }
 
 .stepperButton:active:not(:disabled) {
-  background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+  background: var(--color-neutral-bg);
 }
 
 .stepperButton:disabled {
@@ -66,7 +66,7 @@
 
 .stepperInput:focus {
   outline: none;
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  background: var(--color-neutral-bg);
 }
 
 .stepperInput:disabled {

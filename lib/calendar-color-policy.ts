@@ -3,7 +3,7 @@ export const CATEGORY_CONFIG = {
   tratament: { label: 'Tratament', color: '#10b981' },
   control: { label: 'Control', color: '#8b5cf6' },
   urgenta: { label: 'Urgenta', color: '#f59e0b' },
-  altele: { label: 'Altele', color: '#64748b' },
+  altele: { label: 'Altele', color: '#737373' },
 } as const;
 
 export type CategoryKey = keyof typeof CATEGORY_CONFIG;
@@ -59,7 +59,7 @@ export function getDentistColorHex(colorId: string | null | undefined): string |
 }
 
 export const STATUS_CONFIG = {
-  scheduled: { label: 'Programat', dot: '#94a3b8', opacity: 1, strikethrough: false },
+  scheduled: { label: 'Programat', dot: '#a3a3a3', opacity: 1, strikethrough: false },
   completed: { label: 'Finalizat', dot: '#10b981', opacity: 0.6, strikethrough: false },
   cancelled: { label: 'Anulat', dot: '#f43f5e', opacity: 0.35, strikethrough: true },
   'no-show': { label: 'Absent', dot: '#f59e0b', opacity: 0.45, strikethrough: false },

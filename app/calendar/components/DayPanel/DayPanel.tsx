@@ -282,6 +282,7 @@ export function AppointmentCard({
   const status        = normalizeStatus(apt.status);
   const statusCfg     = getStatusConfig(status);
   const isNoShow      = status === 'no-show';
+  const isCancelled   = status === 'cancelled';
   const resolvedColor = resolveAppointmentColor(apt, viewerUserId);
   const durationMin   = Math.round((end.getTime() - start.getTime()) / 60_000);
   const canChangeStatus = apt.can_change_status !== false;
@@ -293,7 +294,7 @@ export function AppointmentCard({
         <div className={styles.cardDateLabel}>{dateLabel}</div>
       )}
       <div
-        className={`${styles.card} ${isPast ? styles.cardPast : ''} ${isNoShow ? styles.cardNoShow : ''}`.trim()}
+        className={`${styles.card} ${isPast ? styles.cardPast : ''} ${isNoShow ? styles.cardNoShow : ''} ${isCancelled ? styles.cardCancelled : ''}`.trim()}
         onClick={() => {
           if (statusMenuOpen) { setStatusMenuOpen(false); return; }
           onClick(apt);

@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
       endDate,
       calendarIds: parsedCalendarIds,
       status,
+      includeCancelled,
       search,
     } = validationResult.data;
 
@@ -83,6 +84,7 @@ export async function GET(request: NextRequest) {
       startDate,
       endDate,
       status,
+      includeCancelled,
       search,
     });
     const payload = { appointments };

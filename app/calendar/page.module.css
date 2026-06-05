@@ -113,7 +113,7 @@
 
 .rangeButton:hover {
   border-color: var(--color-border-strong);
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  background: var(--color-surface-muted);
 }
 
 .rangeChevron {
@@ -226,7 +226,7 @@
 
 .desktopRangeOption:hover {
   color: var(--color-text);
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  background: var(--color-surface-muted);
 }
 
 .desktopRangeOptionActive {
@@ -438,7 +438,7 @@
 }
 
 .dropdownDay:hover {
-  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  background: var(--color-neutral-bg);
   color: var(--color-accent);
 }
 
@@ -492,7 +492,7 @@
 
 .monthSelectorButton:hover {
   color: var(--color-text);
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  background: var(--color-surface-muted);
 }
 
 .monthSelectorButtonActive {
@@ -521,7 +521,7 @@
 
 .yearListButton:hover {
   color: var(--color-text);
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  background: var(--color-surface-muted);
 }
 
 .yearListButtonActive {
@@ -728,11 +728,11 @@
 }
 
 .weekDayHeader:hover {
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
 }
 
 .weekDayHeader.isSelectedDay {
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  background: var(--color-surface-muted);
 }
 
 .weekDayHeaderMulti.isSelectedDay {
@@ -740,7 +740,7 @@
 }
 
 .weekDayHeaderMulti.isSelectedDay:hover {
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
 }
 
 .weekDayHeaderMulti.isSelectedDay .weekCalendarHeaderGrid {
@@ -803,7 +803,7 @@
 }
 
 .weekDayColumn.isToday {
-  background: color-mix(in srgb, var(--color-accent) 4%, transparent);
+  background: rgba(255, 255, 255, 0.025);
 }
 
 /* Clickable hour slots */
@@ -937,17 +937,17 @@
 }
 
 .slot:hover {
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
 }
 
 .slot:focus-visible {
   outline: none;
-  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  background: var(--color-neutral-bg);
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 55%, transparent);
 }
 
 .slot.dragOver {
-  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  background: var(--color-neutral-bg);
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 70%, transparent);
   animation: pulseDragOver 0.8s ease-in-out infinite;
 }
@@ -1118,7 +1118,7 @@
   gap: 0.4rem;
   padding: 0.3rem 0.65rem;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface));
+  background: var(--color-surface);
   border: 1px solid color-mix(in srgb, var(--color-accent) 32%, var(--color-border));
   color: var(--color-text);
   font-size: 0.85rem;
@@ -1577,7 +1577,7 @@
 }
 
 .monthDay:hover {
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  background: var(--color-neutral-bg);
 }
 
 .monthDay:nth-child(7n), .monthDay:last-child { border-right: none; }
@@ -1585,11 +1585,11 @@
 .monthDayOther   { opacity: 0.38; }
 
 .monthDayToday {
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  background: var(--color-neutral-bg);
 }
 
 .monthDaySelected {
-  background: color-mix(in srgb, var(--color-accent) 13%, transparent);
+  background: var(--color-neutral-bg);
   box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-accent) 35%, transparent);
 }
 
@@ -2160,7 +2160,7 @@
 .clientSuggestionItem:last-child { border-bottom: none; }
 .clientSuggestionItem:hover,
 .clientSuggestionItem:focus {
-  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface-strong));
+  background: var(--color-surface-strong);
   outline: none;
 }
 .clientSuggestionItemActive,
@@ -2254,7 +2254,7 @@
 }
 
 .segmentedControlButtonActive {
-  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  background: var(--color-neutral-bg);
   color: var(--color-accent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
@@ -2370,7 +2370,7 @@
 
 .permissionCardChecked {
   border-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  background: var(--color-neutral-bg);
 }
 
 .resourceTypeCard {
@@ -2394,7 +2394,7 @@
 
 .resourceTypeCardActive {
   border-color: color-mix(in srgb, var(--color-accent) 38%, transparent);
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  background: var(--color-neutral-bg);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 25%, transparent);
 }
 
@@ -2466,7 +2466,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  background: var(--color-neutral-bg);
   color: var(--color-accent);
   font-size: 0.78rem;
   font-weight: 800;
@@ -2789,7 +2789,7 @@
 }
 
 .modalDateNav:hover {
-  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  background: var(--color-neutral-bg);
   color: var(--color-accent);
   border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
@@ -2941,11 +2941,11 @@
 }
 
 .modalTimeOption:hover {
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  background: var(--color-neutral-bg);
 }
 
 .modalTimeOptionSelected {
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  background: var(--color-neutral-bg);
   color: var(--color-text);
   font-weight: 600;
   box-shadow: none;
@@ -3045,11 +3045,11 @@
 }
 
 .modalServiceOption:hover {
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  background: var(--color-neutral-bg);
 }
 
 .modalServiceOptionSelected {
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  background: var(--color-neutral-bg);
   color: var(--color-text);
   font-weight: 600;
   box-shadow: none;
@@ -3109,7 +3109,7 @@
 }
 
 .clientSuggestionItem:hover {
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  background: var(--color-neutral-bg);
 }
 
 .clientSuggestionName {
@@ -3210,7 +3210,7 @@
 .inlineConfirmBox {
   margin-top: 0.85rem;
   border: 1px solid color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
-  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
+  background: var(--color-surface);
   border-radius: var(--radius-md);
   padding: 0.85rem;
 }
@@ -3931,7 +3931,7 @@
     position: absolute;
     inset: 0;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+    background: var(--color-neutral-bg);
   }
 
   .mobileDayBtnActive .mobileDayBtnDigit {
@@ -4077,7 +4077,7 @@
   }
 
   .mobileViewPanel .weekDayColumn.isToday {
-    background: color-mix(in srgb, var(--color-accent) 3%, transparent);
+    background: var(--color-neutral-bg);
   }
 
   .mobileViewPanel .slot {

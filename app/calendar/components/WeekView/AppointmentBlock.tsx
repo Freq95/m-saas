@@ -87,18 +87,37 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
       onDragEnd?.();
     };
 
-    // No-show keeps near-full opacity so the red diagonal stripes (applied
-    // via .appointmentNoShow CSS) remain clearly visible. The default
-    // statusCfg.opacity for 'no-show' is 0.45, which would wash the
-    // stripes out.
+    // No-show keeps near-full opacity so the red diagonal stripes remain
+    // clearly visible. Default statusCfg.opacity for 'no-show' is 0.45,
+    // which would wash the stripes out.
     const baseOpacity = isNoShow ? 0.92 : statusCfg.opacity;
-    const appointmentStyle: React.CSSProperties = {
+    const baseStyle: React.CSSProperties = {
       ...style,
       opacity: isPast ? Math.min(baseOpacity, 0.78) : baseOpacity,
       borderLeft: `5px solid ${blockStyle.borderColor}`,
-      background: blockStyle.bodyColor,
       color: blockStyle.textColor,
     };
+    // For normal appointments use the `background` shorthand so it
+    // overrides the .appointment CSS gradient with the dentist's flat
+    // body color. For no-show we set background-color + background-image
+    // longhand so the stripes paint on top of the body color (the
+    // shorthand would reset background-image to none).
+    const appointmentStyle: React.CSSProperties = isNoShow
+      ? {
+          ...baseStyle,
+          backgroundColor: blockStyle.bodyColor,
+          backgroundImage:
+            'repeating-linear-gradient(' +
+            '135deg,' +
+            'color-mix(in srgb, var(--color-danger-text) 30%, transparent) 0,' +
+            'color-mix(in srgb, var(--color-danger-text) 30%, transparent) 6px,' +
+            'transparent 6px,' +
+            'transparent 13px)',
+        }
+      : {
+          ...baseStyle,
+          background: blockStyle.bodyColor,
+        };
     const containerStyle: React.CSSProperties = {
       ...appointmentStyle,
       ...(compact && { padding: '0.12rem 0.28rem' }),

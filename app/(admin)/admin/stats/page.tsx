@@ -131,7 +131,7 @@ function TenantCard({ tenant }: { tenant: TenantStatRow }) {
         <StatRow label="Seats" value={seatsLabel} />
       </div>
 
-      <div style={{ borderTop: '1px solid #1e293b', paddingTop: 8, display: 'grid', gap: 4 }}>
+      <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 8, display: 'grid', gap: 4 }}>
         <StatRow label="Last seen" value={formatRelative(tenant.lastSeen)} />
         <StatRow label="Active days (30d)" value={tenant.activeDays30d} />
         <StatRow label="Events (30d)" value={tenant.events30d} />

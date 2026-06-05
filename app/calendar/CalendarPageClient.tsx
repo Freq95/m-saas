@@ -651,16 +651,20 @@ export default function CalendarPageClient({
   });
   const decoratedAppointments = useMemo(
     () => appointments
-      // Cancelled appointments are hidden from the calendar entirely. The
-      // dentist who cancelled them can still find them via search/history;
-      // they just don't clutter the time grid.
-      .filter((appointment) => appointment.status !== 'cancelled')
       .filter((appointment) => {
         if (!visibleCalendarIdsInitialized) return true;
         return typeof appointment.calendar_id === 'number' && visibleCalendarIdSet.has(appointment.calendar_id);
       })
       .map((appointment) => decorateAppointmentWithCalendarAccess(appointment, calendarMap, sessionDbUserId)),
     [appointments, calendarMap, sessionDbUserId, visibleCalendarIdSet, visibleCalendarIdsInitialized]
+  );
+  // Cancelled appointments are hidden from the time-grid views (WeekView,
+  // MonthView) so they don't clutter the calendar. They still appear in
+  // the right-side DayPanel (with a strikethrough/dimmed treatment) and
+  // remain searchable.
+  const gridAppointments = useMemo(
+    () => decoratedAppointments.filter((appointment) => appointment.status !== 'cancelled'),
+    [decoratedAppointments]
   );
   const decoratedAvailabilityBlocks = useMemo(
     () => availabilityBlocks.filter((block) => {
@@ -1775,7 +1779,7 @@ export default function CalendarPageClient({
         <MonthView
           monthDays={monthDays}
           currentDate={state.currentDate}
-          appointments={decoratedAppointments}
+          appointments={gridAppointments}
           availabilityBlocks={decoratedAvailabilityBlocks}
           selectedDay={selectedDay}
           viewerUserId={sessionUserId ?? null}
@@ -1792,7 +1796,7 @@ export default function CalendarPageClient({
         <WeekView
           weekDays={visibleWeekDays}
           hours={visibleHours}
-          appointments={decoratedAppointments}
+          appointments={gridAppointments}
           availabilityBlocks={decoratedAvailabilityBlocks}
           viewerUserId={sessionUserId ?? null}
           selectedDay={selectedDay}
@@ -2084,7 +2088,7 @@ export default function CalendarPageClient({
             <WeekView
               weekDays={mobileWeekDays}
               hours={mobileHours}
-              appointments={decoratedAppointments}
+              appointments={gridAppointments}
               availabilityBlocks={decoratedAvailabilityBlocks}
               viewerUserId={sessionUserId ?? null}
               selectedDay={selectedDay}

@@ -310,6 +310,11 @@ export const appointmentsQuerySchema = z.object({
     .transform((value) => value.split(',').map((item) => Number.parseInt(item, 10)))
     .optional(),
   status: z.enum(['scheduled', 'completed', 'cancelled', 'no-show']).optional(),
+  // Opt-in for callers that need to surface cancelled appointments
+  // (e.g. the calendar right-side panel renders them strikethrough +
+  // dimmed). Other consumers keep the default where cancelled is
+  // excluded.
+  includeCancelled: z.enum(['true', 'false']).optional().transform((v) => v === 'true'),
   search: z.string().max(120).optional(),
 });
 

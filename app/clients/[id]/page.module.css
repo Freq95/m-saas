@@ -49,9 +49,9 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(27, 99, 219, 0.22) 0%, rgba(77, 163, 255, 0.18) 100%);
-  border: 1.5px solid rgba(77, 163, 255, 0.35);
-  box-shadow: 0 0 0 4px rgba(77, 163, 255, 0.06);
+  background: linear-gradient(135deg, var(--color-surface-muted) 0%, var(--color-surface-strong) 100%);
+  border: 1.5px solid var(--color-border-strong);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.04);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -149,7 +149,7 @@
   gap: var(--space-2);
   height: 36px;
   padding: 0 var(--space-4);
-  background: var(--color-today-badge);
+  background: var(--color-accent);
   color: var(--color-text-on-accent);
   border: none;
   border-radius: var(--radius-sm);
@@ -161,7 +161,7 @@
   transition: background var(--transition-fast), transform var(--transition-fast);
 }
 .btnPrimary:hover {
-  background: var(--color-accent);
+  background: var(--color-accent-strong);
   transform: translateY(-1px);
 }
 .btnPrimary:active { transform: translateY(0); }
@@ -554,7 +554,7 @@
   transition: background var(--transition-fast);
 }
 .dataTable tbody tr:last-child { border-bottom: none; }
-.dataTable tbody tr:hover { background: rgba(148, 163, 184, 0.04); }
+.dataTable tbody tr:hover { background: color-mix(in srgb, var(--color-text) 4%, transparent); }
 
 .dataTable td {
   padding: var(--space-3);
@@ -628,7 +628,7 @@
   border-radius: 0;
 }
 .rowItem:last-child { border-bottom: none; }
-.rowItem:hover { background: rgba(148, 163, 184, 0.04); }
+.rowItem:hover { background: color-mix(in srgb, var(--color-text) 4%, transparent); }
 
 /* Files */
 .fileRow {
@@ -1282,7 +1282,7 @@
     align-items: flex-end;
     padding: 0;
     /* Slightly lighter scrim — less oppressive at bottom */
-    background: rgba(6, 8, 13, 0.65);
+    background: rgba(0, 0, 0, 0.65);
   }
 
   .modal {

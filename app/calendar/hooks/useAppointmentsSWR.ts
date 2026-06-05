@@ -218,6 +218,11 @@ export function useAppointmentsSWR({
     queryParams.append('search', trimmedSearch);
   }
 
+  // Calendar UI surfaces cancelled appointments in the right-side panel
+  // (strikethrough + dimmed). The grid views filter them out client-side
+  // via `gridAppointments` in CalendarPageClient.
+  queryParams.set('includeCancelled', 'true');
+
   const isReady = Boolean(effectiveUserId);
   const url = isReady && !skipFetchBecauseNoVisibleCalendars
     ? `/api/appointments?${queryParams.toString()}`

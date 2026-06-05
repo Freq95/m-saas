@@ -150,7 +150,7 @@
   gap: 0.55rem;
   padding: 0.7rem 1rem;
   margin: 0.85rem 1rem 0;
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  background: var(--color-neutral-bg);
   border: 1px solid color-mix(in srgb, var(--color-accent) 28%, transparent);
   border-radius: 12px;
   font-size: 0.82rem;
@@ -439,7 +439,7 @@
 }
 
 .timeBlockValueArea:active {
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  background: var(--color-neutral-bg);
 }
 
 .timeBlockLabel {
@@ -536,7 +536,7 @@
 }
 
 .optionSelected {
-  background: color-mix(in srgb, var(--color-accent) 24%, transparent);
+  background: var(--color-neutral-bg);
   border-color: color-mix(in srgb, var(--color-accent) 72%, transparent);
   color: var(--color-text);
   box-shadow: inset 3px 0 0 var(--color-accent);
@@ -579,7 +579,7 @@
 }
 
 .chipSelected {
-  background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  background: var(--color-neutral-bg);
   border-color: color-mix(in srgb, var(--color-accent) 78%, transparent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 24%, transparent);
   font-weight: 760;
@@ -735,7 +735,7 @@
 
 .autocompleteItem:hover,
 .autocompleteItemActive {
-  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  background: var(--color-neutral-bg);
 }
 
 .autocompleteName {
@@ -787,7 +787,7 @@
 .newClientBadge {
   margin-top: 0.5rem;
   padding: 0.4rem 0.7rem;
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  background: var(--color-neutral-bg);
   border-radius: 8px;
   font-size: 0.78rem;
   color: var(--color-text-soft);
