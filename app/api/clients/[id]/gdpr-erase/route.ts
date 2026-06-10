@@ -163,6 +163,18 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
     const legacyCnResult = await db.collection('contact_notes').deleteMany({ contact_id: clientId, tenant_id: tenantId });
     recordCount += legacyCnResult.deletedCount;
 
+    // Dental chart data (Phase 4 GDPR symmetry — exports include these, so
+    // erasure must remove them. Hard-delete; the events soft-delete flag is
+    // used for clinical edits only, not GDPR.)
+    const toothStatesResult = await db.collection('tooth_states').deleteMany({ client_id: clientId, tenant_id: tenantId });
+    recordCount += toothStatesResult.deletedCount;
+    const toothEventsResult = await db.collection('tooth_events').deleteMany({ client_id: clientId, tenant_id: tenantId });
+    recordCount += toothEventsResult.deletedCount;
+    const surgeryGroupsResult = await db.collection('surgery_groups').deleteMany({ client_id: clientId, tenant_id: tenantId });
+    recordCount += surgeryGroupsResult.deletedCount;
+    const bridgeGroupsResult = await db.collection('bridge_groups').deleteMany({ client_id: clientId, tenant_id: tenantId });
+    recordCount += bridgeGroupsResult.deletedCount;
+
     // Client record itself
     await db.collection('clients').deleteOne({ id: clientId, tenant_id: tenantId });
     recordCount += 1;

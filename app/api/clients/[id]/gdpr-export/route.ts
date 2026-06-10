@@ -32,13 +32,29 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     }
 
     // Gather all related data
-    const [appointments, conversations, clientFiles, contactFiles, clientNotes, contactNotes] = await Promise.all([
+    const [
+      appointments,
+      conversations,
+      clientFiles,
+      contactFiles,
+      clientNotes,
+      contactNotes,
+      toothStates,
+      toothEvents,
+      surgeryGroups,
+      bridgeGroups,
+    ] = await Promise.all([
       db.collection('appointments').find({ client_id: clientId, tenant_id: tenantId }).sort({ start_time: -1 }).toArray(),
       db.collection('conversations').find({ client_id: clientId, tenant_id: tenantId }).sort({ created_at: -1 }).toArray(),
       db.collection('client_files').find({ client_id: clientId, tenant_id: tenantId }).sort({ created_at: -1 }).toArray(),
       db.collection('contact_files').find({ contact_id: clientId, tenant_id: tenantId }).sort({ created_at: -1 }).toArray(),
       db.collection('client_notes').find({ client_id: clientId, tenant_id: tenantId }).sort({ created_at: -1 }).toArray(),
       db.collection('contact_notes').find({ contact_id: clientId, tenant_id: tenantId }).sort({ created_at: -1 }).toArray(),
+      // Dental data — Phase 4 GDPR inclusion. Exclude soft-deleted events.
+      db.collection('tooth_states').find({ client_id: clientId, tenant_id: tenantId }).sort({ tooth_fdi: 1 }).toArray(),
+      db.collection('tooth_events').find({ client_id: clientId, tenant_id: tenantId, deleted_at: { $exists: false } }).sort({ occurred_at: -1 }).toArray(),
+      db.collection('surgery_groups').find({ client_id: clientId, tenant_id: tenantId }).sort({ created_at: -1 }).toArray(),
+      db.collection('bridge_groups').find({ client_id: clientId, tenant_id: tenantId }).sort({ created_at: -1 }).toArray(),
     ]);
 
     // Get reminders for this client's appointments
@@ -132,6 +148,42 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         scheduled_at: r.scheduled_at,
         sent_at: r.sent_at || null,
       })),
+      dental_chart: {
+        teeth: toothStates.map((s: any) => ({
+          tooth_fdi: s.tooth_fdi,
+          status: s.status,
+          current_issues: s.current_issues || [],
+          last_manipulation_at: s.last_manipulation_at || null,
+          created_at: s.created_at,
+          updated_at: s.updated_at,
+        })),
+        events: toothEvents.map((e: any) => ({
+          tooth_fdi: e.tooth_fdi,
+          surfaces: e.surfaces || [],
+          issue_type: e.issue_type,
+          action: e.action,
+          severity: e.severity || null,
+          occurred_at: e.occurred_at,
+          notes: e.notes || null,
+          metadata: e.metadata || null,
+          doctor_name: e.doctor_name_snapshot || null,
+          created_at: e.created_at,
+        })),
+        surgery_groups: surgeryGroups.map((g: any) => ({
+          tooth_fdis: g.tooth_fdis || [],
+          comment: g.comment || null,
+          doctor_name: g.doctor_name_snapshot || null,
+          created_at: g.created_at,
+          updated_at: g.updated_at,
+        })),
+        bridges: bridgeGroups.map((g: any) => ({
+          tooth_fdis: g.tooth_fdis || [],
+          comment: g.comment || null,
+          doctor_name: g.doctor_name_snapshot || null,
+          created_at: g.created_at,
+          updated_at: g.updated_at,
+        })),
+      },
     };
 
     // Log the export action

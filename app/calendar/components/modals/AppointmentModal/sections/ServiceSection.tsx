@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import styles from '../../../../page.module.css';
 import type { AppointmentService } from '../types';
@@ -42,6 +42,15 @@ function sumPrice(services: AppointmentService[]): number {
   );
 }
 
+/** Lower-case and strip diacritics so "consultaţie" matches "cons". */
+function normalize(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
 function ServiceSectionBase({
   services,
   serviceIds,
@@ -53,12 +62,6 @@ function ServiceSectionBase({
   validationError,
   readOnlyNames,
 }: ServiceSectionProps) {
-  // Pick-from-dropdown anchor. Empty string = "no service is being picked
-  // right now"; the select shows the placeholder option. Selecting any
-  // service immediately commits it and resets back to the placeholder so
-  // the user can add another.
-  const [pendingPick, setPendingPick] = useState<string>('');
-
   const serviceById = useMemo(
     () => new Map(services.map((s) => [String(s.id), s])),
     [services]
@@ -74,9 +77,12 @@ function ServiceSectionBase({
     [serviceIds, serviceById]
   );
 
+  // Not-yet-selected services, sorted alphabetically (diacritic-insensitive).
   const availableServices = useMemo(() => {
     const selectedSet = new Set(serviceIds);
-    return services.filter((s) => !selectedSet.has(String(s.id)));
+    return services
+      .filter((s) => !selectedSet.has(String(s.id)))
+      .sort((a, b) => normalize(a.name).localeCompare(normalize(b.name), 'ro'));
   }, [services, serviceIds]);
 
   const totalDuration = sumDuration(selectedServices);
@@ -113,20 +119,104 @@ function ServiceSectionBase({
     );
   }
 
+  return (
+    <ServiceSectionEditable
+      services={services}
+      serviceIds={serviceIds}
+      serviceById={serviceById}
+      selectedServices={selectedServices}
+      availableServices={availableServices}
+      totalDuration={totalDuration}
+      totalPrice={totalPrice}
+      onChange={onChange}
+      loading={loading}
+      error={error}
+      disabled={disabled}
+      validationError={validationError}
+    />
+  );
+}
+
+interface EditableProps {
+  services: AppointmentService[];
+  serviceIds: string[];
+  serviceById: Map<string, AppointmentService>;
+  selectedServices: AppointmentService[];
+  availableServices: AppointmentService[];
+  totalDuration: number;
+  totalPrice: number;
+  onChange: (serviceIds: string[], totalDurationMinutes: number) => void;
+  loading: boolean;
+  error: string | null;
+  disabled: boolean;
+  validationError?: string;
+}
+
+function ServiceSectionEditable({
+  services,
+  serviceIds,
+  serviceById,
+  selectedServices,
+  availableServices,
+  totalDuration,
+  totalPrice,
+  onChange,
+  loading,
+  error,
+  disabled,
+  validationError,
+}: EditableProps) {
+  // Free-text search the user types to narrow the list.
+  const [query, setQuery] = useState('');
+  // Whether the suggestion list is visible (open on focus / typing).
+  const [open, setOpen] = useState(false);
+  // Keyboard-highlighted option index within `matches`.
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  // Filter the (already alphabetised) available services by the query.
+  const matches = useMemo(() => {
+    const q = normalize(query);
+    if (!q) return availableServices;
+    return availableServices.filter((s) => normalize(s.name).includes(q));
+  }, [availableServices, query]);
+
+  // Reset the highlight whenever the typed query changes.
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [query]);
+
+  // Close the dropdown when clicking outside the component.
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    return () => document.removeEventListener('mousedown', onPointerDown);
+  }, [open]);
+
+  // Scroll the active option into view as the user arrows through.
+  useEffect(() => {
+    if (!open || !listRef.current) return;
+    const node = listRef.current.children[activeIndex] as HTMLElement | undefined;
+    node?.scrollIntoView({ block: 'nearest' });
+  }, [activeIndex, open]);
+
   const handleAdd = (id: string) => {
-    if (!id) return;
-    if (serviceIds.includes(id)) {
-      // Defensive — shouldn't happen because the option is filtered out.
-      setPendingPick('');
-      return;
-    }
+    if (!id || serviceIds.includes(id)) return;
     const nextIds = [...serviceIds, id];
     const nextServices = nextIds
       .map((sid) => serviceById.get(sid))
       .filter((s): s is AppointmentService => Boolean(s));
     onChange(nextIds, sumDuration(nextServices));
-    // Reset the dropdown so the user can pick another service immediately.
-    setPendingPick('');
+    // Reset so the user can immediately search for another service.
+    setQuery('');
+    setActiveIndex(0);
   };
 
   const handleRemove = (id: string) => {
@@ -137,66 +227,144 @@ function ServiceSectionBase({
     onChange(nextIds, sumDuration(nextServices));
   };
 
-  // ── Editable render ──────────────────────────────────────────────
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      if (!open) setOpen(true);
+      setActiveIndex((i) => Math.min(i + 1, matches.length - 1));
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setActiveIndex((i) => Math.max(i - 1, 0));
+    } else if (event.key === 'Enter') {
+      if (open && matches[activeIndex]) {
+        event.preventDefault();
+        handleAdd(String(matches[activeIndex].id));
+      }
+    } else if (event.key === 'Escape') {
+      if (open) {
+        event.preventDefault();
+        setOpen(false);
+      }
+    } else if (event.key === 'Backspace' && query === '' && selectedServices.length > 0) {
+      // Quick-remove the last chip when the input is empty.
+      handleRemove(String(selectedServices[selectedServices.length - 1].id));
+    }
+  };
+
+  const inputDisabled = disabled || loading;
+  const placeholder = loading
+    ? 'Se incarca serviciile...'
+    : services.length === 0
+      ? '(niciun serviciu)'
+      : availableServices.length === 0
+        ? 'Toate serviciile sunt adaugate'
+        : selectedServices.length === 0
+          ? 'Caută sau alege serviciul…'
+          : '+ Adaugă serviciu';
+
+  const listboxId = 'appt-service-listbox';
+
   return (
     <div className={styles.modalField}>
       <label htmlFor="appt-service-picker">Servicii <span className={styles.requiredMark}>*</span></label>
 
-      <div
-        className={`${styles.servicePickerSurface} ${
-          disabled || loading
-            ? styles.servicePickerSurfaceDisabled
-            : ''
-        } ${validationError ? styles.fieldControlError : ''}`}
-      >
-        {selectedServices.length > 0 && (
-        <div className={styles.serviceChips}>
-          {selectedServices.map((service) => (
-            <span key={service.id} className={styles.serviceChip}>
-              <span className={styles.serviceChipLabel}>
-                {service.name} <span className={styles.serviceChipMeta}>· {service.duration_minutes} min</span>
-              </span>
-              <button
-                type="button"
-                className={styles.serviceChipRemove}
-                onClick={() => handleRemove(String(service.id))}
-                disabled={disabled}
-                aria-label={`Elimina ${service.name}`}
-                title="Elimina"
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
+      <div ref={wrapperRef} className={styles.serviceComboWrapper}>
+        <div
+          className={`${styles.servicePickerSurface} ${
+            inputDisabled ? styles.servicePickerSurfaceDisabled : ''
+          } ${validationError ? styles.fieldControlError : ''}`}
+          onClick={() => {
+            if (!inputDisabled && availableServices.length > 0) setOpen(true);
+          }}
+        >
+          {selectedServices.length > 0 && (
+            <div className={styles.serviceChips}>
+              {selectedServices.map((service) => (
+                <span key={service.id} className={styles.serviceChip}>
+                  <span className={styles.serviceChipLabel}>
+                    {service.name} <span className={styles.serviceChipMeta}>· {service.duration_minutes} min</span>
+                  </span>
+                  <button
+                    type="button"
+                    className={styles.serviceChipRemove}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemove(String(service.id));
+                    }}
+                    disabled={disabled}
+                    aria-label={`Elimina ${service.name}`}
+                    title="Elimina"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
 
-      <select
-        id="appt-service-picker"
-        value={pendingPick}
-        onChange={(event) => handleAdd(event.target.value)}
-        disabled={disabled || loading || availableServices.length === 0}
-        className={styles.serviceInlinePicker}
-        aria-invalid={Boolean(validationError)}
-        aria-describedby={validationError ? 'appt-service-picker-error' : undefined}
-      >
-        <option value="">
-          {loading
-            ? 'Se incarca serviciile...'
-            : services.length === 0
-              ? '(niciun serviciu)'
-              : availableServices.length === 0
-                ? 'Toate serviciile sunt adaugate'
-                : selectedServices.length === 0
-                  ? 'Alege serviciul'
-                  : '+ Adauga serviciu'}
-        </option>
-        {availableServices.map((service) => (
-          <option key={service.id} value={String(service.id)}>
-            {service.name} ({service.duration_minutes} min){formatPrice(service.price)}
-          </option>
-        ))}
-      </select>
+          <input
+            id="appt-service-picker"
+            type="text"
+            role="combobox"
+            aria-expanded={open}
+            aria-controls={listboxId}
+            aria-autocomplete="list"
+            aria-activedescendant={
+              open && matches[activeIndex] ? `appt-service-opt-${matches[activeIndex].id}` : undefined
+            }
+            autoComplete="off"
+            className={styles.serviceInlinePicker}
+            value={query}
+            placeholder={placeholder}
+            disabled={inputDisabled || availableServices.length === 0}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setOpen(true);
+            }}
+            onFocus={() => {
+              if (availableServices.length > 0) setOpen(true);
+            }}
+            onKeyDown={handleKeyDown}
+            aria-invalid={Boolean(validationError)}
+            aria-describedby={validationError ? 'appt-service-picker-error' : undefined}
+          />
+        </div>
+
+        {open && availableServices.length > 0 && (
+          <ul
+            ref={listRef}
+            id={listboxId}
+            role="listbox"
+            className={styles.serviceComboMenu}
+          >
+            {matches.length === 0 ? (
+              <li className={styles.serviceComboEmpty}>Niciun serviciu găsit</li>
+            ) : (
+              matches.map((service, idx) => (
+                <li
+                  key={service.id}
+                  id={`appt-service-opt-${service.id}`}
+                  role="option"
+                  aria-selected={idx === activeIndex}
+                  className={`${styles.serviceComboOption} ${
+                    idx === activeIndex ? styles.serviceComboOptionActive : ''
+                  }`}
+                  // onMouseDown (not onClick) so it fires before the input blurs.
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    handleAdd(String(service.id));
+                  }}
+                  onMouseEnter={() => setActiveIndex(idx)}
+                >
+                  <span className={styles.serviceComboOptionName}>{service.name}</span>
+                  <span className={styles.serviceComboOptionMeta}>
+                    {service.duration_minutes} min{formatPrice(service.price)}
+                  </span>
+                </li>
+              ))
+            )}
+          </ul>
+        )}
       </div>
 
       {validationError && (

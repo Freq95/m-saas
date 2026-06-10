@@ -782,12 +782,6 @@ export default function CalendarPageClient({
   }, [pickerDate]);
 
   useEffect(() => {
-    if (state.viewType !== 'week') {
-      actions.setViewType('week');
-    }
-  }, [state.viewType, actions.setViewType]);
-
-  useEffect(() => {
     window.localStorage.setItem(MOBILE_RANGE_STORAGE_KEY, mobileRangeMode);
   }, [mobileRangeMode]);
 
@@ -882,10 +876,17 @@ export default function CalendarPageClient({
 
   // Drag-and-drop
   const { draggedAppointment, handleDragStart, handleDragEnd, handleDrop } = useDragAndDrop(
-    async (appointmentId, newStartTime, newEndTime) => {
+    async (appointmentId, newStartTime, newEndTime, context) => {
+      const targetCalendar = typeof context?.calendarId === 'number'
+        ? calendarMap.get(context.calendarId)
+        : null;
+      const targetCalendarId = targetCalendar && canCreateOnCalendar(targetCalendar)
+        ? targetCalendar.id
+        : undefined;
       const result = await updateAppointment(appointmentId, {
         startTime: newStartTime.toISOString(),
         endTime: newEndTime.toISOString(),
+        ...(targetCalendarId ? { calendarId: targetCalendarId } : {}),
       });
       if (result.ok) {
         justDroppedRef.current = true;
@@ -1424,8 +1425,13 @@ export default function CalendarPageClient({
   });
 
   // Stable wrappers for memoized children (WeekView, DayPanel).
-  const handleDropStable = useEventCallback(async (day: Date, hour: number, minute?: 0 | 15 | 30 | 45) => {
-    await handleDrop(day, hour, minute);
+  const handleDropStable = useEventCallback(async (
+    day: Date,
+    hour: number,
+    minute?: 0 | 15 | 30 | 45,
+    context?: { calendarId?: number }
+  ) => {
+    await handleDrop(day, hour, minute, context);
   });
   const handleCreateClickStable = useEventCallback(() => {
     handleSlotClick(selectedDay, 9);

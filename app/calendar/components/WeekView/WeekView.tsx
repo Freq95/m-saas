@@ -34,7 +34,7 @@ interface WeekViewProps {
   draggedAppointment?: Appointment | null;
   onDragStart?: (appointment: Appointment, day: Date) => void;
   onDragEnd?: () => void;
-  onDrop?: (day: Date, hour: number, minute?: SlotMinute) => void;
+  onDrop?: (day: Date, hour: number, minute?: SlotMinute, context?: { calendarId?: number }) => void;
   enableDragDrop?: boolean;
   hoveredAppointmentId?: number | null;
   compact?: boolean;
@@ -643,7 +643,7 @@ export function WeekView({
                         e.preventDefault();
                         cancelDragScroll();
                         setDragOverSlot(null);
-                        onDrop(day, hour, minute);
+                        onDrop(day, hour, minute, slotContext);
                       }}
                       aria-hidden="true"
                     />

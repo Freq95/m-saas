@@ -1,0 +1,205 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   Dental clinical report — A4 deliverable.
+   The .sheet redefines the densa color tokens to a light "paper" palette so
+   the document (and the Odontogram inside it, which reads those tokens) looks
+   like print even when the app is in dark mode.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.screen {
+  min-height: 100vh;
+  background: var(--color-bg-elevated, #0a0a0a);
+  padding: var(--space-6) var(--space-4) var(--space-9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+/* ── Screen-only toolbar ─────────────────────────────────────────────── */
+
+.toolbar {
+  width: min(794px, 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+.toolbarRight { display: flex; align-items: center; gap: var(--space-3); }
+
+.backBtn {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  transition: color 140ms ease, border-color 140ms ease;
+}
+.backBtn:hover { color: var(--color-text); border-color: var(--color-border-strong); }
+
+.dentitionToggle { display: inline-flex; padding: 3px; background: var(--color-surface-muted); border: 1px solid var(--color-border); border-radius: 999px; }
+.dentBtn { appearance: none; border: 0; background: transparent; padding: 6px 14px; font-size: var(--text-sm); font-weight: 500; color: var(--color-text-muted); border-radius: 999px; cursor: pointer; transition: all 140ms ease; }
+.dentBtn:hover { color: var(--color-text); }
+.dentBtnActive { background: var(--color-surface); color: var(--color-accent); box-shadow: 0 0 0 1px var(--color-border-strong); }
+
+.printBtn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--height-btn);
+  padding: 0 18px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text-on-accent);
+  background: var(--color-accent);
+  border: 0;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: filter 140ms ease;
+}
+.printBtn:hover { filter: brightness(1.08); }
+
+/* ── A4 sheet (paper palette) ────────────────────────────────────────── */
+
+.sheet {
+  /* Light token overrides — cascade into the Odontogram which reads them. */
+  --color-surface: #ffffff;
+  --color-surface-strong: #f4f5f7;
+  --color-surface-muted: #f7f8fa;
+  --color-border: #e3e6ea;
+  --color-border-strong: #cfd4da;
+  --color-text: #16191d;
+  --color-text-muted: #4a4f57;
+  --color-text-soft: #7a818b;
+  --color-accent: #2c5aa0;
+  --color-accent-subtle: rgba(44, 90, 160, 0.08);
+
+  width: min(794px, 100%);
+  min-height: 1123px; /* A4 ratio at 96dpi */
+  background: #fff;
+  color: var(--color-text);
+  padding: 48px 56px;
+  border-radius: 6px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  font-family: var(--font-sans);
+}
+
+.docHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding-bottom: 18px;
+  border-bottom: 2px solid var(--color-text);
+}
+.eyebrow {
+  margin: 0 0 4px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: var(--color-text-soft);
+}
+.docTitle {
+  margin: 0;
+  font-family: var(--font-brand);
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+.docMeta { display: flex; flex-direction: column; gap: 4px; margin: 0; text-align: right; }
+.docMeta div { display: flex; gap: 8px; justify-content: flex-end; }
+.docMeta dt { font-family: var(--font-mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-text-soft); align-self: center; }
+.docMeta dd { margin: 0; font-size: 12px; font-weight: 600; color: var(--color-text); }
+
+.muted { color: var(--color-text-soft); font-size: var(--text-sm); }
+
+.chartSection { margin: 24px 0; }
+.chartFrame { border: 1px solid var(--color-border); border-radius: 10px; overflow: hidden; }
+
+.block { margin-top: 28px; break-inside: avoid; }
+.blockTitle {
+  margin: 0 0 12px;
+  font-family: var(--font-brand);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.table thead th {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-soft);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--color-border-strong);
+}
+.table tbody td { padding: 9px 10px; border-bottom: 1px solid var(--color-border); vertical-align: top; color: var(--color-text); }
+.fdiCell { font-family: var(--font-mono); font-weight: 700; color: var(--color-accent); }
+
+.issueCellList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.issueCellList li { display: flex; align-items: center; gap: 6px; }
+.surfaceNote { color: var(--color-text-soft); }
+
+.swatch { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+
+.groupList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.groupList li { display: grid; grid-template-columns: 120px 1fr auto; gap: 12px; align-items: baseline; font-size: 12px; padding: 6px 0; border-bottom: 1px solid var(--color-border); }
+.groupTeeth { font-family: var(--font-mono); font-weight: 600; color: var(--color-accent); }
+.groupComment { color: var(--color-text); }
+.groupMeta { font-size: 11px; color: var(--color-text-soft); white-space: nowrap; }
+
+.legendRow { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--color-border); }
+.legendItem { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-text-muted); }
+
+.signatures { display: flex; gap: 48px; margin-top: 56px; }
+.sigBlock { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.sigLine { height: 1px; background: var(--color-text); margin-top: 28px; }
+.sigLabel { font-size: 11px; color: var(--color-text-soft); }
+
+.disclaimer { margin-top: 28px; font-size: 10px; color: var(--color-text-soft); line-height: 1.5; }
+
+/* ── Print isolation ─────────────────────────────────────────────────── */
+
+/* Print positioning (pure local-class rules). Visibility isolation lives in a
+   global <style> injected by RaportClient, because Next's CSS-module loader
+   rejects bare element selectors like `body`. */
+@media print {
+  .screen { padding: 0; background: #fff; display: block; }
+  .toolbar { display: none !important; }
+
+  .sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 16mm 14mm;
+    box-shadow: none;
+    border-radius: 0;
+  }
+
+  .block, .chartSection, .signatures { break-inside: avoid; }
+}
+
+@page { size: A4; margin: 0; }
+
+@media (max-width: 860px) {
+  .sheet { padding: 28px 22px; min-height: 0; }
+  .docHeader { flex-direction: column; }
+  .docMeta { text-align: left; }
+  .docMeta div { justify-content: flex-start; }
+  .table { font-size: 11px; }
+  .groupList li { grid-template-columns: 1fr; gap: 2px; }
+}

@@ -48,6 +48,7 @@ export interface CreateAppointmentInput {
 }
 
 export interface UpdateAppointmentInput {
+  calendarId?: number;
   startTime?: string;
   endTime?: string;
   dentistUserId?: number;
@@ -366,7 +367,8 @@ export function useAppointmentsSWR({
         data.status ||
         data.notes !== undefined ||
         data.category !== undefined ||
-        data.color
+        data.color ||
+        data.calendarId
       );
       let snapshot: Appointment[] | undefined;
       if (hasOptimisticFields) {
@@ -377,6 +379,7 @@ export function useAppointmentsSWR({
               ? {
                   ...apt,
                   ...(data.startTime && data.endTime ? { start_time: data.startTime, end_time: data.endTime } : {}),
+                  ...(data.calendarId ? { calendar_id: data.calendarId } : {}),
                   ...(data.status ? { status: data.status } : {}),
                   ...(data.notes !== undefined ? { notes: data.notes } : {}),
                   ...(data.category !== undefined ? { category: data.category ?? undefined } : {}),

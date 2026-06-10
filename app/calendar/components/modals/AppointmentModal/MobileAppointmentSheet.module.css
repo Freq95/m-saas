@@ -548,6 +548,31 @@
   color: var(--color-text-soft);
 }
 
+/* Search box at the top of the expanded service list. */
+.serviceSearch {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  background: color-mix(in srgb, var(--color-surface) 85%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: 10px;
+  padding: 0.6rem 0.85rem;
+  margin-bottom: 0.15rem;
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 0.95rem;
+  outline: none;
+  min-height: 42px;
+}
+
+.serviceSearch::placeholder {
+  color: color-mix(in srgb, var(--color-text-soft) 80%, transparent);
+}
+
+.serviceSearch:focus {
+  border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+}
+
 .optionDot {
   flex-shrink: 0;
   width: 10px;

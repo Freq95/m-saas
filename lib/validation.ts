@@ -86,6 +86,7 @@ export const createAppointmentSchema = z.object({
 );
 
 export const updateAppointmentSchema = z.object({
+  calendarId: z.number().int().positive().optional(),
   startTime: dateTimeSchema.optional(),
   endTime: dateTimeSchema.optional(),
   dentistUserId: z.number().int().positive().optional(),

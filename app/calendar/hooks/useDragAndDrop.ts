@@ -11,11 +11,16 @@ interface UseDragAndDropResult {
   isDragging: boolean;
   handleDragStart: (appointment: Appointment, sourceDate: Date) => void;
   handleDragEnd: () => void;
-  handleDrop: (targetDate: Date, targetHour?: number, targetMinute?: 0 | 15 | 30 | 45) => Promise<{ newStart: Date; newEnd: Date } | null>;
+  handleDrop: (
+    targetDate: Date,
+    targetHour?: number,
+    targetMinute?: 0 | 15 | 30 | 45,
+    context?: { calendarId?: number }
+  ) => Promise<{ newStart: Date; newEnd: Date } | null>;
 }
 
 export function useDragAndDrop(
-  onReschedule: (appointmentId: number, newStartTime: Date, newEndTime: Date) => Promise<boolean>
+  onReschedule: (appointmentId: number, newStartTime: Date, newEndTime: Date, context?: { calendarId?: number }) => Promise<boolean>
 ): UseDragAndDropResult {
   const [dragData, setDragData] = useState<DragData | null>(null);
 
@@ -28,13 +33,21 @@ export function useDragAndDrop(
   }, []);
 
   const handleDrop = useCallback(
-    async (targetDate: Date, targetHour?: number, targetMinute: 0 | 15 | 30 | 45 = 0): Promise<{ newStart: Date; newEnd: Date } | null> => {
+    async (
+      targetDate: Date,
+      targetHour?: number,
+      targetMinute: 0 | 15 | 30 | 45 = 0,
+      context?: { calendarId?: number }
+    ): Promise<{ newStart: Date; newEnd: Date } | null> => {
       if (!dragData) return null;
 
       const { appointment } = dragData;
       const originalStart = new Date(appointment.start_time);
       const originalEnd = new Date(appointment.end_time);
       const duration = originalEnd.getTime() - originalStart.getTime();
+      const targetCalendarChanged =
+        typeof context?.calendarId === 'number' &&
+        context.calendarId !== appointment.calendar_id;
 
       // Calculate new start time
       const newStart = new Date(targetDate);
@@ -51,14 +64,15 @@ export function useDragAndDrop(
       // Check if the appointment is being moved to the same slot
       if (
         originalStart.getTime() === newStart.getTime() &&
-        originalEnd.getTime() === newEnd.getTime()
+        originalEnd.getTime() === newEnd.getTime() &&
+        !targetCalendarChanged
       ) {
         setDragData(null);
         return null; // No change needed
       }
 
       // Attempt to reschedule
-      const success = await onReschedule(appointment.id, newStart, newEnd);
+      const success = await onReschedule(appointment.id, newStart, newEnd, context);
 
       if (success) {
         setDragData(null);

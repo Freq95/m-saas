@@ -42,6 +42,7 @@ export async function GET(request: NextRequest) {
       endDate: searchParams.get('endDate') || undefined,
       calendarIds: searchParams.get('calendarIds') || undefined,
       status: searchParams.get('status') || undefined,
+      includeCancelled: searchParams.get('includeCancelled') || undefined,
       search: searchParams.get('search') || undefined,
     };
 

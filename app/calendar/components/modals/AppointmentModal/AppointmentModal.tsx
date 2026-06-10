@@ -35,6 +35,16 @@ import type {
   CalendarOption,
 } from './types';
 
+/** Lower-case and strip diacritics so "consultaţie" matches a "cons" query.
+ *  Mirrors the desktop ServiceSection helper so search behaves identically. */
+function normalizeForSearch(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
 type DesktopFieldErrors = Partial<Record<
   'calendarId' | 'serviceIds' | 'clientName' | 'date' | 'startTime' | 'endTime' | 'recurrenceInterval' | 'recurrenceCount' | 'recurrenceEndDate',
   string
@@ -839,6 +849,38 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
   }, [effectiveServices, state.serviceIds]);
   const selectedService = selectedServices[0] || null;
 
+  // ── Service search + alphabetical sort (mobile) ──────────────────────────
+  // Free-text query the user types to narrow the service list. The list is
+  // pre-sorted alphabetically (diacritic-insensitive, Romanian collation) so it
+  // matches the desktop picker. Multi-select toggle behaviour is unchanged.
+  const [serviceQuery, setServiceQuery] = useState('');
+  const serviceSearchRef = useRef<HTMLInputElement>(null);
+
+  const sortedServices = useMemo(
+    () =>
+      [...effectiveServices].sort((a, b) =>
+        normalizeForSearch(a.name).localeCompare(normalizeForSearch(b.name), 'ro')
+      ),
+    [effectiveServices]
+  );
+
+  const serviceMatches = useMemo(() => {
+    const q = normalizeForSearch(serviceQuery);
+    if (!q) return sortedServices;
+    return sortedServices.filter((s) => normalizeForSearch(s.name).includes(q));
+  }, [sortedServices, serviceQuery]);
+
+  // When the service panel opens, clear any stale query and focus the search
+  // box so the user can start typing immediately. Reset on close too.
+  useEffect(() => {
+    if (expandedRow !== 'service') {
+      setServiceQuery('');
+      return;
+    }
+    const id = window.requestAnimationFrame(() => serviceSearchRef.current?.focus());
+    return () => window.cancelAnimationFrame(id);
+  }, [expandedRow]);
+
   const calendarRowDisabled = lockCalendarSelection || calendarOptions.length <= 1;
   const dentistRowVisible = dentists.length > 1 || loadingDentists || Boolean(dentistError);
 
@@ -1118,34 +1160,48 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
                       <div className={m.autocompleteEmpty}>Nu sunt servicii disponibile</div>
                     ) : (
                       <>
-                        {effectiveServices.map((s) => {
-                          const sid = String(s.id);
-                          const isSelected = state.serviceIds.includes(sid);
-                          return (
-                            <button
-                              key={s.id}
-                              type="button"
-                              className={`${m.option} ${isSelected ? m.optionSelected : ''}`}
-                              aria-pressed={isSelected}
-                              onClick={() => {
-                                const nextIds = isSelected
-                                  ? state.serviceIds.filter((id) => id !== sid)
-                                  : [...state.serviceIds, sid];
-                                const byId = new Map(effectiveServices.map((svc) => [String(svc.id), svc]));
-                                const totalDurationMinutes = nextIds.reduce(
-                                  (sum, id) => sum + (byId.get(id)?.duration_minutes || 0),
-                                  0
-                                );
-                                dispatch({ type: 'SET_SERVICES', serviceIds: nextIds, totalDurationMinutes });
-                              }}
-                            >
-                              <span>{s.name}</span>
-                              {s.duration_minutes ? (
-                                <span className={m.optionMeta}>{s.duration_minutes} min</span>
-                              ) : null}
-                            </button>
-                          );
-                        })}
+                        <input
+                          ref={serviceSearchRef}
+                          type="text"
+                          className={m.serviceSearch}
+                          value={serviceQuery}
+                          placeholder="Caută serviciul…"
+                          onChange={(e) => setServiceQuery(e.target.value)}
+                          autoComplete="off"
+                          aria-label="Caută serviciu"
+                        />
+                        {serviceMatches.length === 0 ? (
+                          <div className={m.autocompleteEmpty}>Niciun serviciu găsit</div>
+                        ) : (
+                          serviceMatches.map((s) => {
+                            const sid = String(s.id);
+                            const isSelected = state.serviceIds.includes(sid);
+                            return (
+                              <button
+                                key={s.id}
+                                type="button"
+                                className={`${m.option} ${isSelected ? m.optionSelected : ''}`}
+                                aria-pressed={isSelected}
+                                onClick={() => {
+                                  const nextIds = isSelected
+                                    ? state.serviceIds.filter((id) => id !== sid)
+                                    : [...state.serviceIds, sid];
+                                  const byId = new Map(effectiveServices.map((svc) => [String(svc.id), svc]));
+                                  const totalDurationMinutes = nextIds.reduce(
+                                    (sum, id) => sum + (byId.get(id)?.duration_minutes || 0),
+                                    0
+                                  );
+                                  dispatch({ type: 'SET_SERVICES', serviceIds: nextIds, totalDurationMinutes });
+                                }}
+                              >
+                                <span>{s.name}</span>
+                                {s.duration_minutes ? (
+                                  <span className={m.optionMeta}>{s.duration_minutes} min</span>
+                                ) : null}
+                              </button>
+                            );
+                          })
+                        )}
                         {selectedServices.length > 0 && (
                           <div className={m.optionMeta} style={{ padding: '0.6rem 0.75rem 0' }}>
                             Total: {selectedServices.reduce(

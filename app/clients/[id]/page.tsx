@@ -1,6 +1,6 @@
 import ClientProfileClient from './ClientProfileClient';
 import { getClientProfileData, getClientStatsData } from '@/lib/server/client-profile';
-import { getAuthUser } from '@/lib/auth-helpers';
+import { getAuthUser, isClinicalRole } from '@/lib/auth-helpers';
 import { resolveClientScopeForClient } from '@/lib/client-permissions';
 
 export const revalidate = 30;
@@ -17,6 +17,7 @@ export default async function ClientProfilePage({ params }: { params: Promise<{ 
         initialAppointments={[]}
         initialConversations={[]}
         initialStats={null}
+        canEditDental={false}
       />
     );
   }
@@ -32,10 +33,12 @@ export default async function ClientProfilePage({ params }: { params: Promise<{ 
         initialAppointments={[]}
         initialConversations={[]}
         initialStats={null}
+        canEditDental={false}
       />
     );
   }
   const stats = scope ? await getClientStatsData(clientId, scope.tenantId, scope.userId) : null;
+  const canEditDental = isClinicalRole(auth.role);
 
   return (
     <ClientProfileClient
@@ -44,6 +47,7 @@ export default async function ClientProfilePage({ params }: { params: Promise<{ 
       initialAppointments={profile.appointments}
       initialConversations={profile.conversations}
       initialStats={stats}
+      canEditDental={canEditDental}
     />
   );
 }

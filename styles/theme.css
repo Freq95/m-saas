@@ -153,8 +153,10 @@
   --color-surface:       #121214;
   --color-surface-strong: #18181b;
   --color-surface-muted: #202024;
-  --color-border:        rgba(255, 255, 255, 0.09);
-  --color-border-strong: rgba(255, 255, 255, 0.15);
+  /* Bumped from 0.09/0.15 — at 0.09 the grid lines/dividers (densest in the
+     calendar week grid) were near-invisible on the #000 background. */
+  --color-border:        rgba(255, 255, 255, 0.14);
+  --color-border-strong: rgba(255, 255, 255, 0.22);
 
   --color-text:       #f5f5f5;
   --color-text-muted: #a3a3a3;

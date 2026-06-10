@@ -61,3 +61,19 @@ reports/calendar-rollout-backups/
 app/ui-review/*
 ui-review-board.html
 95novac@gmail.com.ical.zip
+
+# Playwright MCP session artifacts
+.playwright-mcp/
+
+# Local installers / binaries
+*.exe
+
+# Dental design source scratch files (ToothShape.tsx uses inline SVG; these are
+# only design references, kept locally — not loaded at runtime)
+/clean_tooth*.svg
+/good_*.svg
+/molar_*.svg
+/original-*.webp
+
+# Throwaway QA screenshots
+/mobile-service-search-*.png

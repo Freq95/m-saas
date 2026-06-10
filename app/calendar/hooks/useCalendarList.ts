@@ -61,8 +61,8 @@ export function useCalendarList(options: UseCalendarListOptions = {}): UseCalend
       revalidateOnFocus: true,
       focusThrottleInterval: 60_000,
       dedupingInterval: 60_000,
-      revalidateOnMount: !options.fallbackData,
-      revalidateIfStale: !options.fallbackData,
+      revalidateOnMount: true,
+      revalidateIfStale: true,
       fallbackData: options.fallbackData ?? undefined,
     }
   );

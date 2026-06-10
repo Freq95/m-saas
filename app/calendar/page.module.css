@@ -1221,6 +1221,73 @@
   box-shadow: none !important;
 }
 
+.serviceInlinePicker::placeholder {
+  color: var(--color-text-soft);
+}
+
+/* ── Searchable service combobox ─────────────────────────────────── */
+.serviceComboWrapper {
+  position: relative;
+}
+
+.serviceComboMenu {
+  position: absolute;
+  top: calc(100% + 0.3rem);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  max-height: 16rem;
+  overflow-y: auto;
+  background: var(--color-surface-strong, var(--color-surface));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg, 0 12px 32px rgba(0, 0, 0, 0.35));
+}
+
+.serviceComboOption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius-sm, 0.4rem);
+  cursor: pointer;
+  color: var(--color-text);
+}
+
+.serviceComboOptionActive {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast, #fff);
+}
+
+.serviceComboOptionName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.serviceComboOptionMeta {
+  flex: none;
+  font-size: 0.8rem;
+  color: var(--color-text-soft);
+}
+
+.serviceComboOptionActive .serviceComboOptionMeta {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.serviceComboEmpty {
+  padding: 0.6rem;
+  color: var(--color-text-soft);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
 .serviceAddPicker {
   margin-top: 0.55rem;
   /* native <select> styling reuses whatever the modalField pattern uses. */

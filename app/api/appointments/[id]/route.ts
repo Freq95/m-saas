@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMongoDbOrThrow, getNextNumericId, stripMongoId, type FlexDoc } from '@/lib/db/mongo-utils';
 import { updateClientStats } from '@/lib/client-matching';
-import { canDeleteAppointment, canEditAppointment, getCalendarAuth } from '@/lib/calendar-auth';
+import { canDeleteAppointment, canEditAppointment, getCalendarAuth, requireCalendarPermission } from '@/lib/calendar-auth';
 import { handleApiError, createSuccessResponse, createErrorResponse } from '@/lib/error-handler';
 import { checkAppointmentConflict } from '@/lib/calendar-conflicts';
 import {
@@ -181,6 +181,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
     const {
       status,
+      calendarId,
       startTime,
       endTime,
       notes,
@@ -255,6 +256,11 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     const appointmentCalendarId = typeof existingAppointment.calendar_id === 'number'
       ? existingAppointment.calendar_id
       : undefined;
+    let effectiveAppointmentTenantId = appointmentTenantId;
+    let effectiveAppointmentUserId = appointmentUserId;
+    let effectiveAppointmentCalendarId = appointmentCalendarId;
+    let targetCalendarOwnerUserId: number | null = null;
+    let targetCalendarChanged = false;
     const appointmentCalendar = appointmentCalendarId
       ? await db.collection('calendars').findOne(
           { id: appointmentCalendarId, tenant_id: appointmentTenantId },
@@ -284,6 +290,24 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
     if (status !== undefined) {
       updates.status = status;
+    }
+
+    if (calendarId !== undefined) {
+      if (!appointmentCalendarId) {
+        return createErrorResponse('Calendar can only be changed for calendar appointments', 400);
+      }
+      if (calendarId !== appointmentCalendarId) {
+        const targetCalendarAuth = await getCalendarAuth(auth, calendarId);
+        requireCalendarPermission(targetCalendarAuth, 'can_create');
+        effectiveAppointmentCalendarId = targetCalendarAuth.calendarId;
+        effectiveAppointmentUserId = targetCalendarAuth.calendarOwnerId;
+        effectiveAppointmentTenantId = targetCalendarAuth.calendarTenantId;
+        targetCalendarOwnerUserId = targetCalendarAuth.calendarOwnerId;
+        targetCalendarChanged = true;
+        updates.calendar_id = targetCalendarAuth.calendarId;
+        updates.user_id = targetCalendarAuth.calendarOwnerId;
+        updates.tenant_id = targetCalendarAuth.calendarTenantId;
+      }
     }
 
     const WARN_TRANSITIONS: Record<string, string[]> = {
@@ -333,6 +357,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         updates.end_time = newEndTime.toISOString();
       }
     }
+    const shouldCheckConflicts = hasTimeOrAllocationChange || targetCalendarChanged;
 
     if (notes !== undefined) {
       updates.notes = notes;
@@ -343,8 +368,8 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     let effectiveDentistIsCurrentUser = isDentistCurrentUser;
 
     let dentistScopeChanged = false;
-    if (dentistUserId !== undefined) {
-      if (!appointmentCalendarId) {
+    if (dentistUserId !== undefined || targetCalendarChanged) {
+      if (!effectiveAppointmentCalendarId) {
         return createErrorResponse('Assigned dentist can only be changed for calendar appointments', 400);
       }
       if (!serviceOwnerScope) {
@@ -352,8 +377,8 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       }
       const dentistAssignment = await resolveAppointmentDentistAssignment(
         auth,
-        appointmentCalendarId,
-        dentistUserId
+        effectiveAppointmentCalendarId,
+        dentistUserId ?? targetCalendarOwnerUserId
       );
       effectiveServiceOwnerScope = {
         serviceOwnerUserId: dentistAssignment.assignedDentistUserId,
@@ -532,22 +557,32 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
     type PatchResult =
       | { kind: 'not_found' }
+      | { kind: 'invalid_time_range' }
       | { kind: 'availability_conflict'; conflicts: unknown[]; suggestions: Array<{ start: Date; end: Date }> }
       | { kind: 'ok'; doc: any };
 
     const runMutation = async (): Promise<PatchResult> => {
-      if (hasTimeOrAllocationChange && newStartTime && newEndTime) {
+      if (shouldCheckConflicts) {
+        const conflictStartTime = newStartTime ?? new Date(existingAppointment.start_time);
+        const conflictEndTime = newEndTime ?? new Date(existingAppointment.end_time);
+        if (
+          Number.isNaN(conflictStartTime.getTime()) ||
+          Number.isNaN(conflictEndTime.getTime()) ||
+          conflictStartTime >= conflictEndTime
+        ) {
+          return { kind: 'invalid_time_range' };
+        }
         const conflictCheck = await checkAppointmentConflict(
-          appointmentUserId,
-          appointmentTenantId,
-          newStartTime,
-          newEndTime,
+          effectiveAppointmentUserId,
+          effectiveAppointmentTenantId,
+          conflictStartTime,
+          conflictEndTime,
           appointmentId,
           true,
           {
-            calendarId: appointmentCalendarId,
-            dentistUserId: effectiveServiceOwnerScope?.serviceOwnerUserId ?? appointmentDentistId ?? appointmentUserId,
-            dentistTenantId: effectiveServiceOwnerScope?.serviceOwnerTenantId ?? appointmentTenantId,
+            calendarId: effectiveAppointmentCalendarId,
+            dentistUserId: effectiveServiceOwnerScope?.serviceOwnerUserId ?? appointmentDentistId ?? effectiveAppointmentUserId,
+            dentistTenantId: effectiveServiceOwnerScope?.serviceOwnerTenantId ?? effectiveAppointmentTenantId,
           }
         );
         conflictWarningData = {
@@ -581,6 +616,10 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         },
         { status: 409 }
       );
+    }
+
+    if (patchResult.kind === 'invalid_time_range') {
+      return createErrorResponse('Invalid appointment time range', 400);
     }
 
     if (patchResult.kind === 'not_found') {
@@ -710,6 +749,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       (
         previousClientId !== appointmentDoc.client_id ||
         dentistUserId !== undefined ||
+        targetCalendarChanged ||
         status !== undefined ||
         serviceId !== undefined ||
         startTime !== undefined ||
@@ -803,10 +843,24 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     }
 
     await invalidateReadCaches({
-      tenantId: appointmentTenantId,
-      userId: appointmentUserId,
-      calendarId: appointmentCalendarId,
+      tenantId: effectiveAppointmentTenantId,
+      userId: effectiveAppointmentUserId,
+      calendarId: effectiveAppointmentCalendarId,
     });
+    if (
+      targetCalendarChanged &&
+      (
+        effectiveAppointmentTenantId.toString() !== appointmentTenantId.toString() ||
+        effectiveAppointmentUserId !== appointmentUserId ||
+        effectiveAppointmentCalendarId !== appointmentCalendarId
+      )
+    ) {
+      await invalidateReadCaches({
+        tenantId: appointmentTenantId,
+        userId: appointmentUserId,
+        calendarId: appointmentCalendarId,
+      });
+    }
     const conflictWarning = getAppointmentConflictWarning(conflictWarningData.conflicts);
     const responseWarning =
       [warning, conflictWarning, seriesFanOutWarning].filter(Boolean).join(' ') || null;

@@ -28,6 +28,9 @@ function matchesFilter(doc: Doc, filter: Doc): boolean {
     if ('$ne' in rawCondition) {
       return !isEqualValue(value, rawCondition.$ne);
     }
+    if ('$in' in rawCondition && Array.isArray(rawCondition.$in)) {
+      return rawCondition.$in.some((candidate) => isEqualValue(value, candidate));
+    }
     return isEqualValue(value, rawCondition);
   });
 }
@@ -192,6 +195,9 @@ describe('PATCH /api/appointments/[id] price_at_time behavior', () => {
         }
         return {
           findOne: vi.fn(async (filter: Doc) => services.find((doc) => matchesFilter(doc, filter)) ?? null),
+          find: vi.fn((filter: Doc) => ({
+            toArray: vi.fn(async () => services.filter((doc) => matchesFilter(doc, filter))),
+          })),
         };
       },
     };

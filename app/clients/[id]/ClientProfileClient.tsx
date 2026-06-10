@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import styles from './page.module.css';
 import navStyles from '../../dashboard/page.module.css';
@@ -9,6 +10,13 @@ import { ToastContainer } from '@/components/Toast';
 import ClientCreateModal from '@/components/ClientCreateModal';
 import { gdprStateOf, GDPR_COLOR, GDPR_FULL_LABEL } from '@/lib/client-gdpr';
 import { logger } from '@/lib/logger';
+
+// Dental tab is large (SVG odontogram + dialog + chart). Code-split it so users
+// who never open the tab don't download it.
+const DentalTab = dynamic(() => import('./dental/DentalTab'), {
+  ssr: false,
+  loading: () => <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>Se încarcă schema dentară…</div>,
+});
 
 interface Client {
   id: number;
@@ -56,6 +64,7 @@ interface ClientProfileClientProps {
   initialAppointments: Appointment[];
   initialConversations: Conversation[];
   initialStats: any | null;
+  canEditDental: boolean;
 }
 
 export default function ClientProfileClient({
@@ -64,6 +73,7 @@ export default function ClientProfileClient({
   initialAppointments,
   initialConversations,
   initialStats,
+  canEditDental,
 }: ClientProfileClientProps) {
   const [client, setClient] = useState<Client | null>(initialClient);
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
@@ -72,7 +82,7 @@ export default function ClientProfileClient({
   const [notes, setNotes] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(initialStats);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'notes' | 'appointments' | 'conversations' | 'files'>('notes');
+  const [activeTab, setActiveTab] = useState<'notes' | 'appointments' | 'conversations' | 'files' | 'dental'>('notes');
   const [showAddNote, setShowAddNote] = useState(false);
   const [showEditClient, setShowEditClient] = useState(false);
   const [pendingDeleteFileId, setPendingDeleteFileId] = useState<number | null>(null);
@@ -85,7 +95,7 @@ export default function ClientProfileClient({
   const [consentWithdrawing, setConsentWithdrawing] = useState(false);
   const [gdprErasing, setGdprErasing] = useState(false);
   const [showOverflowMenu, setShowOverflowMenu] = useState(false);
-  const { toasts, removeToast, error: toastError } = useToast();
+  const { toasts, removeToast, error: toastError, success: toastSuccess } = useToast();
   const addNoteBackdropPressStartedRef = useRef(false);
   const editNoteBackdropPressStartedRef = useRef(false);
   const deleteNoteBackdropPressStartedRef = useRef(false);
@@ -669,6 +679,12 @@ export default function ClientProfileClient({
             Fișiere
             {files.length > 0 && <span className={styles.tabCount}>({files.length})</span>}
           </button>
+          <button
+            className={`${styles.tab} ${activeTab === 'dental' ? styles.tabActive : ''}`}
+            onClick={() => setActiveTab('dental')}
+          >
+            Dental
+          </button>
         </div>
 
         {/* ── Tab Content ────────────────────────────────────── */}
@@ -846,6 +862,17 @@ export default function ClientProfileClient({
                 </div>
               )}
             </div>
+          )}
+
+          {/* Dental */}
+          {activeTab === 'dental' && (
+            <DentalTab
+              clientId={clientId}
+              canEdit={canEditDental}
+              clientName={client?.name}
+              isMinor={client?.is_minor}
+              onToast={(kind, message) => (kind === 'success' ? toastSuccess(message) : toastError(message))}
+            />
           )}
         </div>
 

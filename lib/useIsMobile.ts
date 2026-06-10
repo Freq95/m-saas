@@ -1,46 +1,41 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 /**
  * Returns true if the current viewport is at or below `breakpoint` pixels.
  *
- * The lazy useState initializer reads matchMedia synchronously on the first
- * client render so SPA navigations land with the correct value on first paint
- * — no desktop-layout-then-mobile-layout flash when entering a route on a
- * phone.
- *
- * On the very first server-rendered page load, the server cannot know the
- * viewport, so it defaults to false. After hydration, the lazy init returns
- * the real value; React reconciles in the same paint cycle so the flash is
- * limited to a single render before the browser shows pixels. SPA navigations
- * within the app are unaffected.
+ * Uses useSyncExternalStore so the hydration render uses the server snapshot
+ * (always false), exactly matching the server-rendered HTML — no hydration
+ * mismatch (React #418). Immediately after commit, React reconciles to the
+ * real client snapshot, so the correct layout lands in the same paint cycle
+ * without a desktop-then-mobile flash on SPA navigations.
  */
 export function useIsMobile(breakpoint = 640): boolean {
-  const [isMobile, setIsMobile] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return window.matchMedia(`(max-width: ${breakpoint}px)`).matches;
-  });
+  const query = `(max-width: ${breakpoint}px)`;
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
+  const subscribe = useCallback(
+    (callback: () => void) => {
+      if (typeof window === 'undefined') return () => {};
+      const mql = window.matchMedia(query);
+      if (typeof mql.addEventListener === 'function') {
+        mql.addEventListener('change', callback);
+        return () => mql.removeEventListener('change', callback);
+      }
+      // Legacy Safari (<14)
+      mql.addListener(callback);
+      return () => mql.removeListener(callback);
+    },
+    [query]
+  );
 
-    const mediaQuery = window.matchMedia(`(max-width: ${breakpoint}px)`);
+  const getSnapshot = useCallback(
+    () => (typeof window === 'undefined' ? false : window.matchMedia(query).matches),
+    [query]
+  );
 
-    // Resync in case the viewport changed between lazy-init and effect
-    // (rare, but possible on slow renders or after a resize during nav).
-    setIsMobile(mediaQuery.matches);
+  // Server (and the hydration render) always sees false → matches SSR HTML.
+  const getServerSnapshot = () => false;
 
-    if (typeof mediaQuery.addEventListener === 'function') {
-      const handleChange = (event: MediaQueryListEvent) => setIsMobile(event.matches);
-      mediaQuery.addEventListener('change', handleChange);
-      return () => mediaQuery.removeEventListener('change', handleChange);
-    }
-
-    const handleLegacyChange = (event: MediaQueryListEvent) => setIsMobile(event.matches);
-    mediaQuery.addListener(handleLegacyChange);
-    return () => mediaQuery.removeListener(handleLegacyChange);
-  }, [breakpoint]);
-
-  return isMobile;
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }

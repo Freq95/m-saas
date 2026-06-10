@@ -1,4 +1,4 @@
-import { useReducer, useCallback, useEffect, useMemo } from 'react';
+import { useReducer, useCallback, useMemo } from 'react';
 import { addWeeks, subWeeks, addMonths, subMonths, addDays, subDays } from 'date-fns';
 
 export type CalendarViewType = 'week' | 'workweek' | 'month' | 'day';
@@ -197,24 +197,6 @@ export function useCalendar(
     selectSlot,
     clearSelection,
   ]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const persistedView = localStorage.getItem('calendar:viewType');
-    if (
-      persistedView === 'week' ||
-      persistedView === 'workweek' ||
-      persistedView === 'month' ||
-      persistedView === 'day'
-    ) {
-      dispatch({ type: 'SET_VIEW_TYPE', payload: persistedView });
-    }
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem('calendar:viewType', state.viewType);
-  }, [state.viewType]);
 
   return { state, actions };
 }

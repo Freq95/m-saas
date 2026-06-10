@@ -1,0 +1,177 @@
+/* ── Tooth + chart color tokens (theme-aware) ─────────────────────────── */
+
+.wrap {
+  --dental-tooth-fill:      color-mix(in srgb, #eef7fc 30%, transparent);
+  --dental-root-fill:       color-mix(in srgb, #eef7fc 10%, transparent);
+  --dental-tooth-stroke:    color-mix(in srgb, #9fb0c3 78%, var(--color-text));
+  --dental-groove-stroke:   color-mix(in srgb, #9fb0c3 38%, transparent);
+  --dental-gum-fill:        color-mix(in srgb, #f5a8bd 62%, transparent);
+  --dental-mini-tooth-fill: color-mix(in srgb, #e6f3fb 62%, var(--color-surface));
+  --dental-mini-guide:      color-mix(in srgb, #e6f3fb 14%, transparent);
+  --dental-crown-fill:      color-mix(in srgb, #f0c879 28%, transparent);
+  --dental-crown-stroke:    color-mix(in srgb, #f0c879 55%, transparent);
+  --dental-implant-fill:    color-mix(in srgb, #b18cd9 20%, transparent);
+  --dental-implant-stroke:  color-mix(in srgb, #b18cd9 62%, transparent);
+  --dental-implant-solid:   #9b6dd0;
+  --dental-implant-thread:  color-mix(in srgb, #ffffff 55%, transparent);
+  --dental-rootcanal-stroke: color-mix(in srgb, #6f4a30 78%, var(--color-text));
+  --dental-bridge-fill:     color-mix(in srgb, #8aa6c5 28%, transparent);
+  --dental-bridge-stroke:   color-mix(in srgb, #8aa6c5 70%, transparent);
+  --dental-bridge-arc:      #5c7a99;
+  --dental-bridge-arc-soft: color-mix(in srgb, #5c7a99 25%, transparent);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 14px);
+}
+
+.svg {
+  width: 100%;
+  height: auto;
+  max-height: 390px;
+  display: block;
+}
+
+.gumBand {
+  fill: var(--dental-gum-fill);
+  opacity: 0.78;
+}
+
+.miniArchGuide {
+  fill: color-mix(in srgb, var(--dental-mini-guide) 82%, transparent);
+  stroke: color-mix(in srgb, var(--dental-tooth-stroke) 24%, transparent);
+  stroke-width: 0.8;
+}
+
+.miniArchLabel {
+  font-size: 10px;
+  fill: var(--color-text-soft);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  opacity: 0.74;
+  pointer-events: none;
+}
+
+.miniTooth {
+  cursor: pointer;
+}
+
+.miniTooth:hover rect:last-child {
+  stroke: var(--color-accent);
+}
+
+.miniSelectedHalo {
+  fill: var(--color-accent-subtle);
+  stroke: var(--color-accent);
+  stroke-width: 0.8;
+  stroke-dasharray: 2 2;
+  opacity: 0.9;
+}
+
+.midline {
+  stroke: var(--color-border-strong);
+  stroke-width: 0.75;
+  stroke-dasharray: 2 4;
+  opacity: 0.45;
+}
+
+.archLabel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: var(--color-text-soft);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.fdiLabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  fill: var(--color-text-soft);
+  letter-spacing: 0.02em;
+  user-select: none;
+  pointer-events: none;
+  transition: fill 120ms ease;
+}
+
+.fdiLabelActive {
+  fill: var(--color-accent);
+  font-weight: 600;
+}
+
+/* ── Bridge connector arc ─────────────────────────────────────────── */
+
+.bridgeArc {
+  fill: none;
+  stroke: var(--dental-bridge-arc);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  filter: drop-shadow(0 1px 2px var(--dental-bridge-arc-soft));
+}
+
+.bridgeAbutment {
+  stroke: var(--dental-bridge-arc);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.bridgeComment {
+  font-family: var(--font-sans);
+  font-size: 9px;
+  fill: var(--dental-bridge-arc);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+/* ── Legend ───────────────────────────────────────────────────────────── */
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4) var(--space-5);
+  justify-content: center;
+  padding: var(--space-3) var(--space-4) var(--space-2);
+  margin: 0;
+  list-style: none;
+  border-top: 1px solid var(--color-border);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.legendLabel {
+  letter-spacing: -0.005em;
+}
+
+.surgeryGumOverlay {
+  fill: color-mix(in srgb, #9ca3af 55%, transparent);
+  stroke: #6b7280;
+  stroke-width: 1.2;
+  stroke-dasharray: 4 3;
+  pointer-events: all;
+}
+.surgeryCommentText {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  fill: #4b5563;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
