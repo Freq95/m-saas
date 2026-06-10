@@ -69,13 +69,25 @@ export function appointmentCategoriesCacheKey(scope: Scope): string {
   return `${scopePrefix(scope)}:appointment_categories:list`;
 }
 
+// Server-local YYYY-MM-DD. The dashboard "today" section is date-sensitive, so
+// the cache key must change at the day boundary — otherwise a snapshot computed
+// just before midnight is served (until TTL) with yesterday's "today" data.
+// Matches the `format(now, 'yyyy-MM-dd')` basis used in getDashboardData.
+function localDateKey(): string {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 export function dashboardCacheKey(scope: Scope, days: number): string {
-  return `${scopePrefix(scope)}:dashboard:days=${days}`;
+  return `${scopePrefix(scope)}:dashboard:days=${days}:date=${localDateKey()}`;
 }
 
 export function dashboardVisibleCalendarsCacheKey(scope: Scope, days: number, calendarIds: number[]): string {
   const normalizedIds = Array.from(new Set(calendarIds)).sort((a, b) => a - b).join(',');
-  return `${scopePrefix(scope)}:dashboard:days=${days}:calendars=${normalizedIds || 'none'}`;
+  return `${scopePrefix(scope)}:dashboard:days=${days}:calendars=${normalizedIds || 'none'}:date=${localDateKey()}`;
 }
 
 export function conversationsCacheKey(scope: Scope): string {

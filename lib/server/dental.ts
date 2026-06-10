@@ -1,7 +1,6 @@
 import { ObjectId } from 'mongodb';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import {
-  ISSUE_TYPES,
   type IssueType,
   type Surface,
   type ToothStatus,
@@ -50,24 +49,12 @@ export type ToothEventDoc = {
   deleted_at?: string;
 };
 
-export type IssueDistribution = Array<{
-  type: IssueType;
-  count: number;
-  percent: number;
-}>;
-
 export type DentalData = {
   tooth_states: ToothStateDoc[];
   latest_event_by_tooth: Record<number, ToothEventDoc>;
   surgery_groups: SurgeryGroupDoc[];
   bridge_groups: BridgeGroupDoc[];
-  aggregates: {
-    by_issue: IssueDistribution;
-    total_issues: number;
-  };
 };
-
-const TOOTH_COUNT = 32;
 
 /** Loads the full odontogram snapshot for a client, plus the latest event for each affected tooth. */
 export async function getDentalData(
@@ -111,28 +98,10 @@ export async function getDentalData(
     latest_event_by_tooth[event.tooth_fdi] = event;
   }
 
-  // Aggregate active issues by type — percent of teeth affected (capped at total tooth count).
-  const issueCounts = new Map<IssueType, number>();
-  for (const state of tooth_states) {
-    for (const issue of state.current_issues ?? []) {
-      issueCounts.set(issue.issue_type, (issueCounts.get(issue.issue_type) || 0) + 1);
-    }
-  }
-  const total_issues = Array.from(issueCounts.values()).reduce((a, b) => a + b, 0);
-  const by_issue: IssueDistribution = ISSUE_TYPES.map((type) => {
-    const count = issueCounts.get(type) || 0;
-    return {
-      type,
-      count,
-      percent: Math.round((count / TOOTH_COUNT) * 1000) / 10,
-    };
-  });
-
   return {
     tooth_states,
     latest_event_by_tooth,
     surgery_groups,
     bridge_groups,
-    aggregates: { by_issue, total_issues },
   };
 }

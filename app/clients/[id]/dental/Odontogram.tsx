@@ -506,10 +506,10 @@ function Odontogram({
           <g className={styles.miniArch}>
             <ellipse cx={MINI_CENTER_X} cy={MINI_CENTER_Y} rx={MINI_RX + 17} ry={MINI_RY + 16} className={styles.miniArchGuide} />
             <text x={MINI_CENTER_X} y={MINI_CENTER_Y - 20} textAnchor="middle" className={styles.miniArchLabel}>
-              MAXILLA
+              MAXILAR
             </text>
             <text x={MINI_CENTER_X} y={MINI_CENTER_Y + 28} textAnchor="middle" className={styles.miniArchLabel}>
-              MANDIBLE
+              MANDIBULA
             </text>
             {miniPositions.map(renderMiniTooth)}
           </g>
