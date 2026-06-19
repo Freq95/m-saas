@@ -136,10 +136,10 @@ describe('treatment plan sharing helpers', () => {
     expect(inserted.expires_at_date.toISOString()).toBe(inserted.expires_at);
   });
 
-  it('revokes active link records and clears legacy plan token fields', async () => {
-    const updatedPlan = { id: 77, tenant_id: tenantId, user_id: scope.userId, client_id: scope.clientId, status: 'draft' };
+  it('revokes all active link records for the plan', async () => {
+    const planDoc = { id: 77, tenant_id: tenantId, user_id: scope.userId, client_id: scope.clientId, status: 'draft' };
     const plans = makeCollection({
-      findOneAndUpdate: vi.fn(async () => updatedPlan),
+      findOne: vi.fn(async () => planDoc),
     });
     const links = makeCollection();
     mockGetMongoDbOrThrow.mockResolvedValue({
@@ -153,10 +153,6 @@ describe('treatment plan sharing helpers', () => {
     const result = await revokeTreatmentPlanPublicLink(scope, 77);
 
     expect(result).toMatchObject({ id: 77 });
-    expect((plans.findOneAndUpdate as any).mock.calls[0]?.[1].$set).toMatchObject({
-      public_view_token_hash: null,
-      public_view_expires_at: null,
-    });
     expect((links.updateMany as any).mock.calls[0]?.[0]).toMatchObject({
       tenant_id: tenantId,
       user_id: scope.userId,

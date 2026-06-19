@@ -60,8 +60,6 @@ export type TreatmentPlanDoc = {
   sent_at: string | null;
   sent_to_email: string | null;
   sent_via?: 'email' | 'whatsapp' | null;
-  public_view_token_hash?: string | null;
-  public_view_expires_at?: string | null;
   created_by_user_id: ObjectId;
   created_at: string;
   updated_at: string;
@@ -553,28 +551,6 @@ export async function issueTreatmentPlanPublicLink(
     updated_at: now,
   });
 
-  const hasActiveLegacyLink = Boolean(
-    plan.public_view_token_hash &&
-    plan.public_view_expires_at &&
-    plan.public_view_expires_at > now
-  );
-  await db.collection('treatment_plans').updateOne(
-    {
-      id: planId,
-      tenant_id: scope.tenantId,
-      user_id: scope.userId,
-      client_id: scope.clientId,
-      deleted_at: { $exists: false },
-    },
-    {
-      $set: {
-        public_view_token_hash: hasActiveLegacyLink ? plan.public_view_token_hash : tokenHash,
-        public_view_expires_at: expiresAt,
-        updated_at: now,
-      },
-    }
-  );
-
   return { token, expiresAt };
 }
 
@@ -589,21 +565,15 @@ export async function getPublicTreatmentPlanPdfUrl(token: string): Promise<strin
     expires_at: { $gt: now },
     revoked_at: { $exists: false },
   });
-  const plan = link
-    ? await db.collection('treatment_plans').findOne({
-        id: link.plan_id,
-        tenant_id: link.tenant_id,
-        user_id: link.user_id,
-        client_id: link.client_id,
-        deleted_at: { $exists: false },
-        pdf_file_id: { $ne: null },
-      })
-    : await db.collection('treatment_plans').findOne({
-        public_view_token_hash: tokenHash,
-        public_view_expires_at: { $gt: now },
-        deleted_at: { $exists: false },
-        pdf_file_id: { $ne: null },
-      });
+  if (!link) return null;
+  const plan = await db.collection('treatment_plans').findOne({
+    id: link.plan_id,
+    tenant_id: link.tenant_id,
+    user_id: link.user_id,
+    client_id: link.client_id,
+    deleted_at: { $exists: false },
+    pdf_file_id: { $ne: null },
+  });
   if (!plan?.pdf_file_id) return null;
 
   const file = await db.collection('client_files').findOne({
@@ -666,16 +636,6 @@ export async function resolveOrIssuePublicLink(
       expires_at: { $gt: now },
     });
     if (link?.expires_at) return { token: existingToken, expiresAt: String(link.expires_at) };
-
-    const plan = await getTreatmentPlan(scope, planId);
-    if (
-      plan?.pdf_file_id &&
-      plan.public_view_token_hash === hashPublicToken(existingToken) &&
-      plan.public_view_expires_at &&
-      plan.public_view_expires_at > new Date().toISOString()
-    ) {
-      return { token: existingToken, expiresAt: plan.public_view_expires_at };
-    }
   }
   // No cross-session reuse: tokens are hash-only, so a fresh share session that
   // doesn't already hold the plaintext mints a new link (invalidating the prior).
@@ -743,21 +703,15 @@ export async function getPublicTreatmentPlanView(token: string): Promise<PublicT
     expires_at: { $gt: now },
     revoked_at: { $exists: false },
   });
-  const plan = link
-    ? await db.collection('treatment_plans').findOne({
-        id: link.plan_id,
-        tenant_id: link.tenant_id,
-        user_id: link.user_id,
-        client_id: link.client_id,
-        deleted_at: { $exists: false },
-        pdf_file_id: { $ne: null },
-      })
-    : await db.collection('treatment_plans').findOne({
-        public_view_token_hash: tokenHash,
-        public_view_expires_at: { $gt: now },
-        deleted_at: { $exists: false },
-        pdf_file_id: { $ne: null },
-      });
+  if (!link) return null;
+  const plan = await db.collection('treatment_plans').findOne({
+    id: link.plan_id,
+    tenant_id: link.tenant_id,
+    user_id: link.user_id,
+    client_id: link.client_id,
+    deleted_at: { $exists: false },
+    pdf_file_id: { $ne: null },
+  });
   if (!plan) return null;
 
   const client = await db.collection('clients').findOne(
@@ -787,7 +741,7 @@ export async function getPublicTreatmentPlanView(token: string): Promise<PublicT
     total: typeof plan.total === 'number' ? plan.total : 0,
     currency: plan.currency || 'lei',
     disclaimer: plan.disclaimer_snapshot || '',
-    expiresAt: String(link?.expires_at || plan.public_view_expires_at || ''),
+    expiresAt: String(link.expires_at || ''),
   };
 }
 
@@ -914,17 +868,6 @@ export async function generateTreatmentPlanPdfFile(scope: Scope, planId: number)
 export async function revokeTreatmentPlanPublicLink(scope: Scope, planId: number): Promise<TreatmentPlanDoc | null> {
   const db = await getMongoDbOrThrow();
   const now = new Date().toISOString();
-  const result = await db.collection('treatment_plans').findOneAndUpdate(
-    {
-      id: planId,
-      tenant_id: scope.tenantId,
-      user_id: scope.userId,
-      client_id: scope.clientId,
-      deleted_at: { $exists: false },
-    },
-    { $set: { public_view_token_hash: null, public_view_expires_at: null, updated_at: now } },
-    { returnDocument: 'after' }
-  );
   await db.collection('treatment_plan_public_links').updateMany(
     {
       tenant_id: scope.tenantId,
@@ -935,5 +878,5 @@ export async function revokeTreatmentPlanPublicLink(scope: Scope, planId: number
     },
     { $set: { revoked_at: now, updated_at: now } }
   );
-  return result ? stripMongoId(result) as TreatmentPlanDoc : null;
+  return getTreatmentPlan(scope, planId);
 }
