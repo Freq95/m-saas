@@ -49,7 +49,7 @@ type Props = {
   plan: TreatmentPlan;
   dentists: DentistOption[];
   canEdit: boolean;
-  onSaved: (plan: TreatmentPlan) => void;
+  onSaved: (plan: TreatmentPlan, opts?: { share?: boolean }) => void;
   onCancel: () => void;
   onToast: (kind: 'success' | 'error', message: string) => void;
 };
@@ -190,7 +190,7 @@ export default function PlanBuilder({
     });
   }
 
-  async function save() {
+  async function save(options?: { share?: boolean }) {
     if (!doctorUserId) {
       onToast('error', 'Alege medicul care semneaza planul.');
       return;
@@ -228,8 +228,8 @@ export default function PlanBuilder({
       });
       const data = await response.json();
       if (!response.ok || !data.plan) throw new Error(data.error || 'Nu am putut salva planul.');
-      onSaved(data.plan);
-      onToast('success', 'Planul de tratament a fost salvat.');
+      onSaved(data.plan, options);
+      if (!options?.share) onToast('success', 'Planul de tratament a fost salvat.');
     } catch (error) {
       onToast('error', error instanceof Error ? error.message : 'Nu am putut salva planul.');
     } finally {
@@ -270,7 +270,7 @@ export default function PlanBuilder({
       <div className={styles.itemsHeader}>
         <span>Proceduri</span>
         {!readOnly && (
-          <button className={styles.secondaryButton} onClick={() => setItems((prev) => [...prev, newRow()])} disabled={saving}>
+          <button type="button" className={styles.secondaryButton} onClick={() => setItems((prev) => [...prev, newRow()])} disabled={saving}>
             + Rand
           </button>
         )}
@@ -318,9 +318,9 @@ export default function PlanBuilder({
             />
             {!readOnly && (
               <div className={styles.rowActions}>
-                <button className={styles.actionIcon} onClick={() => moveRow(index, -1)} disabled={index === 0 || saving} aria-label="Mută mai sus" title="Mută sus"><IconUp /></button>
-                <button className={styles.actionIcon} onClick={() => moveRow(index, 1)} disabled={index === items.length - 1 || saving} aria-label="Mută mai jos" title="Mută jos"><IconDown /></button>
-                <button className={`${styles.actionIcon} ${styles.dangerAction}`} onClick={() => setItems((prev) => prev.length === 1 ? [newRow()] : prev.filter((_, i) => i !== index))} disabled={saving} aria-label="Șterge rândul" title="Șterge"><IconTrash /></button>
+                <button type="button" className={styles.actionIcon} onClick={() => moveRow(index, -1)} disabled={index === 0 || saving} aria-label="Mută mai sus" title="Mută sus"><IconUp /></button>
+                <button type="button" className={styles.actionIcon} onClick={() => moveRow(index, 1)} disabled={index === items.length - 1 || saving} aria-label="Mută mai jos" title="Mută jos"><IconDown /></button>
+                <button type="button" className={`${styles.actionIcon} ${styles.dangerAction}`} onClick={() => setItems((prev) => prev.length === 1 ? [newRow()] : prev.filter((_, i) => i !== index))} disabled={saving} aria-label="Șterge rândul" title="Șterge"><IconTrash /></button>
               </div>
             )}
             <input
@@ -385,13 +385,25 @@ export default function PlanBuilder({
               {readOnly ? (
                 <span aria-hidden style={{ width: 64 }} />
               ) : (
-                <button type="button" className={`${m.actionBtn} ${m.actionBtnPrimary}`} onClick={save} disabled={saving}>
+                <button type="button" className={`${m.actionBtn} ${m.actionBtnPrimary}`} onClick={() => save()} disabled={saving}>
                   {saving ? 'Salvare…' : 'Salvează'}
                 </button>
               )}
             </div>
             <div className={m.body}>
-              <div className={styles.sheetPad}>{body}</div>
+              <div className={styles.sheetPad}>
+                {body}
+                {!readOnly && (
+                  <button
+                    type="button"
+                    className={`${styles.primaryButton} ${styles.fullWidthBtn}`}
+                    onClick={() => save({ share: true })}
+                    disabled={saving}
+                  >
+                    {saving ? 'Se salvează…' : 'Salvează și trimite'}
+                  </button>
+                )}
+              </div>
             </div>
           </Drawer.Content>
         </Drawer.Portal>
@@ -424,7 +436,10 @@ export default function PlanBuilder({
             <button type="button" className={modal.cancelButton} onClick={onCancel} disabled={saving}>
               Renunță
             </button>
-            <button type="button" className={modal.saveButton} onClick={save} disabled={saving}>
+            <button type="button" className={styles.secondaryButton} onClick={() => save({ share: true })} disabled={saving}>
+              Salvează și trimite
+            </button>
+            <button type="button" className={modal.saveButton} onClick={() => save()} disabled={saving}>
               {saving ? 'Se salvează…' : 'Salvează'}
             </button>
           </div>

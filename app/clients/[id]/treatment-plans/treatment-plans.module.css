@@ -36,7 +36,9 @@
   letter-spacing: -0.01em;
 }
 
-.toolbar span:not(.kicker),
+/* Scope to the heading column only — a bare `.toolbar span` also greyed out
+   the "Plan nou" label inside the primary button. */
+.toolbar > div span:not(.kicker),
 .muted {
   color: var(--color-text-soft);
   font-size: var(--text-sm);
@@ -92,6 +94,12 @@
   border: 0;
   background: var(--color-accent);
   color: var(--color-text-on-accent);
+}
+
+/* Full-width "Salvează și trimite" CTA at the bottom of the mobile sheet. */
+.fullWidthBtn {
+  width: 100%;
+  margin-top: var(--space-4);
 }
 
 .primaryButton:hover:not(:disabled) {

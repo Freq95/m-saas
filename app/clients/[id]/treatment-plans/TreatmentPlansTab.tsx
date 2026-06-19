@@ -235,6 +235,9 @@ export default function TreatmentPlansTab({
 
   const sortedPlans = useMemo(() => [...plans].sort((a, b) => (b.id || 0) - (a.id || 0)), [plans]);
 
+  // Update the list only — callers decide whether the builder should open/close.
+  // (Previously this force-opened the builder on every save/share/PDF, which
+  // kept the editor open after saving and flashed it behind the share sheet.)
   function upsertPlan(plan: TreatmentPlan) {
     setPlans((prev) => {
       const exists = prev.some((candidate) => candidate.id === plan.id);
@@ -242,7 +245,6 @@ export default function TreatmentPlansTab({
         ? prev.map((candidate) => candidate.id === plan.id ? plan : candidate)
         : [plan, ...prev];
     });
-    setSelectedPlan(plan);
   }
 
   async function generatePdf(plan: TreatmentPlan) {
@@ -295,7 +297,7 @@ export default function TreatmentPlansTab({
         whatsappReady: Boolean(data.patient?.whatsappReady),
         to: prev.to || data.patient?.email || '',
       } : prev);
-      onFilesChanged?.(); // a PDF may have just been generated
+      onFilesChanged?.(); // the share endpoint generates the PDF on first use
     } catch (error) {
       onToast('error', error instanceof Error ? error.message : 'Nu am putut pregati linkul.');
       setShare(null);
@@ -316,11 +318,15 @@ export default function TreatmentPlansTab({
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Nu am putut deschide WhatsApp.');
-      if (win) win.location.href = data.waUrl;
-      else window.location.href = data.waUrl;
       if (data.plan) upsertPlan(data.plan);
-      onToast('success', 'Planul a fost marcat ca trimis pe WhatsApp.');
-      setShare(null);
+      if (win) {
+        // Point the pre-opened tab at WhatsApp (never navigate the app itself).
+        win.location.href = data.waUrl;
+        onToast('success', 'Planul a fost marcat ca trimis pe WhatsApp.');
+        setShare(null);
+      } else {
+        onToast('error', 'Permite ferestrele pop-up sau folosește „Copiază linkul”.');
+      }
     } catch (error) {
       if (win) win.close();
       onToast('error', error instanceof Error ? error.message : 'Nu am putut deschide WhatsApp.');
@@ -409,7 +415,7 @@ export default function TreatmentPlansTab({
           <span>{client?.name || clientName || 'Pacient'}</span>
         </div>
         {canEdit && (
-          <button className={styles.primaryButton} onClick={() => setSelectedPlan(emptyPlan(dentists))}>
+          <button type="button" className={styles.primaryButton} onClick={() => setSelectedPlan(emptyPlan(dentists))}>
             <IconPlus />
             <span>Plan nou</span>
           </button>
@@ -422,7 +428,11 @@ export default function TreatmentPlansTab({
           plan={selectedPlan}
           dentists={dentists}
           canEdit={canEdit}
-          onSaved={upsertPlan}
+          onSaved={(plan, opts) => {
+            upsertPlan(plan);
+            setSelectedPlan(null);
+            if (opts?.share) void openShareSheet(plan);
+          }}
           onCancel={() => setSelectedPlan(null)}
           onToast={onToast}
         />
@@ -460,11 +470,11 @@ export default function TreatmentPlansTab({
               </div>
               <span className={`${styles.status} ${styles[`status_${plan.status}`]}`}>{STATUS_LABELS[plan.status]}</span>
               <div className={styles.actions}>
-                <button className={styles.actionIcon} onClick={() => setSelectedPlan(plan)} title="Deschide" aria-label="Deschide planul">
+                <button type="button" className={styles.actionIcon} onClick={() => setSelectedPlan(plan)} title="Deschide" aria-label="Deschide planul">
                   <IconOpen />
                 </button>
                 {canEdit && (
-                  <button className={styles.actionIcon} onClick={() => openShareSheet(plan)} disabled={busyId === plan.id} title="Trimite" aria-label="Trimite planul">
+                  <button type="button" className={styles.actionIcon} onClick={() => openShareSheet(plan)} disabled={busyId === plan.id} title="Trimite" aria-label="Trimite planul">
                     <IconSend />
                   </button>
                 )}
@@ -472,12 +482,12 @@ export default function TreatmentPlansTab({
                   <summary className={styles.actionIcon} title="Mai mult" aria-label="Mai multe actiuni">
                     <IconMore />
                   </summary>
-                  <div>
-                    {canEdit && <button onClick={() => generatePdf(plan)} disabled={busyId === plan.id}><IconFile /> Genereaza PDF</button>}
+                  <div onClick={(event) => (event.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open')}>
+                    {canEdit && <button type="button" onClick={() => generatePdf(plan)} disabled={busyId === plan.id}><IconFile /> Genereaza PDF</button>}
                     {plan.pdf_file_id && <a href={`/api/clients/${clientId}/files/${plan.pdf_file_id}/preview`} target="_blank"><IconEye /> Preview / print</a>}
                     {plan.pdf_file_id && <a href={`/api/clients/${clientId}/files/${plan.pdf_file_id}/download`} target="_blank"><IconDownload /> Descarca</a>}
-                    {canEdit && <button onClick={() => duplicatePlan(plan)}><IconCopy /> Duplica</button>}
-                    {canEdit && <button className={styles.dangerAction} onClick={() => deletePlan(plan)} disabled={busyId === plan.id}><IconTrash /> Sterge</button>}
+                    {canEdit && <button type="button" onClick={() => duplicatePlan(plan)}><IconCopy /> Duplica</button>}
+                    {canEdit && <button type="button" className={styles.dangerAction} onClick={() => deletePlan(plan)} disabled={busyId === plan.id}><IconTrash /> Sterge</button>}
                   </div>
                 </details>
               </div>
@@ -498,7 +508,7 @@ export default function TreatmentPlansTab({
                 <h3 id="share-plan-title">Trimite planul</h3>
                 <span>Plan #{share.plan.id} · {formatMoney(share.plan.total)}</span>
               </div>
-              <button className={styles.iconButton} onClick={() => setShare(null)} aria-label="Inchide" disabled={shareBusy}>
+              <button type="button" className={styles.iconButton} onClick={() => setShare(null)} aria-label="Inchide" disabled={shareBusy}>
                 <IconX />
               </button>
             </div>
@@ -507,7 +517,7 @@ export default function TreatmentPlansTab({
               <div className={styles.shareLoading}>Se pregătește linkul securizat…</div>
             ) : share.emailMode ? (
               <>
-                <button className={styles.shareBack} onClick={() => setShare((prev) => prev ? { ...prev, emailMode: false } : prev)} disabled={shareBusy}>
+                <button type="button" className={styles.shareBack} onClick={() => setShare((prev) => prev ? { ...prev, emailMode: false } : prev)} disabled={shareBusy}>
                   ‹ Înapoi
                 </button>
                 <label className={styles.field}>
@@ -537,8 +547,8 @@ export default function TreatmentPlansTab({
                   <span>Ataseaza si PDF-ul la email</span>
                 </label>
                 <div className={styles.modalActions}>
-                  <button className={styles.secondaryButton} onClick={() => setShare((prev) => prev ? { ...prev, emailMode: false } : prev)} disabled={shareBusy}>Anuleaza</button>
-                  <button className={styles.primaryButton} onClick={sendShareEmail} disabled={shareBusy || !share.to.trim()}>
+                  <button type="button" className={styles.secondaryButton} onClick={() => setShare((prev) => prev ? { ...prev, emailMode: false } : prev)} disabled={shareBusy}>Anuleaza</button>
+                  <button type="button" className={styles.primaryButton} onClick={sendShareEmail} disabled={shareBusy || !share.to.trim()}>
                     {shareBusy ? 'Se trimite...' : 'Trimite pe email'}
                   </button>
                 </div>
@@ -547,6 +557,7 @@ export default function TreatmentPlansTab({
               <>
                 <div className={styles.shareOptions}>
                   <button
+                    type="button"
                     className={`${styles.shareOption} ${styles.shareWhatsapp}`}
                     onClick={shareWhatsApp}
                     disabled={shareBusy || !share.whatsappReady}
@@ -560,6 +571,7 @@ export default function TreatmentPlansTab({
                   </button>
 
                   <button
+                    type="button"
                     className={styles.shareOption}
                     onClick={() => setShare((prev) => prev ? { ...prev, emailMode: true } : prev)}
                     disabled={shareBusy}
@@ -572,7 +584,7 @@ export default function TreatmentPlansTab({
                     <span className={styles.shareOptionChevron}><IconChevron /></span>
                   </button>
 
-                  <button className={styles.shareOption} onClick={copyShareLink} disabled={shareBusy || !share.url}>
+                  <button type="button" className={styles.shareOption} onClick={copyShareLink} disabled={shareBusy || !share.url}>
                     <span className={styles.shareOptionIcon}><IconLink /></span>
                     <span className={styles.shareOptionText}>
                       <strong>{share.copied ? 'Link copiat ✓' : 'Copiază linkul'}</strong>
