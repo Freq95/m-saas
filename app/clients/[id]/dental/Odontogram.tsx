@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useMemo } from 'react';
+import { memo, useCallback, useMemo, useRef } from 'react';
 import ToothShape from './ToothShape';
 import {
   FDI_DECIDUOUS_LOWER_ARCH_DISPLAY,
@@ -14,6 +14,7 @@ import {
   type Dentition,
   type IssueType,
   type Surface,
+  type ToothStatus,
 } from '@/lib/dental/constants';
 import type { ToothStateDoc } from '@/lib/server/dental';
 import type { SurgeryGroupDoc } from '@/lib/server/surgery';
@@ -180,6 +181,27 @@ const LOWER_GUM_Y_TOP = 262;
 const LOWER_GUM_Y_BOTTOM = 322;
 const SURGERY_OVERLAY_PADDING_X = 6;
 
+// Per-tooth visual inputs for ToothShape. Memoizing these (keyed by FDI) keeps
+// the object references stable across renders so the memo()'d ToothShape only
+// re-renders the 1–2 teeth whose selection actually changed — not all 32.
+type ToothVisual = {
+  surfaceFills: Partial<Record<Surface, IssueType>>;
+  primaryIssue?: IssueType;
+  hasGingivitis: boolean;
+  hasPeriodontitis: boolean;
+  hasIssues: boolean;
+  status: ToothStatus;
+};
+const EMPTY_SURFACE_FILLS: Partial<Record<Surface, IssueType>> = {};
+const EMPTY_TOOTH_VISUAL: ToothVisual = {
+  surfaceFills: EMPTY_SURFACE_FILLS,
+  primaryIssue: undefined,
+  hasGingivitis: false,
+  hasPeriodontitis: false,
+  hasIssues: false,
+  status: 'present',
+};
+
 function Odontogram({
   toothStates,
   selectedFdi,
@@ -221,6 +243,24 @@ function Odontogram({
     const map = new Map<number, ToothStateDoc>();
     for (const state of toothStates) {
       map.set(state.tooth_fdi, state);
+    }
+    return map;
+  }, [toothStates]);
+
+  // Stable per-tooth visuals — only recomputed when the underlying data changes,
+  // so unchanged teeth keep referentially-equal props and skip re-render.
+  const visualByFdi = useMemo(() => {
+    const map = new Map<number, ToothVisual>();
+    for (const state of toothStates) {
+      const { surfaceFills, primaryIssue, hasGingivitis, hasPeriodontitis } = collectSurfaceFills(state);
+      map.set(state.tooth_fdi, {
+        surfaceFills,
+        primaryIssue,
+        hasGingivitis,
+        hasPeriodontitis,
+        hasIssues: !!state.current_issues?.length,
+        status: state.status ?? 'present',
+      });
     }
     return map;
   }, [toothStates]);
@@ -315,6 +355,12 @@ function Odontogram({
     }
   };
 
+  // A referentially-stable onSelect that always invokes the latest click logic.
+  // Without this, every render hands ToothShape a new function and defeats memo.
+  const handleToothClickRef = useRef(handleToothClick);
+  handleToothClickRef.current = handleToothClick;
+  const stableOnSelect = useCallback((fdi: number) => handleToothClickRef.current(fdi), []);
+
   const renderBridgeOverlay = (b: RenderedBridge) => {
     // "Above teeth on screen" — both arches sit above their respective tooth row.
     // Upper arch row y = 126; lower arch row y = 268. Arc spans from xMin to xMax
@@ -384,9 +430,7 @@ function Odontogram({
   };
 
   const renderDetailedTooth = (pos: ToothPosition) => {
-    const state = stateByFdi.get(pos.fdi);
-    const { surfaceFills, primaryIssue, hasGingivitis, hasPeriodontitis } =
-      collectSurfaceFills(state);
+    const v = visualByFdi.get(pos.fdi) ?? EMPTY_TOOTH_VISUAL;
     const inSurgerySelection = surgerySelectionSet.has(pos.fdi);
     const inBridgeSelection = bridgeSelectionSet.has(pos.fdi);
 
@@ -395,14 +439,14 @@ function Odontogram({
         <g transform={`translate(${pos.x} ${pos.y})`}>
           <ToothShape
             fdi={pos.fdi}
-            status={state?.status ?? 'present'}
-            surfaceFills={surfaceFills}
-            hasGingivitis={hasGingivitis}
-            hasPeriodontitis={hasPeriodontitis}
+            status={v.status}
+            surfaceFills={v.surfaceFills}
+            hasGingivitis={v.hasGingivitis}
+            hasPeriodontitis={v.hasPeriodontitis}
             selected={selectedFdi === pos.fdi || inSurgerySelection || inBridgeSelection}
-            hasIssues={!!state?.current_issues?.length}
-            primaryIssueColor={primaryIssue ? ISSUE_COLOR[primaryIssue] : undefined}
-            onSelect={handleToothClick}
+            hasIssues={v.hasIssues}
+            primaryIssueColor={v.primaryIssue ? ISSUE_COLOR[v.primaryIssue] : undefined}
+            onSelect={stableOnSelect}
           />
         </g>
         <text

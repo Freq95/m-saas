@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import styles from '../../page.module.css';
 import type { Appointment } from '../../hooks/useCalendar';
 import { useModal } from '@/lib/useModal';
+import Spinner from '@/components/Spinner';
 
 interface DeleteConfirmModalProps {
   isOpen: boolean;
@@ -106,7 +107,12 @@ export function DeleteConfirmModal({
           </button>
           <button type="button" onClick={handleConfirmClick} className={styles.deleteButton} disabled={isDeleting}>
             {isDeleting
-              ? 'Se sterge...'
+              ? (
+                <>
+                  <Spinner size={14} thickness={2} centered={false} label="Se sterge" />
+                  <span>Se sterge</span>
+                </>
+              )
               : isRecurring && scope === 'series'
                 ? 'Sterge seria'
                 : 'Sterge'}

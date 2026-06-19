@@ -77,6 +77,36 @@ export async function checkWriteRateLimit(userId: number | string): Promise<Next
   return null;
 }
 
+// Public (unauthenticated) treatment-plan link views — keyed by IP, generous
+// since the token is already a 256-bit secret; this is defense-in-depth against
+// scraping/enumeration of a leaked token.
+const PUBLIC_LINK_LIMIT = 60;
+const PUBLIC_LINK_WINDOW_MS = 60 * 1000;
+const publicLinkFallbackStore = new Map<string, { count: number; resetAt: number }>();
+
+/**
+ * Rate-limit an unauthenticated public-link request by a caller-supplied
+ * identifier (typically the client IP). Returns a 429 when limited, else null.
+ */
+export async function checkPublicLinkRateLimit(identifier: string): Promise<NextResponse | null> {
+  const key = identifier || 'unknown';
+  const now = Date.now();
+  const existing = publicLinkFallbackStore.get(key);
+  if (!existing || now > existing.resetAt) {
+    publicLinkFallbackStore.set(key, { count: 1, resetAt: now + PUBLIC_LINK_WINDOW_MS });
+    return null;
+  }
+  if (existing.count >= PUBLIC_LINK_LIMIT) {
+    const retryAfterSec = Math.max(1, Math.ceil((existing.resetAt - now) / 1000));
+    return NextResponse.json(
+      { error: 'Prea multe cereri. Reincearca mai tarziu.' },
+      { status: 429, headers: { 'Retry-After': String(retryAfterSec) } }
+    );
+  }
+  existing.count += 1;
+  return null;
+}
+
 /**
  * Check whether the given user has exceeded the GDPR export rate limit (5/hr).
  * Returns a 429 NextResponse when limited, or null when the request may proceed.

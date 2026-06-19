@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Drawer } from 'vaul';
 import { useIsMobile } from '@/lib/useIsMobile';
 import { useModal } from '@/lib/useModal';
+import Spinner from '@/components/Spinner';
 import ServicePicker from './ServicePicker';
 import styles from './treatment-plans.module.css';
 import modal from '../../../calendar/page.module.css';
@@ -29,6 +30,7 @@ export type TreatmentPlan = {
   pdf_file_id: number | null;
   sent_at?: string | null;
   sent_to_email?: string | null;
+  source_appointment_label?: string | null;
 };
 
 export type DentistOption = {
@@ -120,7 +122,19 @@ export default function PlanBuilder({
   const [totalOverride, setTotalOverride] = useState(plan.total_override === null ? '' : String(plan.total_override));
   const [saving, setSaving] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
+  const onToastRef = useRef(onToast);
   const readOnly = !canEdit || plan.status !== 'draft';
+
+  useEffect(() => {
+    onToastRef.current = onToast;
+  }, [onToast]);
+
+  useEffect(() => {
+    setDoctorUserId(plan.doctor_user_id || dentists[0]?.userId || 0);
+    setPlanDate(plan.plan_date || new Date().toISOString().slice(0, 10));
+    setItems(plan.items.length > 0 ? plan.items : [newRow()]);
+    setTotalOverride(plan.total_override === null ? '' : String(plan.total_override));
+  }, [dentists, plan]);
 
   useEffect(() => {
     if (!doctorUserId) return;
@@ -133,10 +147,10 @@ export default function PlanBuilder({
         setServices(data.services || []);
       })
       .catch((error) => {
-        if (alive) onToast('error', error instanceof Error ? error.message : 'Nu am putut incarca serviciile.');
+        if (alive) onToastRef.current('error', error instanceof Error ? error.message : 'Nu am putut incarca serviciile.');
       });
     return () => { alive = false; };
-  }, [doctorUserId, onToast]);
+  }, [doctorUserId]);
 
   const recap = useMemo(() => {
     const byProcedure = new Map<string, number>();
@@ -252,6 +266,10 @@ export default function PlanBuilder({
         </p>
       )}
 
+      {!plan.id && plan.source_appointment_label && (
+        <p className={styles.sourceNote}>{plan.source_appointment_label}</p>
+      )}
+
       <div className={styles.builderGrid}>
         <label className={styles.field}>
           <span>Data</span>
@@ -294,33 +312,39 @@ export default function PlanBuilder({
                 onText={(text) => setProcedureText(index, text)}
               />
             </div>
-            <input
-              className={styles.cellInput}
-              type="number"
-              min={1}
-              step="0.5"
-              value={item.quantity}
-              placeholder="Cant."
-              aria-label="Cantitate"
-              onChange={(event) => updateQuantity(index, Number(event.target.value))}
-              disabled={readOnly || saving}
-            />
-            <input
-              className={`${styles.cellInput} ${styles.cellRight}`}
-              type="number"
-              min={0}
-              step="1"
-              value={item.line_total}
-              placeholder="Cost"
-              aria-label="Cost"
-              onChange={(event) => updateItem(index, { line_total: Number(event.target.value) })}
-              disabled={readOnly || saving}
-            />
+            <label className={styles.cellField}>
+              <span>Cant.</span>
+              <input
+                className={styles.cellInput}
+                type="number"
+                min={1}
+                step="0.5"
+                value={item.quantity}
+                placeholder="Cant."
+                aria-label="Cantitate"
+                onChange={(event) => updateQuantity(index, Number(event.target.value))}
+                disabled={readOnly || saving}
+              />
+            </label>
+            <label className={styles.cellField}>
+              <span>Cost</span>
+              <input
+                className={`${styles.cellInput} ${styles.cellRight}`}
+                type="number"
+                min={0}
+                step="1"
+                value={item.line_total}
+                placeholder="Cost"
+                aria-label="Cost"
+                onChange={(event) => updateItem(index, { line_total: Number(event.target.value) })}
+                disabled={readOnly || saving}
+              />
+            </label>
             {!readOnly && (
               <div className={styles.rowActions}>
-                <button type="button" className={styles.actionIcon} onClick={() => moveRow(index, -1)} disabled={index === 0 || saving} aria-label="Mută mai sus" title="Mută sus"><IconUp /></button>
-                <button type="button" className={styles.actionIcon} onClick={() => moveRow(index, 1)} disabled={index === items.length - 1 || saving} aria-label="Mută mai jos" title="Mută jos"><IconDown /></button>
-                <button type="button" className={`${styles.actionIcon} ${styles.dangerAction}`} onClick={() => setItems((prev) => prev.length === 1 ? [newRow()] : prev.filter((_, i) => i !== index))} disabled={saving} aria-label="Șterge rândul" title="Șterge"><IconTrash /></button>
+                <button type="button" className={styles.actionIcon} onClick={() => moveRow(index, -1)} disabled={index === 0 || saving} aria-label="Muta mai sus" data-tooltip="Muta sus"><IconUp /></button>
+                <button type="button" className={styles.actionIcon} onClick={() => moveRow(index, 1)} disabled={index === items.length - 1 || saving} aria-label="Muta mai jos" data-tooltip="Muta jos"><IconDown /></button>
+                <button type="button" className={`${styles.actionIcon} ${styles.dangerAction}`} onClick={() => setItems((prev) => prev.length === 1 ? [newRow()] : prev.filter((_, i) => i !== index))} disabled={saving} aria-label="Sterge randul" data-tooltip="Sterge"><IconTrash /></button>
               </div>
             )}
             <input
@@ -385,24 +409,14 @@ export default function PlanBuilder({
               {readOnly ? (
                 <span aria-hidden style={{ width: 64 }} />
               ) : (
-                <button type="button" className={`${m.actionBtn} ${m.actionBtnPrimary}`} onClick={() => save()} disabled={saving}>
-                  {saving ? 'Salvare…' : 'Salvează'}
+                <button type="button" className={`${m.actionBtn} ${m.actionBtnPrimary}`} onClick={() => save({ share: true })} disabled={saving}>
+                  {saving ? <Spinner size={14} thickness={2} centered={false} label="Salvare" /> : 'Salveaza + trimite'}
                 </button>
               )}
             </div>
             <div className={m.body}>
               <div className={styles.sheetPad}>
                 {body}
-                {!readOnly && (
-                  <button
-                    type="button"
-                    className={`${styles.primaryButton} ${styles.fullWidthBtn}`}
-                    onClick={() => save({ share: true })}
-                    disabled={saving}
-                  >
-                    {saving ? 'Se salvează…' : 'Salvează și trimite'}
-                  </button>
-                )}
               </div>
             </div>
           </Drawer.Content>
@@ -425,7 +439,7 @@ export default function PlanBuilder({
           <h3>{title}</h3>
           <div className={modal.modalHeaderActions}>
             {statusPill}
-            <button type="button" className={modal.closeButton} onClick={onCancel} aria-label="Închide" disabled={saving}>
+            <button type="button" className={modal.closeButton} onClick={onCancel} aria-label="Inchide" data-tooltip="Inchide" disabled={saving}>
               ×
             </button>
           </div>
@@ -433,14 +447,13 @@ export default function PlanBuilder({
         {body}
         {!readOnly && (
           <div className={modal.modalActions}>
-            <button type="button" className={modal.cancelButton} onClick={onCancel} disabled={saving}>
-              Renunță
-            </button>
-            <button type="button" className={styles.secondaryButton} onClick={() => save({ share: true })} disabled={saving}>
-              Salvează și trimite
-            </button>
-            <button type="button" className={modal.saveButton} onClick={() => save()} disabled={saving}>
-              {saving ? 'Se salvează…' : 'Salvează'}
+            <button type="button" className={modal.saveButton} onClick={() => save({ share: true })} disabled={saving}>
+              {saving ? (
+                <>
+                  <Spinner size={14} thickness={2} centered={false} label="Se salveaza" />
+                  <span>Se salveaza</span>
+                </>
+              ) : 'Salveaza + trimite'}
             </button>
           </div>
         )}

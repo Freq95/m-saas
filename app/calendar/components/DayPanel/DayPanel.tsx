@@ -566,7 +566,7 @@ export function DayPanel({
           type="button"
           onClick={() => onSearchChange('')}
           aria-label="Sterge cautarea"
-          title="Sterge cautarea"
+          data-tooltip="Sterge cautarea"
         >
           {'\u00D7'}
         </button>

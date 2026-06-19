@@ -330,6 +330,106 @@ option {
   width: var(--height-btn-lg);
 }
 
+/* Platform icon button standard.
+   Use for icon-only actions; module-local icon classes should mirror this. */
+.icon-btn {
+  --icon-btn-size: 36px;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-btn-size);
+  height: var(--icon-btn-size);
+  min-width: var(--icon-btn-size);
+  min-height: var(--icon-btn-size);
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-muted);
+  color: var(--color-text-soft);
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast),
+    opacity var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.icon-btn:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--color-surface-strong);
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+  transform: translateY(-1px);
+}
+
+.icon-btn:active:not(:disabled):not([aria-disabled="true"]) {
+  transform: translateY(0);
+}
+
+.icon-btn:disabled,
+.icon-btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.icon-btn-sm {
+  --icon-btn-size: 32px;
+  border-radius: 9px;
+}
+
+.icon-btn-lg {
+  --icon-btn-size: 40px;
+  border-radius: 12px;
+}
+
+.icon-btn-danger {
+  color: var(--color-danger-text);
+  border-color: color-mix(in srgb, var(--color-danger-text) 32%, var(--color-border));
+}
+
+.icon-btn-danger:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
+  color: var(--color-danger-text);
+}
+
+:where(button, a, summary)[data-tooltip] {
+  position: relative;
+  overflow: visible;
+}
+
+.tooltip-layer {
+  position: fixed;
+  z-index: 2147483647;
+  max-width: min(220px, calc(100vw - 24px));
+  padding: 0.38rem 0.55rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  background: var(--color-surface-strong);
+  color: var(--color-text);
+  box-shadow: var(--shadow-md);
+  font-size: 0.72rem;
+  font-weight: 650;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, 0);
+}
+
+.tooltip-layer[data-placement="top"] {
+  transform: translate(-50%, -100%);
+}
+
 
 /* ============================================================
    BADGE / STATUS SYSTEM

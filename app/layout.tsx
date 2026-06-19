@@ -9,6 +9,7 @@ import { ThemeProvider } from '@/components/ThemeProvider'
 import { validateServerEnv } from '@/lib/env-validation'
 import PreventZoom from '@/components/PreventZoom'
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister'
+import TooltipLayer from '@/components/TooltipLayer'
 
 validateServerEnv()
 
@@ -45,6 +46,7 @@ export default async function RootLayout({
         <PreventZoom />
         <ServiceWorkerRegister />
         <NavigationProgress />
+        <TooltipLayer />
         <ThemeProvider>
           <AuthSessionProvider>
             <ErrorBoundary>

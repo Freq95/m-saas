@@ -2245,6 +2245,19 @@ export default function CalendarPageClient({
     );
   }
 
+  const selectedAppointmentClientId =
+    state.selectedAppointment?.client_id ??
+    editInitialData?.clientId ??
+    null;
+  const patientProfileHref =
+    appointmentModalMode === 'view' && selectedAppointmentClientId
+      ? `/clients/${selectedAppointmentClientId}`
+      : null;
+  const newTreatmentPlanHref =
+    appointmentModalMode === 'view' && selectedAppointmentClientId && state.selectedAppointment?.id
+      ? `/clients/${selectedAppointmentClientId}?tab=plan&newPlan=1&appointmentId=${state.selectedAppointment.id}`
+      : null;
+
   return (
     <div
       ref={containerRef}
@@ -2281,6 +2294,8 @@ export default function CalendarPageClient({
         allowRecurring={appointmentModalMode !== 'view'}
         initialData={editInitialData}
         onModeChange={setAppointmentModalMode}
+        patientProfileHref={patientProfileHref}
+        newTreatmentPlanHref={newTreatmentPlanHref}
         appointmentStatus={editInitialData?.status || state.selectedAppointment?.status}
         appointmentId={state.selectedAppointment?.id}
         canChangeStatus={state.selectedAppointment?.can_change_status !== false}

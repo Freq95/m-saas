@@ -64,22 +64,25 @@ export default async function PublicTreatmentPlanPage(props: { params: Promise<{
 
         <div className={styles.intro}>
           <span className={styles.eyebrow}>Plan de tratament</span>
-          <h1 className={styles.title}>Pentru {view.patientFirstName}</h1>
+          <h1 className={styles.title}>Planul tau de tratament</h1>
           <p className={styles.meta}>
-            {formatDate(view.planDate)}
+            Pentru {view.patientFirstName} · {formatDate(view.planDate)}
             {view.doctorName ? ` · ${view.doctorName}` : ''}
           </p>
         </div>
 
         {view.recap.length > 0 && (
-          <ul className={styles.recap}>
-            {view.recap.map((line, i) => (
-              <li key={i} className={styles.recapRow}>
-                <span className={styles.recapLabel}>{line.label}</span>
-                <span className={styles.recapAmount}>{formatMoney(line.amount, view.currency)}</span>
-              </li>
-            ))}
-          </ul>
+          <section className={styles.summary} aria-labelledby="plan-summary-title">
+            <h2 id="plan-summary-title">Rezumat</h2>
+            <ul className={styles.recap}>
+              {view.recap.map((line, i) => (
+                <li key={i} className={styles.recapRow}>
+                  <span className={styles.recapLabel}>{line.label}</span>
+                  <span className={styles.recapAmount}>{formatMoney(line.amount, view.currency)}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
 
         <div className={styles.totalRow}>
@@ -93,7 +96,7 @@ export default async function PublicTreatmentPlanPage(props: { params: Promise<{
             <path d="M7 10l5 5 5-5" />
             <path d="M12 15V3" />
           </svg>
-          Deschide PDF-ul complet
+          Descarca PDF
         </a>
 
         {view.disclaimer && <p className={styles.disclaimer}>{view.disclaimer}</p>}

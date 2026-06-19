@@ -352,6 +352,7 @@ export default function AppTopNav({
           className={styles.themeToggle}
           onClick={toggle}
           aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+          data-tooltip={theme === 'dark' ? 'Tema deschisa' : 'Tema inchisa'}
         >
           {theme === 'dark' ? (
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -374,8 +375,8 @@ export default function AppTopNav({
         <a
           href="/settings"
           className={`${styles.settingsIcon} ${activeSection === 'settings' ? styles.settingsIconActive : ''}`}
-          aria-label="Setări"
-          title="Setări"
+          aria-label="Setari"
+          data-tooltip="Setari"
           onPointerDown={() => setOptimisticActiveSection('settings')}
           onPointerEnter={() => prefetchRoute('/settings/services')}
           onTouchStart={() => prefetchRoute('/settings/services')}
@@ -404,7 +405,7 @@ export default function AppTopNav({
           className={styles.powerButton}
           onClick={() => setShowLogoutModal(true)}
           aria-label="Deconectare"
-          title="Deconectare"
+          data-tooltip="Deconectare"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>

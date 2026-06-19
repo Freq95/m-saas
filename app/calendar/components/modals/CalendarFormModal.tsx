@@ -5,6 +5,7 @@ import styles from '../../page.module.css';
 import type { CalendarListItem } from '../../hooks';
 import { ConfirmModal } from './ConfirmModal';
 import { useModal } from '@/lib/useModal';
+import Spinner from '@/components/Spinner';
 
 type CalendarFormMode = 'create' | 'edit';
 
@@ -99,7 +100,7 @@ export function CalendarFormModal({
 
   if (!isOpen) return null;
 
-  const saveLabel = isSubmitting ? 'Se salveaza...' : isEditMode ? 'Salveaza' : 'Creeaza';
+  const saveLabel = isEditMode ? 'Salveaza' : 'Creeaza';
 
   return (
     <div
@@ -120,6 +121,7 @@ export function CalendarFormModal({
             className={styles.modalIconButton}
             onClick={requestClose}
             aria-label="Inchide"
+            data-tooltip="Inchide"
             disabled={busy}
           >
             <IconX />
@@ -152,10 +154,15 @@ export function CalendarFormModal({
             <button
               type="button"
               onClick={handleDeleteClick}
-              className={styles.deleteButton}
-              disabled={busy}
-            >
-              {isDeleting ? 'Se sterge...' : 'Sterge'}
+            className={styles.deleteButton}
+            disabled={busy}
+          >
+              {isDeleting ? (
+                <>
+                  <Spinner size={14} thickness={2} centered={false} label="Se sterge" />
+                  <span>Se sterge</span>
+                </>
+              ) : 'Sterge'}
             </button>
           )}
           <button
@@ -172,7 +179,12 @@ export function CalendarFormModal({
             className={styles.saveButton}
             disabled={busy}
           >
-            {saveLabel}
+            {isSubmitting ? (
+              <>
+                <Spinner size={14} thickness={2} centered={false} label="Se salveaza" />
+                <span>Se salveaza</span>
+              </>
+            ) : saveLabel}
           </button>
         </div>
       </div>

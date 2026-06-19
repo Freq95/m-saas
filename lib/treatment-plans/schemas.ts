@@ -51,9 +51,10 @@ export const sendTreatmentPlanEmailSchema = z.object({
 });
 
 export const shareTreatmentPlanSchema = z.object({
-  // 'link' just ensures a PDF + share link exist (for copy / building a wa.me
-  // URL client-side); 'whatsapp' additionally marks the plan as sent.
-  action: z.enum(['link', 'whatsapp']),
+  // 'link' ensures a PDF + share link exist (for copy / building a wa.me URL
+  // client-side); 'whatsapp' additionally marks the plan as sent; 'revoke'
+  // deactivates the current link.
+  action: z.enum(['link', 'whatsapp', 'revoke']),
   // An already-issued token to reuse, so copy/WhatsApp/email share one link.
   token: z.string().trim().max(200).optional(),
 });

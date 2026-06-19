@@ -106,28 +106,32 @@
 }
 
 .closeButton {
-  background: transparent;
-  border: none;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
   color: var(--color-text-soft);
-  font-size: 1.35rem;
+  font-size: 1.2rem;
   cursor: pointer;
   padding: 0;
   margin-left: 0.75rem;
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--radius-xs);
-  transition: background var(--transition-fast), color var(--transition-fast);
-  opacity: 0.7;
+  border-radius: 9px;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast), opacity var(--transition-fast), transform var(--transition-fast);
+  opacity: 0.85;
   line-height: 1;
 }
 
 .closeButton:hover {
-  background: var(--color-surface-muted);
+  background: var(--color-surface-strong);
+  border-color: var(--color-border-strong);
   color: var(--color-text);
+  transform: translateY(-1px);
   opacity: 1;
 }
 

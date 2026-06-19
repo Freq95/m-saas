@@ -86,6 +86,7 @@ describe('POST /api/appointments/recurring shared calendar behavior', () => {
   const ownerDbUserId = new ObjectId('65f9a0e8f5f89f73d18b0202');
   const viewerDbUserId = new ObjectId('65f9a0e8f5f89f73d18b0203');
   const serviceFindOne = vi.fn();
+  const serviceFind = vi.fn();
   const clientFindOne = vi.fn();
   const insertOne = vi.fn();
   let insertedAppointments: Doc[];
@@ -94,6 +95,7 @@ describe('POST /api/appointments/recurring shared calendar behavior', () => {
     vi.clearAllMocks();
     insertedAppointments = [];
     serviceFindOne.mockReset();
+    serviceFind.mockReset();
     clientFindOne.mockReset();
     insertOne.mockReset();
 
@@ -138,13 +140,20 @@ describe('POST /api/appointments/recurring shared calendar behavior', () => {
     mockGetMongoDbOrThrow.mockResolvedValue({
       collection(name: string) {
         if (name === 'services') {
-          return { findOne: serviceFindOne };
+          return { findOne: serviceFindOne, find: serviceFind };
         }
         if (name === 'clients') {
           return { findOne: clientFindOne };
         }
         if (name === 'appointments') {
+          const emptyCursor = {
+            project: vi.fn(() => emptyCursor),
+            sort: vi.fn(() => emptyCursor),
+            limit: vi.fn(() => emptyCursor),
+            toArray: vi.fn(async () => []),
+          };
           return {
+            find: vi.fn(() => emptyCursor),
             insertOne: async (doc: Doc) => {
               insertedAppointments.push(doc);
               return insertOne(doc);
@@ -152,9 +161,24 @@ describe('POST /api/appointments/recurring shared calendar behavior', () => {
           };
         }
         if (name === 'calendars') {
+          const calendarCursor = {
+            toArray: vi.fn(async () => [{
+              id: 11,
+              tenant_id: tenantId,
+              is_default: false,
+              owner_db_user_id: ownerDbUserId,
+            }]),
+          };
           return {
+            find: vi.fn(() => calendarCursor),
             findOne: vi.fn().mockResolvedValue({ id: 11, tenant_id: tenantId, is_default: false }),
           };
+        }
+        if (name === 'calendar_shares') {
+          return { find: vi.fn(() => ({ toArray: vi.fn(async () => []) })) };
+        }
+        if (name === 'users') {
+          return { find: vi.fn(() => ({ toArray: vi.fn(async () => []) })) };
         }
         throw new Error(`Unexpected collection: ${name}`);
       },
@@ -162,11 +186,13 @@ describe('POST /api/appointments/recurring shared calendar behavior', () => {
   });
 
   it('uses selected dentist clients/services while storing under the shared calendar owner', async () => {
-    serviceFindOne.mockResolvedValue({
+    serviceFind.mockReturnValue({
+      toArray: vi.fn(async () => [{
       id: 222,
       name: 'Consultatie initiala',
       duration_minutes: 30,
       price: 150,
+      }]),
     });
     clientFindOne.mockResolvedValue({ id: 301, user_id: 13, tenant_id: tenantId, name: 'Ana Viewer' });
 
@@ -192,8 +218,8 @@ describe('POST /api/appointments/recurring shared calendar behavior', () => {
     const res = await POST(req);
     expect(res.status).toBe(201);
 
-    expect(serviceFindOne).toHaveBeenCalledWith(expect.objectContaining({
-      id: 222,
+    expect(serviceFind).toHaveBeenCalledWith(expect.objectContaining({
+      id: { $in: [222] },
       user_id: 13,
       tenant_id: tenantId,
       deleted_at: { $exists: false },
@@ -257,11 +283,13 @@ describe('POST /api/appointments/recurring shared calendar behavior', () => {
   });
 
   it('preflights availability blocks before inserting any recurring instance', async () => {
-    serviceFindOne.mockResolvedValue({
+    serviceFind.mockReturnValue({
+      toArray: vi.fn(async () => [{
       id: 222,
       name: 'Consultatie initiala',
       duration_minutes: 30,
       price: 150,
+      }]),
     });
     clientFindOne.mockResolvedValue({ id: 301, user_id: 13, tenant_id: tenantId, name: 'Ana Viewer' });
     let conflictCalls = 0;

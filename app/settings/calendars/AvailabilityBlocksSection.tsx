@@ -166,7 +166,7 @@ export function AvailabilityBlocksSection({
               type="button"
               className={styles.availabilityRow}
               onClick={() => openEdit(block)}
-              title={block.reason || block.type_label}
+              data-tooltip={block.reason || block.type_label}
             >
               <span className={styles.availabilityRowMain}>
                 <strong>{block.type_label}</strong>

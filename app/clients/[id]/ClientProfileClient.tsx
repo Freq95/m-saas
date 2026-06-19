@@ -3,11 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import styles from './page.module.css';
 import navStyles from '../../dashboard/page.module.css';
 import { useToast } from '@/lib/useToast';
 import { ToastContainer } from '@/components/Toast';
 import ClientCreateModal from '@/components/ClientCreateModal';
+import Spinner from '@/components/Spinner';
 import { gdprStateOf, GDPR_COLOR, GDPR_FULL_LABEL } from '@/lib/client-gdpr';
 import { logger } from '@/lib/logger';
 
@@ -15,13 +17,18 @@ import { logger } from '@/lib/logger';
 // who never open the tab don't download it.
 const DentalTab = dynamic(() => import('./dental/DentalTab'), {
   ssr: false,
-  loading: () => <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>Se încarcă schema dentară…</div>,
+  loading: () => <Spinner size={24} thickness={2.2} />,
 });
 
 const TreatmentPlansTab = dynamic(() => import('./treatment-plans/TreatmentPlansTab'), {
   ssr: false,
-  loading: () => <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>Se incarca planurile...</div>,
+  loading: () => <Spinner size={24} thickness={2.2} />,
 });
+
+// Warm the lazy chunks so opening a tab waits only on data, not the JS download.
+// import() is memoized by the bundler, so repeat calls are free.
+const prefetchDentalTab = () => { void import('./dental/DentalTab'); };
+const prefetchTreatmentPlansTab = () => { void import('./treatment-plans/TreatmentPlansTab'); };
 
 interface Client {
   id: number;
@@ -73,6 +80,22 @@ interface ClientProfileClientProps {
   canEditTreatmentPlans: boolean;
 }
 
+type ActiveTab = 'notes' | 'appointments' | 'conversations' | 'files' | 'dental' | 'treatment-plans';
+
+function normalizeProfileTab(value: string | null): ActiveTab {
+  if (value === 'appointments') return 'appointments';
+  if (value === 'conversations') return 'conversations';
+  if (value === 'files') return 'files';
+  if (value === 'dental') return 'dental';
+  if (value === 'plan' || value === 'treatment-plans') return 'treatment-plans';
+  return 'notes';
+}
+
+function tabToQueryValue(tab: ActiveTab): string | null {
+  if (tab === 'notes') return null;
+  return tab === 'treatment-plans' ? 'plan' : tab;
+}
+
 export default function ClientProfileClient({
   clientId,
   initialClient,
@@ -82,6 +105,13 @@ export default function ClientProfileClient({
   canEditDental,
   canEditTreatmentPlans,
 }: ClientProfileClientProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const searchParamsKey = searchParams.toString();
+  const activeTabParam = searchParams.get('tab');
+  const newPlanParam = searchParams.get('newPlan');
+  const appointmentIdParam = searchParams.get('appointmentId');
   const [client, setClient] = useState<Client | null>(initialClient);
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
   const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
@@ -89,7 +119,7 @@ export default function ClientProfileClient({
   const [notes, setNotes] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(initialStats);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'notes' | 'appointments' | 'conversations' | 'files' | 'dental' | 'treatment-plans'>('notes');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => normalizeProfileTab(searchParams.get('tab')));
   const [showAddNote, setShowAddNote] = useState(false);
   const [showEditClient, setShowEditClient] = useState(false);
   const [pendingDeleteFileId, setPendingDeleteFileId] = useState<number | null>(null);
@@ -111,6 +141,21 @@ export default function ClientProfileClient({
   const consentWithdrawBackdropRef = useRef(false);
   const overflowMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const selectTab = useCallback((tab: ActiveTab) => {
+    setActiveTab(tab);
+    const params = new URLSearchParams(searchParamsKey);
+    const tabValue = tabToQueryValue(tab);
+    if (tabValue) params.set('tab', tabValue);
+    else params.delete('tab');
+    if (tab !== 'treatment-plans') {
+      params.delete('newPlan');
+      params.delete('appointmentId');
+    }
+    const query = params.toString();
+    if (query === searchParamsKey) return;
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [pathname, router, searchParamsKey]);
 
   const fetchClientData = useCallback(async () => {
     try {
@@ -173,6 +218,10 @@ export default function ClientProfileClient({
     setLoading(false);
   }, [clientId, initialAppointments, initialClient, initialConversations, initialStats]);
 
+  useEffect(() => {
+    setActiveTab(normalizeProfileTab(activeTabParam));
+  }, [activeTabParam]);
+
   // initialClient being null means the patient wasn't found (or scope check
   // failed) — the bailout below renders "Pacientul nu a fost gasit". Gate all
   // initial fetches on it so we don't fire 4 wasted 404 requests and pollute
@@ -194,6 +243,22 @@ export default function ClientProfileClient({
     if (!clientId || !initialClient) return;
     if (activeTab === 'files') void fetchFiles();
   }, [activeTab, clientId, fetchFiles, initialClient]);
+
+  // Prefetch the heavy Dental + Plan chunks during idle time after the profile
+  // settles, so the first tap on either tab is JS-instant.
+  useEffect(() => {
+    const run = () => { prefetchDentalTab(); prefetchTreatmentPlansTab(); };
+    const w = window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    if (typeof w.requestIdleCallback === 'function') {
+      const id = w.requestIdleCallback(run, { timeout: 2500 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const t = setTimeout(run, 1500);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     if (!showOverflowMenu) return;
@@ -467,7 +532,7 @@ export default function ClientProfileClient({
   if (loading) {
     return (
       <div className={navStyles.container}>
-        <div className={styles.pageLoading}>Se încarcă...</div>
+        <div className={styles.pageLoading}><Spinner size={28} thickness={2.5} /></div>
       </div>
     );
   }
@@ -660,41 +725,45 @@ export default function ClientProfileClient({
         <div className={styles.tabBar}>
           <button
             className={`${styles.tab} ${activeTab === 'notes' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('notes')}
+            onClick={() => selectTab('notes')}
           >
             Note
             {notes.length > 0 && <span className={styles.tabCount}>({notes.length})</span>}
           </button>
           <button
             className={`${styles.tab} ${activeTab === 'appointments' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('appointments')}
+            onClick={() => selectTab('appointments')}
           >
             Programări
             {appointments.length > 0 && <span className={styles.tabCount}>({appointments.length})</span>}
           </button>
           <button
             className={`${styles.tab} ${activeTab === 'conversations' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('conversations')}
+            onClick={() => selectTab('conversations')}
           >
             Conversații
             {conversations.length > 0 && <span className={styles.tabCount}>({conversations.length})</span>}
           </button>
           <button
             className={`${styles.tab} ${activeTab === 'files' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('files')}
+            onClick={() => selectTab('files')}
           >
             Fișiere
             {files.length > 0 && <span className={styles.tabCount}>({files.length})</span>}
           </button>
           <button
             className={`${styles.tab} ${activeTab === 'dental' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('dental')}
+            onClick={() => selectTab('dental')}
+            onMouseEnter={prefetchDentalTab}
+            onFocus={prefetchDentalTab}
           >
             Dental
           </button>
           <button
             className={`${styles.tab} ${activeTab === 'treatment-plans' ? styles.tabActive : ''}`}
-            onClick={() => setActiveTab('treatment-plans')}
+            onClick={() => selectTab('treatment-plans')}
+            onMouseEnter={prefetchTreatmentPlansTab}
+            onFocus={prefetchTreatmentPlansTab}
           >
             Plan de tratament
           </button>
@@ -711,7 +780,7 @@ export default function ClientProfileClient({
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ opacity: 0.3, marginBottom: '0.75rem' }}>
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
                   </svg>
-                  Nu există note.
+                  Nu exista note.
                 </div>
               </div>
             ) : (
@@ -731,8 +800,8 @@ export default function ClientProfileClient({
                       <button
                         className={styles.btnIconSmall}
                         onClick={() => handleEditNote(note)}
-                        title="Editeaza"
                         aria-label="Editeaza nota"
+                        data-tooltip="Editeaza"
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
@@ -741,8 +810,8 @@ export default function ClientProfileClient({
                       <button
                         className={`${styles.btnIconSmall} ${styles.btnIconDanger}`}
                         onClick={() => handleDeleteNote(note)}
-                        title="Sterge"
                         aria-label="Sterge nota"
+                        data-tooltip="Sterge"
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4h6v2" />
@@ -763,7 +832,7 @@ export default function ClientProfileClient({
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ opacity: 0.3, marginBottom: '0.75rem' }}>
                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                   </svg>
-                  Nu există programări.
+                  Nu exista programari.
                 </div>
               ) : (
                 <table className={styles.dataTable}>
@@ -805,7 +874,7 @@ export default function ClientProfileClient({
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ opacity: 0.3, marginBottom: '0.75rem' }}>
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                   </svg>
-                  Nu există conversații.
+                  Nu exista conversatii.
                 </div>
               ) : (
                 <div className={styles.rowList}>
@@ -836,7 +905,7 @@ export default function ClientProfileClient({
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ opacity: 0.3, marginBottom: '0.75rem' }}>
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
                   </svg>
-                  Nu există fișiere.
+                  Nu exista fisiere.
                 </div>
               ) : (
                 <div className={styles.rowList}>
@@ -853,18 +922,18 @@ export default function ClientProfileClient({
                       </div>
                       <div className={styles.fileActions}>
                         {(file.mime_type?.startsWith('image/') || file.mime_type === 'application/pdf' || file.mime_type?.startsWith('text/')) && (
-                          <a href={`/api/clients/${clientId}/files/${file.id}/preview`} target="_blank" className={styles.btnIconSmall} title="Previzualizare" aria-label="Previzualizare">
+                          <a href={`/api/clients/${clientId}/files/${file.id}/preview`} target="_blank" className={styles.btnIconSmall} aria-label="Previzualizare" data-tooltip="Previzualizare">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                               <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" />
                             </svg>
                           </a>
                         )}
-                        <a href={`/api/clients/${clientId}/files/${file.id}/download`} target="_blank" className={styles.btnIconSmall} title="Descarcă" aria-label="Descarcă">
+                        <a href={`/api/clients/${clientId}/files/${file.id}/download`} target="_blank" className={styles.btnIconSmall} aria-label="Descarca" data-tooltip="Descarca">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
                           </svg>
                         </a>
-                        <button className={`${styles.btnIconSmall} ${styles.btnIconDanger}`} onClick={() => handleDeleteFile(file.id)} title="Șterge" aria-label="Șterge fișier">
+                        <button className={`${styles.btnIconSmall} ${styles.btnIconDanger}`} onClick={() => handleDeleteFile(file.id)} aria-label="Sterge fisier" data-tooltip="Sterge">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4h6v2" />
                           </svg>
@@ -895,6 +964,8 @@ export default function ClientProfileClient({
               clientName={client?.name}
               clientEmail={client?.email}
               clientPhone={client?.phone}
+              initialNewPlan={newPlanParam === '1'}
+              seedAppointmentId={appointmentIdParam}
               onToast={(kind, message) => (kind === 'success' ? toastSuccess(message) : toastError(message))}
               onFilesChanged={fetchFiles}
             />

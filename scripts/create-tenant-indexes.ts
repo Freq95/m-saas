@@ -42,6 +42,19 @@ async function createTenantIndexes() {
 
   await db.collection('client_files').createIndex({ tenant_id: 1, client_id: 1 });
 
+  await db.collection('treatment_plan_public_links').createIndex(
+    { token_hash: 1 },
+    { unique: true, name: 'treatment_plan_public_links_token_hash' }
+  );
+  await db.collection('treatment_plan_public_links').createIndex(
+    { tenant_id: 1, user_id: 1, client_id: 1, plan_id: 1, revoked_at: 1, expires_at: 1 },
+    { name: 'treatment_plan_public_links_by_plan_active' }
+  );
+  await db.collection('treatment_plan_public_links').createIndex(
+    { expires_at_date: 1 },
+    { expireAfterSeconds: 0, name: 'treatment_plan_public_links_expires_at_ttl' }
+  );
+
   console.log('Tenant indexes created.');
 }
 

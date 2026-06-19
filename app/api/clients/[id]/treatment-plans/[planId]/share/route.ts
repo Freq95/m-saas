@@ -12,6 +12,7 @@ import {
   markTreatmentPlanSent,
   normalizeRoPhone,
   resolveOrIssuePublicLink,
+  revokeTreatmentPlanPublicLink,
 } from '@/lib/server/treatment-plans';
 import { shareTreatmentPlanSchema } from '@/lib/treatment-plans/schemas';
 
@@ -56,6 +57,22 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
     const planScope = { tenantId: scope.tenantId, userId: scope.userId, clientId };
     let plan = await getTreatmentPlan(planScope, planId);
     if (!plan) return createErrorResponse('Treatment plan not found', 404);
+
+    if (action === 'revoke') {
+      const updated = await revokeTreatmentPlanPublicLink(planScope, planId);
+      await logDataAccess({
+        actorUserId: auth.dbUserId,
+        actorEmail: auth.email,
+        actorRole: auth.role,
+        tenantId: scope.tenantId,
+        targetType: 'client.treatment_plan_share',
+        targetId: planId,
+        route: `/api/clients/${params.id}/treatment-plans/${params.planId}/share`,
+        request,
+        metadata: { action: 'revoke' },
+      });
+      return createSuccessResponse({ plan: updated ? stripMongoId(updated) : plan });
+    }
 
     // The shared link points at the stored PDF, so it must exist first.
     if (!plan.pdf_file_id) {

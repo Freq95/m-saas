@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import styles from '../../page.module.css';
 import { useModal } from '@/lib/useModal';
 import { useFocusRestore } from '@/lib/useFocusRestore';
+import Spinner from '@/components/Spinner';
 
 interface RecurrenceScopeModalProps {
   isOpen: boolean;
@@ -131,7 +132,12 @@ export function RecurrenceScopeModal({
             Renunta
           </button>
           <button type="button" onClick={handleConfirm} className={styles.editButton} disabled={isSubmitting}>
-            {isSubmitting ? 'Se salveaza...' : scope === 'series' ? 'Salveaza seria' : 'Salveaza'}
+            {isSubmitting ? (
+              <>
+                <Spinner size={14} thickness={2} centered={false} label="Se salveaza" />
+                <span>Se salveaza</span>
+              </>
+            ) : scope === 'series' ? 'Salveaza seria' : 'Salveaza'}
           </button>
         </div>
       </div>

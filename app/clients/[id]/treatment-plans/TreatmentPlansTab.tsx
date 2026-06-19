@@ -1,8 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import PlanBuilder, { type DentistOption, type TreatmentPlan } from './PlanBuilder';
 import styles from './treatment-plans.module.css';
+import Spinner from '@/components/Spinner';
+import { ConfirmModal } from '@/app/calendar/components/modals/ConfirmModal';
 
 type ClientInfo = {
   id: number;
@@ -17,6 +20,8 @@ type Props = {
   clientName?: string;
   clientEmail?: string | null;
   clientPhone?: string | null;
+  initialNewPlan?: boolean;
+  seedAppointmentId?: string | null;
   onToast: (kind: 'success' | 'error', message: string) => void;
   onFilesChanged?: () => void;
 };
@@ -33,7 +38,42 @@ type ShareSheet = {
   to: string;
   message: string;
   attachPdf: boolean;
+  revoked: boolean;
 };
+
+type TreatmentPlansPayload = {
+  plans?: TreatmentPlan[];
+  dentists?: DentistOption[];
+  client?: ClientInfo;
+};
+
+const planLoadCache = new Map<string, {
+  promise?: Promise<TreatmentPlansPayload>;
+  data?: TreatmentPlansPayload;
+  expiresAt: number;
+}>();
+
+async function fetchTreatmentPlansPayload(clientId: string): Promise<TreatmentPlansPayload> {
+  const now = Date.now();
+  const cached = planLoadCache.get(clientId);
+  if (cached?.data && cached.expiresAt > now) return cached.data;
+  if (cached?.promise) return cached.promise;
+
+  const promise = fetch(`/api/clients/${clientId}/treatment-plans`)
+    .then(async (response) => {
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Nu am putut incarca planurile.');
+      planLoadCache.set(clientId, { data, expiresAt: Date.now() + 2000 });
+      return data as TreatmentPlansPayload;
+    })
+    .catch((error) => {
+      planLoadCache.delete(clientId);
+      throw error;
+    });
+
+  planLoadCache.set(clientId, { promise, expiresAt: now + 2000 });
+  return promise;
+}
 
 function formatMoney(value: number, currency = 'lei'): string {
   return `${new Intl.NumberFormat('ro-RO', { maximumFractionDigits: 0 }).format(value || 0)} ${currency}`;
@@ -48,6 +88,15 @@ function formatExpiry(iso: string | null): string {
   } catch {
     return '';
   }
+}
+
+function formatAppointmentSource(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  const day = date.toLocaleDateString('ro-RO', { day: '2-digit', month: 'short', year: 'numeric' });
+  const time = date.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' });
+  return `Pornit din programarea din ${day}, ${time}`;
 }
 
 const STATUS_LABELS: Record<TreatmentPlan['status'], string> = {
@@ -165,10 +214,27 @@ function IconTrash() {
   );
 }
 
+function IconSlash() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M5.6 5.6 18.4 18.4" />
+    </svg>
+  );
+}
+
 function IconX() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
       <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  );
+}
+
+function IconCheck() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m5 12 4 4L19 6" />
     </svg>
   );
 }
@@ -199,9 +265,14 @@ export default function TreatmentPlansTab({
   clientName,
   clientEmail,
   clientPhone,
+  initialNewPlan = false,
+  seedAppointmentId = null,
   onToast,
   onFilesChanged,
 }: Props) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [plans, setPlans] = useState<TreatmentPlan[]>([]);
   const [dentists, setDentists] = useState<DentistOption[]>([]);
   const [client, setClient] = useState<ClientInfo | null>(
@@ -212,26 +283,168 @@ export default function TreatmentPlansTab({
   const [busyId, setBusyId] = useState<number | null>(null);
   const [share, setShare] = useState<ShareSheet | null>(null);
   const [shareBusy, setShareBusy] = useState(false);
+  const [pendingDeletePlan, setPendingDeletePlan] = useState<TreatmentPlan | null>(null);
+  const [openMenuPlanId, setOpenMenuPlanId] = useState<number | null>(null);
+  const handledNewPlanKeyRef = useRef<string | null>(null);
+  const loadedClientIdRef = useRef<string | null>(null);
+  const loadingClientIdRef = useRef<string | null>(null);
+  const onToastRef = useRef(onToast);
+  const onFilesChangedRef = useRef(onFilesChanged);
+
+  useEffect(() => {
+    onToastRef.current = onToast;
+  }, [onToast]);
+
+  useEffect(() => {
+    onFilesChangedRef.current = onFilesChanged;
+  }, [onFilesChanged]);
 
   const loadPlans = useCallback(async () => {
+    if (loadedClientIdRef.current === clientId || loadingClientIdRef.current === clientId) return;
+    loadingClientIdRef.current = clientId;
     setLoading(true);
     try {
-      const response = await fetch(`/api/clients/${clientId}/treatment-plans`);
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Nu am putut incarca planurile.');
+      const data = await fetchTreatmentPlansPayload(clientId);
       setPlans(data.plans || []);
       setDentists(data.dentists || []);
       if (data.client) setClient(data.client);
+      loadedClientIdRef.current = clientId;
     } catch (error) {
-      onToast('error', error instanceof Error ? error.message : 'Nu am putut incarca planurile.');
+      onToastRef.current('error', error instanceof Error ? error.message : 'Nu am putut incarca planurile.');
     } finally {
+      if (loadingClientIdRef.current === clientId) loadingClientIdRef.current = null;
       setLoading(false);
     }
-  }, [clientId, onToast]);
+  }, [clientId]);
 
   useEffect(() => {
     void loadPlans();
   }, [loadPlans]);
+
+  const clearNewPlanParams = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (!params.has('newPlan') && !params.has('appointmentId')) return;
+    params.delete('newPlan');
+    params.delete('appointmentId');
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [pathname, router, searchParams]);
+
+  useEffect(() => {
+    if (openMenuPlanId === null) return;
+
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      if (!target.closest('[data-plan-menu-root]')) setOpenMenuPlanId(null);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpenMenuPlanId(null);
+    };
+
+    document.addEventListener('pointerdown', closeOnOutsidePress);
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePress);
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [openMenuPlanId]);
+
+  useEffect(() => {
+    if (!initialNewPlan || !canEdit || loading) return;
+    const key = seedAppointmentId ? `appointment:${seedAppointmentId}` : 'blank';
+    if (handledNewPlanKeyRef.current === key) return;
+    handledNewPlanKeyRef.current = key;
+
+    if (!seedAppointmentId) {
+      setSelectedPlan(emptyPlan(dentists));
+      clearNewPlanParams();
+      return;
+    }
+
+    let alive = true;
+    setSelectedPlan({
+      ...emptyPlan(dentists),
+      source_appointment_label: 'Se pregateste planul din programare...',
+    });
+    void (async () => {
+      try {
+        const response = await fetch(`/api/appointments/${encodeURIComponent(seedAppointmentId)}`, { cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok || !data.appointment) throw new Error(data.error || 'Nu am putut preincarca programarea.');
+        if (!alive) return;
+
+        const appointment = data.appointment as {
+          start_time?: string;
+          dentist_id?: number | null;
+          service_owner_user_id?: number | null;
+          service_id?: number | null;
+          service_ids?: number[];
+          service_name?: string | null;
+          service_names?: string[];
+          price_at_time?: number | null;
+          prices_at_time?: number[];
+          service_price?: number | null;
+        };
+        const serviceIds = Array.isArray(appointment.service_ids) && appointment.service_ids.length > 0
+          ? appointment.service_ids
+          : typeof appointment.service_id === 'number'
+            ? [appointment.service_id]
+            : [];
+        const serviceNames = Array.isArray(appointment.service_names) && appointment.service_names.length > 0
+          ? appointment.service_names
+          : appointment.service_name
+            ? [appointment.service_name]
+            : [];
+        const prices = Array.isArray(appointment.prices_at_time) && appointment.prices_at_time.length > 0
+          ? appointment.prices_at_time
+          : typeof appointment.price_at_time === 'number'
+            ? [appointment.price_at_time]
+            : serviceNames.length === 1 && typeof appointment.service_price === 'number'
+              ? [appointment.service_price]
+              : [];
+        const items = (serviceNames.length > 0 ? serviceNames : serviceIds.map((id) => `Serviciu #${id}`)).map((name, index) => {
+          const unit = Number(prices[index] || 0);
+          return {
+            service_id: serviceIds[index] ?? null,
+            procedure: name,
+            details: '',
+            quantity: 1,
+            unit_price: unit,
+            line_total: unit,
+          };
+        });
+        const total = items.reduce((sum, item) => sum + item.line_total, 0);
+        const doctorUserId = appointment.dentist_id || appointment.service_owner_user_id || dentists[0]?.userId || 0;
+        const planDate = appointment.start_time && !Number.isNaN(new Date(appointment.start_time).getTime())
+          ? new Date(appointment.start_time).toISOString().slice(0, 10)
+          : new Date().toISOString().slice(0, 10);
+
+        setSelectedPlan({
+          doctor_user_id: doctorUserId,
+          plan_date: planDate,
+          items: items.length > 0 ? items : [emptyPlan(dentists).items[0]].filter(Boolean),
+          total_override: null,
+          total,
+          status: 'draft',
+          pdf_file_id: null,
+          source_appointment_label: formatAppointmentSource(appointment.start_time),
+        });
+        clearNewPlanParams();
+      } catch (error) {
+        if (alive) {
+          const fallback = error instanceof Error ? error.message : 'Nu am putut preincarca programarea.';
+          onToast('error', 'Planul a fost deschis fara precompletare.');
+          setSelectedPlan({
+            ...emptyPlan(dentists),
+            source_appointment_label: `${fallback} Completeaza planul manual.`,
+          });
+          clearNewPlanParams();
+        }
+      }
+    })();
+    return () => { alive = false; };
+  }, [canEdit, clearNewPlanParams, dentists, initialNewPlan, loading, onToast, seedAppointmentId]);
 
   const sortedPlans = useMemo(() => [...plans].sort((a, b) => (b.id || 0) - (a.id || 0)), [plans]);
 
@@ -239,6 +452,7 @@ export default function TreatmentPlansTab({
   // (Previously this force-opened the builder on every save/share/PDF, which
   // kept the editor open after saving and flashed it behind the share sheet.)
   function upsertPlan(plan: TreatmentPlan) {
+    planLoadCache.delete(clientId);
     setPlans((prev) => {
       const exists = prev.some((candidate) => candidate.id === plan.id);
       return exists
@@ -255,7 +469,7 @@ export default function TreatmentPlansTab({
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Nu am putut genera PDF-ul.');
       upsertPlan(data.plan);
-      onFilesChanged?.();
+      onFilesChangedRef.current?.();
       onToast('success', 'PDF-ul a fost generat si salvat la fisiere.');
     } catch (error) {
       onToast('error', error instanceof Error ? error.message : 'Nu am putut genera PDF-ul.');
@@ -279,6 +493,7 @@ export default function TreatmentPlansTab({
       to: client?.email || '',
       message: '',
       attachPdf: false,
+      revoked: false,
     });
     try {
       const response = await fetch(`/api/clients/${clientId}/treatment-plans/${plan.id}/share`, {
@@ -296,8 +511,9 @@ export default function TreatmentPlansTab({
         expiresAt: data.expiresAt ?? null,
         whatsappReady: Boolean(data.patient?.whatsappReady),
         to: prev.to || data.patient?.email || '',
+        revoked: false,
       } : prev);
-      onFilesChanged?.(); // the share endpoint generates the PDF on first use
+      onFilesChangedRef.current?.(); // the share endpoint generates the PDF on first use
     } catch (error) {
       onToast('error', error instanceof Error ? error.message : 'Nu am putut pregati linkul.');
       setShare(null);
@@ -346,6 +562,35 @@ export default function TreatmentPlansTab({
     }
   }
 
+  async function revokeShareLink() {
+    if (!share?.plan.id) return;
+    setShareBusy(true);
+    try {
+      const response = await fetch(`/api/clients/${clientId}/treatment-plans/${share.plan.id}/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'revoke' }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Nu am putut dezactiva linkul.');
+      if (data.plan) upsertPlan(data.plan);
+      onToast('success', 'Linkul a fost dezactivat.');
+      setShare((prev) => prev ? {
+        ...prev,
+        plan: data.plan || prev.plan,
+        url: null,
+        token: null,
+        expiresAt: null,
+        copied: false,
+        revoked: true,
+      } : prev);
+    } catch (error) {
+      onToast('error', error instanceof Error ? error.message : 'Nu am putut dezactiva linkul.');
+    } finally {
+      setShareBusy(false);
+    }
+  }
+
   async function sendShareEmail() {
     if (!share?.plan.id) return;
     setShareBusy(true);
@@ -385,15 +630,17 @@ export default function TreatmentPlansTab({
   }
 
   async function deletePlan(plan: TreatmentPlan) {
-    if (!plan.id || !window.confirm('Stergi acest plan de tratament?')) return;
+    if (!plan.id) return;
     setBusyId(plan.id);
     try {
       const response = await fetch(`/api/clients/${clientId}/treatment-plans/${plan.id}`, { method: 'DELETE' });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Nu am putut sterge planul.');
+      planLoadCache.delete(clientId);
       setPlans((prev) => prev.filter((candidate) => candidate.id !== plan.id));
       if (selectedPlan?.id === plan.id) setSelectedPlan(null);
-      onFilesChanged?.();
+      setPendingDeletePlan(null);
+      onFilesChangedRef.current?.();
       onToast('success', 'Planul a fost sters.');
     } catch (error) {
       onToast('error', error instanceof Error ? error.message : 'Nu am putut sterge planul.');
@@ -402,8 +649,28 @@ export default function TreatmentPlansTab({
     }
   }
 
+  function getPrimaryPlanAction(plan: TreatmentPlan): { label: string; icon?: React.ReactNode; iconOnly?: boolean; run: () => void; disabled?: boolean } {
+    if (plan.status === 'draft') {
+      return { label: 'Continua', run: () => setSelectedPlan(plan) };
+    }
+    if (canEdit && plan.pdf_file_id) {
+      return {
+        label: 'Trimite',
+        icon: <IconSend />,
+        iconOnly: plan.status === 'sent',
+        run: () => openShareSheet(plan),
+        disabled: busyId === plan.id,
+      };
+    }
+    return { label: 'Deschide', run: () => setSelectedPlan(plan) };
+  }
+
   if (loading) {
-    return <div className={styles.loading}>Se incarca planurile...</div>;
+    return (
+      <div className={styles.loading}>
+        <Spinner size={24} thickness={2.2} centered={false} label="Se incarca planurile" />
+      </div>
+    );
   }
 
   return (
@@ -444,7 +711,7 @@ export default function TreatmentPlansTab({
           <strong>Niciun plan de tratament</strong>
           <p>Creează primul plan pentru {client?.name || clientName || 'acest pacient'} — adaugă proceduri, generează PDF-ul și trimite-l pe WhatsApp sau email.</p>
           {canEdit && (
-            <button className={styles.primaryButton} onClick={() => setSelectedPlan(emptyPlan(dentists))}>
+            <button type="button" className={styles.primaryButton} onClick={() => setSelectedPlan(emptyPlan(dentists))}>
               <IconPlus />
               <span>Plan nou</span>
             </button>
@@ -460,6 +727,7 @@ export default function TreatmentPlansTab({
           </div>
           {sortedPlans.map((plan) => {
             const dentistName = dentists.find((dentist) => dentist.userId === plan.doctor_user_id)?.name;
+            const primaryAction = getPrimaryPlanAction(plan);
             return (
             <div key={plan.id} className={styles.planRow}>
               <time className={styles.planDate}>{plan.plan_date}</time>
@@ -470,26 +738,40 @@ export default function TreatmentPlansTab({
               </div>
               <span className={`${styles.status} ${styles[`status_${plan.status}`]}`}>{STATUS_LABELS[plan.status]}</span>
               <div className={styles.actions}>
-                <button type="button" className={styles.actionIcon} onClick={() => setSelectedPlan(plan)} title="Deschide" aria-label="Deschide planul">
-                  <IconOpen />
+                <button
+                  type="button"
+                  className={`${styles.rowPrimaryAction} ${primaryAction.iconOnly ? styles.rowPrimaryActionIcon : ''}`}
+                  onClick={primaryAction.run}
+                  disabled={primaryAction.disabled}
+                  aria-label={primaryAction.label}
+                  data-tooltip={primaryAction.label}
+                >
+                  {primaryAction.icon}
+                  {!primaryAction.iconOnly && primaryAction.label}
                 </button>
-                {canEdit && (
-                  <button type="button" className={styles.actionIcon} onClick={() => openShareSheet(plan)} disabled={busyId === plan.id} title="Trimite" aria-label="Trimite planul">
-                    <IconSend />
-                  </button>
-                )}
-                <details className={styles.moreMenu}>
-                  <summary className={styles.actionIcon} title="Mai mult" aria-label="Mai multe actiuni">
+                <div className={styles.moreMenu} data-plan-menu-root>
+                  <button
+                    type="button"
+                    className={styles.actionIcon}
+                    aria-label="Mai multe actiuni"
+                    aria-expanded={openMenuPlanId === plan.id}
+                    data-tooltip="Mai multe actiuni"
+                    onClick={() => setOpenMenuPlanId((current) => current === plan.id ? null : plan.id ?? null)}
+                  >
                     <IconMore />
-                  </summary>
-                  <div onClick={(event) => (event.currentTarget.closest('details') as HTMLDetailsElement | null)?.removeAttribute('open')}>
-                    {canEdit && <button type="button" onClick={() => generatePdf(plan)} disabled={busyId === plan.id}><IconFile /> Genereaza PDF</button>}
-                    {plan.pdf_file_id && <a href={`/api/clients/${clientId}/files/${plan.pdf_file_id}/preview`} target="_blank"><IconEye /> Preview / print</a>}
-                    {plan.pdf_file_id && <a href={`/api/clients/${clientId}/files/${plan.pdf_file_id}/download`} target="_blank"><IconDownload /> Descarca</a>}
-                    {canEdit && <button type="button" onClick={() => duplicatePlan(plan)}><IconCopy /> Duplica</button>}
-                    {canEdit && <button type="button" className={styles.dangerAction} onClick={() => deletePlan(plan)} disabled={busyId === plan.id}><IconTrash /> Sterge</button>}
-                  </div>
-                </details>
+                  </button>
+                  {openMenuPlanId === plan.id && (
+                    <div role="menu">
+                      <button type="button" role="menuitem" onClick={() => { setOpenMenuPlanId(null); setSelectedPlan(plan); }}><IconOpen /> Deschide</button>
+                      {canEdit && <button type="button" role="menuitem" onClick={() => { setOpenMenuPlanId(null); void openShareSheet(plan); }} disabled={busyId === plan.id}><IconSend /> Trimite</button>}
+                      {canEdit && !plan.pdf_file_id && <button type="button" role="menuitem" onClick={() => { setOpenMenuPlanId(null); void generatePdf(plan); }} disabled={busyId === plan.id}><IconFile /> Genereaza PDF</button>}
+                      {plan.pdf_file_id && <a role="menuitem" href={`/api/clients/${clientId}/files/${plan.pdf_file_id}/preview`} target="_blank" onClick={() => setOpenMenuPlanId(null)}><IconEye /> Preview / print</a>}
+                      {plan.pdf_file_id && <a role="menuitem" href={`/api/clients/${clientId}/files/${plan.pdf_file_id}/download`} target="_blank" onClick={() => setOpenMenuPlanId(null)}><IconDownload /> Descarca</a>}
+                      {canEdit && <button type="button" role="menuitem" onClick={() => { setOpenMenuPlanId(null); duplicatePlan(plan); }}><IconCopy /> Duplica</button>}
+                      {canEdit && <button type="button" role="menuitem" className={styles.dangerAction} onClick={() => { setOpenMenuPlanId(null); setPendingDeletePlan(plan); }} disabled={busyId === plan.id}><IconTrash /> Sterge</button>}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             );
@@ -508,13 +790,16 @@ export default function TreatmentPlansTab({
                 <h3 id="share-plan-title">Trimite planul</h3>
                 <span>Plan #{share.plan.id} · {formatMoney(share.plan.total)}</span>
               </div>
-              <button type="button" className={styles.iconButton} onClick={() => setShare(null)} aria-label="Inchide" disabled={shareBusy}>
+              <button type="button" className={styles.iconButton} onClick={() => setShare(null)} aria-label="Inchide" data-tooltip="Inchide" disabled={shareBusy}>
                 <IconX />
               </button>
             </div>
 
             {share.loading ? (
-              <div className={styles.shareLoading}>Se pregătește linkul securizat…</div>
+              <div className={styles.shareLoading}>
+                <Spinner size={22} thickness={2.2} centered={false} label="Se pregateste linkul" />
+                <span>Se pregateste linkul securizat</span>
+              </div>
             ) : share.emailMode ? (
               <>
                 <button type="button" className={styles.shareBack} onClick={() => setShare((prev) => prev ? { ...prev, emailMode: false } : prev)} disabled={shareBusy}>
@@ -547,20 +832,52 @@ export default function TreatmentPlansTab({
                   <span>Ataseaza si PDF-ul la email</span>
                 </label>
                 <div className={styles.modalActions}>
-                  <button type="button" className={styles.secondaryButton} onClick={() => setShare((prev) => prev ? { ...prev, emailMode: false } : prev)} disabled={shareBusy}>Anuleaza</button>
                   <button type="button" className={styles.primaryButton} onClick={sendShareEmail} disabled={shareBusy || !share.to.trim()}>
-                    {shareBusy ? 'Se trimite...' : 'Trimite pe email'}
+                    {shareBusy ? (
+                      <>
+                        <Spinner size={14} thickness={2} centered={false} label="Se trimite" />
+                        <span>Se trimite</span>
+                      </>
+                    ) : 'Trimite pe email'}
                   </button>
                 </div>
               </>
             ) : (
               <>
+                <div className={`${styles.shareStatus} ${share.revoked ? styles.shareStatusRevoked : styles.shareStatusActive}`}>
+                  <span className={styles.shareStatusIcon}>{share.revoked ? <IconSlash /> : share.copied ? <IconCheck /> : <IconLink />}</span>
+                  <span>
+                    <strong>{share.revoked ? 'Link dezactivat' : share.copied ? 'Link copiat' : 'PDF pregatit'}</strong>
+                    <small>{share.revoked ? 'Linkul trimis anterior nu mai poate fi accesat.' : share.expiresAt ? `Link valabil pana la ${formatExpiry(share.expiresAt)}` : 'Gata pentru trimitere.'}</small>
+                  </span>
+                </div>
+
+                {!share.revoked && (
+                  <div className={styles.shareReadiness} aria-label="Canale disponibile">
+                    <span className={share.whatsappReady ? styles.readyItemOk : styles.readyItemMissing}>
+                      <IconWhatsApp />
+                      {share.whatsappReady ? 'Telefon pregatit pentru WhatsApp' : 'Telefon lipsa sau invalid'}
+                    </span>
+                    <span className={share.to ? styles.readyItemOk : styles.readyItemMissing}>
+                      <IconMail />
+                      {share.to ? share.to : 'Email lipsa'}
+                    </span>
+                  </div>
+                )}
+
+                {!share.revoked && (!share.whatsappReady || !share.to) && (
+                  <div className={styles.shareFixHint}>
+                    <span>{!share.whatsappReady ? 'Numar de telefon lipsa sau invalid.' : 'Email lipsa pentru pacient.'}</span>
+                    <a href={`/clients/${clientId}/edit`}>Editeaza pacientul</a>
+                  </div>
+                )}
+
                 <div className={styles.shareOptions}>
                   <button
                     type="button"
                     className={`${styles.shareOption} ${styles.shareWhatsapp}`}
                     onClick={shareWhatsApp}
-                    disabled={shareBusy || !share.whatsappReady}
+                    disabled={shareBusy || !share.whatsappReady || share.revoked}
                   >
                     <span className={styles.shareOptionIcon}><IconWhatsApp /></span>
                     <span className={styles.shareOptionText}>
@@ -574,7 +891,7 @@ export default function TreatmentPlansTab({
                     type="button"
                     className={styles.shareOption}
                     onClick={() => setShare((prev) => prev ? { ...prev, emailMode: true } : prev)}
-                    disabled={shareBusy}
+                    disabled={shareBusy || share.revoked}
                   >
                     <span className={styles.shareOptionIcon}><IconMail /></span>
                     <span className={styles.shareOptionText}>
@@ -584,15 +901,23 @@ export default function TreatmentPlansTab({
                     <span className={styles.shareOptionChevron}><IconChevron /></span>
                   </button>
 
-                  <button type="button" className={styles.shareOption} onClick={copyShareLink} disabled={shareBusy || !share.url}>
+                  <button type="button" className={styles.shareOption} onClick={copyShareLink} disabled={shareBusy || !share.url || share.revoked}>
                     <span className={styles.shareOptionIcon}><IconLink /></span>
                     <span className={styles.shareOptionText}>
                       <strong>{share.copied ? 'Link copiat ✓' : 'Copiază linkul'}</strong>
                       <small>Lipește-l oriunde dorești</small>
                     </span>
                   </button>
+
+                  <button type="button" className={`${styles.shareOption} ${styles.shareDanger}`} onClick={revokeShareLink} disabled={shareBusy || !share.token || share.revoked}>
+                    <span className={styles.shareOptionIcon}><IconSlash /></span>
+                    <span className={styles.shareOptionText}>
+                      <strong>Dezactiveaza link</strong>
+                      <small>Linkul trimis nu va mai putea fi accesat</small>
+                    </span>
+                  </button>
                 </div>
-                {share.expiresAt && (
+                {share.expiresAt && !share.revoked && (
                   <p className={styles.shareHint}>Link securizat, valabil până la {formatExpiry(share.expiresAt)}.</p>
                 )}
               </>
@@ -600,6 +925,19 @@ export default function TreatmentPlansTab({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={pendingDeletePlan !== null}
+        title="Sterge planul?"
+        message={pendingDeletePlan ? `Plan #${pendingDeletePlan.id} va fi sters din lista pacientului. PDF-ul atasat ramane in fisierele pacientului, daca exista.` : ''}
+        confirmLabel="Sterge"
+        cancelLabel="Renunta"
+        tone="danger"
+        onClose={() => setPendingDeletePlan(null)}
+        onConfirm={async () => {
+          if (pendingDeletePlan) await deletePlan(pendingDeletePlan);
+        }}
+      />
     </div>
   );
 }

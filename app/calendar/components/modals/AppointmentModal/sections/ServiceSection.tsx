@@ -293,7 +293,7 @@ function ServiceSectionEditable({
                     }}
                     disabled={disabled}
                     aria-label={`Elimina ${service.name}`}
-                    title="Elimina"
+                    data-tooltip="Elimina"
                   >
                     ×
                   </button>

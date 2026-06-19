@@ -56,10 +56,10 @@ describe('resolveAppointmentColor', () => {
 });
 
 describe('getAppointmentBlockStyle', () => {
-  it('keeps the default style pastel with a darker edge', () => {
+  it('keeps the default style solid with a darker edge', () => {
     expect(getAppointmentBlockStyle('#3b82f6', 'light')).toMatchObject({
-      borderColor: 'color-mix(in srgb, #3b82f6 85%, black 15%)',
-      bodyColor: 'color-mix(in srgb, #3b82f6 15%, var(--color-bg) 85%)',
+      borderColor: 'color-mix(in srgb, #3b82f6 80%, black 20%)',
+      bodyColor: '#3b82f6',
     });
   });
 

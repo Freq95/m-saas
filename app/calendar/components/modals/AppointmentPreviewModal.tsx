@@ -60,7 +60,7 @@ export function AppointmentPreviewModal({
             <h2 className={styles.previewTitle}>{appointment.client_name}</h2>
             {subtitleText && <p className={styles.previewSubtitle}>{subtitleText}</p>}
           </div>
-          <button className={styles.closeButton} onClick={onClose}>
+          <button className={styles.closeButton} onClick={onClose} aria-label="Inchide" data-tooltip="Inchide">
             x
           </button>
         </div>

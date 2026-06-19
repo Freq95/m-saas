@@ -1754,7 +1754,7 @@ export default function InboxPageClient({
               onClick={syncInbox}
               disabled={syncing}
               aria-label={syncing ? 'Sincronizare inbox' : 'Sincronizeaza Inbox'}
-              title={syncing ? 'Sincronizare inbox' : 'Sincronizeaza Inbox'}
+              data-tooltip={syncing ? 'Sincronizare inbox' : 'Sincronizeaza Inbox'}
             >
               <span className={styles.syncButtonInner}>
                 <span className={styles.syncIcon} aria-hidden="true">
@@ -1790,7 +1790,7 @@ export default function InboxPageClient({
                 className={`${styles.filterButton}${attachmentsOnly ? ` ${styles.filterButtonActive}` : ''}`}
                 onClick={() => setAttachmentsOnly((prev) => !prev)}
                 aria-label={attachmentsOnly ? 'Arata toate emailurile' : 'Doar cu atasamente'}
-                title={attachmentsOnly ? 'Arata toate emailurile' : 'Doar cu atasamente'}
+                data-tooltip={attachmentsOnly ? 'Arata toate emailurile' : 'Doar cu atasamente'}
               >
                 <span className={styles.filterButtonIcon} aria-hidden="true">
                   <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
@@ -2242,7 +2242,7 @@ export default function InboxPageClient({
                             }}
                             disabled={isRemoving || isSavingSelection}
                             aria-label={`Elimina fisierul pentru ${clientName}`}
-                            title={`Elimina pentru ${clientName}`}
+                            data-tooltip={`Elimina pentru ${clientName}`}
                           >
                             ×
                           </button>
@@ -2295,7 +2295,7 @@ export default function InboxPageClient({
                   className={styles.modalCloseButton}
                   onClick={closeSaveModal}
                   aria-label="Inchide"
-                  title="Inchide (Esc)"
+                  data-tooltip="Inchide (Esc)"
                 >
                   ✕
                 </button>
@@ -2339,7 +2339,7 @@ export default function InboxPageClient({
                           setClientSearch('');
                         }}
                         aria-label="Sterge selectia pacientului"
-                        title="Sterge selectia"
+                        data-tooltip="Sterge selectia"
                       >
                         ✕
                       </button>

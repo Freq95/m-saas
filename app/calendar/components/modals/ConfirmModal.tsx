@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import styles from '../../page.module.css';
 import { useModal } from '@/lib/useModal';
 import { useFocusRestore } from '@/lib/useFocusRestore';
+import Spinner from '@/components/Spinner';
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -87,7 +88,12 @@ export function ConfirmModal({
             className={tone === 'danger' ? styles.deleteButton : styles.saveButton}
             disabled={isWorking}
           >
-            {isWorking ? 'Se proceseaza...' : confirmLabel}
+            {isWorking ? (
+              <>
+                <Spinner size={14} thickness={2} centered={false} label="Se proceseaza" />
+                <span>Se proceseaza</span>
+              </>
+            ) : confirmLabel}
           </button>
         </div>
       </div>

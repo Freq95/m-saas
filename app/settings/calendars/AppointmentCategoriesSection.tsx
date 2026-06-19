@@ -353,7 +353,7 @@ export function AppointmentCategoriesSection({
                         onClick={() => startEdit(category)}
                         disabled={saving}
                         aria-label={`Editeaza ${category.label}`}
-                        title="Editeaza"
+                        data-tooltip="Editeaza"
                       >
                         <IconEdit />
                       </button>
@@ -366,7 +366,7 @@ export function AppointmentCategoriesSection({
                         }}
                         disabled={saving}
                         aria-label={`Sterge ${category.label}`}
-                        title="Sterge"
+                        data-tooltip="Sterge"
                       >
                         <IconTrash />
                       </button>

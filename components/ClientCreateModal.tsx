@@ -7,6 +7,7 @@ import styles from './ClientCreateModal.module.css';
 import { validatePhoneInput } from '@/lib/phone-validation';
 import { useIsMobile } from '@/lib/useIsMobile';
 import { useFocusRestore } from '@/lib/useFocusRestore';
+import Spinner from '@/components/Spinner';
 
 type ClientPayload = {
   id: number;
@@ -337,7 +338,7 @@ export default function ClientCreateModal({
                   className={`${styles.mobileActionBtn} ${styles.mobileActionBtnPrimary}`}
                   disabled={loading || !formData.name.trim()}
                 >
-                  {loading ? 'Salvare...' : 'Salveaza'}
+                  {loading ? <Spinner size={14} thickness={2} centered={false} label="Salvare" /> : 'Salveaza'}
                 </button>
               </div>
 
@@ -518,7 +519,7 @@ export default function ClientCreateModal({
       <div className={styles.modal} onClick={(event) => event.stopPropagation()}>
         <div className={styles.header}>
           <h2 className={styles.title}>{title}</h2>
-          <button type="button" className={styles.closeButton} onClick={resetAndClose} aria-label="Inchide">
+          <button type="button" className={styles.closeButton} onClick={resetAndClose} aria-label="Inchide" data-tooltip="Inchide">
             x
           </button>
         </div>
@@ -680,7 +681,12 @@ export default function ClientCreateModal({
               Anuleaza
             </button>
             <button type="submit" className={styles.submitButton} disabled={loading || !formData.name.trim()}>
-              {loading ? 'Se salveaza...' : resolvedSubmitLabel}
+              {loading ? (
+                <>
+                  <Spinner size={14} thickness={2} centered={false} label="Se salveaza" />
+                  <span>Se salveaza</span>
+                </>
+              ) : resolvedSubmitLabel}
             </button>
           </div>
         </form>

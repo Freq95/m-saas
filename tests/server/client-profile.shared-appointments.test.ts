@@ -48,12 +48,12 @@ function collectionFor(items: Doc[]) {
     findOne: vi.fn(async (filter: Doc) => items.find((item) => matchesFilter(item, filter)) ?? null),
     find: vi.fn((filter: Doc) => {
       const rows = items.filter((item) => matchesFilter(item, filter));
-      return {
-        sort: vi.fn(() => ({
-          toArray: vi.fn(async () => rows),
-        })),
+      const cursor = {
+        project: vi.fn(() => cursor),
+        sort: vi.fn(() => cursor),
         toArray: vi.fn(async () => rows),
       };
+      return cursor;
     }),
   };
 }

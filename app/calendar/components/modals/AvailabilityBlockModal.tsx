@@ -6,6 +6,7 @@ import { ro } from 'date-fns/locale';
 import styles from '../../page.module.css';
 import type { AvailabilityBlock } from '../../hooks';
 import { ConfirmModal } from './ConfirmModal';
+import Spinner from '@/components/Spinner';
 
 export interface AvailabilityBlockFormData {
   id?: number;
@@ -154,7 +155,7 @@ export function AvailabilityBlockModal({
       <div className={`${styles.modal} ${styles.createSheet}`} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={title}>
         <div className={styles.modalHeader}>
           <h3>{title}</h3>
-          <button type="button" className={styles.modalIconButton} onClick={onClose} disabled={busy} aria-label="Inchide">x</button>
+          <button type="button" className={styles.modalIconButton} onClick={onClose} disabled={busy} aria-label="Inchide" data-tooltip="Inchide">x</button>
         </div>
 
         <div className={styles.modalContent}>
@@ -233,7 +234,14 @@ export function AvailabilityBlockModal({
           )}
           <button type="button" className={styles.cancelButton} onClick={onClose} disabled={busy}>{readOnly ? 'Inchide' : 'Renunta'}</button>
           {!readOnly && (
-            <button type="button" className={styles.saveButton} onClick={submit} disabled={busy}>{busy ? 'Se salveaza...' : 'Salveaza'}</button>
+            <button type="button" className={styles.saveButton} onClick={submit} disabled={busy}>
+              {busy ? (
+                <>
+                  <Spinner size={14} thickness={2} centered={false} label="Se salveaza" />
+                  <span>Se salveaza</span>
+                </>
+              ) : 'Salveaza'}
+            </button>
           )}
         </div>
       </div>

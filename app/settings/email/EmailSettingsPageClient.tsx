@@ -548,7 +548,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId, isOwner 
                           className={styles.iconButton}
                           onClick={() => testConnection(yahooIntegration.id)}
                           disabled={testing === yahooIntegration.id || fetchingEmail === yahooIntegration.id || deleting === yahooIntegration.id}
-                          title="Test conexiune"
+                          data-tooltip="Test conexiune"
                           aria-label="Test Yahoo Mail connection"
                         >
                           {testing === yahooIntegration.id ? <IconClock /> : <IconWifi />}
@@ -557,7 +557,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId, isOwner 
                           className={styles.iconButton}
                           onClick={() => fetchLastEmail(yahooIntegration.id)}
                           disabled={testing === yahooIntegration.id || fetchingEmail === yahooIntegration.id || deleting === yahooIntegration.id}
-                          title="Preia ultimul email"
+                          data-tooltip="Preia ultimul email"
                           aria-label="Fetch last email from Yahoo Mail"
                         >
                           {fetchingEmail === yahooIntegration.id ? <IconClock /> : <IconRefresh />}
@@ -566,7 +566,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId, isOwner 
                           className={styles.iconButtonDanger}
                           onClick={() => setDisconnectTargetId(yahooIntegration.id)}
                           disabled={testing === yahooIntegration.id || fetchingEmail === yahooIntegration.id || deleting === yahooIntegration.id}
-                          title="Deconectează"
+                          data-tooltip="Deconecteaza"
                           aria-label="Disconnect Yahoo Mail"
                         >
                           <IconX />
@@ -625,7 +625,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId, isOwner 
                           className={styles.iconButton}
                           onClick={() => testConnection(gmailIntegration.id)}
                           disabled={testing === gmailIntegration.id || fetchingEmail === gmailIntegration.id || deleting === gmailIntegration.id}
-                          title="Test conexiune"
+                          data-tooltip="Test conexiune"
                           aria-label="Test Gmail connection"
                         >
                           {testing === gmailIntegration.id ? <IconClock /> : <IconWifi />}
@@ -634,7 +634,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId, isOwner 
                           className={styles.iconButton}
                           onClick={() => fetchLastEmail(gmailIntegration.id)}
                           disabled={testing === gmailIntegration.id || fetchingEmail === gmailIntegration.id || deleting === gmailIntegration.id}
-                          title="Preia ultimul email"
+                          data-tooltip="Preia ultimul email"
                           aria-label="Fetch last Gmail email"
                         >
                           {fetchingEmail === gmailIntegration.id ? <IconClock /> : <IconRefresh />}
@@ -643,7 +643,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId, isOwner 
                           className={styles.iconButtonDanger}
                           onClick={() => setDisconnectTargetId(gmailIntegration.id)}
                           disabled={testing === gmailIntegration.id || fetchingEmail === gmailIntegration.id || deleting === gmailIntegration.id}
-                          title="Deconectează"
+                          data-tooltip="Deconecteaza"
                           aria-label="Disconnect Gmail"
                         >
                           <IconX />
@@ -777,8 +777,8 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId, isOwner 
               <button
                 onClick={() => setLastEmailByIntegration((prev) => ({ ...prev, [yahooIntegration.id]: null }))}
                 className={styles.closeButton}
-                title="Închide"
                 aria-label="Close email preview"
+                data-tooltip="Inchide"
               >
                 <IconX />
               </button>
@@ -812,8 +812,8 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId, isOwner 
               <button
                 onClick={() => setLastEmailByIntegration((prev) => ({ ...prev, [gmailIntegration.id]: null }))}
                 className={styles.closeButton}
-                title="Închide"
                 aria-label="Close email preview"
+                data-tooltip="Inchide"
               >
                 <IconX />
               </button>

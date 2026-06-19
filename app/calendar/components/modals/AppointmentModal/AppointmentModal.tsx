@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import Link from 'next/link';
 import { Drawer } from 'vaul';
 import styles from '../../../page.module.css';
 import m from './MobileAppointmentSheet.module.css';
@@ -22,6 +23,7 @@ import { useAppointmentSubmit } from './useAppointmentSubmit';
 import { useClientSuggestions } from './useClientSuggestions';
 import { useDentistServices } from './useDentistServices';
 import { useIsMobile } from '@/lib/useIsMobile';
+import Spinner from '@/components/Spinner';
 import { useModal } from '@/lib/useModal';
 import { useFocusRestore } from '@/lib/useFocusRestore';
 import NumberStepper from '@/components/NumberStepper';
@@ -78,6 +80,8 @@ interface AppointmentModalProps {
    *  We show a banner so the dentist knows edits/deletes default to "this one only". */
   isRecurringInstance?: boolean;
   onModeChange?: (mode: AppointmentModalMode) => void;
+  patientProfileHref?: string | null;
+  newTreatmentPlanHref?: string | null;
   onDelete?: () => void;
   onClose: () => void;
   onSubmit: (payload: AppointmentFormPayload) => Promise<void>;
@@ -105,6 +109,8 @@ export function AppointmentModal({
   canDelete = true,
   isRecurringInstance = false,
   onModeChange,
+  patientProfileHref = null,
+  newTreatmentPlanHref = null,
   onDelete,
   onClose,
   onSubmit,
@@ -509,6 +515,8 @@ export function AppointmentModal({
           clientDropdownOpen={clientDropdownOpen}
           onClose={onClose}
           onModeChange={onModeChange}
+          patientProfileHref={patientProfileHref}
+          newTreatmentPlanHref={newTreatmentPlanHref}
           onDelete={onDelete}
           onSubmit={handleSubmit}
         />
@@ -533,13 +541,33 @@ export function AppointmentModal({
         <div className={styles.modalHeader}>
           <h3>{resolvedTitle}</h3>
           <div className={styles.modalHeaderActions}>
+            {mode === 'view' && patientProfileHref && (
+              <Link
+                href={patientProfileHref}
+                className={styles.modalIconButton}
+                aria-label="Deschide fisa pacientului"
+                data-tooltip="Deschide fisa pacientului"
+              >
+                <UserIcon />
+              </Link>
+            )}
+            {mode === 'view' && newTreatmentPlanHref && (
+              <Link
+                href={newTreatmentPlanHref}
+                className={styles.modalIconButton}
+                aria-label="Plan nou"
+                data-tooltip="Plan nou"
+              >
+                <PlanIcon />
+              </Link>
+            )}
             {mode === 'view' && canEdit && onModeChange && (
               <button
                 type="button"
                 className={styles.modalIconButton}
                 onClick={() => onModeChange('edit')}
                 aria-label="Editeaza"
-                title="Editeaza"
+                data-tooltip="Editeaza"
               >
                 <svg
                   width="15"
@@ -563,7 +591,7 @@ export function AppointmentModal({
                 className={`${styles.modalIconButton} ${styles.modalIconButtonDanger}`}
                 onClick={onDelete}
                 aria-label="Sterge"
-                title="Sterge"
+                data-tooltip="Sterge"
               >
                 <svg
                   width="15"
@@ -589,6 +617,7 @@ export function AppointmentModal({
               className={styles.closeButton}
               onClick={onClose}
               aria-label="Inchide"
+              data-tooltip="Inchide"
               disabled={isSubmitting}
             >
               ×
@@ -766,7 +795,12 @@ export function AppointmentModal({
                   className={styles.saveButton}
                   disabled={isSubmitting || noWritableCalendars}
                 >
-                  {isSubmitting ? 'Se salveaza...' : resolvedSubmitLabel}
+                  {isSubmitting ? (
+                    <>
+                      <Spinner size={14} thickness={2} centered={false} label="Se salveaza" />
+                      <span>Se salveaza</span>
+                    </>
+                  ) : resolvedSubmitLabel}
                 </button>
               </div>
             )}
@@ -821,6 +855,8 @@ interface MobileSheetProps {
   clientDropdownOpen: boolean;
   onClose: () => void;
   onModeChange?: (mode: AppointmentModalMode) => void;
+  patientProfileHref?: string | null;
+  newTreatmentPlanHref?: string | null;
   onDelete?: () => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }
@@ -836,7 +872,7 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
     isOwnDentist, showCategoryPicker, numericCalendarId, numericDentistUserId,
     lockCalendarSelection,
     expandedRow, toggleExpanded, setClientDropdownOpen, clientDropdownOpen,
-    onClose, onModeChange, onDelete, onSubmit,
+    onClose, onModeChange, patientProfileHref, newTreatmentPlanHref, onDelete, onSubmit,
   } = props;
 
   // Multi-service: resolve the selected services in user-defined order.
@@ -848,6 +884,14 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
       .filter((s): s is AppointmentService => Boolean(s));
   }, [effectiveServices, state.serviceIds]);
   const selectedService = selectedServices[0] || null;
+  const [showActionMenu, setShowActionMenu] = useState(false);
+  const hasMobileActions = Boolean(
+    patientProfileHref || newTreatmentPlanHref || (canEdit && onModeChange) || (canDelete && onDelete)
+  );
+
+  useEffect(() => {
+    if (!readOnly) setShowActionMenu(false);
+  }, [readOnly]);
 
   // ── Service search + alphabetical sort (mobile) ──────────────────────────
   // Free-text query the user types to narrow the service list. The list is
@@ -977,26 +1021,18 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
 
               {readOnly ? (
                 <div className={m.headerActionGroup}>
-                  {canEdit && onModeChange && (
+                  {hasMobileActions ? (
                     <button
                       type="button"
                       className={m.iconHeaderBtn}
-                      onClick={() => onModeChange('edit')}
-                      aria-label="Editeaza"
+                      onClick={() => setShowActionMenu((open) => !open)}
+                      aria-label="Actiuni programare"
+                      aria-expanded={showActionMenu}
+                      aria-controls="mobile-appointment-actions"
                     >
-                      <EditIcon />
+                      <MoreIcon />
                     </button>
-                  )}
-                  {canDelete && onDelete && (
-                    <button
-                      type="button"
-                      className={`${m.iconHeaderBtn} ${m.iconHeaderBtnDanger}`}
-                      onClick={onDelete}
-                      aria-label="Sterge"
-                    >
-                      <TrashIcon />
-                    </button>
-                  )}
+                  ) : <span aria-hidden style={{ width: 34 }} />}
                 </div>
               ) : (
                 <button
@@ -1004,13 +1040,42 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
                   className={`${m.actionBtn} ${m.actionBtnPrimary}`}
                   disabled={isSubmitting || noWritableCalendars}
                 >
-                  {isSubmitting ? 'Salvare...' : 'Salveaza'}
+                  {isSubmitting ? <Spinner size={14} thickness={2} centered={false} label="Salvare" /> : 'Salveaza'}
                 </button>
               )}
             </div>
 
             {/* ── Body ── */}
             <div className={m.body}>
+              {readOnly && showActionMenu && (
+                <div id="mobile-appointment-actions" className={m.mobileActionMenu} role="menu" aria-label="Actiuni programare">
+                  {patientProfileHref && (
+                    <Link href={patientProfileHref} className={m.mobileActionItem} role="menuitem" onClick={() => setShowActionMenu(false)}>
+                      <span className={m.mobileActionIcon}><UserIcon /></span>
+                      <span>Deschide fisa pacientului</span>
+                    </Link>
+                  )}
+                  {newTreatmentPlanHref && (
+                    <Link href={newTreatmentPlanHref} className={m.mobileActionItem} role="menuitem" onClick={() => setShowActionMenu(false)}>
+                      <span className={m.mobileActionIcon}><PlanIcon /></span>
+                      <span>Plan nou</span>
+                    </Link>
+                  )}
+                  {canEdit && onModeChange && (
+                    <button type="button" className={m.mobileActionItem} role="menuitem" onClick={() => { setShowActionMenu(false); onModeChange('edit'); }}>
+                      <span className={m.mobileActionIcon}><EditIcon /></span>
+                      <span>Editeaza</span>
+                    </button>
+                  )}
+                  {canDelete && onDelete && (
+                    <button type="button" className={`${m.mobileActionItem} ${m.mobileActionItemDanger}`} role="menuitem" onClick={() => { setShowActionMenu(false); onDelete(); }}>
+                      <span className={m.mobileActionIcon}><TrashIcon /></span>
+                      <span>Sterge</span>
+                    </button>
+                  )}
+                </div>
+              )}
+
               {state.error && (
                 <div className={m.error} role="alert">{state.error}</div>
               )}
@@ -1559,6 +1624,27 @@ function UserIcon() {
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
+function PlanIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6" />
+      <path d="M12 12v6" />
+      <path d="M9 15h6" />
+    </svg>
+  );
+}
+
+function MoreIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <circle cx="5" cy="12" r="1.8" />
+      <circle cx="12" cy="12" r="1.8" />
+      <circle cx="19" cy="12" r="1.8" />
     </svg>
   );
 }

@@ -314,6 +314,7 @@ export function ShareCalendarModal({
             className={styles.modalIconButton}
             onClick={requestClose}
             aria-label="Inchide"
+            data-tooltip="Inchide"
           >
             <IconX />
           </button>
@@ -391,7 +392,12 @@ export function ShareCalendarModal({
                 onClick={handleSubmit}
                 disabled={isSubmitting}
               >
-                {isSubmitting ? 'Se salveaza...' : isEditing ? 'Actualizeaza' : 'Trimite invitatia'}
+                {isSubmitting ? (
+                  <>
+                    <Spinner size={14} thickness={2} centered={false} label="Se salveaza" />
+                    <span>Se salveaza</span>
+                  </>
+                ) : isEditing ? 'Actualizeaza' : 'Trimite invitatia'}
               </button>
             </div>
           </section>
@@ -453,8 +459,8 @@ export function ShareCalendarModal({
                               className={styles.secondaryInlineAction}
                               onClick={() => handleEditShare(share)}
                               disabled={!activeShare || processingShareId === share.id || isSubmitting}
-                              title="Editeaza permisiunile"
                               aria-label={`Editeaza ${share.shared_with_email}`}
+                              data-tooltip="Editeaza permisiunile"
                             >
                               <IconEdit />
                             </button>
@@ -463,10 +469,12 @@ export function ShareCalendarModal({
                               className={styles.dangerInlineAction}
                               onClick={() => handleDeleteShare(share)}
                               disabled={processingShareId === share.id || isSubmitting}
-                              title={share.status === 'accepted' ? 'Revoca accesul' : 'Sterge invitatia'}
                               aria-label={share.status === 'accepted' ? `Revoca ${share.shared_with_email}` : `Sterge invitatia pentru ${share.shared_with_email}`}
+                              data-tooltip={share.status === 'accepted' ? 'Revoca accesul' : 'Sterge invitatia'}
                             >
-                              {processingShareId === share.id ? '...' : share.status === 'accepted' ? 'Revoca' : 'Sterge'}
+                              {processingShareId === share.id ? (
+                                <Spinner size={14} thickness={2} centered={false} label="Se proceseaza" />
+                              ) : share.status === 'accepted' ? 'Revoca' : 'Sterge'}
                             </button>
                           </div>
                         </td>

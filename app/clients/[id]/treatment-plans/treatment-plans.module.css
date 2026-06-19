@@ -46,10 +46,10 @@
 
 .primaryButton,
 .secondaryButton,
+.rowPrimaryAction,
 .actions button,
 .actions a,
 .rowActions button,
-.moreMenu summary,
 .moreMenu button,
 .moreMenu a,
 .iconButton {
@@ -75,6 +75,7 @@
   width: 36px;
   min-width: 36px;
   padding: 0;
+  border-radius: 10px;
 }
 
 /* Icons must never be shrunk by their flex button — without an explicit size +
@@ -96,21 +97,24 @@
   color: var(--color-text-on-accent);
 }
 
-/* Full-width "Salvează și trimite" CTA at the bottom of the mobile sheet. */
-.fullWidthBtn {
-  width: 100%;
-  margin-top: var(--space-4);
-}
-
 .primaryButton:hover:not(:disabled) {
   background: var(--color-accent-strong);
 }
 
+.dangerButton {
+  background: var(--color-danger, #b42318);
+  color: #fff;
+}
+
+.dangerButton:hover:not(:disabled) {
+  background: var(--color-danger-strong, #912018);
+}
+
 .secondaryButton,
+.rowPrimaryAction,
 .actions button,
 .actions a,
 .rowActions button,
-.moreMenu summary,
 .moreMenu button,
 .moreMenu a,
 .iconButton {
@@ -120,10 +124,10 @@
 }
 
 .secondaryButton:hover:not(:disabled),
+.rowPrimaryAction:hover:not(:disabled),
 .actions button:hover:not(:disabled),
 .actions a:hover,
 .rowActions button:hover:not(:disabled),
-.moreMenu summary:hover,
 .moreMenu button:hover:not(:disabled),
 .moreMenu a:hover,
 .iconButton:hover {
@@ -136,8 +140,22 @@
   color: var(--color-danger-text) !important;
 }
 
+.rowPrimaryAction {
+  min-width: 86px;
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+}
+
+.rowPrimaryActionIcon {
+  width: 36px;
+  min-width: 36px;
+  padding: 0;
+}
+
 .primaryButton:disabled,
 .secondaryButton:disabled,
+.rowPrimaryAction:disabled,
 .actions button:disabled,
 .rowActions button:disabled,
 .moreMenu button:disabled {
@@ -146,6 +164,8 @@
 }
 
 .loading {
+  display: flex;
+  justify-content: center;
   padding: var(--space-10) 0;
   color: var(--color-text-soft);
   font-size: var(--text-sm);
@@ -201,7 +221,7 @@
 
 .listHeader {
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr) 110px minmax(230px, auto);
+  grid-template-columns: 116px minmax(0, 1fr) 108px minmax(148px, auto);
   gap: var(--space-4);
   padding: 0 0 var(--space-3);
   border-bottom: 1px solid var(--color-border);
@@ -218,11 +238,12 @@
 
 .planRow {
   display: grid;
-  grid-template-columns: 120px minmax(0, 1fr) 110px minmax(230px, auto);
+  grid-template-columns: 116px minmax(0, 1fr) 108px minmax(148px, auto);
   gap: var(--space-4);
   align-items: center;
-  padding: var(--space-3) 0;
+  padding: var(--space-3) var(--space-2);
   border-bottom: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
 }
 
 .planRow:hover {
@@ -244,8 +265,9 @@
 
 .planMain strong {
   color: var(--color-text);
-  font-size: var(--text-sm);
-  font-weight: 650;
+  font-size: 0.92rem;
+  font-weight: 720;
+  letter-spacing: -0.01em;
 }
 
 .planMain span {
@@ -296,19 +318,11 @@
   display: flex;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
 .moreMenu {
   position: relative;
-}
-
-.moreMenu summary {
-  list-style: none;
-}
-
-.moreMenu summary::-webkit-details-marker {
-  display: none;
 }
 
 .moreMenu > div {
@@ -336,15 +350,6 @@
   text-align: left;
 }
 
-.builder {
-  display: grid;
-  gap: var(--space-5);
-  padding: var(--space-5);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-}
-
 /* Inner content shared by the desktop dialog and the mobile bottom sheet. */
 .builderBody {
   display: grid;
@@ -360,21 +365,18 @@
   font-size: var(--text-sm);
 }
 
+.sourceNote {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-soft);
+  font-size: var(--text-sm);
+}
+
 .sheetPad {
   padding: var(--space-4) var(--space-4) calc(env(safe-area-inset-bottom) + var(--space-6));
-}
-
-.headerActions {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
-.sentMeta {
-  color: var(--color-text-soft);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
 }
 
 .builderGrid,
@@ -462,19 +464,30 @@
   grid-template-columns: minmax(0, 1fr) 58px 104px 92px;
   gap: var(--space-2) var(--space-3);
   align-items: center;
-  padding: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
-  transition: background var(--transition-fast);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
 .itemRow:hover {
   background: color-mix(in srgb, var(--color-text) 3.5%, transparent);
+  border-color: var(--color-border);
 }
 
 .itemMain {
   grid-column: 1;
   grid-row: 1;
   min-width: 0;
+}
+
+.cellField {
+  display: block;
+  min-width: 0;
+}
+
+.cellField > span {
+  display: none;
 }
 
 .cellInput {
@@ -545,23 +558,18 @@
 }
 
 .rowActions .actionIcon {
-  width: 30px;
-  min-width: 30px;
-  height: 30px;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
   padding: 0;
-  background: transparent;
-  border-color: transparent;
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
   color: var(--color-text-soft);
-  opacity: 0.5;
-}
-
-.itemRow:hover .rowActions .actionIcon {
-  opacity: 1;
 }
 
 .rowActions .actionIcon:hover:not(:disabled) {
   background: var(--color-surface-strong);
-  border-color: var(--color-border);
+  border-color: var(--color-border-strong);
   color: var(--color-text);
 }
 
@@ -692,10 +700,8 @@
   animation: fadeIn 180ms ease-out;
 }
 
-.emailModal {
-  width: min(520px, 100%);
-  max-height: min(720px, calc(100vh - 32px));
-  overflow: auto;
+.confirmModal {
+  width: min(420px, 100%);
   display: grid;
   gap: var(--space-4);
   border: 1px solid var(--color-border-strong);
@@ -731,10 +737,12 @@
 }
 
 .iconButton {
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
   padding: 0;
-  border-radius: var(--radius-xs);
+  border-radius: 10px;
 }
 
 .checkboxField {
@@ -760,24 +768,126 @@
 
 /* ── Share sheet (WhatsApp / Email / Copy) ─────────────────── */
 .shareSheet {
-  width: min(440px, 100%);
+  width: min(420px, 100%);
   max-height: min(720px, calc(100vh - 32px));
   overflow: auto;
   display: grid;
-  gap: var(--space-3);
+  gap: var(--space-2);
   border: 1px solid var(--color-border-strong);
   border-radius: var(--radius-lg);
   background: var(--color-surface-strong);
   box-shadow: var(--shadow-lg);
-  padding: var(--space-5);
+  padding: var(--space-4);
   animation: slideUp 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .shareLoading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
   padding: var(--space-6) var(--space-2);
-  text-align: center;
   color: var(--color-text-soft);
   font-size: var(--text-sm);
+}
+
+.shareStatus {
+  display: grid;
+  grid-template-columns: 30px 1fr;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+
+.shareStatusIcon {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+
+.shareStatus strong,
+.shareStatus small {
+  display: block;
+}
+
+.shareStatus strong {
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.shareStatus small {
+  margin-top: 2px;
+  color: var(--color-text-soft);
+  font-size: 0.78rem;
+}
+
+.shareStatusActive .shareStatusIcon {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+.shareStatusRevoked .shareStatusIcon {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
+.shareReadiness {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-surface) 80%, transparent);
+}
+
+.shareReadiness span {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: 0.78rem;
+}
+
+.shareReadiness svg {
+  width: 14px;
+  height: 14px;
+}
+
+.readyItemOk {
+  color: var(--color-success-text);
+}
+
+.readyItemMissing {
+  color: var(--color-text-soft);
+}
+
+.shareFixHint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-soft);
+  font-size: 0.78rem;
+}
+
+.shareFixHint a {
+  flex-shrink: 0;
+  color: var(--color-accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.shareFixHint a:hover {
+  text-decoration: underline;
 }
 
 .shareOptions {
@@ -788,11 +898,12 @@
 .shareOption {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   width: 100%;
-  padding: var(--space-3) var(--space-4);
+  min-height: 52px;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: 10px;
   background: var(--color-surface);
   color: var(--color-text);
   text-align: left;
@@ -815,9 +926,9 @@
   flex-shrink: 0;
   display: grid;
   place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: var(--radius-md);
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   background: var(--color-surface-muted);
   color: var(--color-text-soft);
 }
@@ -825,6 +936,15 @@
 .shareWhatsapp .shareOptionIcon {
   background: #25d366;
   color: #fff;
+}
+
+.shareDanger .shareOptionIcon {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
+.shareDanger:hover:not(:disabled) {
+  border-color: var(--color-danger-border);
 }
 
 .shareOptionText {
@@ -922,10 +1042,6 @@
     display: none;
   }
 
-  .builder {
-    padding: var(--space-4);
-  }
-
   .itemRow {
     grid-template-columns: 1fr 1fr;
     gap: var(--space-2) var(--space-3);
@@ -944,6 +1060,21 @@
 
   .cellRight {
     grid-row: auto;
+  }
+
+  .cellField {
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .cellField > span {
+    display: block;
+    color: var(--color-text-soft);
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 
   .rowActions {
@@ -984,12 +1115,17 @@
   }
 
   .actions button.actionIcon,
-  .moreMenu summary.actionIcon {
+  .moreMenu .actionIcon {
     width: 36px;
   }
 
   .moreMenu > div {
     width: 100%;
+  }
+
+  .shareFixHint {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .modalBackdrop {
@@ -998,7 +1134,6 @@
     background: rgba(0, 0, 0, 0.65);
   }
 
-  .emailModal,
   .shareSheet {
     width: 100%;
     max-height: 92dvh;

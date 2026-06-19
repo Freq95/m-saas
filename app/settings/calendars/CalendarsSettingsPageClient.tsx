@@ -378,7 +378,7 @@ export default function CalendarsSettingsPageClient({
               className={sharedStyles.primaryButton}
               onClick={openCreateCalendarModal}
               disabled={!canManageCalendars}
-              title={canManageCalendars ? undefined : 'Doar ownerul poate crea calendare'}
+              data-tooltip={canManageCalendars ? undefined : 'Doar ownerul poate crea calendare'}
             >
               + Calendar
             </button>
@@ -411,8 +411,8 @@ export default function CalendarsSettingsPageClient({
                             type="button"
                             className={styles.iconButton}
                             onClick={() => openEditCalendarModal(calendar.id)}
-                            title="Redenumeste"
                             aria-label={`Redenumeste ${calendar.name}`}
+                            data-tooltip="Redenumeste"
                           >
                             <IconEdit />
                           </button>
@@ -421,8 +421,8 @@ export default function CalendarsSettingsPageClient({
                               type="button"
                               className={styles.iconButton}
                               onClick={() => openShareCalendarModal(calendar.id)}
-                              title="Partajare"
                               aria-label={`Partajeaza ${calendar.name}`}
+                              data-tooltip="Partajare"
                             >
                               <IconShare />
                             </button>
@@ -481,8 +481,8 @@ export default function CalendarsSettingsPageClient({
                               }
                             }}
                             disabled={!calendar.shareId || removingShareId === calendar.shareId}
-                            title="Paraseste calendarul"
                             aria-label={`Paraseste ${calendar.name}`}
+                            data-tooltip="Paraseste calendarul"
                           >
                             <IconLeave />
                           </button>
@@ -573,8 +573,8 @@ export default function CalendarsSettingsPageClient({
                           className={styles.iconButtonDanger}
                           onClick={() => handleRevokeSentShare(share)}
                           disabled={revokingShareId === share.id}
-                          title="Revoca invitatia"
                           aria-label={`Revoca invitatia pentru ${share.shared_with_email}`}
+                          data-tooltip="Revoca invitatia"
                         >
                           <IconX />
                         </button>
@@ -608,8 +608,8 @@ export default function CalendarsSettingsPageClient({
                             className={styles.iconButtonDanger}
                             onClick={() => handleDeclinePendingShare(share.id)}
                             disabled={actionShareId === share.id}
-                            title="Refuza"
                             aria-label={`Refuza invitatia la ${share.calendar.name}`}
+                            data-tooltip="Refuza"
                           >
                             <IconX />
                           </button>

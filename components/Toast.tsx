@@ -55,6 +55,7 @@ export function ToastComponent({ toast, onClose }: ToastProps) {
         className={styles.closeButton}
         onClick={() => onClose(toast.id)}
         aria-label="Close notification"
+        data-tooltip="Inchide"
       >
         ×
       </button>
@@ -86,4 +87,3 @@ export function ToastContainer({ toasts, onClose }: ToastContainerProps) {
     document.body
   );
 }
-

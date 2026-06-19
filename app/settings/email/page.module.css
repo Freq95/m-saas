@@ -130,21 +130,24 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
   padding: 0;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
   color: var(--color-text-soft);
   cursor: pointer;
-  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast), transform var(--transition-fast);
 }
 
 .iconButton:hover:not(:disabled) {
   color: var(--color-text);
-  background: var(--color-surface-muted);
-  border-color: var(--color-border);
+  background: var(--color-surface-strong);
+  border-color: var(--color-border-strong);
+  transform: translateY(-1px);
 }
 
 .iconButton:disabled {
@@ -156,20 +159,23 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
   padding: 0;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  color: var(--color-danger);
+  background: var(--color-surface-muted);
+  border: 1px solid color-mix(in srgb, var(--color-danger-text) 32%, var(--color-border));
+  border-radius: 10px;
+  color: var(--color-danger-text);
   cursor: pointer;
-  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast), opacity var(--transition-fast), transform var(--transition-fast);
 }
 
 .iconButtonDanger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
-  border-color: color-mix(in srgb, var(--color-danger) 30%, transparent);
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
+  transform: translateY(-1px);
 }
 
 .iconButtonDanger:disabled {
@@ -353,20 +359,23 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
   color: var(--color-text-soft);
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .closeButton:hover {
-  background: var(--color-surface-muted);
-  border-color: var(--color-border);
+  background: var(--color-surface-strong);
+  border-color: var(--color-border-strong);
   color: var(--color-text);
+  transform: translateY(-1px);
 }
 
 .emailMeta {
