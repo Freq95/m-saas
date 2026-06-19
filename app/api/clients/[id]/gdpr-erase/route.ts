@@ -174,6 +174,8 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
     recordCount += surgeryGroupsResult.deletedCount;
     const bridgeGroupsResult = await db.collection('bridge_groups').deleteMany({ client_id: clientId, tenant_id: tenantId });
     recordCount += bridgeGroupsResult.deletedCount;
+    const treatmentPlansResult = await db.collection('treatment_plans').deleteMany({ client_id: clientId, tenant_id: tenantId });
+    recordCount += treatmentPlansResult.deletedCount;
 
     // Client record itself
     await db.collection('clients').deleteOne({ id: clientId, tenant_id: tenantId });

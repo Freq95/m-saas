@@ -33,6 +33,7 @@ const TENANT_SCOPED = [
   'client_notes', 'contact_notes', 'client_files', 'contact_files',
   'reminders', 'blocked_times', 'calendars', 'appointment_categories',
   'tooth_states', 'tooth_events', 'surgery_groups', 'bridge_groups',
+  'treatment_plans', 'treatment_plan_settings',
   'notifications', 'message_attachments', 'conversation_tags',
 ];
 

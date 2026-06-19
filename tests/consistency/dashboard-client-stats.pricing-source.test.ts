@@ -139,6 +139,10 @@ describe('dashboard/client stats pricing source consistency', () => {
               });
               return createCursor(rows);
             },
+            // Week-count + weekday-chart + monthly-revenue queries added to the
+            // dashboard; not asserted here, so return benign values.
+            countDocuments: vi.fn(async () => appointments.length),
+            aggregate: vi.fn(() => ({ toArray: async () => [] })),
           };
         }
 

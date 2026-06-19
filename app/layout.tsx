@@ -57,8 +57,8 @@ export default async function RootLayout({
             <rect x="5" y="2" width="14" height="20" rx="2.5" />
             <path d="M12 18h.01" />
           </svg>
-          <div className="landscape-lock-title">Roteste dispozitivul</div>
-          <div className="landscape-lock-sub">Aplicatia este optimizata pentru modul portret.</div>
+          <div className="landscape-lock-title">Rotește dispozitivul</div>
+          <div className="landscape-lock-sub">Aplicația este optimizată pentru modul portret.</div>
         </div>
       </body>
     </html>

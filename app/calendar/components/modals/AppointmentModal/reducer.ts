@@ -161,12 +161,20 @@ export function appointmentFormReducer(
       const next = { ...state };
       if (action.date !== undefined) next.date = action.date;
       if (action.startTime !== undefined) {
+        // Moving the start shifts the end to keep the same duration (standard
+        // calendar behaviour). Otherwise moving the start later silently
+        // shrinks the appointment — e.g. a 60-min slot moved +30m became 30m.
+        const prevDuration = state.startTime && state.endTime
+          ? computeDurationMinutes(state.startTime, state.endTime)
+          : 0;
         next.startTime = action.startTime;
-        // If end time is now <= start, push it forward by 30m
-        if (next.endTime && next.endTime <= action.startTime) {
+        if (prevDuration > 0) {
+          next.endTime = addMinutesToTime(action.startTime, prevDuration);
+        } else if (next.endTime && next.endTime <= action.startTime) {
           next.endTime = addMinutesToTime(action.startTime, DEFAULT_DURATION_MINUTES);
         }
       }
+      // An explicit end-time edit always wins (lets the user change duration).
       if (action.endTime !== undefined) next.endTime = action.endTime;
       return next;
     }

@@ -77,3 +77,14 @@ ui-review-board.html
 
 # Throwaway QA screenshots
 /mobile-service-search-*.png
+/JetBrainsMono-2.304.zip
+/JetBrainsMono-2.304
+/demo-dental-check.png
+/prod-dental-chart.png
+/prod-mobile-service-search.png
+/ls-*.png
+
+# Python bytecode (benchmark tooling lives under scripts/ — keep the source,
+# ignore the compiled artifacts; do NOT blanket-ignore /scripts itself)
+__pycache__/
+*.pyc

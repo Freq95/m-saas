@@ -15,6 +15,7 @@ const HIDDEN_NAV_PREFIXES = [
   '/admin',
   '/privacy',
   '/terms',
+  '/plan', // public patient-facing treatment-plan share page
 ];
 
 export default function AppChrome({

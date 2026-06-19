@@ -69,6 +69,10 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   touch-action: manipulation; /* prevents pinch-to-zoom + double-tap zoom on Android/Chrome */
+  /* Pin text scaling so iOS Safari doesn't inflate font sizes when the device
+     rotates (the "labels get bigger after going landscape→portrait" bug). */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 /* Prevents iOS Safari from zooming in when tapping inputs with small font sizes.

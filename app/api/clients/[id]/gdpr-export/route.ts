@@ -43,6 +43,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       toothEvents,
       surgeryGroups,
       bridgeGroups,
+      treatmentPlans,
     ] = await Promise.all([
       db.collection('appointments').find({ client_id: clientId, tenant_id: tenantId }).sort({ start_time: -1 }).toArray(),
       db.collection('conversations').find({ client_id: clientId, tenant_id: tenantId }).sort({ created_at: -1 }).toArray(),
@@ -55,6 +56,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       db.collection('tooth_events').find({ client_id: clientId, tenant_id: tenantId, deleted_at: { $exists: false } }).sort({ occurred_at: -1 }).toArray(),
       db.collection('surgery_groups').find({ client_id: clientId, tenant_id: tenantId }).sort({ created_at: -1 }).toArray(),
       db.collection('bridge_groups').find({ client_id: clientId, tenant_id: tenantId }).sort({ created_at: -1 }).toArray(),
+      db.collection('treatment_plans').find({ client_id: clientId, tenant_id: tenantId, deleted_at: { $exists: false } }).sort({ created_at: -1 }).toArray(),
     ]);
 
     // Get reminders for this client's appointments
@@ -184,6 +186,27 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
           updated_at: g.updated_at,
         })),
       },
+      treatment_plans: treatmentPlans.map((plan: any) => ({
+        id: plan.id,
+        doctor_name: plan.doctor_name_snapshot || null,
+        plan_date: plan.plan_date,
+        items: (plan.items || []).map((item: any) => ({
+          procedure: item.procedure,
+          details: item.details || null,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          line_total: item.line_total,
+        })),
+        recap: plan.recap || [],
+        total_override: plan.total_override ?? null,
+        total: plan.total,
+        currency: plan.currency,
+        status: plan.status,
+        sent_at: plan.sent_at || null,
+        sent_to_email: plan.sent_to_email || null,
+        created_at: plan.created_at,
+        updated_at: plan.updated_at,
+      })),
     };
 
     // Log the export action

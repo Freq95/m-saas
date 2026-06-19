@@ -1,4 +1,4 @@
-import { format, startOfDay, endOfDay, subDays } from 'date-fns';
+import { format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, addDays, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { ObjectId } from 'mongodb';
 
@@ -8,17 +8,26 @@ type DashboardData = {
   today: {
     messages: number;
     appointments: number;
+    urgentCount: number;
     totalClients: number;
     appointmentsList: Array<{
       id: number;
+      client_id: number | null;
       client_name: string;
       service_name: string;
       start_time: string;
       end_time: string;
       status: string;
+      category: string | null;
+      dentist_name: string | null;
     }>;
   };
+  weekAppointments: number;
+  weekChart: Array<{ label: string; count: number; isToday: boolean }>;
+  monthRevenue: number;
+  monthRevenueDeltaPct: number | null;
   noShowRate: number;
+  noShowDeltaPct: number;
   estimatedRevenue: number;
   clients: {
     topClients: Array<any>;
@@ -76,6 +85,8 @@ export async function getDashboardData(
     const weekStartIso = weekStart.toISOString();
     const growthStartIso = growthStart.toISOString();
     const thirtyDaysAgoIso = thirtyDaysAgo.toISOString();
+    const monthEndIso = endOfMonth(now).toISOString();
+    const lastMonthStartIso = startOfMonth(subMonths(now, 1)).toISOString();
     // Used by the "Pacienti Inactivi" filter so a patient with an upcoming
     // appointment never shows as inactive, regardless of how long ago
     // their last completed visit was.
@@ -101,6 +112,7 @@ export async function getDashboardData(
 
     const appointmentProjection = {
       id: 1,
+      client_id: 1,
       service_id: 1,
       service_name: 1,
       client_name: 1,
@@ -108,6 +120,8 @@ export async function getDashboardData(
       end_time: 1,
       status: 1,
       price_at_time: 1,
+      category: 1,
+      dentist_id: 1,
     };
 
     const appointmentsRangeQuery = db
@@ -131,6 +145,18 @@ export async function getDashboardData(
       .collection('conversations')
       .find(scopeFilter)
       .project({ id: 1 });
+    // This-month + last-month appointments, reduced in-memory with the same
+    // price_at_time → service.price fallback as estimatedRevenue (below) so the
+    // "Venituri · lună" stat isn't undercounted when prices weren't snapshotted.
+    const monthAppointmentsQuery = db
+      .collection('appointments')
+      .find({
+        ...appointmentScopeFilter,
+        deleted_at: { $exists: false },
+        status: { $in: ['scheduled', 'completed'] },
+        start_time: { $gte: lastMonthStartIso, $lte: monthEndIso },
+      })
+      .project({ service_id: 1, price_at_time: 1, start_time: 1 });
     const topClientsQuery = db
       .collection('clients')
       .find({
@@ -218,6 +244,7 @@ export async function getDashboardData(
     const [
       appointmentsInRange,
       todayAppointmentsRaw,
+      monthAppointmentsRaw,
       conversations,
       totalClients,
       topClientsRaw,
@@ -228,6 +255,7 @@ export async function getDashboardData(
     ] = await Promise.all([
       appointmentsRangeQuery.toArray(),
       todayAppointmentsQuery.toArray(),
+      monthAppointmentsQuery.toArray(),
       conversationsQuery.toArray(),
       db.collection('clients').countDocuments(activeClientsFilter),
       topClientsQuery.toArray(),
@@ -311,7 +339,7 @@ export async function getDashboardData(
 
     const serviceIds = Array.from(
       new Set(
-        [...appointmentsInRange, ...todayAppointmentsRaw]
+        [...appointmentsInRange, ...todayAppointmentsRaw, ...monthAppointmentsRaw]
           .map((appointment: any) => appointment.service_id)
           .filter((serviceId: unknown): serviceId is number => typeof serviceId === 'number')
       )
@@ -349,15 +377,108 @@ export async function getDashboardData(
         return sum + price;
       }, 0);
 
+    // Calendar-week appointment count (Mon–Sun) for the "Săptămâna aceasta" card.
+    const calWeekStartIso = startOfWeek(now, { weekStartsOn: 1 }).toISOString();
+    const calWeekEndIso = endOfWeek(now, { weekStartsOn: 1 }).toISOString();
+    const weekAppointments = await db.collection('appointments').countDocuments({
+      ...appointmentScopeFilter,
+      deleted_at: { $exists: false },
+      start_time: { $gte: calWeekStartIso, $lte: calWeekEndIso },
+    });
+
+    // Per-weekday counts for the "Săptămâna aceasta" bar chart (Mon–Sun).
+    const weekRows = await db.collection('appointments').aggregate([
+      {
+        $match: {
+          ...appointmentScopeFilter,
+          deleted_at: { $exists: false },
+          start_time: { $gte: calWeekStartIso, $lte: calWeekEndIso },
+        },
+      },
+      { $group: { _id: { $substrBytes: ['$start_time', 0, 10] }, count: { $sum: 1 } } },
+    ]).toArray();
+    const weekCountByDate = new Map<string, number>();
+    for (const row of weekRows as any[]) {
+      if (typeof row?._id === 'string') weekCountByDate.set(row._id, row.count || 0);
+    }
+    const calWeekStartDate = startOfWeek(now, { weekStartsOn: 1 });
+    const WEEKDAY_LABELS = ['Lu', 'Ma', 'Mi', 'Jo', 'Vi', 'Sâ', 'Du'];
+    const weekChart = WEEKDAY_LABELS.map((label, i) => {
+      const date = format(addDays(calWeekStartDate, i), 'yyyy-MM-dd');
+      return { label, count: weekCountByDate.get(date) || 0, isToday: date === todayStr };
+    });
+
+    // Monthly revenue (this month vs last month) for the "Venituri · lună" stat.
+    const revenueByMonth = new Map<string, number>();
+    for (const appointment of monthAppointmentsRaw as any[]) {
+      if (typeof appointment?.start_time !== 'string') continue;
+      const monthKey = appointment.start_time.slice(0, 7);
+      const service = servicesMap.get(appointment.service_id);
+      const price = typeof appointment.price_at_time === 'number'
+        ? appointment.price_at_time
+        : (typeof service?.price === 'number' ? service.price : 0);
+      revenueByMonth.set(monthKey, (revenueByMonth.get(monthKey) || 0) + price);
+    }
+    const monthRevenue = revenueByMonth.get(format(now, 'yyyy-MM')) || 0;
+    const lastMonthRevenue = revenueByMonth.get(format(subMonths(now, 1), 'yyyy-MM')) || 0;
+    // null when there's no meaningful prior baseline (e.g. a brand-new clinic),
+    // so the UI can omit the badge rather than show a misleading "0%". When a
+    // real baseline exists, clamp so a tiny last month can't yield an absurd %.
+    const monthRevenueDeltaPct = lastMonthRevenue >= 100
+      ? Math.max(-99, Math.min(200, Math.round(((monthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100)))
+      : null;
+
+    // No-show rate change vs the previous 7-day window (percentage points).
+    const prevRangeStartIso = startOfDay(subDays(now, resolvedDays * 2 - 1)).toISOString();
+    const prevRangeEndIso = endOfDay(subDays(now, resolvedDays)).toISOString();
+    const prevRangeAppts = await db.collection('appointments')
+      .find({
+        ...appointmentScopeFilter,
+        deleted_at: { $exists: false },
+        start_time: { $gte: prevRangeStartIso, $lte: prevRangeEndIso },
+      })
+      .project({ status: 1 })
+      .toArray();
+    const prevCountable = (prevRangeAppts as any[]).filter((a: any) =>
+      ['scheduled', 'completed', 'no-show', 'no_show', 'cancelled'].includes(a.status)
+    );
+    const prevNoShows = prevCountable.filter((a: any) => a.status === 'no-show' || a.status === 'no_show').length;
+    const prevNoShowRate = prevCountable.length > 0 ? (prevNoShows / prevCountable.length) * 100 : 0;
+    const noShowDeltaPct = Math.round((noShowRate - prevNoShowRate) * 10) / 10;
+
+    // Resolve dentist display names for today's appointments (multi-dentist clinics).
+    const dentistIds = Array.from(new Set(
+      (todayAppointmentsRaw as any[])
+        .map((a: any) => a.dentist_id)
+        .filter((id: unknown): id is number => typeof id === 'number')
+    ));
+    const dentistDocs = dentistIds.length > 0
+      ? await db.collection('users')
+          .find(
+            tenantId ? { tenant_id: tenantId, id: { $in: dentistIds } } : { id: { $in: dentistIds } },
+            { projection: { id: 1, name: 1 } }
+          )
+          .toArray()
+      : [];
+    const dentistNameById = new Map<number, string>(
+      dentistDocs.map((d: any) => [d.id, typeof d.name === 'string' ? d.name : ''])
+    );
+
+    const urgentCount = (todayAppointmentsRaw as any[])
+      .filter((a: any) => a.category === 'urgenta').length;
+
     const todayAppointments = (todayAppointmentsRaw as any[]).map((appointment: any) => {
       const service = servicesMap.get(appointment.service_id);
       return {
         id: appointment.id,
+        client_id: typeof appointment.client_id === 'number' ? appointment.client_id : null,
         client_name: appointment.client_name,
         service_name: service?.name || (appointment.service_name as string | undefined) || 'Unknown',
         start_time: appointment.start_time,
         end_time: appointment.end_time,
         status: appointment.status === 'no_show' ? 'no-show' : appointment.status,
+        category: typeof appointment.category === 'string' ? appointment.category : null,
+        dentist_name: dentistNameById.get(appointment.dentist_id) || null,
       };
     });
 
@@ -386,10 +507,16 @@ export async function getDashboardData(
       today: {
         messages: messagesToday,
         appointments: todayAppointments.length,
+        urgentCount,
         totalClients,
         appointmentsList: todayAppointments,
       },
+      weekAppointments,
+      weekChart,
+      monthRevenue: Math.round(monthRevenue * 100) / 100,
+      monthRevenueDeltaPct,
       noShowRate: Math.round(noShowRate * 10) / 10,
+      noShowDeltaPct,
       estimatedRevenue: Math.round(estimatedRevenue * 100) / 100,
       clients: {
         topClients,

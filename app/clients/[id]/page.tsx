@@ -18,6 +18,7 @@ export default async function ClientProfilePage({ params }: { params: Promise<{ 
         initialConversations={[]}
         initialStats={null}
         canEditDental={false}
+        canEditTreatmentPlans={false}
       />
     );
   }
@@ -34,11 +35,13 @@ export default async function ClientProfilePage({ params }: { params: Promise<{ 
         initialConversations={[]}
         initialStats={null}
         canEditDental={false}
+        canEditTreatmentPlans={false}
       />
     );
   }
   const stats = scope ? await getClientStatsData(clientId, scope.tenantId, scope.userId) : null;
   const canEditDental = isClinicalRole(auth.role);
+  const canEditTreatmentPlans = isClinicalRole(auth.role);
 
   return (
     <ClientProfileClient
@@ -48,6 +51,7 @@ export default async function ClientProfilePage({ params }: { params: Promise<{ 
       initialConversations={profile.conversations}
       initialStats={stats}
       canEditDental={canEditDental}
+      canEditTreatmentPlans={canEditTreatmentPlans}
     />
   );
 }

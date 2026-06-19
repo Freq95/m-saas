@@ -1,367 +1,3 @@
-.container {
-  min-height: 100vh;
-  background: transparent;
-}
-
-.main {
-  padding: var(--space-7) var(--space-6) var(--space-8);
-  width: min(100%, var(--max-content-width));
-  margin: 0 auto;
-}
-
-.title {
-  font-size: clamp(1.5rem, 1.9vw, 1.85rem);
-  margin-bottom: var(--space-6);
-  color: var(--color-text);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.statsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--space-4);
-  margin-bottom: var(--space-7);
-}
-
-.statCard {
-  background: var(--color-surface);
-  padding: var(--space-5) var(--space-6);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(var(--blur-md));
-  -webkit-backdrop-filter: blur(var(--blur-md));
-  transition: transform var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-.statCard:hover {
-  transform: translateY(-2px);
-  border-color: var(--color-border-strong);
-  box-shadow: var(--shadow-md);
-}
-
-.statLabel {
-  font-size: 0.82rem;
-  color: var(--color-text-muted);
-  margin-bottom: var(--space-2);
-  font-weight: 500;
-  letter-spacing: 0.01em;
-}
-
-.statValue {
-  font-size: clamp(1.55rem, 2.4vw, 1.95rem);
-  font-weight: 700;
-  color: var(--color-text);
-  letter-spacing: -0.03em;
-}
-
-.charts {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: var(--space-5);
-  margin-bottom: var(--space-7);
-}
-
-.chartCard {
-  background: var(--color-surface);
-  padding: var(--space-6);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(var(--blur-md));
-  -webkit-backdrop-filter: blur(var(--blur-md));
-}
-
-.chartCard h3 {
-  font-size: 0.98rem;
-  margin-bottom: var(--space-5);
-  color: var(--color-text);
-  font-weight: 650;
-  letter-spacing: -0.01em;
-}
-
-.barChart {
-  display: flex;
-  align-items: flex-end;
-  gap: var(--space-2);
-  height: 184px;
-  padding: var(--space-2) 0;
-}
-
-.barItem {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.45rem;
-  height: 100%;
-}
-
-.barValue {
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: var(--color-text-muted);
-  order: 1;
-}
-
-.barContainer {
-  flex: 1;
-  width: 100%;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  min-height: 40px;
-  order: 2;
-}
-
-.bar {
-  width: 100%;
-  background: var(--gradient-accent);
-  border-radius: 9px 9px 5px 5px;
-  transition: height var(--transition-base);
-  min-height: 4px;
-  box-shadow: 0 0 0 1px rgba(77, 163, 255, 0.25), 0 10px 20px rgba(27, 99, 219, 0.22);
-}
-
-.barLabel {
-  font-size: 0.74rem;
-  color: var(--color-text-soft);
-  text-align: center;
-  order: 3;
-  margin-top: var(--space-1);
-}
-
-.appointmentsList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.appointmentItem {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  padding: var(--space-4);
-  background: var(--color-surface-muted);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
-}
-
-.appointmentItem:hover {
-  background: var(--color-surface);
-  border-color: var(--color-border-strong);
-  transform: translateX(2px);
-}
-
-.appointmentTime {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 96px;
-  font-variant-numeric: tabular-nums;
-}
-
-.timeStart,
-.timeEnd {
-  font-size: 0.92rem;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.timeSeparator {
-  font-size: 0.82rem;
-  color: var(--color-text-soft);
-  font-weight: 400;
-}
-
-.appointmentDetails {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  min-width: 0;
-}
-
-.appointmentClient {
-  font-size: 0.94rem;
-  font-weight: 600;
-  color: var(--color-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.appointmentService {
-  font-size: 0.8rem;
-  color: var(--color-text-soft);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.appointmentStatus {
-  padding: 0.34rem 0.76rem;
-  border-radius: 999px;
-  font-size: 0.74rem;
-  font-weight: 600;
-  text-transform: capitalize;
-  white-space: nowrap;
-}
-
-.statusScheduled {
-  background: var(--color-neutral-bg);
-  color: var(--color-neutral-text);
-  border: 1px solid var(--color-neutral-border);
-}
-
-.statusCompleted {
-  background: var(--color-success-bg);
-  color: var(--color-success-text);
-  border: 1px solid var(--color-success-border);
-}
-
-.statusCancelled {
-  background: var(--color-warning-bg);
-  color: var(--color-warning-text);
-  border: 1px solid var(--color-warning-border);
-}
-
-.statusNoShow {
-  background: var(--color-danger-bg);
-  color: var(--color-danger-text);
-  border: 1px solid var(--color-danger-border);
-}
-
-.emptyAppointments,
-.empty {
-  padding: var(--space-8) var(--space-4);
-  text-align: center;
-  color: var(--color-text-soft);
-  font-size: 0.9rem;
-}
-
-.clientsSection {
-  margin-top: var(--space-6);
-}
-
-.sectionTitle {
-  font-size: 1.12rem;
-  margin-bottom: var(--space-4);
-  color: var(--color-text);
-  font-weight: 650;
-}
-
-.clientGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
-  gap: var(--space-4);
-}
-
-.clientCard {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-  padding: var(--space-5);
-  backdrop-filter: blur(var(--blur-md));
-  -webkit-backdrop-filter: blur(var(--blur-md));
-}
-
-.clientCard h4 {
-  font-size: 0.95rem;
-  margin-bottom: var(--space-4);
-  color: var(--color-text);
-  font-weight: 650;
-}
-
-.clientList {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.clientItem {
-  display: block;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-muted);
-  border-radius: var(--radius-md);
-  transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
-}
-
-.clientItem:hover {
-  border-color: var(--color-border-strong);
-  background: var(--color-surface);
-  transform: translateY(-1px);
-}
-
-.clientName {
-  color: var(--color-text);
-  font-size: 0.92rem;
-  font-weight: 600;
-}
-
-.clientStats,
-.clientMeta {
-  margin-top: 0.2rem;
-  display: flex;
-  gap: var(--space-3);
-  color: var(--color-text-soft);
-  font-size: 0.78rem;
-}
-
-.viewAllLink {
-  font-size: 0.8rem;
-  color: var(--color-accent);
-  text-decoration: underline;
-  display: block;
-  margin-top: 8px;
-}
-
-.growthChart {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(28px, 1fr));
-  gap: var(--space-2);
-  height: 152px;
-  align-items: end;
-}
-
-.growthBar {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.2rem;
-  min-width: 0;
-}
-
-.growthValue {
-  font-size: 0.7rem;
-  color: var(--color-text-muted);
-}
-
-.growthBarContainer {
-  width: 100%;
-  height: 96px;
-  display: flex;
-  align-items: flex-end;
-}
-
-.growthBarFill {
-  width: 100%;
-  min-height: 3px;
-  border-radius: 8px 8px 4px 4px;
-  background: var(--gradient-accent);
-}
-
-.growthLabel {
-  font-size: 0.65rem;
-  color: var(--color-text-soft);
-  text-align: center;
-}
-
 .retryButton {
   margin-top: var(--space-4);
   padding: 0.62rem 1rem;
@@ -378,90 +14,7 @@
   border-color: var(--color-border-strong);
 }
 
-@media (max-width: 900px) {
-  .main {
-    padding: var(--space-6) var(--space-4);
-  }
-}
-
-@media (max-width: 700px) {
-  .container {
-    overflow-x: hidden;
-  }
-
-  .statsGrid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--space-3);
-  }
-
-  .statCard {
-    padding: var(--space-4);
-  }
-
-  .statValue {
-    font-size: 1.45rem;
-  }
-
-  .charts {
-    grid-template-columns: 1fr;
-  }
-
-  .chartCard {
-    overflow: hidden;
-    padding: var(--space-4);
-  }
-
-  .barChart {
-    gap: 4px;
-  }
-
-  .barItem {
-    min-width: 0;
-  }
-
-  .barValue {
-    font-size: 0.68rem;
-  }
-
-  .barLabel {
-    font-size: 0.62rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-  }
-
-  .appointmentTime {
-    min-width: 80px;
-  }
-
-  .appointmentItem {
-    gap: var(--space-3);
-    padding: var(--space-3);
-  }
-}
-
-@media (max-width: 480px) {
-  .statsGrid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* ── Onboarding checklist ──────────────────────────────────── */
-.onboardingChecklist {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-6);
-  margin-bottom: var(--space-6);
-}
-
-.onboardingTitle {
-  margin: 0 0 var(--space-4);
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
+/* ── Onboarding checklist (new-tenant empty state) ─────────── */
 .onboardingItems {
   display: flex;
   flex-direction: column;
@@ -512,3 +65,453 @@
   flex-shrink: 0;
 }
 
+/* ════════════════════════════════════════════════════════════════════
+   Today-focused dashboard — greeting · now-card · day list · this week
+   ════════════════════════════════════════════════════════════════════ */
+.feed {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) calc(env(safe-area-inset-bottom) + var(--space-8));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ── Greeting ── */
+.greeting {
+  padding: var(--space-2) var(--space-1) 0;
+}
+
+.greetingTitle {
+  margin: 0;
+  font-size: clamp(1.55rem, 6vw, 1.9rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--color-text);
+}
+
+.greetingSub {
+  margin: 6px 0 0;
+  font-size: 0.92rem;
+  color: var(--color-text-soft);
+}
+
+.greetingUrgent {
+  color: #e8743b;
+  font-weight: 600;
+}
+
+/* ── "Acum în cabinet" hero card ── */
+.nowCard {
+  position: relative;
+  overflow: hidden;
+  display: block;
+  padding: var(--space-4) var(--space-5);
+  border-radius: 22px;
+  text-decoration: none;
+  color: #fff;
+  background: linear-gradient(145deg, #4a78ec 0%, #2f55d4 52%, #2845bd 100%);
+  box-shadow: 0 18px 40px -18px rgba(40, 69, 189, 0.7);
+  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 160ms ease;
+}
+
+.nowCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 24px 50px -18px rgba(40, 69, 189, 0.78);
+}
+
+/* Soft bubbles drifting inside the card — clipped by .nowCard's overflow:hidden. */
+.nowGlow {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.nowGlow::before,
+.nowGlow::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 30%, rgba(255, 255, 255, 0.30), rgba(255, 255, 255, 0.03) 70%);
+  will-change: transform;
+}
+
+.nowGlow::before {
+  width: 170px;
+  height: 170px;
+  top: -54px;
+  right: -34px;
+  animation: bubbleFloat 9s ease-in-out infinite;
+}
+
+.nowGlow::after {
+  width: 96px;
+  height: 96px;
+  bottom: -34px;
+  left: 22%;
+  background: radial-gradient(circle at 32% 30%, rgba(255, 255, 255, 0.2), transparent 72%);
+  animation: bubbleFloat 12s ease-in-out infinite reverse;
+  animation-delay: -3.5s;
+}
+
+@keyframes bubbleFloat {
+  0%   { transform: translate(0, 0) scale(1); }
+  33%  { transform: translate(-20px, 16px) scale(1.1); }
+  66%  { transform: translate(12px, -12px) scale(0.94); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+.nowTop {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.nowLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.nowDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 0 4px rgba(74, 222, 128, 0.28);
+}
+
+.nowTime {
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.nowPatient {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.nowAvatar {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #ffb765, #f59331);
+  box-shadow: 0 6px 16px -6px rgba(245, 147, 49, 0.8);
+}
+
+.nowPatientText { min-width: 0; }
+
+.nowName {
+  font-size: 1.18rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nowService {
+  margin-top: 1px;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.78);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nowMeta {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: 0.82rem;
+}
+
+.nowMetaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.nowOpen {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.nowOpen span { font-size: 1.15rem; line-height: 1; }
+
+/* ── "Restul zilei" + cards ── */
+.dayCard,
+.weekCard {
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  background: var(--color-surface);
+  box-shadow: 0 6px 20px -16px rgba(15, 23, 42, 0.4);
+}
+
+.dayCard {
+  padding: var(--space-4) var(--space-5);
+}
+
+.cardHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-1);
+}
+
+.cardHeadTitle {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+
+.cardLink {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.cardLink:hover { text-decoration: underline; }
+
+.dayList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dayRow {
+  display: grid;
+  grid-template-columns: 48px 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 65%, transparent);
+  text-decoration: none;
+  border-radius: 8px;
+  transition: background 140ms ease;
+}
+
+.dayList li:last-child .dayRow { border-bottom: 0; }
+
+.dayRow:hover {
+  background: color-mix(in srgb, var(--color-text) 3.5%, transparent);
+}
+
+.dayTime {
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-soft);
+}
+
+.dayDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--color-text-soft);
+}
+
+.dayMain { min-width: 0; }
+
+.dayName {
+  display: block;
+  font-size: 0.96rem;
+  font-weight: 650;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dayService {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--color-text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dayStatus {
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dayRowMuted .dayName { color: var(--color-text-soft); }
+.dayRowMuted .dayService { opacity: 0.7; }
+
+.dotDone { background: #22c55e; }
+.dotNext { background: #94a3b8; }
+.dotCancel { background: #f43f5e; }
+.dotNoshow { background: #f59e0b; }
+
+.stDone { color: #16a34a; }
+.stNext { color: var(--color-text-soft); }
+.stCancel { color: #e11d48; }
+.stNoshow { color: #d97706; }
+
+.dayEmpty {
+  margin: var(--space-3) 0 var(--space-2);
+  font-size: 0.88rem;
+  color: var(--color-text-soft);
+}
+
+/* ── "Săptămâna aceasta" card ── */
+.weekCard {
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.weekTotal {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.weekChart {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  align-items: end;
+  gap: var(--space-2);
+  height: 118px;
+  margin: var(--space-4) 0 var(--space-2);
+}
+
+.weekCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+}
+
+.weekBarTrack {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.weekBar {
+  width: min(62%, 26px);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-accent) 15%, var(--color-surface-muted));
+  transform-origin: bottom;
+  animation: barRise 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.weekBarToday {
+  background: linear-gradient(180deg, #5e8cf2, var(--color-accent));
+  box-shadow: 0 10px 20px -10px color-mix(in srgb, var(--color-accent) 80%, transparent);
+}
+
+@keyframes barRise {
+  from { transform: scaleY(0.02); opacity: 0; }
+  to   { transform: scaleY(1); opacity: 1; }
+}
+
+.weekDay {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--color-text-soft);
+}
+
+.weekDayToday {
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+.weekStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+.weekStat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.weekStatValue {
+  font-size: 1.32rem;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.weekStatLabel {
+  font-size: 0.74rem;
+  color: var(--color-text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.weekDeltaUp,
+.weekDeltaDown {
+  margin-top: 2px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.weekDeltaUp { color: #16a34a; }
+.weekDeltaDown { color: #e11d48; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nowGlow::before,
+  .nowGlow::after,
+  .weekBar {
+    animation: none;
+  }
+}
+
+@media (min-width: 768px) {
+  .feed {
+    max-width: 640px;
+    padding-top: var(--space-7);
+  }
+}

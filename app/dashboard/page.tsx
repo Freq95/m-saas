@@ -32,5 +32,5 @@ export default async function DashboardPage() {
     () => getDashboardData(auth.userId, auth.tenantId, days, visibleCalendarIds, dashboardUserIds)
   ).catch(() => null);
 
-  return <DashboardPageClient initialDashboard={initialDashboard} />;
+  return <DashboardPageClient initialDashboard={initialDashboard} userName={auth.name} />;
 }

@@ -2,6 +2,15 @@
 const nextConfig = {
   reactStrictMode: true,
   distDir: '.next-build',
+  serverExternalPackages: ['@react-pdf/renderer'],
+  // Bundle the treatment-plan PDF fonts into the serverless functions that
+  // render PDFs (files under public/ are not traced into functions by default).
+  outputFileTracingIncludes: {
+    '/api/clients/[id]/treatment-plans/[planId]/pdf': ['./public/fonts/ptserif/**'],
+    '/api/clients/[id]/treatment-plans/[planId]/send-email': ['./public/fonts/ptserif/**'],
+    // The share route lazily generates the PDF if one doesn't exist yet.
+    '/api/clients/[id]/treatment-plans/[planId]/share': ['./public/fonts/ptserif/**'],
+  },
   // CORS policy: authenticated API routes are same-origin only.
   // Do not add Access-Control-Allow-Origin: * for authenticated endpoints.
   async headers() {

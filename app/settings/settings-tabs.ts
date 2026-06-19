@@ -1,4 +1,4 @@
-export type SettingsTabKey = 'account' | 'calendars' | 'email' | 'services' | 'gdpr' | 'team';
+export type SettingsTabKey = 'account' | 'calendars' | 'email' | 'services' | 'gdpr' | 'team' | 'treatment-plan';
 
 export const SETTINGS_EXIT_PATH_STORAGE_KEY = 'settings:last-exit-path';
 
@@ -15,6 +15,7 @@ export const SETTINGS_TABS: Array<{
   clinicalOnly?: boolean;
 }> = [
   { key: 'services', href: '/settings/services', label: 'Servicii' },
+  { key: 'treatment-plan', href: '/settings/treatment-plan', label: 'Plan de tratament', clinicalOnly: true },
   { key: 'calendars', href: '/settings/calendars', label: 'Calendare' },
   { key: 'email', href: '/settings/email', label: 'Email', clinicalOnly: true },
   { key: 'team', href: '/settings/team', label: 'Echipă' },

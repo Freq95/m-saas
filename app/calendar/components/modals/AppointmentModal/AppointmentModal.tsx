@@ -1192,6 +1192,9 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
                                     0
                                   );
                                   dispatch({ type: 'SET_SERVICES', serviceIds: nextIds, totalDurationMinutes });
+                                  // Collapse the picker after adding a service, mirroring the
+                                  // desktop combobox which closes on each pick.
+                                  if (!isSelected) toggleExpanded('service');
                                 }}
                               >
                                 <span>{s.name}</span>

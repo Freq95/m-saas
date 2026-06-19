@@ -5,7 +5,18 @@ export type EmailSendResult =
   | { ok: true; provider: 'resend'; id?: string }
   | { ok: false; reason: 'not_configured' | 'provider_error' };
 
-export async function sendEmail(options: { to: string; subject: string; html: string }): Promise<EmailSendResult> {
+export type EmailAttachment = {
+  filename: string;
+  content: Buffer | string;
+  contentType?: string;
+};
+
+export async function sendEmail(options: {
+  to: string;
+  subject: string;
+  html: string;
+  attachments?: EmailAttachment[];
+}): Promise<EmailSendResult> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
     logger.warn('[EMAIL] RESEND_API_KEY not set. Email send skipped.', {

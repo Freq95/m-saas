@@ -18,6 +18,11 @@ const DentalTab = dynamic(() => import('./dental/DentalTab'), {
   loading: () => <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>Se încarcă schema dentară…</div>,
 });
 
+const TreatmentPlansTab = dynamic(() => import('./treatment-plans/TreatmentPlansTab'), {
+  ssr: false,
+  loading: () => <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--color-text-muted)' }}>Se incarca planurile...</div>,
+});
+
 interface Client {
   id: number;
   name: string;
@@ -65,6 +70,7 @@ interface ClientProfileClientProps {
   initialConversations: Conversation[];
   initialStats: any | null;
   canEditDental: boolean;
+  canEditTreatmentPlans: boolean;
 }
 
 export default function ClientProfileClient({
@@ -74,6 +80,7 @@ export default function ClientProfileClient({
   initialConversations,
   initialStats,
   canEditDental,
+  canEditTreatmentPlans,
 }: ClientProfileClientProps) {
   const [client, setClient] = useState<Client | null>(initialClient);
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
@@ -82,7 +89,7 @@ export default function ClientProfileClient({
   const [notes, setNotes] = useState<any[]>([]);
   const [stats, setStats] = useState<any>(initialStats);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'notes' | 'appointments' | 'conversations' | 'files' | 'dental'>('notes');
+  const [activeTab, setActiveTab] = useState<'notes' | 'appointments' | 'conversations' | 'files' | 'dental' | 'treatment-plans'>('notes');
   const [showAddNote, setShowAddNote] = useState(false);
   const [showEditClient, setShowEditClient] = useState(false);
   const [pendingDeleteFileId, setPendingDeleteFileId] = useState<number | null>(null);
@@ -685,6 +692,12 @@ export default function ClientProfileClient({
           >
             Dental
           </button>
+          <button
+            className={`${styles.tab} ${activeTab === 'treatment-plans' ? styles.tabActive : ''}`}
+            onClick={() => setActiveTab('treatment-plans')}
+          >
+            Plan de tratament
+          </button>
         </div>
 
         {/* ── Tab Content ────────────────────────────────────── */}
@@ -872,6 +885,18 @@ export default function ClientProfileClient({
               clientName={client?.name}
               isMinor={client?.is_minor}
               onToast={(kind, message) => (kind === 'success' ? toastSuccess(message) : toastError(message))}
+            />
+          )}
+
+          {activeTab === 'treatment-plans' && (
+            <TreatmentPlansTab
+              clientId={clientId}
+              canEdit={canEditTreatmentPlans}
+              clientName={client?.name}
+              clientEmail={client?.email}
+              clientPhone={client?.phone}
+              onToast={(kind, message) => (kind === 'success' ? toastSuccess(message) : toastError(message))}
+              onFilesChanged={fetchFiles}
             />
           )}
         </div>
