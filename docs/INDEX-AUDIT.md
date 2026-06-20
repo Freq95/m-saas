@@ -4,6 +4,10 @@ This audit covers the production hot paths in the dashboard, patient profile, de
 treatment plans, public links, and patient files. All index keys begin with the tenant/scope
 fields used by the query unless the lookup is intentionally global (the hashed public token).
 
+Production status (2026-06-20): migration 011 is applied, the audit below is green, and no
+audited winning plan uses a collection scan. Retention TTL indexes are documented separately
+in [DATA-RETENTION.md](DATA-RETENTION.md).
+
 | Query path | Backing index |
 | --- | --- |
 | Dashboard appointments by owner and time range | appointments_scope_time |

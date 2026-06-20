@@ -4,6 +4,18 @@ Multi-tenant SaaS platform for managing appointments, clients, email inbox, and 
 
 ---
 
+## Recent Updates (2026-06-20)
+
+- Created an encrypted logical backup of the production Atlas database and restore-verified all 42 collections and 24,336 documents by count and canonical EJSON hash. Backup artifacts remain local under the ignored `backups/` directory.
+- Applied the hot-query index migration and the approved five-year GDPR retention migration. Production counts remained unchanged and the first retention dry-run found zero eligible records.
+- Completed the patient erasure cascade, treatment-plan sharing safeguards, dental mutation authorization coverage, and tenant-isolation tests.
+- CI now runs typecheck, 93 Vitest tests, cleanup scans, a production build, and 10 Playwright checks across desktop and phone viewports.
+- Added automated WCAG A/AA checks, restored browser zoom support, corrected public-page contrast, and strengthened global browser security policies.
+
+See [Data Retention](docs/DATA-RETENTION.md) and [MongoDB Index Audit](docs/INDEX-AUDIT.md) for operational evidence.
+
+---
+
 ## Recent Updates (2026-05-12)
 
 - Mobile app shell was redesigned for phone/PWA use: icon-only bottom navigation, settings/theme/logout moved into Settings, reduced route motion on mobile, and smoother immediate tap feedback.
@@ -85,6 +97,9 @@ Application at **http://localhost:3000**
 | [PRODUCT.md](PRODUCT.md) | Feature-by-feature product documentation |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Technical architecture, API surface, database schema, deployment |
 | [CODE-HEALTH.md](CODE-HEALTH.md) | Known issues, technical debt, priority matrix |
+| [docs/DATA-RETENTION.md](docs/DATA-RETENTION.md) | Approved retention policy, controls, and production verification |
+| [docs/INDEX-AUDIT.md](docs/INDEX-AUDIT.md) | Production hot-query index map and explain evidence |
+| [docs/TREATMENT-PLAN-FEATURE.md](docs/TREATMENT-PLAN-FEATURE.md) | Treatment-plan feature and data model |
 
 ---
 
@@ -94,6 +109,8 @@ Application at **http://localhost:3000**
 npm run dev              # Start dev server
 npm run build            # Production build
 npm run typecheck        # TypeScript checks
+npm run test:run         # Vitest unit and integration suite
+npm run test:e2e         # Playwright desktop/mobile smoke and WCAG checks
 npm run check:cleanup    # Build + typecheck + unused exports + dead CSS
 
 npm run db:init:mongo    # Initialize MongoDB collections
@@ -135,5 +152,5 @@ tests/               # Vitest test files
 
 **Private project — Not open source**
 
-**Last updated:** 2026-05-12
+**Last updated:** 2026-06-20
 

@@ -50,6 +50,22 @@ GDPR_ORPHAN_SCAN_LIMIT=250
 only after reviewing dry-run summaries. Patient deletion and orphan-file deletion use the
 same switch. Keep the orphan cleanup disabled until R2 listing permissions are verified.
 
+## Production verification (2026-06-20)
+
+- Atlas snapshots were unavailable on the current cluster tier, so a compressed logical
+  dump was created before migration. The final archive is AES-256-GCM encrypted; its key is
+  protected with Windows DPAPI for the current user and the backup directory ACL is restricted.
+- All 42 collections and 24,336 documents were restored into temporary verification targets.
+  Source and restore counts plus canonical EJSON SHA-256 hashes matched for every collection.
+- Temporary restore databases and collections were removed after verification. The plaintext
+  archive was deleted; encrypted artifacts and JSON verification reports remain in the local,
+  git-ignored `backups/` directory.
+- Migration `012_data_retention.js` was tested on a temporary clone before production. The
+  production run preserved all source counts, produced valid future expiry dates, and created
+  the expected TTL and candidate indexes.
+- The first production dry-run reported zero candidates, zero eligible records, zero deletions,
+  and zero failures. Orphan-object cleanup remained disabled.
+
 ## Deployment
 
 1. Apply `migrations/012_data_retention.js`. It backfills five-year expiry dates on audit
