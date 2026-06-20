@@ -32,14 +32,19 @@ async function run() {
     for (const group of duplicateGroups) {
       await links.updateMany(
         { _id: { $in: group.duplicates.filter((id) => String(id) !== String(group.keep)) } },
-        { $set: { revoked_at: now, updated_at: now } }
+        { $set: { revoked_at: now, updated_at: now }, $unset: { active: '' } }
       );
     }
+    // MongoDB partial-index filters can't express "revoked_at absent" ($exists:false),
+    // so active links carry an explicit `active: true` flag (maintained by the app on
+    // issue/revoke). Normalize existing rows, then index on that supported predicate.
+    await links.updateMany({ revoked_at: { $exists: false } }, { $set: { active: true } });
+    await links.updateMany({ revoked_at: { $exists: true } }, { $unset: { active: '' } });
     await links.createIndex(
       { tenant_id: 1, user_id: 1, client_id: 1, plan_id: 1 },
       {
         unique: true,
-        partialFilterExpression: { revoked_at: { $exists: false } },
+        partialFilterExpression: { active: true },
         name: 'treatment_plan_public_links_one_active',
       }
     );

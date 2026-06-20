@@ -589,6 +589,9 @@ export async function issueTreatmentPlanPublicLink(
         expires_at: expiresAt,
         expires_at_date: new Date(expiresAt),
         updated_at: now,
+        // Discriminator for the partial unique index (one active link per plan);
+        // cleared on revoke. Partial filters can't express "revoked_at absent".
+        active: true,
       },
       $setOnInsert: {
         tenant_id: scope.tenantId,
@@ -926,7 +929,7 @@ export async function revokeTreatmentPlanPublicLink(scope: Scope, planId: number
       plan_id: planId,
       revoked_at: { $exists: false },
     },
-    { $set: { revoked_at: now, updated_at: now } }
+    { $set: { revoked_at: now, updated_at: now }, $unset: { active: '' } }
   );
   return getTreatmentPlan(scope, planId);
 }
@@ -944,6 +947,6 @@ export async function revokeTreatmentPlanPublicToken(scope: Scope, planId: numbe
       token_hash: hashPublicToken(token),
       revoked_at: { $exists: false },
     },
-    { $set: { revoked_at: now, updated_at: now } }
+    { $set: { revoked_at: now, updated_at: now }, $unset: { active: '' } }
   );
 }
