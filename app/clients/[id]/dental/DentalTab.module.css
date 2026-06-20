@@ -779,73 +779,96 @@
 .fab { display: none; }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   MOBILE — chart full width, inspector becomes a bottom sheet, FAB visible.
+   MOBILE — chart full width; a single tooth opens a full-screen modal,
+   surgery/bridge keep the chart with a bottom panel, FAB = record chooser.
    ═══════════════════════════════════════════════════════════════════════ */
 
 @media (max-width: 860px) {
-  /* The app's bottom nav is fixed (z-index 120, ~80px tall). Everything the
-     sheet + FAB show must clear it, or the footer (Salvează) and the collapsed
-     peek handle end up hidden behind it. --nav-clear is that reserved height,
-     defined on .tabRoot so both the sheet and the (sibling) FAB inherit it. */
-  .tabRoot { --nav-clear: calc(84px + env(safe-area-inset-bottom)); }
+  .tabRoot { --nav-clear: calc(72px + env(safe-area-inset-bottom)); }
 
   .layout {
     grid-template-columns: 1fr;
     gap: var(--space-4);
   }
 
-  .chartColumn { padding-bottom: 64px; } /* room above the collapsed sheet */
+  /* Compact, non-sticky header so it scrolls away with the page. */
+  .header {
+    gap: var(--space-2);
+    padding-bottom: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+  .dentitionToggle { padding: 2px; }
+  .dentitionButton { padding: 5px 14px; font-size: 0.82rem; }
+  .reportLink { padding: 6px 12px; font-size: 0.82rem; }
 
-  .header { position: sticky; top: 0; z-index: 30; background: var(--color-bg); }
+  .inspector { max-height: none; overflow: visible; }
 
-  .sheet {
+  /* Overview ("Privire de ansamblu") as a normal card under the charts. */
+  .overviewCard {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg, 18px);
+    overflow: hidden;
+  }
+
+  /* Inspector inside the full-screen tooth modal. */
+  .modalBody .inspector { max-height: none; overflow: visible; }
+  .modalBody .inspBody { padding: var(--space-5); }
+
+  /* Surgery/bridge: chart stays for picking; the form sits in a bottom panel. */
+  .groupPanel {
     position: fixed;
     left: 0;
     right: 0;
-    bottom: var(--nav-clear); /* sit ABOVE the bottom nav, not behind it */
-    top: auto;
-    z-index: 50;
-    border-radius: 20px 20px 0 0;
-    border: 1px solid var(--color-border-strong);
-    border-bottom: 0;
-    box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.4);
-    max-height: calc(100vh - var(--nav-clear) - 12px);
-    display: flex;
-    flex-direction: column;
-    transform: translateY(calc(100% - 56px)); /* collapsed: peek */
-    transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    bottom: var(--nav-clear);
+    z-index: 55;
+    max-height: 56vh;
+    overflow-y: auto;
+    background: var(--color-surface);
+    border-top: 1px solid var(--color-border-strong);
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.28);
   }
-  /* half: bottom ~44vh visible, chart stays tappable in the top ~56vh */
-  .sheetHalf { transform: translateY(50%); }
-  .sheetExpanded { transform: translateY(0); }
+  .groupPanel .inspector { max-height: none; overflow: visible; }
+  .groupPanel .inspBody { padding: var(--space-4) var(--space-5) var(--space-5); }
 
-  .sheetHandle {
+  /* "Tap a tooth" hint while recording a single tooth. */
+  .recordHintBar {
+    position: fixed;
+    left: var(--space-4);
+    right: var(--space-4);
+    bottom: calc(var(--nav-clear) + 10px);
+    z-index: 55;
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 6px;
-    width: 100%;
-    padding: 10px var(--space-5) 8px;
-    background: transparent;
-    border: 0;
-    cursor: pointer;
-    flex-shrink: 0;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: 12px 14px;
+    background: var(--color-surface-strong);
+    border: 1px solid var(--color-border-strong);
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    font-size: var(--text-sm);
+    color: var(--color-text);
   }
-  .sheetGrip { width: 38px; height: 4px; border-radius: 999px; background: var(--color-border-strong); }
-  .sheetSummary { font-size: var(--text-sm); font-weight: 600; color: var(--color-text); }
+  .recordHintBar button {
+    appearance: none;
+    border: 0;
+    background: none;
+    color: var(--color-accent);
+    font-weight: 600;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
 
-  .inspector { max-height: none; flex: 1; min-height: 0; }
-  .inspBody { padding: var(--space-4) var(--space-5) var(--space-6); }
-
+  /* FAB + its record-kind chooser. */
   .fab {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     position: fixed;
     right: var(--space-5);
-    /* Above the bottom nav AND above the collapsed peek (56px) so it never
-       hides behind the nav or overlaps the peek handle bar. */
-    bottom: calc(var(--nav-clear) + 64px);
+    bottom: calc(var(--nav-clear) + 12px);
     z-index: 60;
     width: 52px;
     height: 52px;
@@ -855,17 +878,47 @@
     background: var(--color-accent);
     box-shadow: 0 8px 24px color-mix(in srgb, var(--color-accent) 45%, transparent);
     cursor: pointer;
-    transition: transform 140ms ease, filter 140ms ease;
+    transition: transform 160ms ease, filter 140ms ease;
   }
   .fab:hover { filter: brightness(1.08); }
   .fab:active { transform: scale(0.94); }
-  /* Hidden unless the sheet is collapsed, so it never floats over the form. */
-  .fab.fabHidden { display: none; }
+  .fabOpen { transform: rotate(45deg); }
+
+  .fabScrim { position: fixed; inset: 0; z-index: 58; background: transparent; }
+  .fabMenu {
+    position: fixed;
+    right: var(--space-5);
+    bottom: calc(var(--nav-clear) + 76px);
+    z-index: 60;
+    display: grid;
+    gap: 2px;
+    min-width: 204px;
+    padding: 6px;
+    background: var(--color-surface-strong);
+    border: 1px solid var(--color-border-strong);
+    border-radius: 14px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
+  }
+  .fabMenu button {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    padding: 11px 12px;
+    border-radius: 10px;
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    color: var(--color-text);
+    cursor: pointer;
+  }
+  .fabMenu button:hover,
+  .fabMenu button:active { background: var(--color-neutral-bg); }
 
   .issueChips { grid-template-columns: 1fr; }
   .detailRow { grid-template-columns: 96px 1fr; }
 
-  /* The header CTA duplicates the floating FAB on phones — keep only the FAB. */
+  /* The header CTA duplicates the FAB on phones — keep only the FAB. */
   .recordCta { display: none; }
 }
 

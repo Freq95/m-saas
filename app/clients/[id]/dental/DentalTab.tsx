@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
+import { Drawer } from 'vaul';
+import { useIsMobile } from '@/lib/useIsMobile';
 import { authFetcher } from '@/lib/fetcher';
+import m from '../../../calendar/components/modals/AppointmentModal/MobileAppointmentSheet.module.css';
 import Odontogram from './Odontogram';
 import IssueDistributionChart from './IssueDistributionChart';
 import DentalInspector, { type InspectorView, type RecordKind } from './DentalInspector';
@@ -30,7 +33,6 @@ interface Props {
   isMinor?: boolean;
 }
 
-/** Mobile bottom-sheet snap states. 'half' keeps the chart tappable above the sheet. */
 type SheetMode = 'collapsed' | 'half' | 'expanded';
 
 type DentalResponse = { dental: DentalData };
@@ -47,7 +49,10 @@ export default function DentalTab({ clientId, canEdit, onToast, clientName, isMi
   const [surgerySelection, setSurgerySelection] = useState<number[]>([]);
   const [bridgeSelection, setBridgeSelection] = useState<number[]>([]);
   const [dentition, setDentition] = useState<Dentition>('permanent');
-  const [sheetMode, setSheetMode] = useState<SheetMode>('collapsed'); // mobile bottom sheet
+  const [sheetMode, setSheetMode] = useState<SheetMode>('collapsed');
+  const [fabMenuOpen, setFabMenuOpen] = useState(false);
+  // 860 matches the dental layout's mobile breakpoint (chart stacks, modal opens).
+  const isMobile = useIsMobile(860);
   // True once the dentition has been pinned — by a stored preference, an
   // explicit toggle, or a one-time auto-pick from the data. Prevents the
   // auto-pick from fighting a user's choice.
@@ -101,24 +106,19 @@ export default function DentalTab({ clientId, canEdit, onToast, clientName, isMi
     if (fdi === null) {
       setSelectedFdi(null);
       setView('today');
-      setSheetMode('collapsed');
     } else {
       setSelectedFdi(fdi);
       setView('tooth');
-      setSheetMode('expanded'); // detail needs no chart interaction
     }
   };
 
   const startRecording = (kind: RecordKind) => {
+    setFabMenuOpen(false);
     setRecordKind(kind);
     setSurgerySelection([]);
     setBridgeSelection([]);
     if (kind !== 'tooth') setSelectedFdi(null);
     setView('recording');
-    // Mobile sheet: 'expanded' when the form is ready (tooth already chosen);
-    // 'half' when the user must still tap teeth on the chart, so both the chart
-    // (top) and the form/count (bottom) are visible at once.
-    setSheetMode(kind === 'tooth' && selectedFdi !== null ? 'expanded' : 'half');
   };
 
   const setKind = (kind: RecordKind) => {
@@ -126,8 +126,6 @@ export default function DentalTab({ clientId, canEdit, onToast, clientName, isMi
     setSurgerySelection([]);
     setBridgeSelection([]);
     if (kind !== 'tooth') setSelectedFdi(null);
-    // Group kinds always need chart picking → keep the chart visible (half).
-    setSheetMode(kind === 'tooth' && selectedFdi !== null ? 'expanded' : 'half');
   };
 
   const cancelRecording = () => {
@@ -135,10 +133,8 @@ export default function DentalTab({ clientId, canEdit, onToast, clientName, isMi
     setBridgeSelection([]);
     if (selectedFdi !== null && recordKind === 'tooth') {
       setView('tooth');
-      setSheetMode('expanded');
     } else {
       setView('today');
-      setSheetMode('collapsed');
     }
   };
 
@@ -150,10 +146,8 @@ export default function DentalTab({ clientId, canEdit, onToast, clientName, isMi
       } else if (recordKind === 'bridge') {
         setBridgeSelection((p) => (p.includes(fdi) ? p.filter((f) => f !== fdi) : [...p, fdi]));
       } else {
-        // Tooth-diagnostic target chosen — now the form is usable, so expand
-        // the sheet fully on mobile.
+        // Tooth-diagnostic target chosen → the record modal opens with the form.
         setSelectedFdi(fdi);
-        setSheetMode('expanded');
       }
       return;
     }
@@ -274,18 +268,47 @@ export default function DentalTab({ clientId, canEdit, onToast, clientName, isMi
     (s) => toothMatters(s) && dentitionOf(s.tooth_fdi) === otherDentition
   ).length;
 
-  // Short label summarising what the collapsed mobile sheet contains. During
-  // surgery/bridge picking it shows the running count + a hint to tap-to-finish.
   const sheetSummary =
     view === 'recording'
       ? recordKind === 'surgery'
-        ? `Chirurgie · ${surgerySelection.length} aleși — apasă pentru a continua`
+        ? 'Chirurgie · ' + surgerySelection.length + ' aleși — apasă pentru a continua'
         : recordKind === 'bridge'
-          ? `Punte · ${bridgeSelection.length} aleși — apasă pentru a continua`
+          ? 'Punte · ' + bridgeSelection.length + ' aleși — apasă pentru a continua'
           : 'Înregistrează pe dinte'
       : view === 'tooth' && selectedFdi !== null
-        ? `Dinte ${selectedFdi}`
+        ? 'Dinte ' + selectedFdi
         : 'Privire de ansamblu';
+
+  const inspectorProps = {
+    clientId,
+    canEdit,
+    dental,
+    selectedFdi,
+    recordKind,
+    dentition,
+    surgerySelection,
+    bridgeSelection,
+    onSelectTooth: goToTooth,
+    onStartRecording: startRecording,
+    onSetRecordKind: setKind,
+    onCancelRecording: cancelRecording,
+    onSubmitTooth: submitTooth,
+    onSubmitSurgery: submitSurgery,
+    onSubmitBridge: submitBridge,
+    onChangeStatus: changeStatus,
+    onDeleteSurgeryGroup: deleteSurgeryGroup,
+    onDeleteBridgeGroup: deleteBridgeGroup,
+    onDentalUpdate: (updated: DentalData) => void mutate({ dental: updated }, { revalidate: false }),
+    onToast,
+  };
+
+  // Phone: a single tooth (view or record) opens a full-screen modal; surgery
+  // and bridge keep the chart for multi-tooth picking with a bottom panel.
+  const toothModalOpen = isMobile && selectedFdi !== null
+    && (view === 'tooth' || (view === 'recording' && recordKind === 'tooth'));
+  const groupRecording = view === 'recording' && (recordKind === 'surgery' || recordKind === 'bridge');
+  const toothRecordPrompt = isMobile && view === 'recording' && recordKind === 'tooth' && selectedFdi === null;
+  const closeToothModal = () => { if (view === 'recording') cancelRecording(); else goToTooth(null); };
 
   return (
     <div className={styles.tabRoot}>
@@ -364,61 +387,95 @@ export default function DentalTab({ clientId, canEdit, onToast, clientName, isMi
             showMiniArch={false}
           />
           <IssueDistributionChart toothStates={dental.tooth_states} dentition={dentition} />
+
+          {/* Mobile: overview as a normal card (not a floating sheet). */}
+          {isMobile && (
+            <div className={styles.overviewCard}>
+              <DentalInspector {...inspectorProps} view="today" />
+            </div>
+          )}
         </div>
 
-        {/* Inspector — right column on desktop, bottom sheet on mobile */}
-        <div
-          className={`${styles.sheet} ${
-            sheetMode === 'expanded' ? styles.sheetExpanded : sheetMode === 'half' ? styles.sheetHalf : ''
-          }`}
-        >
-          <button
-            type="button"
-            className={styles.sheetHandle}
-            onClick={() => setSheetMode((m) => (m === 'expanded' ? 'collapsed' : 'expanded'))}
-            aria-label={sheetMode === 'expanded' ? 'Restrânge panoul' : 'Extinde panoul'}
-          >
-            <span className={styles.sheetGrip} aria-hidden="true" />
-            <span className={styles.sheetSummary}>{sheetSummary}</span>
-          </button>
-          <DentalInspector
-            clientId={clientId}
-            canEdit={canEdit}
-            dental={dental}
-            view={view}
-            selectedFdi={selectedFdi}
-            recordKind={recordKind}
-            dentition={dentition}
-            surgerySelection={surgerySelection}
-            bridgeSelection={bridgeSelection}
-            onSelectTooth={goToTooth}
-            onStartRecording={startRecording}
-            onSetRecordKind={setKind}
-            onCancelRecording={cancelRecording}
-            onSubmitTooth={submitTooth}
-            onSubmitSurgery={submitSurgery}
-            onSubmitBridge={submitBridge}
-            onChangeStatus={changeStatus}
-            onDeleteSurgeryGroup={deleteSurgeryGroup}
-            onDeleteBridgeGroup={deleteBridgeGroup}
-            onDentalUpdate={(updated) => void mutate({ dental: updated }, { revalidate: false })}
-            onToast={onToast}
-          />
-        </div>
+        {/* Desktop: inspector as the sticky right column. */}
+        {!isMobile && (
+          <div className={styles.sheet}>
+            <DentalInspector {...inspectorProps} view={view} />
+          </div>
+        )}
       </div>
 
-      {/* Mobile FAB — always-reachable record entry */}
-      {canEdit && (
-        <button
-          type="button"
-          className={`${styles.fab} ${sheetMode !== 'collapsed' ? styles.fabHidden : ''}`}
-          onClick={() => startRecording('tooth')}
-          aria-label="Înregistrează intervenție"
+      {/* Mobile: single tooth (view or record) opens a full-screen modal. */}
+      {isMobile && (
+        <Drawer.Root
+          open={toothModalOpen}
+          onOpenChange={(open) => { if (!open && toothModalOpen) closeToothModal(); }}
+          direction="bottom"
+          handleOnly
+          dismissible
         >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-        </button>
+          <Drawer.Portal>
+            <Drawer.Overlay className={m.overlay} />
+            <Drawer.Content className={m.sheet} aria-label={view === 'recording' ? 'Înregistrează intervenție' : `Dinte ${selectedFdi ?? ''}`}>
+              <div className={m.topBar}>
+                <button type="button" className={`${m.actionBtn} ${m.actionBtnLeft}`} onClick={closeToothModal}>
+                  {view === 'recording' ? 'Anulează' : 'Închide'}
+                </button>
+                <div className={m.topBarCenter}>
+                  <Drawer.Handle className={m.dragHandle} />
+                  <Drawer.Title className={m.topBarTitle}>
+                    {view === 'recording' ? 'Înregistrează' : `Dinte ${selectedFdi ?? ''}`}
+                  </Drawer.Title>
+                </div>
+                <span aria-hidden style={{ width: 56 }} />
+              </div>
+              <div className={`${m.body} ${styles.modalBody}`}>
+                <DentalInspector {...inspectorProps} view={view} />
+              </div>
+            </Drawer.Content>
+          </Drawer.Portal>
+        </Drawer.Root>
+      )}
+
+      {/* Mobile: surgery/bridge keep the chart for picking; form sits in a panel. */}
+      {isMobile && groupRecording && (
+        <div className={styles.groupPanel}>
+          <DentalInspector {...inspectorProps} view="recording" />
+        </div>
+      )}
+
+      {/* Mobile: prompt to tap a tooth when recording a single tooth. */}
+      {toothRecordPrompt && (
+        <div className={styles.recordHintBar}>
+          <span>Apasă pe un dinte pentru a înregistra</span>
+          <button type="button" onClick={cancelRecording}>Anulează</button>
+        </div>
+      )}
+
+      {/* Mobile FAB → record-kind chooser. */}
+      {isMobile && canEdit && view !== 'recording' && !toothModalOpen && (
+        <>
+          {fabMenuOpen && (
+            <>
+              <div className={styles.fabScrim} onClick={() => setFabMenuOpen(false)} aria-hidden="true" />
+              <div className={styles.fabMenu} role="menu" aria-label="Tip înregistrare">
+                <button type="button" role="menuitem" onClick={() => startRecording('tooth')}>Diagnostic pe dinte</button>
+                <button type="button" role="menuitem" onClick={() => startRecording('surgery')}>Chirurgie</button>
+                <button type="button" role="menuitem" onClick={() => startRecording('bridge')}>Punte</button>
+              </div>
+            </>
+          )}
+          <button
+            type="button"
+            className={`${styles.fab} ${fabMenuOpen ? styles.fabOpen : ''}`}
+            onClick={() => setFabMenuOpen((o) => !o)}
+            aria-label="Înregistrează intervenție"
+            aria-expanded={fabMenuOpen}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
+        </>
       )}
 
       {/* clientName is consumed by the dedicated /raport route, not here. */}
