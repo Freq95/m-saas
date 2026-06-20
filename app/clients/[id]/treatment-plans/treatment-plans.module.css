@@ -991,9 +991,116 @@
   color: var(--color-text-muted);
 }
 
-/* ── Mobile sheet (matches the appointment sheet's iOS row language) ─────── */
-.mobileSectionTitle {
-  padding: 1.15rem 1rem 0.4rem;
+/* ════════════════════════════════════════════════════════════════════════
+   Mobile plan builder — elevated card layout (phone bottom sheet)
+   ════════════════════════════════════════════════════════════════════════ */
+.mPad { padding: 14px 14px 10px; }
+
+.mNote {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--color-neutral-bg);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 22%, transparent);
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--color-text-soft);
+}
+
+.mPatientChip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+
+.mPatientAvatar {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--color-success-text) 14%, transparent);
+  color: var(--color-success-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.mPatientText { display: flex; flex-direction: column; min-width: 0; }
+.mPatientName { font-size: 0.9rem; font-weight: 650; color: var(--color-text); }
+.mPatientSub { font-size: 0.72rem; color: var(--color-text-muted); }
+
+.mCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+
+.mCardRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 14px;
+  background: transparent;
+  border: 0;
+  font-family: inherit;
+  text-align: left;
+  color: var(--color-text);
+}
+
+.mCardRowBtn { cursor: pointer; }
+.mCardRowDivided { border-top: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent); }
+.mCardIcon { display: inline-flex; flex-shrink: 0; color: var(--color-text-soft); }
+.mCardLabel { flex: 1; font-size: 0.95rem; }
+
+.mCardValue {
+  font-size: 0.9rem;
+  color: var(--color-text-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 52%;
+}
+
+.mDateValue {
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  border: 0;
+  outline: none;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--color-text);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.mDateValue::-webkit-calendar-picker-indicator { opacity: 0.4; }
+
+.mMedicList {
+  padding: 4px 10px 10px;
+  display: grid;
+  gap: 4px;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+}
+
+.mGroupHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 2px 4px 8px;
+}
+
+.mGroupHead > span:first-child {
   font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -1001,67 +1108,284 @@
   color: var(--color-text-soft);
 }
 
-/* Number badge in the leading icon slot of each procedure row. */
-.mobileProcNum {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--color-surface-muted);
-  color: var(--color-text-soft);
+.mGroupCount { font-size: 0.72rem; color: var(--color-text-muted); }
+
+/* ── Procedure card ── */
+.mProcCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  transition: border-color 140ms ease;
+}
+
+.mProcCardOpen { border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border)); }
+
+.mProcHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 14px;
+  background: transparent;
+  border: 0;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mProcNum {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent);
   font-size: 0.8rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
-.mobileProcActions {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-top: 0.65rem;
+.mProcMain { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+
+.mProcName {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.mobileProcActions button {
+.mProcNameMuted { color: var(--color-text-muted); font-weight: 500; }
+.mProcMeta { font-size: 0.76rem; color: var(--color-text-muted); }
+.mProcPrice { font-size: 0.95rem; font-weight: 700; color: var(--color-text); white-space: nowrap; }
+.mProcChevron { flex-shrink: 0; color: var(--color-text-muted); transition: transform 180ms ease; }
+.mProcChevronOpen { transform: rotate(90deg); }
+
+.mProcEditor {
+  padding: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+  display: grid;
+  gap: 10px;
+}
+
+.mSearch,
+.mField input,
+.mFieldFull input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  background: var(--color-surface-muted);
+  border: 1px solid transparent;
+  border-radius: 11px;
+  padding: 0 12px;
+  height: 40px;
+  font-family: inherit;
+  font-size: 0.92rem;
+  color: var(--color-text);
+  outline: none;
+}
+
+.mSearch:focus,
+.mField input:focus,
+.mFieldFull input:focus {
+  border-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
+  background: var(--color-surface);
+}
+
+.mOptionList {
+  max-height: 168px;
+  overflow-y: auto;
+  display: grid;
+  gap: 3px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mOption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 11px;
+  background: var(--color-surface-muted);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 0.88rem;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.mOption:active { background: var(--color-surface-strong); }
+
+.mOptionSelected {
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent) 55%, transparent);
+  box-shadow: inset 3px 0 0 var(--color-accent);
+  font-weight: 650;
+}
+
+.mOptionName { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mOptionMeta { flex-shrink: 0; font-size: 0.76rem; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+
+.mFieldRow { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mField, .mFieldFull { display: flex; flex-direction: column; gap: 5px; }
+
+.mField > span,
+.mFieldFull > span {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-soft);
+}
+
+.mField input, .mFieldFull input { font-variant-numeric: tabular-nums; }
+
+.mEditorActions { display: flex; align-items: center; gap: 8px; margin-top: 2px; }
+
+.mIconBtn {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  appearance: none;
-  background: color-mix(in srgb, var(--color-surface) 85%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
-  border-radius: 10px;
-  padding: 0.5rem 0.7rem;
-  font-family: inherit;
-  font-size: 0.84rem;
-  font-weight: 600;
+  justify-content: center;
+  width: 40px;
+  height: 38px;
+  background: var(--color-surface-muted);
+  border: 1px solid transparent;
+  border-radius: 11px;
   color: var(--color-text-soft);
   cursor: pointer;
 }
 
-.mobileProcActions button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
+.mIconBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+.mEditorActions svg { width: 15px; height: 15px; }
 
-.mobileProcActions button svg {
-  width: 14px;
-  height: 14px;
-}
-
-.mobileProcActions .mobileProcDelete {
+.mDeleteBtn {
   margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  height: 38px;
+  background: color-mix(in srgb, var(--color-danger-text) 9%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-danger-text) 28%, transparent);
+  border-radius: 11px;
   color: var(--color-danger-text);
-  border-color: color-mix(in srgb, var(--color-danger-text) 30%, var(--color-border));
+  font-family: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
 }
 
-.mobileAddLabel {
+.mAddCard {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 13px;
+  background: transparent;
+  border: 1.5px dashed color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
+  border-radius: 16px;
   color: var(--color-accent);
+  font-family: inherit;
+  font-size: 0.9rem;
   font-weight: 650;
+  cursor: pointer;
+  margin-bottom: 18px;
 }
 
-.mobileTotalValue {
-  color: var(--color-text);
-  font-weight: 800;
-  font-size: 1.05rem;
+.mAddCard svg { width: 16px; height: 16px; }
+.mAddCard:disabled { opacity: 0.5; }
+
+.mOverrideCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 12px 14px;
+  margin-bottom: 6px;
 }
+
+.mOverrideLabel { font-size: 0.85rem; color: var(--color-text-soft); }
+.mOverrideInput { display: inline-flex; align-items: center; gap: 5px; }
+
+.mOverrideInput input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 94px;
+  text-align: right;
+  background: var(--color-surface-muted);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 0 10px;
+  height: 38px;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text);
+  outline: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.mOverrideInput input:focus { border-color: color-mix(in srgb, var(--color-accent) 50%, transparent); background: var(--color-surface); }
+.mOverrideInput > span { font-size: 0.85rem; color: var(--color-text-muted); }
+
+/* ── Sticky total bar + send CTA ── */
+.mTotalBar {
+  flex-shrink: 0;
+  display: grid;
+  gap: 11px;
+  padding: 13px 16px calc(13px + env(safe-area-inset-bottom));
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  box-shadow: 0 -10px 24px -18px rgba(15, 23, 42, 0.3);
+}
+
+.mTotalRow { display: flex; align-items: center; gap: 12px; }
+.mTotalInfo { display: flex; flex-direction: column; }
+.mTotalLabel { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: var(--color-text-soft); }
+.mTotalSub { font-size: 0.74rem; color: var(--color-text-muted); }
+
+.mTotalValue {
+  margin-left: auto;
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.mSendBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 50px;
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+  border: 0;
+  border-radius: 14px;
+  font-family: inherit;
+  font-size: 0.98rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 12px 26px -12px color-mix(in srgb, var(--color-accent) 75%, transparent);
+}
+
+.mSendBtn:disabled { opacity: 0.7; cursor: not-allowed; }
+.mSendBtn svg { width: 16px; height: 16px; }
 
 @keyframes fadeIn {
   from { opacity: 0; }

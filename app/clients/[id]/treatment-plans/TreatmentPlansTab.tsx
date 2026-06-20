@@ -695,6 +695,7 @@ export default function TreatmentPlansTab({
           plan={selectedPlan}
           dentists={dentists}
           canEdit={canEdit}
+          clientName={client?.name || clientName}
           onSaved={(plan, opts) => {
             upsertPlan(plan);
             setSelectedPlan(null);

@@ -51,10 +51,16 @@ type Props = {
   plan: TreatmentPlan;
   dentists: DentistOption[];
   canEdit: boolean;
+  clientName?: string;
   onSaved: (plan: TreatmentPlan, opts?: { share?: boolean }) => void;
   onCancel: () => void;
   onToast: (kind: 'success' | 'error', message: string) => void;
 };
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase() || '·';
+}
 
 function newRow(): TreatmentPlanItem {
   return {
@@ -139,13 +145,21 @@ function IconPlus() {
   );
 }
 
+function IconSend() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M22 2 11 13" /><path d="M22 2 15 22l-4-9-9-4 20-7z" />
+    </svg>
+  );
+}
+
 /** lower-case + strip diacritics so "consultaţie" matches "cons". */
 function normalizeSearch(value: string): string {
   return value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 }
 
-/** One procedure rendered as an iOS-style expandable row, matching the
- *  appointment sheet's service section (m.row → m.expanded → m.option). */
+/** A procedure as a compact phone card: collapsed summary row that opens a
+ *  tight inline editor (scrollable picker + qty/cost + details + actions). */
 function MobileProcedureItem({
   item, index, total, services, disabled, isOpen, onToggle,
   onPick, onText, onQuantity, onCost, onDetails, onMove, onRemove,
@@ -169,84 +183,72 @@ function MobileProcedureItem({
   const matches = useMemo(() => {
     const sorted = [...services].sort((a, b) => normalizeSearch(a.name).localeCompare(normalizeSearch(b.name), 'ro'));
     const q = normalizeSearch(query);
-    return (q ? sorted.filter((s) => normalizeSearch(s.name).includes(q)) : sorted).slice(0, 24);
+    return (q ? sorted.filter((s) => normalizeSearch(s.name).includes(q)) : sorted).slice(0, 40);
   }, [services, query]);
   const hasName = item.procedure.trim().length > 0;
+  const unit = Number(item.unit_price) > 0 ? ` · ${formatMoney(Number(item.unit_price))} lei/buc` : '';
 
   return (
-    <div className={m.section}>
-      <button type="button" className={m.row} onClick={onToggle} disabled={disabled}>
-        <span className={`${m.rowIcon} ${styles.mobileProcNum}`}>{index + 1}</span>
-        <div className={m.rowMain}>
-          <div className={`${m.rowLabel} ${hasName ? '' : m.rowLabelMuted}`}>
+    <div className={`${styles.mProcCard} ${isOpen ? styles.mProcCardOpen : ''}`}>
+      <button type="button" className={styles.mProcHead} onClick={onToggle} disabled={disabled}>
+        <span className={styles.mProcNum}>{index + 1}</span>
+        <span className={styles.mProcMain}>
+          <span className={`${styles.mProcName} ${hasName ? '' : styles.mProcNameMuted}`}>
             {hasName ? item.procedure.trim() : 'Procedură nouă'}
-          </div>
-          <div className={m.rowValue}>{item.quantity} buc · {formatMoney(Number(item.line_total || 0))} lei</div>
-        </div>
-        {!disabled && (
-          <span className={`${m.rowChevron} ${isOpen ? m.rowChevronOpen : ''}`}><IconChevron /></span>
-        )}
+          </span>
+          <span className={styles.mProcMeta}>{item.quantity} buc{unit}</span>
+        </span>
+        <span className={styles.mProcPrice}>{formatMoney(Number(item.line_total || 0))} lei</span>
+        {!disabled && <span className={`${styles.mProcChevron} ${isOpen ? styles.mProcChevronOpen : ''}`}><IconChevron /></span>}
       </button>
       {isOpen && !disabled && (
-        <div className={m.expanded}>
+        <div className={styles.mProcEditor}>
           <input
             type="text"
-            className={m.serviceSearch}
+            className={styles.mSearch}
             value={query}
             placeholder="Caută serviciu sau scrie liber…"
             onChange={(event) => { setQuery(event.target.value); onText(event.target.value); }}
             aria-label="Caută serviciu"
           />
-          {matches.map((service) => (
-            <button
-              key={service.id}
-              type="button"
-              className={`${m.option} ${item.procedure === service.name ? m.optionSelected : ''}`}
-              onClick={() => { onPick(service); setQuery(''); }}
-            >
-              <span>{service.name}</span>
-              {typeof service.price === 'number' && service.price > 0 && (
-                <span className={m.optionMeta}>{service.price} lei</span>
-              )}
-            </button>
-          ))}
-          <div className={m.recurrenceGrid}>
-            <div className={m.recurrenceField}>
-              <span className={m.recurrenceFieldLabel}>Cantitate</span>
-              <input
-                className={m.recurrenceInput}
-                type="number" min={1} step="0.5" inputMode="decimal"
-                value={item.quantity}
-                onChange={(event) => onQuantity(Number(event.target.value))}
-                aria-label="Cantitate"
-              />
+          {matches.length > 0 && (
+            <div className={styles.mOptionList}>
+              {matches.map((service) => (
+                <button
+                  key={service.id}
+                  type="button"
+                  className={`${styles.mOption} ${item.procedure === service.name ? styles.mOptionSelected : ''}`}
+                  onClick={() => { onPick(service); setQuery(''); }}
+                >
+                  <span className={styles.mOptionName}>{service.name}</span>
+                  {typeof service.price === 'number' && service.price > 0 && (
+                    <span className={styles.mOptionMeta}>{service.price} lei</span>
+                  )}
+                </button>
+              ))}
             </div>
-            <div className={m.recurrenceField}>
-              <span className={m.recurrenceFieldLabel}>Cost (lei)</span>
-              <input
-                className={m.recurrenceInput}
-                type="number" min={0} step="1" inputMode="decimal"
-                value={item.line_total}
-                onChange={(event) => onCost(Number(event.target.value))}
-                aria-label="Cost"
-              />
-            </div>
+          )}
+          <div className={styles.mFieldRow}>
+            <label className={styles.mField}>
+              <span>Cantitate</span>
+              <input type="number" min={1} step="0.5" inputMode="decimal" value={item.quantity}
+                onChange={(event) => onQuantity(Number(event.target.value))} aria-label="Cantitate" />
+            </label>
+            <label className={styles.mField}>
+              <span>Cost (lei)</span>
+              <input type="number" min={0} step="1" inputMode="decimal" value={item.line_total}
+                onChange={(event) => onCost(Number(event.target.value))} aria-label="Cost" />
+            </label>
           </div>
-          <div className={m.recurrenceField} style={{ marginTop: '0.65rem' }}>
-            <span className={m.recurrenceFieldLabel}>Detalii (opțional)</span>
-            <input
-              className={m.recurrenceInput}
-              type="text"
-              value={item.details}
-              placeholder="Note pentru această procedură"
-              onChange={(event) => onDetails(event.target.value)}
-              aria-label="Detalii"
-            />
-          </div>
-          <div className={styles.mobileProcActions}>
-            <button type="button" onClick={() => onMove(-1)} disabled={index === 0}><IconUp /> Sus</button>
-            <button type="button" onClick={() => onMove(1)} disabled={index === total - 1}><IconDown /> Jos</button>
-            <button type="button" className={styles.mobileProcDelete} onClick={onRemove}><IconTrash /> Șterge</button>
+          <label className={styles.mFieldFull}>
+            <span>Detalii (opțional)</span>
+            <input type="text" value={item.details} placeholder="Note pentru această procedură"
+              onChange={(event) => onDetails(event.target.value)} aria-label="Detalii" />
+          </label>
+          <div className={styles.mEditorActions}>
+            <button type="button" className={styles.mIconBtn} onClick={() => onMove(-1)} disabled={index === 0} aria-label="Mută mai sus"><IconUp /></button>
+            <button type="button" className={styles.mIconBtn} onClick={() => onMove(1)} disabled={index === total - 1} aria-label="Mută mai jos"><IconDown /></button>
+            <button type="button" className={styles.mDeleteBtn} onClick={onRemove}><IconTrash /> Șterge</button>
           </div>
         </div>
       )}
@@ -259,6 +261,7 @@ export default function PlanBuilder({
   plan,
   dentists,
   canEdit,
+  clientName,
   onSaved,
   onCancel,
   onToast,
@@ -561,150 +564,145 @@ export default function PlanBuilder({
               {readOnly ? (
                 <span aria-hidden style={{ width: 64 }} />
               ) : (
-                <button type="button" className={`${m.actionBtn} ${m.actionBtnPrimary}`} onClick={() => save({ share: true })} disabled={saving}>
-                  {saving ? <Spinner size={14} thickness={2} centered={false} label="Salvare" /> : 'Salveaza + trimite'}
+                <button type="button" className={`${m.actionBtn} ${m.actionBtnPrimary}`} onClick={() => save()} disabled={saving}>
+                  {saving ? <Spinner size={14} thickness={2} centered={false} label="Salvare" /> : 'Salvează'}
                 </button>
               )}
             </div>
             <div className={m.body}>
-              {readOnly && (
-                <div className={m.banner}>
-                  <span className={m.bannerIcon} aria-hidden>🔒</span>
-                  Plan {STATUS_LABELS[plan.status].toLowerCase()} — blocat pentru editare. Duplică-l pentru o revizie nouă.
-                </div>
-              )}
-              {!plan.id && plan.source_appointment_label && (
-                <div className={m.banner}>
-                  <span className={m.bannerIcon} aria-hidden>↩</span>
-                  {plan.source_appointment_label}
-                </div>
-              )}
-
-              {/* ── Detaliile planului ── */}
-              <div className={m.section}>
-                <div className={m.timeBlock}>
-                  <span className={m.rowIcon}><IconCalendar /></span>
-                  <div className={m.timeBlockMain}>
-                    <div className={m.timeBlockGroup}>
-                      <span className={m.timeBlockLabel}>Data</span>
-                      <span className={m.timeBlockValueArea}>
-                        <input
-                          type="date"
-                          className={m.nativeDateInput}
-                          value={planDate}
-                          onChange={(event) => setPlanDate(event.target.value)}
-                          disabled={readOnly || saving}
-                        />
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className={m.section}>
-                <button
-                  type="button"
-                  className={m.row}
-                  onClick={() => !readOnly && setMedicOpen((open) => !open)}
-                  disabled={readOnly}
-                >
-                  <span className={m.rowIcon}><IconUser /></span>
-                  <div className={m.rowMain}>
-                    <div className={m.rowLabel}>Medic</div>
-                    <div className={m.rowValue}>
-                      {dentists.find((d) => d.userId === doctorUserId)?.name || 'Selectează medicul'}
-                    </div>
-                  </div>
-                  {!readOnly && (
-                    <span className={`${m.rowChevron} ${medicOpen ? m.rowChevronOpen : ''}`}><IconChevron /></span>
-                  )}
-                </button>
-                {medicOpen && !readOnly && (
-                  <div className={m.expanded}>
-                    {dentists.map((dentist) => (
-                      <button
-                        key={dentist.userId}
-                        type="button"
-                        className={`${m.option} ${dentist.userId === doctorUserId ? m.optionSelected : ''}`}
-                        onClick={() => { setDoctorUserId(dentist.userId); setMedicOpen(false); }}
-                      >
-                        <span>{dentist.name}</span>
-                        {dentist.doctorSpecialty && <span className={m.optionMeta}>{dentist.doctorSpecialty}</span>}
-                      </button>
-                    ))}
+              <div className={styles.mPad}>
+                {readOnly && (
+                  <div className={styles.mNote}>
+                    Plan {STATUS_LABELS[plan.status].toLowerCase()} — blocat pentru editare. Duplică-l pentru o revizie nouă.
                   </div>
                 )}
-              </div>
+                {!plan.id && plan.source_appointment_label && (
+                  <div className={styles.mNote}>{plan.source_appointment_label}</div>
+                )}
 
-              {/* ── Proceduri ── */}
-              <div className={styles.mobileSectionTitle}>Proceduri</div>
-              {items.map((item, index) => (
-                <MobileProcedureItem
-                  key={index}
-                  item={item}
-                  index={index}
-                  total={items.length}
-                  services={services}
-                  disabled={readOnly || saving}
-                  isOpen={openProcedure === index}
-                  onToggle={() => setOpenProcedure((current) => (current === index ? null : index))}
-                  onPick={(service) => pickService(index, service)}
-                  onText={(text) => setProcedureText(index, text)}
-                  onQuantity={(n) => updateQuantity(index, n)}
-                  onCost={(n) => updateItem(index, { line_total: n })}
-                  onDetails={(text) => updateItem(index, { details: text })}
-                  onMove={(dir) => moveRow(index, dir)}
-                  onRemove={() => {
-                    setItems((prev) => (prev.length === 1 ? [newRow()] : prev.filter((_, i) => i !== index)));
-                    setOpenProcedure(null);
-                  }}
-                />
-              ))}
-              {!readOnly && (
-                <div className={m.section}>
-                  <button
-                    type="button"
-                    className={m.row}
-                    onClick={() => { setItems((prev) => [...prev, newRow()]); setOpenProcedure(items.length); }}
-                    disabled={saving}
-                  >
-                    <span className={m.rowIcon}><IconPlus /></span>
-                    <div className={m.rowMain}>
-                      <div className={`${m.rowLabel} ${styles.mobileAddLabel}`}>Adaugă procedură</div>
-                    </div>
-                  </button>
-                </div>
-              )}
+                {clientName && (
+                  <div className={styles.mPatientChip}>
+                    <span className={styles.mPatientAvatar}>{initials(clientName)}</span>
+                    <span className={styles.mPatientText}>
+                      <span className={styles.mPatientName}>{clientName}</span>
+                      <span className={styles.mPatientSub}>Plan de tratament</span>
+                    </span>
+                  </div>
+                )}
 
-              {/* ── Total ── */}
-              <div className={styles.mobileSectionTitle}>Total</div>
-              <div className={m.section}>
-                <div className={`${m.row} ${m.rowStatic}`}>
-                  <span className={m.rowIcon} aria-hidden />
-                  <div className={m.rowMain}><div className={m.rowLabel}>Total calculat</div></div>
-                  <span className={m.rowTrailing}>{formatMoney(computedTotal)} lei</span>
-                </div>
-                <div className={m.inputRowWithLabel}>
-                  <span className={m.rowIcon} aria-hidden />
-                  <div className={m.inputRowMain}>
-                    <span className={m.inputRowLabel}>Total manual (opțional)</span>
+                {/* ── Detaliile planului ── */}
+                <div className={styles.mCard}>
+                  <div className={styles.mCardRow}>
+                    <span className={styles.mCardIcon}><IconCalendar /></span>
+                    <span className={styles.mCardLabel}>Data</span>
                     <input
-                      className={m.inputBare}
-                      type="number" min={0} step="0.01" inputMode="decimal"
-                      value={totalOverride}
-                      placeholder="Lasă gol pentru totalul calculat"
-                      onChange={(event) => setTotalOverride(event.target.value)}
+                      type="date"
+                      className={styles.mDateValue}
+                      value={planDate}
+                      onChange={(event) => setPlanDate(event.target.value)}
                       disabled={readOnly || saving}
                     />
                   </div>
+                  <button
+                    type="button"
+                    className={`${styles.mCardRow} ${styles.mCardRowBtn} ${styles.mCardRowDivided}`}
+                    onClick={() => !readOnly && setMedicOpen((open) => !open)}
+                    disabled={readOnly}
+                  >
+                    <span className={styles.mCardIcon}><IconUser /></span>
+                    <span className={styles.mCardLabel}>Medic</span>
+                    <span className={styles.mCardValue}>{dentists.find((d) => d.userId === doctorUserId)?.name || 'Alege medicul'}</span>
+                    {!readOnly && <span className={`${styles.mProcChevron} ${medicOpen ? styles.mProcChevronOpen : ''}`}><IconChevron /></span>}
+                  </button>
+                  {medicOpen && !readOnly && (
+                    <div className={styles.mMedicList}>
+                      {dentists.map((dentist) => (
+                        <button
+                          key={dentist.userId}
+                          type="button"
+                          className={`${styles.mOption} ${dentist.userId === doctorUserId ? styles.mOptionSelected : ''}`}
+                          onClick={() => { setDoctorUserId(dentist.userId); setMedicOpen(false); }}
+                        >
+                          <span className={styles.mOptionName}>{dentist.name}</span>
+                          {dentist.doctorSpecialty && <span className={styles.mOptionMeta}>{dentist.doctorSpecialty}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className={`${m.row} ${m.rowStatic}`}>
-                  <span className={m.rowIcon} aria-hidden />
-                  <div className={m.rowMain}><div className={m.rowLabel}>Total general</div></div>
-                  <span className={`${m.rowTrailing} ${styles.mobileTotalValue}`}>{formatMoney(finalTotal)} lei</span>
+
+                {/* ── Proceduri ── */}
+                <div className={styles.mGroupHead}>
+                  <span>Proceduri</span>
+                  <span className={styles.mGroupCount}>{items.length} {items.length === 1 ? 'procedură' : 'proceduri'}</span>
                 </div>
+                {items.map((item, index) => (
+                  <MobileProcedureItem
+                    key={index}
+                    item={item}
+                    index={index}
+                    total={items.length}
+                    services={services}
+                    disabled={readOnly || saving}
+                    isOpen={openProcedure === index}
+                    onToggle={() => setOpenProcedure((current) => (current === index ? null : index))}
+                    onPick={(service) => pickService(index, service)}
+                    onText={(text) => setProcedureText(index, text)}
+                    onQuantity={(n) => updateQuantity(index, n)}
+                    onCost={(n) => updateItem(index, { line_total: n })}
+                    onDetails={(text) => updateItem(index, { details: text })}
+                    onMove={(dir) => moveRow(index, dir)}
+                    onRemove={() => {
+                      setItems((prev) => (prev.length === 1 ? [newRow()] : prev.filter((_, i) => i !== index)));
+                      setOpenProcedure(null);
+                    }}
+                  />
+                ))}
+                {!readOnly && (
+                  <button
+                    type="button"
+                    className={styles.mAddCard}
+                    onClick={() => { setItems((prev) => [...prev, newRow()]); setOpenProcedure(items.length); }}
+                    disabled={saving}
+                  >
+                    <IconPlus /> Adaugă procedură
+                  </button>
+                )}
+
+                {!readOnly && (
+                  <div className={styles.mOverrideCard}>
+                    <span className={styles.mOverrideLabel}>Total manual (opțional)</span>
+                    <div className={styles.mOverrideInput}>
+                      <input
+                        type="number" min={0} step="0.01" inputMode="decimal"
+                        value={totalOverride}
+                        placeholder={`${formatMoney(computedTotal)}`}
+                        onChange={(event) => setTotalOverride(event.target.value)}
+                        disabled={saving}
+                      />
+                      <span>lei</span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
+
+            {!readOnly && (
+              <div className={styles.mTotalBar}>
+                <div className={styles.mTotalRow}>
+                  <div className={styles.mTotalInfo}>
+                    <span className={styles.mTotalLabel}>Total general</span>
+                    <span className={styles.mTotalSub}>{totalOverride.trim() ? 'total manual' : 'calculat din proceduri'}</span>
+                  </div>
+                  <span className={styles.mTotalValue}>{formatMoney(finalTotal)} lei</span>
+                </div>
+                <button type="button" className={styles.mSendBtn} onClick={() => save({ share: true })} disabled={saving}>
+                  {saving
+                    ? <><Spinner size={15} thickness={2} centered={false} label="Salvare" /><span>Se salvează…</span></>
+                    : <><IconSend /><span>Salvează și trimite</span></>}
+                </button>
+              </div>
+            )}
           </Drawer.Content>
         </Drawer.Portal>
       </Drawer.Root>
