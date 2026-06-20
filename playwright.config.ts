@@ -1,7 +1,42 @@
+import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 
 const port = 3199;
 const baseURL = `http://127.0.0.1:${port}`;
+
+// Authenticated coverage is opt-in: it needs a seeded DB + credentials, so the
+// default gate (CI) stays public-only until those are wired into the pipeline.
+const authEnabled = Boolean(process.env.E2E_AUTH);
+const ownerStorageState = path.join(__dirname, 'tests', 'e2e', '.auth', 'owner.json');
+
+const publicProjects = [
+  {
+    name: 'desktop-chromium',
+    testMatch: /public-smoke\.spec\.ts/,
+    use: { ...devices['Desktop Chrome'] },
+  },
+  {
+    name: 'mobile-chromium',
+    testMatch: /public-smoke\.spec\.ts/,
+    use: { ...devices['Pixel 7'] },
+  },
+];
+
+const authProjects = [
+  { name: 'auth-setup', testMatch: /auth\.setup\.ts/ },
+  {
+    name: 'authenticated-desktop',
+    testMatch: /authenticated-.*\.spec\.ts/,
+    dependencies: ['auth-setup'],
+    use: { ...devices['Desktop Chrome'], storageState: ownerStorageState },
+  },
+  {
+    name: 'authenticated-mobile',
+    testMatch: /authenticated-.*\.spec\.ts/,
+    dependencies: ['auth-setup'],
+    use: { ...devices['Pixel 7'], storageState: ownerStorageState },
+  },
+];
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -15,16 +50,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  projects: [
-    {
-      name: 'desktop-chromium',
-      use: { ...devices['Desktop Chrome'] },
-    },
-    {
-      name: 'mobile-chromium',
-      use: { ...devices['Pixel 7'] },
-    },
-  ],
+  projects: authEnabled ? [...publicProjects, ...authProjects] : publicProjects,
   webServer: {
     command: `npm run start -- -p ${port}`,
     url: `${baseURL}/login`,
