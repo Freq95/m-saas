@@ -35,6 +35,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
     "test:webhooks": "node scripts/test-webhooks.js",
     "yahoo:sync": "node scripts/sync-yahoo.js",
     "test:yahoo": "node scripts/test-yahoo.js",
