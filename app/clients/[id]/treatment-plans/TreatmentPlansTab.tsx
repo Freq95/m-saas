@@ -6,6 +6,7 @@ import PlanBuilder, { type DentistOption, type TreatmentPlan } from './PlanBuild
 import styles from './treatment-plans.module.css';
 import Spinner from '@/components/Spinner';
 import { ConfirmModal } from '@/app/calendar/components/modals/ConfirmModal';
+import { useModal } from '@/lib/useModal';
 
 type ClientInfo = {
   id: number;
@@ -283,6 +284,12 @@ export default function TreatmentPlansTab({
   const [busyId, setBusyId] = useState<number | null>(null);
   const [share, setShare] = useState<ShareSheet | null>(null);
   const [shareBusy, setShareBusy] = useState(false);
+  // Share dialog accessibility: initial focus, focus restore, Escape, backdrop close.
+  const { overlayProps: shareOverlayProps, dialogProps: shareDialogProps } = useModal({
+    isOpen: share !== null,
+    onClose: () => setShare(null),
+    closeDisabled: shareBusy,
+  });
   const [pendingDeletePlan, setPendingDeletePlan] = useState<TreatmentPlan | null>(null);
   const [openMenuPlanId, setOpenMenuPlanId] = useState<number | null>(null);
   const handledNewPlanKeyRef = useRef<string | null>(null);
@@ -753,10 +760,8 @@ export default function TreatmentPlansTab({
       )}
 
       {share && (
-        <div className={styles.modalBackdrop} role="presentation" onMouseDown={(event) => {
-          if (event.target === event.currentTarget && !shareBusy) setShare(null);
-        }}>
-          <div className={styles.shareSheet} role="dialog" aria-modal="true" aria-labelledby="share-plan-title">
+        <div className={styles.modalBackdrop} role="presentation" {...shareOverlayProps}>
+          <div className={styles.shareSheet} role="dialog" aria-modal="true" aria-labelledby="share-plan-title" {...shareDialogProps}>
             <div className={styles.sheetHandle} />
             <div className={styles.modalHeader}>
               <div>
@@ -902,7 +907,7 @@ export default function TreatmentPlansTab({
       <ConfirmModal
         isOpen={pendingDeletePlan !== null}
         title="Șterge planul?"
-        message={pendingDeletePlan ? `Plan #${pendingDeletePlan.id} va fi șters din lista pacientului. PDF-ul atașat rămâne în fișierele pacientului, dacă există.` : ''}
+        message={pendingDeletePlan ? `Plan #${pendingDeletePlan.id} va fi șters din lista pacientului. PDF-ul atașat, dacă există, va fi de asemenea șters din fișiere.` : ''}
         confirmLabel="Șterge"
         cancelLabel="Renunță"
         tone="danger"
