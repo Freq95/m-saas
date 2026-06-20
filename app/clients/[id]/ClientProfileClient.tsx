@@ -70,12 +70,39 @@ interface Conversation {
   updated_at: string;
 }
 
+interface Note {
+  id: number;
+  title?: string | null;
+  description?: string | null;
+  activity_type?: string | null;
+  activity_date?: string | null;
+  created_at?: string | null;
+  note_collection?: string | null;
+  start_time?: string | null;
+  appointment_date?: string | null;
+  appointment_service_name?: string | null;
+}
+
+interface ClientFile {
+  id: number;
+  name?: string | null;
+  original_filename?: string | null;
+  file_size?: number | null;
+  mime_type?: string | null;
+  created_at?: string | null;
+}
+
+interface ClientStats {
+  completed_appointments?: number;
+  no_show_rate?: number;
+}
+
 interface ClientProfileClientProps {
   clientId: string;
   initialClient: Client | null;
   initialAppointments: Appointment[];
   initialConversations: Conversation[];
-  initialStats: any | null;
+  initialStats: ClientStats | null;
   canEditDental: boolean;
   canEditTreatmentPlans: boolean;
 }
@@ -115,16 +142,16 @@ export default function ClientProfileClient({
   const [client, setClient] = useState<Client | null>(initialClient);
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
   const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
-  const [files, setFiles] = useState<any[]>([]);
-  const [notes, setNotes] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>(initialStats);
+  const [files, setFiles] = useState<ClientFile[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [stats, setStats] = useState<ClientStats | null>(initialStats);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => normalizeProfileTab(searchParams.get('tab')));
   const [showAddNote, setShowAddNote] = useState(false);
   const [showEditClient, setShowEditClient] = useState(false);
   const [pendingDeleteFileId, setPendingDeleteFileId] = useState<number | null>(null);
-  const [editingNote, setEditingNote] = useState<any | null>(null);
-  const [pendingDeleteNote, setPendingDeleteNote] = useState<any | null>(null);
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [pendingDeleteNote, setPendingDeleteNote] = useState<Note | null>(null);
   const [noteContent, setNoteContent] = useState('');
   const [editNoteContent, setEditNoteContent] = useState('');
   const [showGdprErase, setShowGdprErase] = useState(false);
@@ -290,7 +317,7 @@ export default function ClientProfileClient({
     }
   };
 
-  const handleEditNote = (note: any) => {
+  const handleEditNote = (note: Note) => {
     setEditingNote(note);
     setEditNoteContent(note.description || note.title || '');
   };
@@ -322,7 +349,7 @@ export default function ClientProfileClient({
     }
   };
 
-  const handleDeleteNote = (note: any) => setPendingDeleteNote(note);
+  const handleDeleteNote = (note: Note) => setPendingDeleteNote(note);
 
   const confirmDeleteNote = async () => {
     if (!pendingDeleteNote) return;
@@ -712,7 +739,7 @@ export default function ClientProfileClient({
           </div>
           <div className={styles.statDivider} />
           <div className={styles.stat}>
-            <span className={`${styles.statValue} ${stats?.no_show_rate > 20 ? styles.statValueWarn : ''}`}>
+            <span className={`${styles.statValue} ${(stats?.no_show_rate ?? 0) > 20 ? styles.statValueWarn : ''}`}>
               {stats?.no_show_rate != null ? (
                 <>{stats.no_show_rate.toFixed(1)}<span className={styles.statUnit}>%</span></>
               ) : '—'}
@@ -787,12 +814,12 @@ export default function ClientProfileClient({
               <div className={styles.rowList}>
                 {notes.map((note) => (
                   <div key={`${note.activity_type || 'note'}-${note.id}`} className={styles.noteRow}>
-                    <span className={styles.noteDate}>{formatDate(note.activity_date || note.created_at)}</span>
+                    <span className={styles.noteDate}>{formatDate(note.activity_date || note.created_at || null)}</span>
                     <div className={styles.noteInfo}>
                       <span className={styles.noteText}>{note.description || note.title}</span>
                       {note.activity_type === 'appointment_note' && (
                         <span className={styles.noteMeta}>
-                          {note.appointment_service_name || 'Programare'} - {formatDate(note.appointment_date || note.start_time)}
+                          {note.appointment_service_name || 'Programare'} - {formatDate(note.appointment_date || note.start_time || null)}
                         </span>
                       )}
                     </div>
@@ -917,7 +944,7 @@ export default function ClientProfileClient({
                       <div className={styles.fileInfo}>
                         <span className={styles.fileName}>{file.original_filename}</span>
                         <span className={styles.fileMeta}>
-                          {(file.file_size / 1024).toFixed(1)} KB · {formatDate(file.created_at)}
+                          {((file.file_size ?? 0) / 1024).toFixed(1)} KB · {formatDate(file.created_at ?? null)}
                         </span>
                       </div>
                       <div className={styles.fileActions}>

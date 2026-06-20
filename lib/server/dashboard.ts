@@ -2,6 +2,24 @@ import { format, startOfDay, endOfDay, subDays, startOfWeek, endOfWeek, addDays,
 import { getMongoDbOrThrow, stripMongoId } from '@/lib/db/mongo-utils';
 import { ObjectId } from 'mongodb';
 
+// Loosely-typed projections of the Mongo docs this module reads. Typing them
+// (vs `any`) catches field-name typos and missing null-handling at compile time.
+type DashAppointment = {
+  id: number;
+  client_id?: number | null;
+  service_id?: number;
+  service_name?: string;
+  client_name: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  price_at_time?: number;
+  category?: string | null;
+  dentist_id?: number;
+};
+type DashService = { id: number; name?: string; price?: number };
+type DashCountRow = { _id?: string; count?: number; total?: number };
+
 type DashboardData = {
   messagesPerDay: Array<{ date: string; count: number }>;
   appointmentsPerDay: Array<{ date: string; count: number }>;
@@ -314,7 +332,7 @@ export async function getDashboardData(
       ];
       const messagesAggCursor = db.collection('messages').aggregate(messagesPipeline);
       const messageRows = await messagesAggCursor.toArray();
-      for (const row of messageRows as any[]) {
+      for (const row of messageRows as DashCountRow[]) {
         if (typeof row?._id === 'string') {
           messagesPerDayMap.set(row._id, row.count || 0);
         }
@@ -340,7 +358,7 @@ export async function getDashboardData(
     const serviceIds = Array.from(
       new Set(
         [...appointmentsInRange, ...todayAppointmentsRaw, ...monthAppointmentsRaw]
-          .map((appointment: any) => appointment.service_id)
+          .map((appointment) => appointment.service_id)
           .filter((serviceId: unknown): serviceId is number => typeof serviceId === 'number')
       )
     );
@@ -353,22 +371,22 @@ export async function getDashboardData(
       )
       .project({ id: 1, name: 1, price: 1 });
     const services = serviceIds.length > 0 ? await servicesQuery.toArray() : [];
-    const servicesMap = new Map<number, any>(services.map((service: any) => [service.id, service]));
+    const servicesMap = new Map<number, DashService>((services as DashService[]).map((service) => [service.id, service]));
 
-    const normalizedAppointmentStatuses = (appointmentsInRange as any[]).map((appointment: any) => ({
+    const normalizedAppointmentStatuses = (appointmentsInRange as DashAppointment[]).map((appointment) => ({
       ...appointment,
       status: appointment.status === 'no_show' ? 'no-show' : appointment.status,
     }));
     const noShows = normalizedAppointmentStatuses.filter(
-      (appointment: any) => appointment.status === 'no-show'
+      (appointment) => appointment.status === 'no-show'
     ).length;
-    const totalAppointments = normalizedAppointmentStatuses.filter((appointment: any) =>
+    const totalAppointments = normalizedAppointmentStatuses.filter((appointment) =>
       ['scheduled', 'completed', 'no-show', 'cancelled'].includes(appointment.status)
     ).length;
     const noShowRate = totalAppointments > 0 ? (noShows / totalAppointments) * 100 : 0;
 
-    const estimatedRevenue = (appointmentsInRange as any[])
-      .filter((appointment: any) => ['scheduled', 'completed'].includes(appointment.status))
+    const estimatedRevenue = (appointmentsInRange as DashAppointment[])
+      .filter((appointment) => ['scheduled', 'completed'].includes(appointment.status))
       .reduce((sum: number, appointment: any) => {
         const service = servicesMap.get(appointment.service_id);
         const price = typeof appointment.price_at_time === 'number'
@@ -398,7 +416,7 @@ export async function getDashboardData(
       { $group: { _id: { $substrBytes: ['$start_time', 0, 10] }, count: { $sum: 1 } } },
     ]).toArray();
     const weekCountByDate = new Map<string, number>();
-    for (const row of weekRows as any[]) {
+    for (const row of weekRows as DashCountRow[]) {
       if (typeof row?._id === 'string') weekCountByDate.set(row._id, row.count || 0);
     }
     const calWeekStartDate = startOfWeek(now, { weekStartsOn: 1 });
@@ -439,17 +457,17 @@ export async function getDashboardData(
       })
       .project({ status: 1 })
       .toArray();
-    const prevCountable = (prevRangeAppts as any[]).filter((a: any) =>
+    const prevCountable = (prevRangeAppts as DashAppointment[]).filter((a) =>
       ['scheduled', 'completed', 'no-show', 'no_show', 'cancelled'].includes(a.status)
     );
-    const prevNoShows = prevCountable.filter((a: any) => a.status === 'no-show' || a.status === 'no_show').length;
+    const prevNoShows = prevCountable.filter((a) => a.status === 'no-show' || a.status === 'no_show').length;
     const prevNoShowRate = prevCountable.length > 0 ? (prevNoShows / prevCountable.length) * 100 : 0;
     const noShowDeltaPct = Math.round((noShowRate - prevNoShowRate) * 10) / 10;
 
     // Resolve dentist display names for today's appointments (multi-dentist clinics).
     const dentistIds = Array.from(new Set(
-      (todayAppointmentsRaw as any[])
-        .map((a: any) => a.dentist_id)
+      (todayAppointmentsRaw as DashAppointment[])
+        .map((a) => a.dentist_id)
         .filter((id: unknown): id is number => typeof id === 'number')
     ));
     const dentistDocs = dentistIds.length > 0
@@ -464,26 +482,26 @@ export async function getDashboardData(
       dentistDocs.map((d: any) => [d.id, typeof d.name === 'string' ? d.name : ''])
     );
 
-    const urgentCount = (todayAppointmentsRaw as any[])
-      .filter((a: any) => a.category === 'urgenta').length;
+    const urgentCount = (todayAppointmentsRaw as DashAppointment[])
+      .filter((a) => a.category === 'urgenta').length;
 
-    const todayAppointments = (todayAppointmentsRaw as any[]).map((appointment: any) => {
-      const service = servicesMap.get(appointment.service_id);
+    const todayAppointments = (todayAppointmentsRaw as DashAppointment[]).map((appointment) => {
+      const service = appointment.service_id != null ? servicesMap.get(appointment.service_id) : undefined;
       return {
         id: appointment.id,
         client_id: typeof appointment.client_id === 'number' ? appointment.client_id : null,
         client_name: appointment.client_name,
-        service_name: service?.name || (appointment.service_name as string | undefined) || 'Unknown',
+        service_name: service?.name || appointment.service_name || 'Unknown',
         start_time: appointment.start_time,
         end_time: appointment.end_time,
         status: appointment.status === 'no_show' ? 'no-show' : appointment.status,
         category: typeof appointment.category === 'string' ? appointment.category : null,
-        dentist_name: dentistNameById.get(appointment.dentist_id) || null,
+        dentist_name: (appointment.dentist_id != null ? dentistNameById.get(appointment.dentist_id) : null) || null,
       };
     });
 
     const growthCountsByDate = new Map<string, number>();
-    for (const row of clientGrowthRows as any[]) {
+    for (const row of clientGrowthRows as DashCountRow[]) {
       if (typeof row?._id === 'string') {
         growthCountsByDate.set(row._id, row.count || 0);
       }
