@@ -2,10 +2,12 @@ import { ObjectId } from 'mongodb';
 import type { AuthContext } from '@/lib/auth-helpers';
 import { AuthError } from '@/lib/auth-helpers';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
+import { resolveCalendarOwnerScope } from '@/lib/calendar-owner-scope';
 
 export type ClientScope = {
   userId: number;
   tenantId: ObjectId;
+  viaSharedCalendar?: boolean;
 };
 
 export function canAccessClientsFor(auth: AuthContext, targetUserId: number): boolean {
@@ -70,15 +72,49 @@ export async function resolveClientCreateScope(
 
 export async function resolveClientScopeForClient(auth: AuthContext, clientId: number): Promise<ClientScope | null> {
   const db = await getMongoDbOrThrow();
-  const client = await db.collection('clients').findOne({
+  const localClient = await db.collection('clients').findOne({
     id: clientId,
     tenant_id: auth.tenantId,
     deleted_at: { $exists: false },
   });
 
-  if (!client || typeof client.user_id !== 'number') return null;
-  if (!canAccessClientsFor(auth, client.user_id)) return null;
-  return { userId: client.user_id, tenantId: auth.tenantId };
+  if (localClient && typeof localClient.user_id === 'number') {
+    if (!canAccessClientsFor(auth, localClient.user_id)) return null;
+    return { userId: localClient.user_id, tenantId: auth.tenantId };
+  }
+
+  // Numeric client IDs are global. For a cross-tenant patient reached from an
+  // accepted shared calendar, recover the owner scope server-side instead of
+  // trusting tenant/user identifiers supplied by the browser.
+  const sharedClient = await db.collection('clients').findOne({
+    id: clientId,
+    deleted_at: { $exists: false },
+  }, { projection: { id: 1, tenant_id: 1, user_id: 1 } });
+  if (!sharedClient?.tenant_id || typeof sharedClient.user_id !== 'number') return null;
+  const normalizedEmail = auth.email.toLowerCase().trim();
+  const shares = await db.collection('calendar_shares').find({
+    status: 'accepted',
+    $or: normalizedEmail
+      ? [{ shared_with_user_id: auth.dbUserId }, { shared_with_email: normalizedEmail }]
+      : [{ shared_with_user_id: auth.dbUserId }],
+  }, { projection: { calendar_id: 1 } }).toArray();
+  const calendarIds = shares.map((share) => share.calendar_id).filter((id): id is number => Number.isInteger(id));
+  if (calendarIds.length === 0) return null;
+  const calendar = await db.collection('calendars').findOne({
+    id: { $in: calendarIds },
+    tenant_id: sharedClient.tenant_id,
+    owner_user_id: sharedClient.user_id,
+    is_active: true,
+    deleted_at: { $exists: false },
+  }, { projection: { id: 1 } });
+  if (!calendar || typeof calendar.id !== 'number') return null;
+  try {
+    const ownerScope = await resolveCalendarOwnerScope(auth, calendar.id);
+    if (ownerScope.userId !== sharedClient.user_id || !ownerScope.tenantId.equals(sharedClient.tenant_id)) return null;
+    return { userId: ownerScope.userId, tenantId: ownerScope.tenantId, viaSharedCalendar: true };
+  } catch {
+    return null;
+  }
 }
 
 export async function getAssignedClientDentistOptions(auth: AuthContext) {

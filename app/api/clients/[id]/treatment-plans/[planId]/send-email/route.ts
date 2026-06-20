@@ -10,7 +10,9 @@ import { getStorageProvider, isStorageConfigured } from '@/lib/storage';
 import {
   generateTreatmentPlanPdfFile,
   getTreatmentPlan,
+  markTreatmentPlanSent,
   resolveOrIssuePublicLink,
+  revokeTreatmentPlanPublicToken,
 } from '@/lib/server/treatment-plans';
 import { sendTreatmentPlanEmailSchema } from '@/lib/treatment-plans/schemas';
 
@@ -115,20 +117,19 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       attachments,
     });
     if (!result.ok) {
+      await revokeTreatmentPlanPublicToken(
+        { tenantId: scope.tenantId, userId: scope.userId, clientId },
+        planId,
+        link.token
+      );
       return createErrorResponse('Emailul nu a putut fi trimis.', 502, result.reason);
     }
 
-    const now = new Date().toISOString();
-    const updated = await db.collection('treatment_plans').findOneAndUpdate(
-      {
-        id: planId,
-        tenant_id: scope.tenantId,
-        user_id: scope.userId,
-        client_id: clientId,
-        deleted_at: { $exists: false },
-      },
-      { $set: { status: 'sent', sent_at: now, sent_to_email: to, sent_via: 'email', updated_at: now } },
-      { returnDocument: 'after' }
+    const updated = await markTreatmentPlanSent(
+      { tenantId: scope.tenantId, userId: scope.userId, clientId },
+      planId,
+      'email',
+      to
     );
 
     await logDataAccess({

@@ -5,6 +5,7 @@ import { getAuthUser } from '@/lib/auth-helpers';
 import { getStorageProvider, isStorageConfigured } from '@/lib/storage';
 import { invalidateReadCaches } from '@/lib/cache-keys';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
+import { validateUploadBytes } from '@/lib/file-validation';
 
 const MAX_CONSENT_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
@@ -51,16 +52,16 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       return createErrorResponse('File too large. Maximum 5MB.', 400);
     }
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      return createErrorResponse('Invalid file type. Allowed: JPG, PNG, PDF.', 400);
-    }
-
     const storage = getStorageProvider();
     const safeName = sanitizeFilename(file.name) || 'consent.pdf';
     const storageKey = `tenants/${String(tenantId)}/clients/${clientId}/consent/${Date.now()}_${safeName}`;
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    await storage.upload(storageKey, buffer, file.type);
+    const validated = await validateUploadBytes(buffer, file.name, { allowedMimeTypes: ALLOWED_TYPES });
+    if (!validated) {
+      return createErrorResponse('Invalid file content. Allowed: JPG, PNG, PDF.', 400);
+    }
+    await storage.upload(storageKey, buffer, validated.mimeType);
 
     // Delete old consent document if exists
     if (existing.consent_document_key) {

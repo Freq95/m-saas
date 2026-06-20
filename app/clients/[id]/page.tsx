@@ -40,8 +40,8 @@ export default async function ClientProfilePage({ params }: { params: Promise<{ 
     );
   }
   const stats = scope ? await getClientStatsData(clientId, scope.tenantId, scope.userId) : null;
-  const canEditDental = isClinicalRole(auth.role);
-  const canEditTreatmentPlans = isClinicalRole(auth.role);
+  const canEditDental = isClinicalRole(auth.role) && !scope?.viaSharedCalendar;
+  const canEditTreatmentPlans = isClinicalRole(auth.role) && !scope?.viaSharedCalendar;
 
   return (
     <ClientProfileClient

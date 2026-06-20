@@ -46,6 +46,8 @@ import {
   normalizeRoPhone,
   resolveOrIssuePublicLink,
   revokeTreatmentPlanPublicLink,
+  softDeleteTreatmentPlan,
+  updateTreatmentPlan,
 } from '@/lib/server/treatment-plans';
 
 function hashToken(token: string): string {
@@ -57,6 +59,7 @@ function makeCollection(overrides: Partial<Record<string, any>> = {}) {
     findOne: vi.fn(async () => null),
     findOneAndUpdate: vi.fn(async () => null),
     insertOne: vi.fn(async () => ({ acknowledged: true })),
+    deleteOne: vi.fn(async () => ({ deletedCount: 1 })),
     updateMany: vi.fn(async () => ({ modifiedCount: 0 })),
     updateOne: vi.fn(async () => ({ modifiedCount: 0 })),
     ...overrides,
@@ -127,13 +130,22 @@ describe('treatment plan sharing helpers', () => {
     const result = await issueTreatmentPlanPublicLink(scope, 77);
 
     expect(result?.token).toMatch(/^[A-Za-z0-9_-]{32,128}$/);
-    expect(links.insertOne).toHaveBeenCalledTimes(1);
-    const inserted = (links.insertOne as any).mock.calls[0]?.[0] as Doc;
-    expect(inserted.token_hash).toBe(hashToken(result!.token));
+    expect(links.findOneAndUpdate).toHaveBeenCalledTimes(1);
+    const update = (links.findOneAndUpdate as any).mock.calls[0]?.[1] as Doc;
+    expect(update.$set.token_hash).toBe(hashToken(result!.token));
     // Security: the plaintext token must never be persisted.
-    expect(inserted).not.toHaveProperty('token');
-    expect(inserted.expires_at_date).toBeInstanceOf(Date);
-    expect(inserted.expires_at_date.toISOString()).toBe(inserted.expires_at);
+    expect(update.$set).not.toHaveProperty('token');
+    expect(update.$set.expires_at_date).toBeInstanceOf(Date);
+    expect(update.$set.expires_at_date.toISOString()).toBe(update.$set.expires_at);
+    const [filter, , options] = (links.findOneAndUpdate as any).mock.calls[0];
+    expect(filter).toMatchObject({
+      tenant_id: tenantId,
+      user_id: scope.userId,
+      client_id: scope.clientId,
+      plan_id: 77,
+      revoked_at: { $exists: false },
+    });
+    expect(options).toMatchObject({ upsert: true });
   });
 
   it('revokes all active link records for the plan', async () => {
@@ -289,5 +301,39 @@ describe('treatment plan sharing helpers', () => {
     });
     expect(view).not.toHaveProperty('email');
     expect(view).not.toHaveProperty('phone');
+  });
+
+  it('commits plan edits before deleting the stale PDF', async () => {
+    const plan = {
+      id: 77, tenant_id: tenantId, user_id: scope.userId, client_id: scope.clientId,
+      status: 'draft', pdf_file_id: 900,
+      items: [{ procedure: 'Old', details: '', quantity: 1, unit_price: 10, line_total: 10 }],
+      total_override: null,
+    };
+    const plans = makeCollection({
+      findOne: vi.fn(async () => plan),
+      findOneAndUpdate: vi.fn(async () => ({ ...plan, pdf_file_id: null })),
+    });
+    const files = makeCollection({ findOne: vi.fn(async () => ({ id: 900, storage_key: 'old.pdf' })) });
+    mockGetMongoDbOrThrow.mockResolvedValue({ collection: (name: string) => name === 'treatment_plans' ? plans : files });
+
+    await updateTreatmentPlan(scope, { dbUserId: new ObjectId(), role: 'dentist', userId: 42 } as any, 77, {
+      items: [{ service_id: null, procedure: 'New', details: '', quantity: 1, unit_price: 20, line_total: 20 }],
+    });
+
+    expect((plans.findOneAndUpdate as any).mock.invocationCallOrder[0])
+      .toBeLessThan(mockStorageProvider.delete.mock.invocationCallOrder[0]);
+  });
+
+  it('soft-deletes the plan before cleaning up its PDF', async () => {
+    const plan = { id: 77, tenant_id: tenantId, user_id: scope.userId, client_id: scope.clientId, pdf_file_id: 900 };
+    const plans = makeCollection({ findOne: vi.fn(async () => plan), updateOne: vi.fn(async () => ({ matchedCount: 1 })) });
+    const files = makeCollection({ findOne: vi.fn(async () => ({ id: 900, storage_key: 'old.pdf' })) });
+    mockGetMongoDbOrThrow.mockResolvedValue({ collection: (name: string) => name === 'treatment_plans' ? plans : files });
+
+    await softDeleteTreatmentPlan(scope, 77);
+
+    expect((plans.updateOne as any).mock.invocationCallOrder[0])
+      .toBeLessThan(mockStorageProvider.delete.mock.invocationCallOrder[0]);
   });
 });

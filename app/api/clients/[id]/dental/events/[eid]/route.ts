@@ -68,7 +68,17 @@ export async function PATCH(request: NextRequest, props: RouteParams) {
       return createErrorResponse('No fields to update', 400);
     }
 
-    await db.collection('tooth_events').updateOne({ id: eventId }, { $set: updates });
+    const updated = await db.collection('tooth_events').updateOne(
+      {
+        id: eventId,
+        tenant_id: loaded.scope.tenantId,
+        user_id: loaded.scope.userId,
+        client_id: clientId,
+        deleted_at: { $exists: false },
+      },
+      { $set: updates }
+    );
+    if (updated.matchedCount === 0) return createErrorResponse('Event not found', 404);
     await recomputeToothState(
       { tenantId: loaded.scope.tenantId, userId: loaded.scope.userId, clientId },
       loaded.event.tooth_fdi as number
@@ -101,10 +111,17 @@ export async function DELETE(_request: NextRequest, props: RouteParams) {
     if (!loaded.ok) return createErrorResponse(loaded.error, loaded.status);
 
     const db = await getMongoDbOrThrow();
-    await db.collection('tooth_events').updateOne(
-      { id: eventId },
+    const deleted = await db.collection('tooth_events').updateOne(
+      {
+        id: eventId,
+        tenant_id: loaded.scope.tenantId,
+        user_id: loaded.scope.userId,
+        client_id: clientId,
+        deleted_at: { $exists: false },
+      },
       { $set: { deleted_at: new Date().toISOString() } }
     );
+    if (deleted.matchedCount === 0) return createErrorResponse('Event not found', 404);
     await recomputeToothState(
       { tenantId: loaded.scope.tenantId, userId: loaded.scope.userId, clientId },
       loaded.event.tooth_fdi as number

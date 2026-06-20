@@ -463,10 +463,28 @@ export async function updateTreatmentPlan(
     update.doctor_specialty_snapshot = doctor.specialty;
   }
 
-  // Editing line data makes any previously-generated PDF stale; drop it so the
-  // next share/preview regenerates a fresh one. Best-effort file cleanup.
+  // Editing line data makes any previously-generated PDF stale. First commit
+  // the plan change, then remove the superseded object. Reversing that order can
+  // leave a live plan pointing at a file that was already deleted.
   if (editsLineData && existing.pdf_file_id) {
     update.pdf_file_id = null;
+  }
+
+  const result = await db.collection('treatment_plans').findOneAndUpdate(
+    {
+      id: planId,
+      tenant_id: scope.tenantId,
+      user_id: scope.userId,
+      client_id: scope.clientId,
+      deleted_at: { $exists: false },
+    },
+    { $set: update },
+    { returnDocument: 'after' }
+  );
+
+  if (!result) return null;
+
+  if (editsLineData && existing.pdf_file_id) {
     try {
       const oldFile = await db.collection('client_files').findOne({
         id: existing.pdf_file_id,
@@ -482,45 +500,17 @@ export async function updateTreatmentPlan(
         client_id: scope.clientId,
       });
     } catch {
-      // Non-fatal: a leftover file is harmless; the plan no longer points at it.
+      // The plan no longer points at this file; orphan cleanup can safely retry.
     }
   }
 
-  const result = await db.collection('treatment_plans').findOneAndUpdate(
-    {
-      id: planId,
-      tenant_id: scope.tenantId,
-      user_id: scope.userId,
-      client_id: scope.clientId,
-      deleted_at: { $exists: false },
-    },
-    { $set: update },
-    { returnDocument: 'after' }
-  );
-
-  return result ? stripMongoId(result) as TreatmentPlanDoc : null;
+  return stripMongoId(result) as TreatmentPlanDoc;
 }
 
 export async function softDeleteTreatmentPlan(scope: Scope, planId: number): Promise<boolean> {
   const db = await getMongoDbOrThrow();
   const plan = await getTreatmentPlan(scope, planId);
   if (!plan) return false;
-
-  if (plan.pdf_file_id) {
-    const file = await db.collection('client_files').findOne({
-      id: plan.pdf_file_id,
-      tenant_id: scope.tenantId,
-      client_id: scope.clientId,
-    });
-    if (file?.storage_key && isStorageConfigured()) {
-      await getStorageProvider().delete(String(file.storage_key));
-    }
-    await db.collection('client_files').deleteOne({
-      id: plan.pdf_file_id,
-      tenant_id: scope.tenantId,
-      client_id: scope.clientId,
-    });
-  }
 
   const result = await db.collection('treatment_plans').updateOne(
     {
@@ -532,7 +522,28 @@ export async function softDeleteTreatmentPlan(scope: Scope, planId: number): Pro
     },
     { $set: { deleted_at: new Date().toISOString(), updated_at: new Date().toISOString(), pdf_file_id: null } }
   );
-  return result.matchedCount > 0;
+  if (result.matchedCount === 0) return false;
+
+  if (plan.pdf_file_id) {
+    try {
+      const file = await db.collection('client_files').findOne({
+        id: plan.pdf_file_id,
+        tenant_id: scope.tenantId,
+        client_id: scope.clientId,
+      });
+      if (file?.storage_key && isStorageConfigured()) {
+        await getStorageProvider().delete(String(file.storage_key));
+      }
+      await db.collection('client_files').deleteOne({
+        id: plan.pdf_file_id,
+        tenant_id: scope.tenantId,
+        client_id: scope.clientId,
+      });
+    } catch {
+      // The deleted plan no longer references the file; cleanup can be retried.
+    }
+  }
+  return true;
 }
 
 function sanitizeFilenamePart(value: string): string {
@@ -562,17 +573,33 @@ export async function issueTreatmentPlanPublicLink(
   const now = new Date().toISOString();
   // Store ONLY the SHA-256 hash — never the plaintext token. A DB leak/backup
   // must not expose live links to patients' treatment-plan PDFs.
-  await db.collection('treatment_plan_public_links').insertOne({
-    tenant_id: scope.tenantId,
-    user_id: scope.userId,
-    client_id: scope.clientId,
-    plan_id: planId,
-    token_hash: tokenHash,
-    expires_at: expiresAt,
-    expires_at_date: new Date(expiresAt),
-    created_at: now,
-    updated_at: now,
-  });
+  // One active record per plan: replacing its hash invalidates the previous
+  // plaintext URL without ever storing that plaintext in MongoDB.
+  await db.collection('treatment_plan_public_links').findOneAndUpdate(
+    {
+      tenant_id: scope.tenantId,
+      user_id: scope.userId,
+      client_id: scope.clientId,
+      plan_id: planId,
+      revoked_at: { $exists: false },
+    },
+    {
+      $set: {
+        token_hash: tokenHash,
+        expires_at: expiresAt,
+        expires_at_date: new Date(expiresAt),
+        updated_at: now,
+      },
+      $setOnInsert: {
+        tenant_id: scope.tenantId,
+        user_id: scope.userId,
+        client_id: scope.clientId,
+        plan_id: planId,
+        created_at: now,
+      },
+    },
+    { upsert: true, returnDocument: 'after' }
+  );
 
   return { token, expiresAt };
 }
@@ -902,4 +929,21 @@ export async function revokeTreatmentPlanPublicLink(scope: Scope, planId: number
     { $set: { revoked_at: now, updated_at: now } }
   );
   return getTreatmentPlan(scope, planId);
+}
+
+export async function revokeTreatmentPlanPublicToken(scope: Scope, planId: number, token: string): Promise<void> {
+  if (!/^[A-Za-z0-9_-]{32,128}$/.test(token)) return;
+  const db = await getMongoDbOrThrow();
+  const now = new Date().toISOString();
+  await db.collection('treatment_plan_public_links').updateOne(
+    {
+      tenant_id: scope.tenantId,
+      user_id: scope.userId,
+      client_id: scope.clientId,
+      plan_id: planId,
+      token_hash: hashPublicToken(token),
+      revoked_at: { $exists: false },
+    },
+    { $set: { revoked_at: now, updated_at: now } }
+  );
 }

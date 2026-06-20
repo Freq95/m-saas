@@ -39,11 +39,13 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       contactFiles,
       clientNotes,
       contactNotes,
+      contactCustomFields,
       toothStates,
       toothEvents,
       surgeryGroups,
       bridgeGroups,
       treatmentPlans,
+      accessLogs,
     ] = await Promise.all([
       db.collection('appointments').find({ client_id: clientId, tenant_id: tenantId }).sort({ start_time: -1 }).toArray(),
       db.collection('conversations').find({ client_id: clientId, tenant_id: tenantId }).sort({ created_at: -1 }).toArray(),
@@ -51,12 +53,20 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       db.collection('contact_files').find({ contact_id: clientId, tenant_id: tenantId }).sort({ created_at: -1 }).toArray(),
       db.collection('client_notes').find({ client_id: clientId, tenant_id: tenantId }).sort({ created_at: -1 }).toArray(),
       db.collection('contact_notes').find({ contact_id: clientId, tenant_id: tenantId }).sort({ created_at: -1 }).toArray(),
+      db.collection('contact_custom_fields').find({ contact_id: clientId, tenant_id: tenantId }).toArray(),
       // Dental data — Phase 4 GDPR inclusion. Exclude soft-deleted events.
       db.collection('tooth_states').find({ client_id: clientId, tenant_id: tenantId }).sort({ tooth_fdi: 1 }).toArray(),
-      db.collection('tooth_events').find({ client_id: clientId, tenant_id: tenantId, deleted_at: { $exists: false } }).sort({ occurred_at: -1 }).toArray(),
+      db.collection('tooth_events').find({ client_id: clientId, tenant_id: tenantId }).sort({ occurred_at: -1 }).toArray(),
       db.collection('surgery_groups').find({ client_id: clientId, tenant_id: tenantId }).sort({ created_at: -1 }).toArray(),
       db.collection('bridge_groups').find({ client_id: clientId, tenant_id: tenantId }).sort({ created_at: -1 }).toArray(),
-      db.collection('treatment_plans').find({ client_id: clientId, tenant_id: tenantId, deleted_at: { $exists: false } }).sort({ created_at: -1 }).toArray(),
+      db.collection('treatment_plans').find({ client_id: clientId, tenant_id: tenantId }).sort({ created_at: -1 }).toArray(),
+      db.collection('data_access_logs').find({
+        tenant_id: tenantId,
+        $or: [
+          { target_id: clientId, target_type: { $regex: '^client(?:\\.|$)' } },
+          { route: { $regex: `/clients/${clientId}(?:/|$)` } },
+        ],
+      }).sort({ created_at: -1 }).toArray(),
     ]);
 
     // Get reminders for this client's appointments
@@ -70,9 +80,15 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     const messages = convIds.length > 0
       ? await db.collection('messages').find({ conversation_id: { $in: convIds }, tenant_id: tenantId }).sort({ created_at: 1 }).toArray()
       : [];
+    const messageAttachments = convIds.length > 0
+      ? await db.collection('message_attachments')
+          .find({ conversation_id: { $in: convIds }, tenant_id: tenantId })
+          .sort({ created_at: 1 })
+          .toArray()
+      : [];
 
     // Generate file download URLs if storage is configured
-    const allFiles = [...clientFiles, ...contactFiles];
+    const allFiles = [...clientFiles, ...contactFiles, ...messageAttachments];
     let fileExports: any[] = [];
     if (isStorageConfigured() && allFiles.length > 0) {
       const storage = getStorageProvider();
@@ -95,6 +111,12 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         })
       );
     }
+    let consentDocumentUrl: string | null = null;
+    if (isStorageConfigured() && typeof client.consent_document_key === 'string') {
+      try {
+        consentDocumentUrl = await getStorageProvider().getSignedUrl(client.consent_document_key, 3600);
+      } catch { /* export metadata even when signing temporarily fails */ }
+    }
 
     // Strip internal fields from export
     const stripInternal = (doc: any) => {
@@ -116,6 +138,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         consent_method: client.consent_method || null,
         is_minor: client.is_minor || false,
         parent_guardian_name: client.parent_guardian_name || null,
+        consent_document_url: consentDocumentUrl,
       },
       appointments: appointments.map((a: any) => ({
         service_name: a.service_name,
@@ -140,6 +163,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         sent_at: m.sent_at || m.created_at,
       })),
       files: fileExports,
+      custom_fields: contactCustomFields.map(stripInternal),
       notes: [...clientNotes, ...contactNotes].map((n: any) => ({
         content: n.content,
         created_at: n.created_at,
@@ -149,6 +173,13 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         status: r.status,
         scheduled_at: r.scheduled_at,
         sent_at: r.sent_at || null,
+      })),
+      data_access_history: accessLogs.map((entry: any) => ({
+        method: entry.method,
+        route: entry.route,
+        target_type: entry.target_type,
+        target_id: entry.target_id,
+        created_at: entry.created_at,
       })),
       dental_chart: {
         teeth: toothStates.map((s: any) => ({
@@ -170,6 +201,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
           metadata: e.metadata || null,
           doctor_name: e.doctor_name_snapshot || null,
           created_at: e.created_at,
+          deleted_at: e.deleted_at || null,
         })),
         surgery_groups: surgeryGroups.map((g: any) => ({
           tooth_fdis: g.tooth_fdis || [],
@@ -206,6 +238,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         sent_to_email: plan.sent_to_email || null,
         created_at: plan.created_at,
         updated_at: plan.updated_at,
+        deleted_at: plan.deleted_at || null,
       })),
     };
 

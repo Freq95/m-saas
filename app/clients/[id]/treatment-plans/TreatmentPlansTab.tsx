@@ -538,7 +538,7 @@ export default function TreatmentPlansTab({
       if (win) {
         // Point the pre-opened tab at WhatsApp (never navigate the app itself).
         win.location.href = data.waUrl;
-        onToast('success', 'Planul a fost marcat ca trimis pe WhatsApp.');
+        onToast('success', 'WhatsApp a fost deschis cu mesajul pregătit.');
         setShare(null);
       } else {
         onToast('error', 'Permite ferestrele pop-up sau folosește „Copiază linkul”.');

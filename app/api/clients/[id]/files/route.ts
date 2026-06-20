@@ -5,6 +5,7 @@ import { getAuthUser } from '@/lib/auth-helpers';
 import { buildClientStorageKey, getStorageProvider } from '@/lib/storage';
 import { checkWriteRateLimit } from '@/lib/rate-limit';
 import { resolveClientScopeForClient } from '@/lib/client-permissions';
+import { validateUploadBytes } from '@/lib/file-validation';
 
 // GET /api/clients/[id]/files - Get files for a client
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
@@ -79,17 +80,16 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       return createErrorResponse(`File size exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB limit`, 400);
     }
 
-    // Validate file type (basic check)
-    const isValidType = ALLOWED_FILE_TYPES.some(type => file.type.startsWith(type));
-    if (!isValidType && file.type !== 'application/octet-stream') {
-      return createErrorResponse('File type not allowed', 400);
-    }
-
     const storage = getStorageProvider();
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
+    const validated = await validateUploadBytes(buffer, file.name);
+    const declaredTypeAllowed = ALLOWED_FILE_TYPES.some((type) => validated?.mimeType.startsWith(type));
+    if (!validated || !declaredTypeAllowed) {
+      return createErrorResponse('File content or extension is not allowed', 400);
+    }
     const storageKey = buildClientStorageKey(String(tenantId), clientId, file.name);
-    await storage.upload(storageKey, buffer, file.type || 'application/octet-stream');
+    await storage.upload(storageKey, buffer, validated.mimeType);
 
     const now = new Date().toISOString();
     const fileId = await getNextNumericId('client_files');
@@ -102,7 +102,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       original_filename: file.name,
       storage_key: storageKey,
       file_size: file.size,
-      mime_type: file.type,
+      mime_type: validated.mimeType,
       description: description || null,
       created_at: now,
       updated_at: now,

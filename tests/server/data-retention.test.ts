@@ -3,13 +3,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Doc = Record<string, any>;
 
-const { mockEraseClientData, mockStorageDelete, mockStorageList } = vi.hoisted(() => ({
+const { mockEraseClientData, mockRetryCleanup, mockStorageDelete, mockStorageList } = vi.hoisted(() => ({
   mockEraseClientData: vi.fn(),
+  mockRetryCleanup: vi.fn(),
   mockStorageDelete: vi.fn(),
   mockStorageList: vi.fn(),
 }));
 
-vi.mock('@/lib/server/gdpr-erasure', () => ({ eraseClientData: mockEraseClientData }));
+vi.mock('@/lib/server/gdpr-erasure', () => ({
+  eraseClientData: mockEraseClientData,
+  retryPendingErasureStorageCleanup: mockRetryCleanup,
+}));
 vi.mock('@/lib/storage', () => ({
   isStorageConfigured: vi.fn(() => true),
   getStorageProvider: vi.fn(() => ({
@@ -29,7 +33,11 @@ function cursor(rows: Doc[]) {
   };
 }
 
-function makeDb(patients: Doc[], referencedStorageKeys = new Set<string>()) {
+function makeDb(
+  patients: Doc[],
+  referencedStorageKeys = new Set<string>(),
+  previousCursor: Doc | null = null
+) {
   const clientsFind = vi.fn((query: Doc) => cursor(patients));
   const retentionInsert = vi.fn(async () => ({ acknowledged: true }));
   const collections = new Map<string, any>();
@@ -50,10 +58,20 @@ function makeDb(patients: Doc[], referencedStorageKeys = new Set<string>()) {
     find: clientsFind,
     findOne: vi.fn(async (query: Doc) => {
       const key = query.consent_document_key;
-      return key && referencedStorageKeys.has(key) ? { _id: 1 } : null;
+      if (key && referencedStorageKeys.has(key)) return { _id: 1 };
+      if (Number.isInteger(query.id)) return patients.find((patient) => patient.id === query.id) ?? null;
+      return null;
     }),
   });
-  collections.set('retention_runs', { insertOne: retentionInsert });
+  collections.set('retention_runs', {
+    insertOne: retentionInsert,
+    findOne: vi.fn(async () => previousCursor ? { next_candidate_after: previousCursor } : null),
+  });
+  collections.set('erasure_storage_cleanup_jobs', {
+    find: vi.fn(() => cursor([])),
+    deleteOne: vi.fn(),
+    updateOne: vi.fn(),
+  });
 
   return {
     db: {
@@ -75,6 +93,7 @@ describe('data retention runner', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockEraseClientData.mockResolvedValue({ recordsDeleted: 12, filesDeleted: 2 });
+    mockRetryCleanup.mockResolvedValue({ attempted: 0, completed: 0, failed: 0 });
     mockStorageDelete.mockResolvedValue(undefined);
     mockStorageList.mockResolvedValue({ objects: [], continuationToken: null });
   });
@@ -151,5 +170,17 @@ describe('data retention runner', () => {
     expect(result).toMatchObject({ orphanScanned: 3, orphanCandidates: 1, orphanDeleted: 1 });
     expect(mockStorageDelete).toHaveBeenCalledOnce();
     expect(mockStorageDelete).toHaveBeenCalledWith('tenants/a/clients/1/orphan.pdf');
+  });
+
+  it('continues after the previous batch cursor instead of rescanning the same patients', async () => {
+    const previous = { deleted_at: '2026-03-01T00:00:00.000Z', id: 250 };
+    const { db, clientsFind } = makeDb([], new Set(), previous);
+    await runDataRetention({ db, now, execute: false });
+    expect(clientsFind).toHaveBeenCalledWith(expect.objectContaining({
+      $or: expect.arrayContaining([
+        { deleted_at: { $gt: previous.deleted_at, $lte: expect.any(String) } },
+        { deleted_at: previous.deleted_at, id: { $gt: previous.id } },
+      ]),
+    }));
   });
 });

@@ -53,6 +53,7 @@ import { POST as POST_EVENT } from '@/app/api/clients/[id]/dental/events/route';
 import { POST as POST_SURGERY } from '@/app/api/clients/[id]/dental/surgery/route';
 import { POST as POST_BRIDGE } from '@/app/api/clients/[id]/dental/bridges/route';
 import { PATCH as PATCH_TOOTH } from '@/app/api/clients/[id]/dental/teeth/[fdi]/route';
+import { PATCH as PATCH_EVENT, DELETE as DELETE_EVENT } from '@/app/api/clients/[id]/dental/events/[eid]/route';
 
 describe('dental mutation route authorization and scope', () => {
   const viewerTenantId = new ObjectId('65f9a0e8f5f89f73d18b0901');
@@ -61,6 +62,8 @@ describe('dental mutation route authorization and scope', () => {
   const scope = { userId: 42, tenantId: ownerTenantId };
   const clientId = 301;
   const insertOne = vi.fn();
+  const findOne = vi.fn();
+  const updateOne = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -73,7 +76,9 @@ describe('dental mutation route authorization and scope', () => {
     mockCreateSurgery.mockResolvedValue({ id: 51 });
     mockCreateBridge.mockResolvedValue({ id: 61 });
     insertOne.mockResolvedValue({ acknowledged: true });
-    mockGetDb.mockResolvedValue({ collection: () => ({ insertOne }) });
+    findOne.mockResolvedValue({ id: 91, tooth_fdi: 11 });
+    updateOne.mockResolvedValue({ matchedCount: 1 });
+    mockGetDb.mockResolvedValue({ collection: () => ({ insertOne, findOne, updateOne }) });
   });
 
   it('blocks non-clinical users before resolving patient scope', async () => {
@@ -174,5 +179,28 @@ describe('dental mutation route authorization and scope', () => {
       'implant'
     );
     expect(mockGetDentalData).toHaveBeenCalledWith(clientId, ownerTenantId, 42);
+  });
+
+  it('repeats the complete owner scope in dental event PATCH and DELETE writes', async () => {
+    const patchResponse = await PATCH_EVENT(new NextRequest('http://localhost', {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ notes: 'Actualizat' }),
+    }), { params: Promise.resolve({ id: String(clientId), eid: '91' }) });
+    const deleteResponse = await DELETE_EVENT(new NextRequest('http://localhost', { method: 'DELETE' }), {
+      params: Promise.resolve({ id: String(clientId), eid: '91' }),
+    });
+
+    expect(patchResponse.status).toBe(200);
+    expect(deleteResponse.status).toBe(200);
+    for (const [filter] of updateOne.mock.calls) {
+      expect(filter).toMatchObject({
+        id: 91,
+        tenant_id: ownerTenantId,
+        user_id: 42,
+        client_id: clientId,
+        deleted_at: { $exists: false },
+      });
+    }
   });
 });

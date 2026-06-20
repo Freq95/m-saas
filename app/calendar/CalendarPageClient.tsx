@@ -2253,8 +2253,12 @@ export default function CalendarPageClient({
     appointmentModalMode === 'view' && selectedAppointmentClientId
       ? `/clients/${selectedAppointmentClientId}`
       : null;
+  const selectedAppointmentCalendar = calendarOptions.find(
+    (calendar) => calendar.id === state.selectedAppointment?.calendar_id
+  );
   const newTreatmentPlanHref =
     appointmentModalMode === 'view' && selectedAppointmentClientId && state.selectedAppointment?.id
+      && selectedAppointmentCalendar?.isOwn !== false
       ? `/clients/${selectedAppointmentClientId}?tab=plan&newPlan=1&appointmentId=${state.selectedAppointment.id}`
       : null;
 

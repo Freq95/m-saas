@@ -28,6 +28,11 @@ Sources:
 | Retention run summaries | One year; summaries contain counts and cutoffs, not patient identifiers. |
 | Unreferenced R2 objects | Eligible after 30 days, only under `tenants/`, after checking every known DB reference. |
 
+Manual erasure requests are subject to the same five-year minimum and are blocked by a legal
+hold. Database deletion is transactional. R2 cleanup is recorded before the transaction and is
+retried from `erasure_storage_cleanup_jobs` if the object store is temporarily unavailable; those
+retries finish already-approved erasures and do not enable new retention deletions.
+
 The last-contact calculation checks patient activity fields plus appointments,
 conversations, notes, files, dental events, surgery/bridge groups, and treatment plans.
 The five-year minimum and 30-day grace cannot be reduced through environment values.
@@ -68,8 +73,8 @@ same switch. Keep the orphan cleanup disabled until R2 listing permissions are v
 
 ## Deployment
 
-1. Apply `migrations/012_data_retention.js`. It backfills five-year expiry dates on audit
-   records and creates TTL/candidate indexes.
+1. Apply `migrations/012_data_retention.js`, then `013_active_plan_links_and_retention_cursor.js`.
+   They create the expiry, rotating-cursor, pending-cleanup, and single-active-share indexes.
 2. Deploy with retention enabled and execution disabled.
 3. Review `retention_runs` and application logs for at least one scheduled run.
 4. Enable orphan scanning in dry-run and verify the candidate count.

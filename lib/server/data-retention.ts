@@ -1,9 +1,10 @@
 import { ObjectId, type Db, type Document } from 'mongodb';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
-import { eraseClientData } from '@/lib/server/gdpr-erasure';
+import { eraseClientData, retryPendingErasureStorageCleanup } from '@/lib/server/gdpr-erasure';
 import { logger } from '@/lib/logger';
 import { MINIMUM_CLINICAL_RETENTION_YEARS } from '@/lib/retention';
 import { getStorageProvider, isStorageConfigured } from '@/lib/storage';
+import { evaluatePatientErasureEligibility } from '@/lib/server/patient-retention';
 
 const DEFAULT_CLINICAL_YEARS = MINIMUM_CLINICAL_RETENTION_YEARS;
 const DEFAULT_DELETE_GRACE_DAYS = 30;
@@ -52,50 +53,6 @@ function subtractUtcYears(date: Date, years: number) {
 
 function subtractUtcDays(date: Date, days: number) {
   return new Date(date.getTime() - days * 24 * 60 * 60 * 1000);
-}
-
-function latestIso(values: unknown[]) {
-  const valid = values
-    .filter((value): value is string => typeof value === 'string' && !Number.isNaN(Date.parse(value)))
-    .sort();
-  return valid.at(-1) ?? null;
-}
-
-async function latestField(
-  db: Db,
-  collectionName: string,
-  filter: Document,
-  field: string
-) {
-  const doc = await db.collection(collectionName).findOne(filter, {
-    projection: { [field]: 1 },
-    sort: { [field]: -1 },
-  });
-  return doc?.[field];
-}
-
-async function getLastPatientContact(db: Db, patient: Document) {
-  const scope = { tenant_id: patient.tenant_id, client_id: patient.id };
-  const legacyScope = { tenant_id: patient.tenant_id, contact_id: patient.id };
-  const latest = await Promise.all([
-    latestField(db, 'appointments', scope, 'start_time'),
-    latestField(db, 'conversations', scope, 'updated_at'),
-    latestField(db, 'client_notes', scope, 'created_at'),
-    latestField(db, 'contact_notes', legacyScope, 'created_at'),
-    latestField(db, 'client_files', scope, 'created_at'),
-    latestField(db, 'contact_files', legacyScope, 'created_at'),
-    latestField(db, 'tooth_events', scope, 'occurred_at'),
-    latestField(db, 'surgery_groups', scope, 'created_at'),
-    latestField(db, 'bridge_groups', scope, 'created_at'),
-    latestField(db, 'treatment_plans', scope, 'updated_at'),
-  ]);
-  return latestIso([
-    patient.last_activity_date,
-    patient.last_appointment_date,
-    patient.last_conversation_date,
-    patient.created_at,
-    ...latest,
-  ]);
 }
 
 async function storageKeyIsReferenced(db: Db, storageKey: string) {
@@ -158,6 +115,13 @@ async function cleanupOrphanedStorage(
 
 export async function runDataRetention(options: RetentionOptions = {}): Promise<RetentionRunResult> {
   const db = options.db ?? await getMongoDbOrThrow();
+  // These jobs belong to already-approved manual/retention erasures. Retrying
+  // their private-object cleanup is safe even while new retention runs dry-run.
+  try {
+    await retryPendingErasureStorageCleanup(db);
+  } catch (error) {
+    logger.error('Retention: pending erasure storage cleanup failed', error instanceof Error ? error : new Error(String(error)));
+  }
   const now = options.now ?? new Date();
   const clinicalYears = clampInteger(options.clinicalYears, DEFAULT_CLINICAL_YEARS, DEFAULT_CLINICAL_YEARS);
   const deleteGraceDays = clampInteger(options.deleteGraceDays, DEFAULT_DELETE_GRACE_DAYS, DEFAULT_DELETE_GRACE_DAYS);
@@ -167,12 +131,27 @@ export async function runDataRetention(options: RetentionOptions = {}): Promise<
   const clinicalCutoff = subtractUtcYears(now, clinicalYears);
   const deleteGraceCutoff = subtractUtcDays(now, deleteGraceDays);
 
-  const patients = await db.collection('clients')
-    .find({
+  const previousRun = await db.collection('retention_runs').findOne(
+    { next_candidate_after: { $exists: true } },
+    { sort: { started_at: -1 }, projection: { next_candidate_after: 1 } }
+  );
+  const cursor = previousRun?.next_candidate_after;
+  const baseFilter: Document = {
       deleted_at: { $type: 'string', $lte: deleteGraceCutoff.toISOString() },
       retention_legal_hold: { $ne: true },
-    })
-    .sort({ deleted_at: 1 })
+  };
+  const candidateFilter = cursor?.deleted_at && Number.isInteger(cursor?.id)
+    ? {
+        ...baseFilter,
+        $or: [
+          { deleted_at: { $gt: cursor.deleted_at, $lte: deleteGraceCutoff.toISOString() } },
+          { deleted_at: cursor.deleted_at, id: { $gt: cursor.id } },
+        ],
+      }
+    : baseFilter;
+  let patients = await db.collection('clients')
+    .find(candidateFilter)
+    .sort({ deleted_at: 1, id: 1 })
     .limit(batchSize)
     .project({
       id: 1,
@@ -184,6 +163,18 @@ export async function runDataRetention(options: RetentionOptions = {}): Promise<
       last_conversation_date: 1,
     })
     .toArray();
+  if (patients.length === 0 && cursor) {
+    patients = await db.collection('clients')
+      .find(baseFilter)
+      .sort({ deleted_at: 1, id: 1 })
+      .limit(batchSize)
+      .project({
+        id: 1, tenant_id: 1, deleted_at: 1, created_at: 1,
+        last_activity_date: 1, last_appointment_date: 1, last_conversation_date: 1,
+        retention_legal_hold: 1,
+      })
+      .toArray();
+  }
 
   let eligible = 0;
   let deleted = 0;
@@ -195,8 +186,8 @@ export async function runDataRetention(options: RetentionOptions = {}): Promise<
       failed++;
       continue;
     }
-    const lastContact = await getLastPatientContact(db, patient);
-    if (!lastContact || lastContact > clinicalCutoff.toISOString()) {
+    const eligibility = await evaluatePatientErasureEligibility(db, patient, now, clinicalYears);
+    if (!eligibility.eligible) {
       skippedRecentActivity++;
       continue;
     }
@@ -204,6 +195,16 @@ export async function runDataRetention(options: RetentionOptions = {}): Promise<
     if (!execute) continue;
 
     try {
+      const current = await db.collection('clients').findOne({
+        id: patient.id,
+        tenant_id: patient.tenant_id,
+        retention_legal_hold: { $ne: true },
+      });
+      if (!current || !(await evaluatePatientErasureEligibility(db, current, new Date(), clinicalYears)).eligible) {
+        skippedRecentActivity++;
+        eligible--;
+        continue;
+      }
       const result = await eraseClientData({
         db,
         tenantId: patient.tenant_id,
@@ -248,6 +249,9 @@ export async function runDataRetention(options: RetentionOptions = {}): Promise<
     ...result,
     started_at: now.toISOString(),
     expires_at_date: expiresAt,
+    next_candidate_after: patients.length > 0
+      ? { deleted_at: patients.at(-1)?.deleted_at, id: patients.at(-1)?.id }
+      : null,
   });
   return result;
 }

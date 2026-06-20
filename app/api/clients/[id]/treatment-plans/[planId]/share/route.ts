@@ -9,7 +9,6 @@ import { isStorageConfigured } from '@/lib/storage';
 import {
   generateTreatmentPlanPdfFile,
   getTreatmentPlan,
-  markTreatmentPlanSent,
   normalizeRoPhone,
   resolveOrIssuePublicLink,
   revokeTreatmentPlanPublicLink,
@@ -115,8 +114,6 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       `este disponibil aici: ${publicUrl} — îl puteți vizualiza și descărca direct de pe telefon. O zi bună!`;
     const waUrl = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(message)}`;
 
-    const updated = await markTreatmentPlanSent(planScope, planId, 'whatsapp');
-
     await logDataAccess({
       actorUserId: auth.dbUserId,
       actorEmail: auth.email,
@@ -132,7 +129,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
     return createSuccessResponse({
       url: publicUrl,
       waUrl,
-      plan: updated ? stripMongoId(updated) : plan,
+      plan,
     });
   } catch (error) {
     return handleApiError(error, 'Failed to share treatment plan');

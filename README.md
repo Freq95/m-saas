@@ -9,7 +9,7 @@ Multi-tenant SaaS platform for managing appointments, clients, email inbox, and 
 - Created an encrypted logical backup of the production Atlas database and restore-verified all 42 collections and 24,336 documents by count and canonical EJSON hash. Backup artifacts remain local under the ignored `backups/` directory.
 - Applied the hot-query index migration and the approved five-year GDPR retention migration. Production counts remained unchanged and the first retention dry-run found zero eligible records.
 - Completed the patient erasure cascade, treatment-plan sharing safeguards, dental mutation authorization coverage, and tenant-isolation tests.
-- CI now runs typecheck, 93 Vitest tests, cleanup scans, a production build, and 10 Playwright checks across desktop and phone viewports.
+- CI now runs typecheck, 109 Vitest tests, cleanup scans, a production build, and 10 Playwright checks across desktop and phone viewports.
 - Added automated WCAG A/AA checks, restored browser zoom support, corrected public-page contrast, and strengthened global browser security policies.
 
 See [Data Retention](docs/DATA-RETENTION.md) and [MongoDB Index Audit](docs/INDEX-AUDIT.md) for operational evidence.
