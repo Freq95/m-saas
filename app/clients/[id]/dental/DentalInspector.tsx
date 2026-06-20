@@ -201,7 +201,7 @@ function TodayView({ dental, dentition, canEdit, onStartRecording, onSelectTooth
    TOOTH VIEW — selected tooth: hero, status menu, issues, Detalii | Istoric.
    ───────────────────────────────────────────────────────────────────────── */
 function ToothView(props: Props & { fdi: number }) {
-  const { fdi, dental, canEdit, onSelectTooth, onStartRecording, onChangeStatus } = props;
+  const { fdi, dental, canEdit, chromeless, onSelectTooth, onStartRecording, onChangeStatus } = props;
   const state = dental.tooth_states.find((s) => s.tooth_fdi === fdi);
   const latest = dental.latest_event_by_tooth[fdi];
   const [tab, setTab] = useState<'detalii' | 'istoric'>('detalii');
@@ -226,11 +226,15 @@ function ToothView(props: Props & { fdi: number }) {
 
   return (
     <div className={styles.inspBody}>
-      <div className={styles.inspTopRow}>
-        <button type="button" className={styles.backLink} onClick={() => onSelectTooth(null)}>
-          ← Înapoi
-        </button>
-      </div>
+      {/* The phone modal's top bar already provides "Închide"; only the desktop
+          panel needs this back link. */}
+      {!chromeless && (
+        <div className={styles.inspTopRow}>
+          <button type="button" className={styles.backLink} onClick={() => onSelectTooth(null)}>
+            ← Înapoi
+          </button>
+        </div>
+      )}
 
       <div className={styles.toothHeader}>
         <div className={styles.toothBadge}>
@@ -731,8 +735,12 @@ function RecordingView({
             </fieldset>
           )}
 
-          <div className={styles.recordFooter}>
-            <button type="button" className={styles.ghostAction} onClick={onCancelRecording} disabled={busy}>Anulează</button>
+          {/* In the phone modal the top bar already owns the cancel, so the
+              footer drops its redundant Anulează and the save goes full-width. */}
+          <div className={`${styles.recordFooter} ${chromeless ? styles.recordFooterSolo : ''}`}>
+            {!chromeless && (
+              <button type="button" className={styles.ghostAction} onClick={onCancelRecording} disabled={busy}>Anulează</button>
+            )}
             <button
               type="button"
               className={styles.primaryAction}

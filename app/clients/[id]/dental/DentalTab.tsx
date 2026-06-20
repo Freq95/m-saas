@@ -33,8 +33,6 @@ interface Props {
   isMinor?: boolean;
 }
 
-type SheetMode = 'collapsed' | 'half' | 'expanded';
-
 type DentalResponse = { dental: DentalData };
 
 export default function DentalTab({ clientId, canEdit, onToast, clientName, isMinor }: Props) {
@@ -49,7 +47,6 @@ export default function DentalTab({ clientId, canEdit, onToast, clientName, isMi
   const [surgerySelection, setSurgerySelection] = useState<number[]>([]);
   const [bridgeSelection, setBridgeSelection] = useState<number[]>([]);
   const [dentition, setDentition] = useState<Dentition>('permanent');
-  const [sheetMode, setSheetMode] = useState<SheetMode>('collapsed');
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
   // 860 matches the dental layout's mobile breakpoint (chart stacks, modal opens).
   const isMobile = useIsMobile(860);
@@ -267,17 +264,6 @@ export default function DentalTab({ clientId, canEdit, onToast, clientName, isMi
   const otherDentitionCount = dental.tooth_states.filter(
     (s) => toothMatters(s) && dentitionOf(s.tooth_fdi) === otherDentition
   ).length;
-
-  const sheetSummary =
-    view === 'recording'
-      ? recordKind === 'surgery'
-        ? 'Chirurgie · ' + surgerySelection.length + ' aleși — apasă pentru a continua'
-        : recordKind === 'bridge'
-          ? 'Punte · ' + bridgeSelection.length + ' aleși — apasă pentru a continua'
-          : 'Înregistrează pe dinte'
-      : view === 'tooth' && selectedFdi !== null
-        ? 'Dinte ' + selectedFdi
-        : 'Privire de ansamblu';
 
   const inspectorProps = {
     clientId,

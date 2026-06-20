@@ -698,6 +698,8 @@
 
 .recordFooter { display: flex; justify-content: flex-end; gap: var(--space-3); padding-top: var(--space-2); }
 .recordFooter .primaryAction { flex: 0 0 auto; }
+/* Modal footer: single full-width save (cancel lives in the modal top bar). */
+.recordFooterSolo .primaryAction { flex: 1 1 auto; width: 100%; }
 
 /* ── Recording: surgery/bridge tooth-pick ────────────────────────────── */
 
