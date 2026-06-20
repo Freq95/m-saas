@@ -565,9 +565,9 @@ export default function InboxPageClient({
       const normalizedMessage = (message || '').trim();
       const fallback =
         status === 429
-          ? 'Prea multe cereri. Incearca din nou in cateva secunde.'
+          ? 'Prea multe cereri. Încearcă din nou în cateva secunde.'
           : status === 401 || status === 403
-            ? 'Sesiunea nu este valida pentru aceasta actiune. Reautentifica-te.'
+            ? 'Sesiunea nu este validă pentru această acțiune. Reautentifică-te.'
             : 'A aparut o eroare la comunicarea cu serverul.';
       const finalMessage = normalizedMessage || fallback;
       const key = `${scope}:${status}:${finalMessage}`;
@@ -907,7 +907,7 @@ export default function InboxPageClient({
         const result = settledResults[index];
 
         if (result.status === 'rejected') {
-          const reason = result.reason?.message || 'Cererea de sincronizare a esuat.';
+          const reason = result.reason?.message || 'Cererea de sincronizare a eșuat.';
           appendSyncLog('error', `${provider}: ${reason}`);
           blockingErrors.push(reason);
           continue;
@@ -925,7 +925,7 @@ export default function InboxPageClient({
           if (isNotConfigured) {
             appendSyncLog('info', `${provider}: nu este conectat, sincronizarea a fost omisa.`);
           } else {
-            const fallback = 'Sincronizarea a esuat.';
+            const fallback = 'Sincronizarea a eșuat.';
             const errorMessage = responseMessage || fallback;
             appendSyncLog('error', `${provider}: ${errorMessage}`);
             blockingErrors.push(errorMessage);
@@ -952,7 +952,7 @@ export default function InboxPageClient({
               typeof payload.attachmentUploadFailures === 'number' ? payload.attachmentUploadFailures : 0;
             appendSyncLog(
               'warning',
-              `Yahoo: ${attachmentFailures} atasamente nu au putut fi salvate (${missingContent} fara continut, ${uploadFailures} upload esuat).`
+              `Yahoo: ${attachmentFailures} atașamente nu au putut fi salvate (${missingContent} fără continut, ${uploadFailures} upload eșuat).`
             );
           }
         }
@@ -1442,7 +1442,7 @@ export default function InboxPageClient({
         const response = await fetch(`/api/clients/${clientId}/files/${fileId}`, { method: 'DELETE' });
         if (!response.ok) {
           const errorMessage = await readErrorMessage(response);
-          throw new Error(errorMessage || 'Nu am putut elimina fisierul de la pacient.');
+          throw new Error(errorMessage || 'Nu am putut elimină fișierul de la pacient.');
         }
 
         const freshMessages = await fetchMessages(selectedConversation.id, true);
@@ -1460,7 +1460,7 @@ export default function InboxPageClient({
         }
       } catch (error) {
         console.error('Failed to remove file from client:', error);
-        toast.error(error instanceof Error ? error.message : 'Eroare la eliminarea fisierului.');
+        toast.error(error instanceof Error ? error.message : 'Eroare la eliminarea fișierului.');
       } finally {
         setRemovingClientChipKeys((prev) => prev.filter((entry) => entry !== chipKey));
       }
@@ -1499,7 +1499,7 @@ export default function InboxPageClient({
       // Fix 4: clear selected keys after a successful save so stale selection
       // does not persist if the user reopens or stays in the modal
       setSelectedSaveItemKeys([]);
-      toast.success('Elementele selectate au fost salvate in fisa pacientului.');
+      toast.success('Elementele selectate au fost salvate în fișa pacientului.');
     } catch (error) {
       console.error('Save selection failed:', error);
       toast.error(error instanceof Error ? error.message : 'Eroare la salvare');
@@ -1520,7 +1520,7 @@ export default function InboxPageClient({
       return `Deja salvat pentru pacientul selectat (${selectedPatientName})`;
     }
     if (item.savedClients.length > 1) {
-      return `Salvat la ${item.savedClients.length} pacienti`;
+      return `Salvat la ${item.savedClients.length} pacienți`;
     }
     if (item.savedClients.length === 1) {
       const patientName = getPatientNameById(item.savedClients[0].clientId);
@@ -1570,7 +1570,7 @@ export default function InboxPageClient({
             </div>
             <div className={styles.attachmentStatus}>
               {Array.isArray(att.saved_client_ids) && att.saved_client_ids.length > 1
-                ? `Salvat la ${att.saved_client_ids.length} pacienti`
+                ? `Salvat la ${att.saved_client_ids.length} pacienți`
                 : Array.isArray(att.saved_client_ids) && att.saved_client_ids.length === 1
                 ? `Salvat la pacient ${getPatientNameById(att.saved_client_ids[0].clientId)}`
                 : att.persisted
@@ -1606,7 +1606,7 @@ export default function InboxPageClient({
               <div className={styles.attachmentMeta}>Inline image #{idx + 1}</div>
               <div className={styles.attachmentStatus}>
                 {Array.isArray(image.saved_client_ids) && image.saved_client_ids.length > 1
-                  ? `Salvata la ${image.saved_client_ids.length} pacienti`
+                  ? `Salvata la ${image.saved_client_ids.length} pacienți`
                   : Array.isArray(image.saved_client_ids) && image.saved_client_ids.length === 1
                   ? `Salvata la pacient ${getPatientNameById(image.saved_client_ids[0].clientId)}`
                   : canSave
@@ -1789,8 +1789,8 @@ export default function InboxPageClient({
                 type="button"
                 className={`${styles.filterButton}${attachmentsOnly ? ` ${styles.filterButtonActive}` : ''}`}
                 onClick={() => setAttachmentsOnly((prev) => !prev)}
-                aria-label={attachmentsOnly ? 'Arata toate emailurile' : 'Doar cu atasamente'}
-                data-tooltip={attachmentsOnly ? 'Arata toate emailurile' : 'Doar cu atasamente'}
+                aria-label={attachmentsOnly ? 'Arata toate emailurile' : 'Doar cu atașamente'}
+                data-tooltip={attachmentsOnly ? 'Arata toate emailurile' : 'Doar cu atașamente'}
               >
                 <span className={styles.filterButtonIcon} aria-hidden="true">
                   <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
@@ -1805,12 +1805,12 @@ export default function InboxPageClient({
                   </svg>
                 </span>
                 <span className={styles.filterButtonLabel}>
-                  {attachmentsOnly ? 'Arata toate emailurile' : 'Doar cu atasamente'}
+                  {attachmentsOnly ? 'Arata toate emailurile' : 'Doar cu atașamente'}
                 </span>
               </button>
             </div>
             <div className={styles.lastSyncLabel}>
-              Ultima sincronizare: {lastSyncAt ? format(new Date(lastSyncAt), 'dd.MM.yyyy HH:mm') : lastSyncLoaded ? 'niciodata' : 'se incarca...'}
+              Ultima sincronizare: {lastSyncAt ? format(new Date(lastSyncAt), 'dd.MM.yyyy HH:mm') : lastSyncLoaded ? 'niciodată' : 'se încarcă...'}
             </div>
             {syncLogs.length > 0 && (
               <div className={styles.syncLogPanel}>
@@ -1854,7 +1854,7 @@ export default function InboxPageClient({
                 <div className={styles.conversationHeader}>
                   <div className={styles.contactName}>{cleanInboxDisplayText(conv.contact_name) || 'Fără nume'}</div>
                   {conv.has_attachments && (
-                    <span className={styles.attachmentBadge} title="Contine atasamente" aria-label="Contine atasamente">
+                    <span className={styles.attachmentBadge} title="Contine atașamente" aria-label="Contine atașamente">
                       <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
                         <path
                           fill="currentColor"
@@ -1924,7 +1924,7 @@ export default function InboxPageClient({
                     type="button"
                     className={styles.mobileBackButton}
                     onClick={() => setSelectedConversation(null)}
-                    aria-label="Inapoi la conversatii"
+                    aria-label="Inapoi la conversații"
                   >
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M15 18l-6-6 6-6" />
@@ -1945,7 +1945,7 @@ export default function InboxPageClient({
                     onClick={openSaveModal}
                     disabled={saveableItems.length === 0}
                   >
-                    Salveaza Documentele
+                    Salvează Documentele
                   </button>
                   <button
                     type="button"
@@ -2104,7 +2104,7 @@ export default function InboxPageClient({
             return (
               <span className={`${styles.saveItemStatusPill} ${styles.saveItemStatusPillSaving}`}>
                 <span className={styles.clientSearchSpinner} aria-hidden="true" />
-                Se salveaza...
+                Se salvează...
               </span>
             );
           }
@@ -2241,8 +2241,8 @@ export default function InboxPageClient({
                               void removeFileFromClient(item.key, entry.clientId, entry.fileId);
                             }}
                             disabled={isRemoving || isSavingSelection}
-                            aria-label={`Elimina fisierul pentru ${clientName}`}
-                            data-tooltip={`Elimina pentru ${clientName}`}
+                            aria-label={`Elimină fișierul pentru ${clientName}`}
+                            data-tooltip={`Elimină pentru ${clientName}`}
                           >
                             ×
                           </button>
@@ -2283,10 +2283,10 @@ export default function InboxPageClient({
               {/* ---- Header ---- */}
               <div className={styles.saveModalHeader}>
                 <div className={styles.saveModalTitleGroup}>
-                  <h4 className={styles.saveModalTitle}>Salveaza atasamente si poze</h4>
+                  <h4 className={styles.saveModalTitle}>Salvează atașamente și poze</h4>
                   <div className={styles.saveModalSubtitle}>
                     {saveableItems.length === 0
-                      ? 'Niciun element detectat in conversatie'
+                      ? 'Niciun element detectat în conversație'
                       : `${saveableItems.length} element${saveableItems.length !== 1 ? 'e' : ''} detectat${saveableItems.length !== 1 ? 'e' : ''} in conversatie`}
                   </div>
                 </div>
@@ -2294,8 +2294,8 @@ export default function InboxPageClient({
                   type="button"
                   className={styles.modalCloseButton}
                   onClick={closeSaveModal}
-                  aria-label="Inchide"
-                  data-tooltip="Inchide (Esc)"
+                  aria-label="Închide"
+                  data-tooltip="Închide (Esc)"
                 >
                   ✕
                 </button>
@@ -2308,7 +2308,7 @@ export default function InboxPageClient({
                 {saveModalLoading && (
                   <div className={styles.modalHint} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '1.5rem 0' }}>
                     <span className={styles.clientSearchSpinner} aria-hidden="true" />
-                    Se incarca datele actualizate...
+                    Se încarcă datele actualizate...
                   </div>
                 )}
 
@@ -2338,8 +2338,8 @@ export default function InboxPageClient({
                           setSelectedTargetClientId(null);
                           setClientSearch('');
                         }}
-                        aria-label="Sterge selectia pacientului"
-                        data-tooltip="Sterge selectia"
+                        aria-label="Șterge selectia pacientului"
+                        data-tooltip="Șterge selectia"
                       >
                         ✕
                       </button>
@@ -2361,7 +2361,7 @@ export default function InboxPageClient({
                         onChange={(e) => setClientSearch(e.target.value)}
                         onFocus={() => setHasActivatedClientSearch(true)}
                         className={styles.clientSearchInput}
-                        placeholder="Cauta pacient dupa nume, email sau telefon..."
+                        placeholder="Caută pacient după nume, email sau telefon..."
                         autoComplete="off"
                       />
                     </div>
@@ -2390,7 +2390,7 @@ export default function InboxPageClient({
                           </button>
                         ))}
                       {!loadingClientOptions && clientOptions.filter((c) => c.id !== selectedTargetClientId).length === 0 && (
-                        <div className={styles.modalHint}>Nu am gasit pacienti pentru cautarea curenta.</div>
+                        <div className={styles.modalHint}>Nu am găsit pacienți pentru căutarea curentă.</div>
                       )}
                     </div>
                   )}
@@ -2398,7 +2398,7 @@ export default function InboxPageClient({
                   {!selectedTargetClientId && (
                     <div className={styles.modalHintAutoCreate}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: '1px', opacity: 0.7 }}><circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/></svg>
-                      Daca nu alegi un pacient, sistemul va crea automat unul nou la prima salvare.
+                      Dacă nu alegi un pacient, sistemul va crea automat unul nou la prima salvare.
                     </div>
                   )}
                 </div>
@@ -2406,13 +2406,13 @@ export default function InboxPageClient({
                 {/* Attachments section */}
                 {saveableItems.length === 0 ? (
                   <div className={styles.modalHint}>
-                    Nu exista atasamente sau poze inline de salvat in aceasta conversatie.
+                    Nu există atașamente sau poze inline de salvat în această conversație.
                   </div>
                 ) : (
                   <>
                     {renderGroup(
                       attachmentItems,
-                      'Documente si fisiere',
+                      'Documente și fișiere',
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                     )}
                     {renderGroup(
@@ -2435,7 +2435,7 @@ export default function InboxPageClient({
                   onClick={closeSaveModal}
                   disabled={isSavingSelection}
                 >
-                  Anuleaza
+                  Anulează
                 </button>
                 <button
                   type="button"
@@ -2446,11 +2446,11 @@ export default function InboxPageClient({
                   {isSavingSelection ? (
                     <>
                       <span className={styles.clientSearchSpinner} aria-hidden="true" style={{ borderTopColor: 'currentColor' }} />
-                      Se salveaza...
+                      Se salvează...
                     </>
                   ) : (
                     <>
-                      Salveaza
+                      Salvează
                       {pendingCount > 0 && (
                         <span className={styles.saveModalSaveBadge}>{pendingCount}</span>
                       )}

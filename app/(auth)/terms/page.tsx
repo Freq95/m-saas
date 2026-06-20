@@ -2,92 +2,92 @@ import styles from '../privacy/page.module.css';
 import Link from 'next/link';
 
 export const metadata = {
-  title: 'Termeni si conditii - densa',
+  title: 'Termeni și condiții - densa',
 };
 
 export default function TermsPage() {
   return (
     <div className={styles.container}>
       <div className={styles.content}>
-        <h1>Termeni si conditii</h1>
+        <h1>Termeni și condiții</h1>
         <p className={styles.updated}>Ultima actualizare: Martie 2026</p>
 
         <section>
           <h2>1. Descrierea serviciului</h2>
           <p>
-            <span className="brand-wordmark-inline">densa</span> este o platforma SaaS de management pentru cabinete stomatologice
-            care ofera: programarea pacientilor, gestionarea pacientilor, sincronizarea
-            email-urilor si instrumente de comunicare. Serviciul este furnizat de
-            [NUMELE COMPANIEI], inregistrata in Romania.
+            <span className="brand-wordmark-inline">densa</span> este o platformă SaaS de management pentru cabinete stomatologice
+            care oferă: programarea pacienților, gestionarea pacienților, sincronizarea
+            email-urilor și instrumente de comunicare. Serviciul este furnizat de
+            [NUMELE COMPANIEI], înregistrată în România.
           </p>
         </section>
 
         <section>
           <h2>2. Contul de utilizator</h2>
           <ul>
-            <li>Fiecare cabinet primeste un cont principal (proprietar) si poate invita personal suplimentar.</li>
-            <li>Sunteti responsabil pentru securitatea credentialelor contului.</li>
-            <li>Un cont poate fi suspendat pentru incalcarea termenilor sau la cerere.</li>
+            <li>Fiecare cabinet primește un cont principal (proprietar) și poate invita personal suplimentar.</li>
+            <li>Sunteți responsabil pentru securitatea credențialelor contului.</li>
+            <li>Un cont poate fi suspendat pentru încălcarea termenilor sau la cerere.</li>
           </ul>
         </section>
 
         <section>
-          <h2>3. Obligatiile cabinetului</h2>
-          <p>In calitate de operator de date (controller GDPR), cabinetul este responsabil pentru:</p>
+          <h2>3. Obligațiile cabinetului</h2>
+          <p>În calitate de operator de date (controller GDPR), cabinetul este responsabil pentru:</p>
           <ul>
-            <li>Obtinerea consimtamantului pacientilor pentru prelucrarea datelor personale</li>
-            <li>Informarea pacientilor despre drepturile lor GDPR</li>
-            <li>Raspunsul la cererile pacientilor privind datele personale (acces, stergere, portabilitate)</li>
-            <li>Asigurarea ca datele introduse in platforma sunt corecte si actualizate</li>
+            <li>Obținerea consimțământului pacienților pentru prelucrarea datelor personale</li>
+            <li>Informarea pacienților despre drepturile lor GDPR</li>
+            <li>Răspunsul la cererile pacienților privind datele personale (acces, ștergere, portabilitate)</li>
+            <li>Asigurarea că datele introduse în platformă sunt corecte și actualizate</li>
           </ul>
         </section>
 
         <section>
-          <h2>4. Obligatiile noastre</h2>
-          <p>In calitate de imputernicit (processor GDPR), ne angajam sa:</p>
+          <h2>4. Obligațiile noastre</h2>
+          <p>În calitate de împuternicit (processor GDPR), ne angajăm să:</p>
           <ul>
-            <li>Prelucram datele exclusiv conform instructiunilor cabinetului</li>
-            <li>Asiguram securitatea tehnica a platformei</li>
-            <li>Notificam cabinetul in cazul unui incident de securitate in maximum 24 de ore</li>
-            <li>Oferim instrumente pentru exportul si stergerea datelor pacientilor</li>
-            <li>Nu accesam datele pacientilor decat in scopuri tehnice de mentenanta</li>
+            <li>Prelucrăm datele exclusiv conform instrucțiunilor cabinetului</li>
+            <li>Asigurăm securitatea tehnică a platformei</li>
+            <li>Notificăm cabinetul în cazul unui incident de securitate în maximum 24 de ore</li>
+            <li>Oferim instrumente pentru exportul și ștergerea datelor pacienților</li>
+            <li>Nu accesăm datele pacienților decât în scopuri tehnice de mentenanță</li>
           </ul>
         </section>
 
         <section>
-          <h2>5. Protectia datelor</h2>
+          <h2>5. Protecția datelor</h2>
           <p>
-            Prelucrarea datelor personale se face in conformitate cu GDPR.
-            Detalii complete in <Link href="/privacy">Politica de confidentialitate</Link>.
+            Prelucrarea datelor personale se face în conformitate cu GDPR.
+            Detalii complete în <Link href="/privacy">Politica de confidențialitate</Link>.
           </p>
           <p>
-            Un Acord de Prelucrare a Datelor (DPA) va fi semnat intre noi si
-            fiecare cabinet inainte de activarea contului.
+            Un Acord de Prelucrare a Datelor (DPA) va fi semnat între noi și
+            fiecare cabinet înainte de activarea contului.
           </p>
         </section>
 
         <section>
           <h2>6. Disponibilitatea serviciului</h2>
           <p>
-            Ne straduim sa mentinam serviciul disponibil 99.9% din timp.
-            Mentenanta planificata va fi anuntata in avans. Nu raspundem pentru
-            intreruperi cauzate de terti (furnizori de hosting, internet).
+            Ne străduim să menținem serviciul disponibil 99.9% din timp.
+            Mentenanța planificată va fi anunțată în avans. Nu răspundem pentru
+            întreruperi cauzate de terți (furnizori de hosting, internet).
           </p>
         </section>
 
         <section>
-          <h2>7. Incetarea contractului</h2>
+          <h2>7. Încetarea contractului</h2>
           <ul>
-            <li>Cabinetul poate solicita incetarea contului in orice moment.</li>
-            <li>La incetare, datele vor fi pastrate 30 de zile, dupa care vor fi sterse definitiv.</li>
-            <li>Cabinetul poate solicita un export complet al datelor inainte de stergere.</li>
+            <li>Cabinetul poate solicita încetarea contului în orice moment.</li>
+            <li>La încetare, datele vor fi păstrate 30 de zile, după care vor fi șterse definitiv.</li>
+            <li>Cabinetul poate solicita un export complet al datelor înainte de ștergere.</li>
           </ul>
         </section>
 
         <section>
           <h2>8. Contact</h2>
           <p>
-            Pentru intrebari despre acesti termeni, contactati-ne la: <strong>[EMAIL CONTACT]</strong>
+            Pentru întrebări despre acești termeni, contactați-ne la: <strong>[EMAIL CONTACT]</strong>
           </p>
         </section>
       </div>

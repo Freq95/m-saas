@@ -96,7 +96,7 @@ export default async function PublicTreatmentPlanPage(props: { params: Promise<{
             <path d="M7 10l5 5 5-5" />
             <path d="M12 15V3" />
           </svg>
-          Descarca PDF
+          Descarcă PDF
         </a>
 
         {view.disclaimer && <p className={styles.disclaimer}>{view.disclaimer}</p>}

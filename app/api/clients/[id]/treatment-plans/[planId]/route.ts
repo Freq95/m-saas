@@ -93,7 +93,7 @@ export async function DELETE(_request: NextRequest, props: { params: Promise<{ i
   try {
     const auth = await getAuthUser();
     if (!isClinicalRole(auth.role)) {
-      return createErrorResponse('Doar medicii pot sterge planuri de tratament.', 403);
+      return createErrorResponse('Doar medicii pot șterge planuri de tratament.', 403);
     }
     const limited = await checkUpdateRateLimit(auth.userId);
     if (limited) return limited;

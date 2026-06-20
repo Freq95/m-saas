@@ -62,7 +62,7 @@ async function fetchTreatmentPlansPayload(clientId: string): Promise<TreatmentPl
   const promise = fetch(`/api/clients/${clientId}/treatment-plans`)
     .then(async (response) => {
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Nu am putut incarca planurile.');
+      if (!response.ok) throw new Error(data.error || 'Nu am putut încărca planurile.');
       planLoadCache.set(clientId, { data, expiresAt: Date.now() + 2000 });
       return data as TreatmentPlansPayload;
     })
@@ -310,7 +310,7 @@ export default function TreatmentPlansTab({
       if (data.client) setClient(data.client);
       loadedClientIdRef.current = clientId;
     } catch (error) {
-      onToastRef.current('error', error instanceof Error ? error.message : 'Nu am putut incarca planurile.');
+      onToastRef.current('error', error instanceof Error ? error.message : 'Nu am putut încărca planurile.');
     } finally {
       if (loadingClientIdRef.current === clientId) loadingClientIdRef.current = null;
       setLoading(false);
@@ -365,13 +365,13 @@ export default function TreatmentPlansTab({
     let alive = true;
     setSelectedPlan({
       ...emptyPlan(dentists),
-      source_appointment_label: 'Se pregateste planul din programare...',
+      source_appointment_label: 'Se pregătește planul din programare...',
     });
     void (async () => {
       try {
         const response = await fetch(`/api/appointments/${encodeURIComponent(seedAppointmentId)}`, { cache: 'no-store' });
         const data = await response.json();
-        if (!response.ok || !data.appointment) throw new Error(data.error || 'Nu am putut preincarca programarea.');
+        if (!response.ok || !data.appointment) throw new Error(data.error || 'Nu am putut preîncărca programarea.');
         if (!alive) return;
 
         const appointment = data.appointment as {
@@ -433,8 +433,8 @@ export default function TreatmentPlansTab({
         clearNewPlanParams();
       } catch (error) {
         if (alive) {
-          const fallback = error instanceof Error ? error.message : 'Nu am putut preincarca programarea.';
-          onToast('error', 'Planul a fost deschis fara precompletare.');
+          const fallback = error instanceof Error ? error.message : 'Nu am putut preîncărca programarea.';
+          onToast('error', 'Planul a fost deschis fără precompletare.');
           setSelectedPlan({
             ...emptyPlan(dentists),
             source_appointment_label: `${fallback} Completeaza planul manual.`,
@@ -470,7 +470,7 @@ export default function TreatmentPlansTab({
       if (!response.ok) throw new Error(data.error || 'Nu am putut genera PDF-ul.');
       upsertPlan(data.plan);
       onFilesChangedRef.current?.();
-      onToast('success', 'PDF-ul a fost generat si salvat la fisiere.');
+      onToast('success', 'PDF-ul a fost generat și salvat la fișiere.');
     } catch (error) {
       onToast('error', error instanceof Error ? error.message : 'Nu am putut genera PDF-ul.');
     } finally {
@@ -635,15 +635,15 @@ export default function TreatmentPlansTab({
     try {
       const response = await fetch(`/api/clients/${clientId}/treatment-plans/${plan.id}`, { method: 'DELETE' });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Nu am putut sterge planul.');
+      if (!response.ok) throw new Error(data.error || 'Nu am putut șterge planul.');
       planLoadCache.delete(clientId);
       setPlans((prev) => prev.filter((candidate) => candidate.id !== plan.id));
       if (selectedPlan?.id === plan.id) setSelectedPlan(null);
       setPendingDeletePlan(null);
       onFilesChangedRef.current?.();
-      onToast('success', 'Planul a fost sters.');
+      onToast('success', 'Planul a fost șters.');
     } catch (error) {
-      onToast('error', error instanceof Error ? error.message : 'Nu am putut sterge planul.');
+      onToast('error', error instanceof Error ? error.message : 'Nu am putut șterge planul.');
     } finally {
       setBusyId(null);
     }
@@ -652,7 +652,7 @@ export default function TreatmentPlansTab({
   if (loading) {
     return (
       <div className={styles.loading}>
-        <Spinner size={24} thickness={2.2} centered={false} label="Se incarca planurile" />
+        <Spinner size={24} thickness={2.2} centered={false} label="Se încarcă planurile" />
       </div>
     );
   }
@@ -722,20 +722,20 @@ export default function TreatmentPlansTab({
                   <button
                     type="button"
                     className={styles.tpIconBtn}
-                    aria-label="Mai multe actiuni"
+                    aria-label="Mai multe acțiuni"
                     aria-expanded={openMenuPlanId === plan.id}
-                    data-tooltip="Mai multe actiuni"
+                    data-tooltip="Mai multe acțiuni"
                     onClick={() => setOpenMenuPlanId((current) => current === plan.id ? null : plan.id ?? null)}
                   >
                     <IconMore />
                   </button>
                   {openMenuPlanId === plan.id && (
                     <div role="menu">
-                      {canEdit && !plan.pdf_file_id && <button type="button" role="menuitem" onClick={() => { setOpenMenuPlanId(null); void generatePdf(plan); }} disabled={busyId === plan.id}><IconFile /> Genereaza PDF</button>}
+                      {canEdit && !plan.pdf_file_id && <button type="button" role="menuitem" onClick={() => { setOpenMenuPlanId(null); void generatePdf(plan); }} disabled={busyId === plan.id}><IconFile /> Generează PDF</button>}
                       {plan.pdf_file_id && <a role="menuitem" href={`/api/clients/${clientId}/files/${plan.pdf_file_id}/preview`} target="_blank" onClick={() => setOpenMenuPlanId(null)}><IconEye /> Preview / print</a>}
-                      {plan.pdf_file_id && <a role="menuitem" href={`/api/clients/${clientId}/files/${plan.pdf_file_id}/download`} target="_blank" onClick={() => setOpenMenuPlanId(null)}><IconDownload /> Descarca</a>}
+                      {plan.pdf_file_id && <a role="menuitem" href={`/api/clients/${clientId}/files/${plan.pdf_file_id}/download`} target="_blank" onClick={() => setOpenMenuPlanId(null)}><IconDownload /> Descarcă</a>}
                       {canEdit && <button type="button" role="menuitem" onClick={() => { setOpenMenuPlanId(null); duplicatePlan(plan); }}><IconCopy /> Duplica</button>}
-                      {canEdit && <button type="button" role="menuitem" className={styles.dangerAction} onClick={() => { setOpenMenuPlanId(null); setPendingDeletePlan(plan); }} disabled={busyId === plan.id}><IconTrash /> Sterge</button>}
+                      {canEdit && <button type="button" role="menuitem" className={styles.dangerAction} onClick={() => { setOpenMenuPlanId(null); setPendingDeletePlan(plan); }} disabled={busyId === plan.id}><IconTrash /> Șterge</button>}
                     </div>
                   )}
                 </div>
@@ -763,15 +763,15 @@ export default function TreatmentPlansTab({
                 <h3 id="share-plan-title">Trimite planul</h3>
                 <span>Plan #{share.plan.id} · {formatMoney(share.plan.total)}</span>
               </div>
-              <button type="button" className={styles.iconButton} onClick={() => setShare(null)} aria-label="Inchide" data-tooltip="Inchide" disabled={shareBusy}>
+              <button type="button" className={styles.iconButton} onClick={() => setShare(null)} aria-label="Închide" data-tooltip="Închide" disabled={shareBusy}>
                 <IconX />
               </button>
             </div>
 
             {share.loading ? (
               <div className={styles.shareLoading}>
-                <Spinner size={22} thickness={2.2} centered={false} label="Se pregateste linkul" />
-                <span>Se pregateste linkul securizat</span>
+                <Spinner size={22} thickness={2.2} centered={false} label="Se pregătește linkul" />
+                <span>Se pregătește linkul securizat</span>
               </div>
             ) : share.emailMode ? (
               <>
@@ -788,12 +788,12 @@ export default function TreatmentPlansTab({
                   />
                 </label>
                 <label className={styles.field}>
-                  <span>Mesaj optional</span>
+                  <span>Mesaj opțional</span>
                   <textarea
                     rows={3}
                     value={share.message}
                     onChange={(event) => setShare((prev) => prev ? { ...prev, message: event.target.value } : prev)}
-                    placeholder="Adauga o nota scurta pentru pacient."
+                    placeholder="Adaugă o nota scurta pentru pacient."
                   />
                 </label>
                 <label className={styles.checkboxField}>
@@ -802,7 +802,7 @@ export default function TreatmentPlansTab({
                     checked={share.attachPdf}
                     onChange={(event) => setShare((prev) => prev ? { ...prev, attachPdf: event.target.checked } : prev)}
                   />
-                  <span>Ataseaza si PDF-ul la email</span>
+                  <span>Ataseaza și PDF-ul la email</span>
                 </label>
                 <div className={styles.modalActions}>
                   <button type="button" className={styles.primaryButton} onClick={sendShareEmail} disabled={shareBusy || !share.to.trim()}>
@@ -820,8 +820,8 @@ export default function TreatmentPlansTab({
                 <div className={`${styles.shareStatus} ${share.revoked ? styles.shareStatusRevoked : styles.shareStatusActive}`}>
                   <span className={styles.shareStatusIcon}>{share.revoked ? <IconSlash /> : share.copied ? <IconCheck /> : <IconLink />}</span>
                   <span>
-                    <strong>{share.revoked ? 'Link dezactivat' : share.copied ? 'Link copiat' : 'PDF pregatit'}</strong>
-                    <small>{share.revoked ? 'Linkul trimis anterior nu mai poate fi accesat.' : share.expiresAt ? `Link valabil pana la ${formatExpiry(share.expiresAt)}` : 'Gata pentru trimitere.'}</small>
+                    <strong>{share.revoked ? 'Link dezactivat' : share.copied ? 'Link copiat' : 'PDF pregătit'}</strong>
+                    <small>{share.revoked ? 'Linkul trimis anterior nu mai poate fi accesat.' : share.expiresAt ? `Link valabil până la ${formatExpiry(share.expiresAt)}` : 'Gata pentru trimitere.'}</small>
                   </span>
                 </div>
 
@@ -829,7 +829,7 @@ export default function TreatmentPlansTab({
                   <div className={styles.shareReadiness} aria-label="Canale disponibile">
                     <span className={share.whatsappReady ? styles.readyItemOk : styles.readyItemMissing}>
                       <IconWhatsApp />
-                      {share.whatsappReady ? 'Telefon pregatit pentru WhatsApp' : 'Telefon lipsa sau invalid'}
+                      {share.whatsappReady ? 'Telefon pregătit pentru WhatsApp' : 'Telefon lipsa sau invalid'}
                     </span>
                     <span className={share.to ? styles.readyItemOk : styles.readyItemMissing}>
                       <IconMail />
@@ -840,8 +840,8 @@ export default function TreatmentPlansTab({
 
                 {!share.revoked && (!share.whatsappReady || !share.to) && (
                   <div className={styles.shareFixHint}>
-                    <span>{!share.whatsappReady ? 'Numar de telefon lipsa sau invalid.' : 'Email lipsa pentru pacient.'}</span>
-                    <a href={`/clients/${clientId}/edit`}>Editeaza pacientul</a>
+                    <span>{!share.whatsappReady ? 'Număr de telefon lipsa sau invalid.' : 'Email lipsa pentru pacient.'}</span>
+                    <a href={`/clients/${clientId}/edit`}>Editează pacientul</a>
                   </div>
                 )}
 
@@ -901,10 +901,10 @@ export default function TreatmentPlansTab({
 
       <ConfirmModal
         isOpen={pendingDeletePlan !== null}
-        title="Sterge planul?"
-        message={pendingDeletePlan ? `Plan #${pendingDeletePlan.id} va fi sters din lista pacientului. PDF-ul atasat ramane in fisierele pacientului, daca exista.` : ''}
-        confirmLabel="Sterge"
-        cancelLabel="Renunta"
+        title="Șterge planul?"
+        message={pendingDeletePlan ? `Plan #${pendingDeletePlan.id} va fi șters din lista pacientului. PDF-ul atașat rămâne în fișierele pacientului, dacă există.` : ''}
+        confirmLabel="Șterge"
+        cancelLabel="Renunță"
         tone="danger"
         onClose={() => setPendingDeletePlan(null)}
         onConfirm={async () => {

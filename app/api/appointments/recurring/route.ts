@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
     // Only the dentist themselves can create new patients in their own account.
     if (!dentistAssignment.isCurrentUser && (typeof clientId !== 'number' || forceNewClient)) {
       return NextResponse.json(
-        { error: 'Selecteaza un pacient existent. Pacientii pot fi adaugati doar de medicul selectat.' },
+        { error: 'Selectează un pacient existent. Pacientii pot fi adăugați doar de medicul selectat.' },
         { status: 403 }
       );
     }
@@ -229,7 +229,7 @@ export async function POST(request: NextRequest) {
       if (hasAvailabilityBlockConflict(conflictCheck.conflicts)) {
         return NextResponse.json(
           {
-            error: 'Una sau mai multe programari recurente cad peste un blocaj de disponibilitate.',
+            error: 'Una sau mai multe programări recurente cad peste un blocaj de disponibilitate.',
             conflicts: conflictCheck.conflicts.map(formatAppointmentConflictPayload),
             suggestions: formatAppointmentConflictSuggestions(conflictCheck.suggestions),
           },
@@ -257,7 +257,7 @@ export async function POST(request: NextRequest) {
       if (hasAvailabilityBlockConflict(conflictCheck.conflicts)) {
         return NextResponse.json(
           {
-            error: 'Una sau mai multe programari recurente cad peste un blocaj de disponibilitate.',
+            error: 'Una sau mai multe programări recurente cad peste un blocaj de disponibilitate.',
             conflicts: conflictCheck.conflicts.map(formatAppointmentConflictPayload),
             suggestions: formatAppointmentConflictSuggestions(conflictCheck.suggestions),
           },
@@ -344,7 +344,7 @@ export async function POST(request: NextRequest) {
         appointments: decoratedAppointments,
         conflicts: conflicts.length > 0 ? conflicts : undefined,
         warning: conflicts.length > 0
-          ? 'Programarile au fost salvate, dar unele intervale se suprapun cu alte programari.'
+          ? 'Programarile au fost salvate, dar unele intervale se suprapun cu alte programări.'
           : null,
         recurrence_group_id: recurrenceGroupId,
       },

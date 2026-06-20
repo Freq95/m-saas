@@ -44,7 +44,7 @@ export function DeleteConfirmModal({
     try {
       await onConfirm(isRecurring && scope === 'series' ? 'series' : undefined);
     } catch {
-      setDeleteError('Nu s-a putut sterge programarea. Incearca din nou.');
+      setDeleteError('Nu s-a putut șterge programarea. Încearcă din nou.');
     } finally {
       setIsDeleting(false);
     }
@@ -62,17 +62,17 @@ export function DeleteConfirmModal({
         {...dialogProps}
         role="dialog"
         aria-modal="true"
-        aria-label="Confirmare stergere"
+        aria-label="Confirmare ștergere"
       >
         <h3>Stergere programare</h3>
         <p className={styles.sheetDescription}>
-          Sigur vrei sa stergi programarea pentru <strong>{appointment.client_name}</strong>?
+          Sigur vrei să ștergi programarea pentru <strong>{appointment.client_name}</strong>?
         </p>
 
         {isRecurring && (
           <div
             role="radiogroup"
-            aria-label="Ce vrei sa stergi"
+            aria-label="Ce vrei să ștergi"
             style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', margin: '0.5rem 0 0.25rem' }}
           >
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
@@ -84,7 +84,7 @@ export function DeleteConfirmModal({
                 onChange={() => setScope('single')}
                 disabled={isDeleting}
               />
-              <span>Doar aceasta aparitie</span>
+              <span>Doar această apariție</span>
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
               <input
@@ -103,19 +103,19 @@ export function DeleteConfirmModal({
         {deleteError && <p className={styles.sheetDescription}>{deleteError}</p>}
         <div className={styles.modalActions}>
           <button type="button" onClick={onClose} className={styles.cancelButton} disabled={isDeleting}>
-            Renunta
+            Renunță
           </button>
           <button type="button" onClick={handleConfirmClick} className={styles.deleteButton} disabled={isDeleting}>
             {isDeleting
               ? (
                 <>
-                  <Spinner size={14} thickness={2} centered={false} label="Se sterge" />
-                  <span>Se sterge</span>
+                  <Spinner size={14} thickness={2} centered={false} label="Se șterge" />
+                  <span>Se șterge</span>
                 </>
               )
               : isRecurring && scope === 'series'
-                ? 'Sterge seria'
-                : 'Sterge'}
+                ? 'Șterge seria'
+                : 'Șterge'}
           </button>
         </div>
       </div>

@@ -71,11 +71,11 @@ export default function TreatmentPlanSettingsClient({ initialPayload, isOwner }:
       body.append('file', file);
       const response = await fetch('/api/settings/treatment-plan/logo', { method: 'POST', body });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Nu am putut incarca logo-ul.');
+      if (!response.ok) throw new Error(data.error || 'Nu am putut încărca logo-ul.');
       setLogoKey(data.settings?.logo_storage_key || null);
-      toast.success('Logo-ul a fost incarcat.');
+      toast.success('Logo-ul a fost încărcat.');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Nu am putut incarca logo-ul.');
+      toast.error(error instanceof Error ? error.message : 'Nu am putut încărca logo-ul.');
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -94,7 +94,7 @@ export default function TreatmentPlanSettingsClient({ initialPayload, isOwner }:
           <section className={styles.section}>
             <div className={styles.sectionHeader}>
               <h2>Branding clinică</h2>
-              {!isOwner && <span>Doar proprietarul poate edita aceste campuri.</span>}
+              {!isOwner && <span>Doar proprietarul poate edita aceste câmpuri.</span>}
             </div>
             <label className={styles.field}>
               <span>Nume clinică</span>
@@ -121,11 +121,11 @@ export default function TreatmentPlanSettingsClient({ initialPayload, isOwner }:
             <div className={styles.logoRow}>
               <div>
                 <strong>Logo</strong>
-                <span>{logoKey ? 'Logo incarcat pentru PDF.' : 'Fara logo. Se foloseste numele clinicii.'}</span>
+                <span>{logoKey ? 'Logo încărcat pentru PDF.' : 'Fără logo. Se folosește numele clinicii.'}</span>
               </div>
               {isOwner && (
                 <label className={styles.secondaryButton}>
-                  {uploading ? 'Se incarca...' : 'Incarca logo'}
+                  {uploading ? 'Se încarcă...' : 'Încarcă logo'}
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -160,7 +160,7 @@ export default function TreatmentPlanSettingsClient({ initialPayload, isOwner }:
 
         <div className={styles.actions}>
           <button className={styles.primaryButton} onClick={saveSettings} disabled={saving}>
-            {saving ? 'Se salveaza...' : 'Salveaza'}
+            {saving ? 'Se salvează...' : 'Salvează'}
           </button>
         </div>
         <ToastContainer toasts={toast.toasts} onClose={toast.removeToast} />

@@ -4,9 +4,9 @@ import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { getAuthUser } from '@/lib/auth-helpers';
 
 const DEFAULT_PRIVACY_NOTICE =
-  'Datele dumneavoastra personale sunt prelucrate in conformitate cu Regulamentul (UE) 2016/679 (GDPR). ' +
-  'Aveti dreptul la acces, rectificare, stergere si portabilitatea datelor. ' +
-  'Pentru exercitarea drepturilor dumneavoastra, va rugam sa contactati cabinetul.';
+  'Datele dumneavoastră personale sunt prelucrate în conformitate cu Regulamentul (UE) 2016/679 (GDPR). ' +
+  'Aveți dreptul la acces, rectificare, ștergere și portabilitatea datelor. ' +
+  'Pentru exercitarea drepturilor dumneavoastră, vă rugăm să contactați cabinetul.';
 
 // GET /api/settings/gdpr — fetch tenant GDPR settings (any authenticated tenant user)
 export async function GET(_request: NextRequest) {
@@ -39,10 +39,10 @@ export async function PATCH(request: NextRequest) {
       : null;
 
     if (text === null || text.length === 0) {
-      return createErrorResponse('Textul notificarii GDPR este obligatoriu', 400);
+      return createErrorResponse('Textul notificării GDPR este obligatoriu', 400);
     }
     if (text.length > 2000) {
-      return createErrorResponse('Textul notificarii GDPR nu poate depasi 2000 de caractere', 400);
+      return createErrorResponse('Textul notificării GDPR nu poate depăși 2000 de caractere', 400);
     }
 
     const db = await getMongoDbOrThrow();

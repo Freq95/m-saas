@@ -20,7 +20,7 @@ export default function Home() {
       <main className={styles.main}>
         <div ref={heroRef} className={styles.hero}>
           <h1 className={styles.wordmark}>densa</h1>
-          <p className={styles.tagline}>Gestionare centralizata pentru mesaje, programari si automatizari</p>
+          <p className={styles.tagline}>Gestionare centralizata pentru mesaje, programări și automatizari</p>
           <div className={styles.actions}>
             <Link href="/dashboard" className={styles.primaryButton} prefetch>
               Acceseaza Dashboard

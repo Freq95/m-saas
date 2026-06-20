@@ -456,7 +456,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
 
       // Only the dentist themselves can create new patients in their own account.
       if (!effectiveDentistIsCurrentUser && (typeof clientId !== 'number' || forceNewClient)) {
-        return createErrorResponse('Selecteaza un pacient existent. Pacientii pot fi adaugati doar de medicul selectat.', 403);
+        return createErrorResponse('Selectează un pacient existent. Pacientii pot fi adăugați doar de medicul selectat.', 403);
       }
 
       const normalizedEmail = clientEmail !== undefined
@@ -610,7 +610,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     if (patchResult.kind === 'availability_conflict') {
       return NextResponse.json(
         {
-          error: 'Intervalul este blocat in calendar.',
+          error: 'Intervalul este blocat în calendar.',
           conflicts: patchResult.conflicts.map(formatAppointmentConflictPayload),
           suggestions: formatAppointmentConflictSuggestions(patchResult.suggestions),
         },
@@ -667,7 +667,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
         if (hasAvailabilityBlockConflict(conflictCheck.conflicts)) {
           return NextResponse.json(
             {
-              error: 'Una sau mai multe programari recurente cad peste un blocaj de disponibilitate.',
+              error: 'Una sau mai multe programări recurente cad peste un blocaj de disponibilitate.',
               conflicts: conflictCheck.conflicts.map(formatAppointmentConflictPayload),
               suggestions: formatAppointmentConflictSuggestions(conflictCheck.suggestions),
             },
@@ -837,8 +837,8 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       if (startTime !== undefined || endTime !== undefined) changedPerInstanceFields.push('data/ora');
       if (status !== undefined) changedPerInstanceFields.push('statusul');
       if (changedPerInstanceFields.length > 0) {
-        const list = changedPerInstanceFields.join(' si ');
-        seriesFanOutWarning = `Modificarile pentru ${list} s-au aplicat doar acestei aparitii.`;
+        const list = changedPerInstanceFields.join(' și ');
+        seriesFanOutWarning = `Modificarile pentru ${list} s-au aplicat doar acestei apariții.`;
       }
     }
 
@@ -882,7 +882,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
       return createErrorResponse(error.message, 409);
     }
     if (error instanceof Error && error.message === 'AVAILABILITY_BLOCK_CONFLICT') {
-      return createErrorResponse('Una sau mai multe programari recurente cad peste un blocaj de disponibilitate.', 409);
+      return createErrorResponse('Una sau mai multe programări recurente cad peste un blocaj de disponibilitate.', 409);
     }
     return handleApiError(error, 'Failed to update appointment');
   }

@@ -305,7 +305,7 @@ function buildTreatmentPlanDocument(
       View,
       { key: 'header', style: styles.headerRow },
       h(Text, { style: [styles.th, styles.cNo] }, 'Nr. crt.'),
-      h(Text, { style: [styles.th, styles.cProcedure] }, 'Procedura'),
+      h(Text, { style: [styles.th, styles.cProcedure] }, 'Procedură'),
       h(Text, { style: [styles.th, styles.cDetails] }, 'Detalii'),
       h(Text, { style: [styles.th, styles.cCost] }, 'Cost')
     ),

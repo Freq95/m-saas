@@ -14,7 +14,7 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
   try {
     const auth = await getAuthUser();
     if (!isClinicalRole(auth.role)) {
-      return createErrorResponse('Doar medicii pot modifica starea dintilor.', 403);
+      return createErrorResponse('Doar medicii pot modifica starea dinților.', 403);
     }
     const limited = await checkUpdateRateLimit(auth.userId);
     if (limited) return limited;

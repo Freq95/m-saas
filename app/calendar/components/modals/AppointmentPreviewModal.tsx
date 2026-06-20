@@ -60,7 +60,7 @@ export function AppointmentPreviewModal({
             <h2 className={styles.previewTitle}>{appointment.client_name}</h2>
             {subtitleText && <p className={styles.previewSubtitle}>{subtitleText}</p>}
           </div>
-          <button className={styles.closeButton} onClick={onClose} aria-label="Inchide" data-tooltip="Inchide">
+          <button className={styles.closeButton} onClick={onClose} aria-label="Închide" data-tooltip="Închide">
             x
           </button>
         </div>
@@ -68,7 +68,7 @@ export function AppointmentPreviewModal({
         <div className={styles.previewContent}>
           <div className={styles.previewSection}>
             <div className={styles.previewRow}>
-              <span className={styles.previewLabel}>Data si ora</span>
+              <span className={styles.previewLabel}>Data și ora</span>
               <span className={styles.previewValue}>
                 {format(new Date(appointment.start_time), "EEEE, d MMMM yyyy 'la' HH:mm", { locale: ro })} -{' '}
                 {format(new Date(appointment.end_time), 'HH:mm', { locale: ro })}
@@ -105,10 +105,10 @@ export function AppointmentPreviewModal({
 
         <div className={styles.previewActions}>
           <button className={styles.editButton} onClick={onEdit}>
-            Editeaza
+            Editează
           </button>
           <button className={styles.deleteButton} onClick={onDelete}>
-            Sterge
+            Șterge
           </button>
         </div>
       </div>

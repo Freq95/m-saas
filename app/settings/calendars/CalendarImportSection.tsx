@@ -147,7 +147,7 @@ export function CalendarImportSection({ role, calendars, notify }: CalendarImpor
 
   const submitPreview = async (nextOptions = options) => {
     if (!file) {
-      notify.warning('Alege un fisier .ics sau .zip.');
+      notify.warning('Alege un fișier .ics sau .zip.');
       return;
     }
     if (!nextOptions.calendarId) {
@@ -331,7 +331,7 @@ export function CalendarImportSection({ role, calendars, notify }: CalendarImpor
       <div className={styles.importHeader}>
         <div>
           <h3 className={styles.sectionTitle}>Import calendar</h3>
-          <p className={styles.sectionCaption}>Incarca un export Google Calendar .ics sau .zip si alege exact ce devine programare Densa.</p>
+          <p className={styles.sectionCaption}>Încarcă un export Google Calendar .ics sau .zip și alege exact ce devine programare Densa.</p>
         </div>
         {step !== 'upload' && (
           <button type="button" className={styles.importGhostButton} onClick={resetImport} disabled={busy}>
@@ -343,7 +343,7 @@ export function CalendarImportSection({ role, calendars, notify }: CalendarImpor
       <div className={styles.importShell}>
         <div className={styles.importConfig}>
           <label className={styles.importField}>
-            <span>Fisier</span>
+            <span>Fișier</span>
             <input
               type="file"
               accept=".ics,.zip,text/calendar,application/zip"
@@ -385,7 +385,7 @@ export function CalendarImportSection({ role, calendars, notify }: CalendarImpor
               />
             </label>
             <label className={styles.importField}>
-              <span>Pana la</span>
+              <span>Până la</span>
               <input
                 type="date"
                 value={options.dateRangeEnd || ''}
@@ -431,7 +431,7 @@ export function CalendarImportSection({ role, calendars, notify }: CalendarImpor
 
           <div className={styles.importActions}>
             <button type="button" className={sharedStyles.primaryButton} onClick={() => submitPreview()} disabled={busy || !file || writableCalendars.length === 0}>
-              {previewId ? 'Actualizeaza previzualizarea' : 'Previzualizeaza'}
+              {previewId ? 'Actualizează previzualizarea' : 'Previzualizeaza'}
             </button>
             {step === 'preview' && (
               <button type="button" className={sharedStyles.primaryButton} onClick={confirmImport} disabled={!canConfirm}>
@@ -456,7 +456,7 @@ export function CalendarImportSection({ role, calendars, notify }: CalendarImpor
           </div>
           {step === 'preview' && (
             <p className={styles.outcomeSentence}>
-              {outcome.willImport} programari vor fi importate. {outcome.willSkipDuplicates + outcome.willSkipConflicts + outcome.willSkipPrivate + outcome.invalidOrIncomplete + outcome.alreadyDeselected} vor fi sarite.
+              {outcome.willImport} programări vor fi importate. {outcome.willSkipDuplicates + outcome.willSkipConflicts + outcome.willSkipPrivate + outcome.invalidOrIncomplete + outcome.alreadyDeselected} vor fi sarite.
             </p>
           )}
           {step === 'done' && actualOutcome && (
@@ -487,7 +487,7 @@ export function CalendarImportSection({ role, calendars, notify }: CalendarImpor
             </div>
             <div className={styles.bulkActions}>
               <button type="button" onClick={() => selectRows(rows.filter((row) => !row.invalidReason && !row.duplicate && !row.hasAvailabilityBlock && (!row.hasOverlap || options.includeOverlaps)))}>
-                Selecteaza importabile
+                Selectează importabile
               </button>
               <button type="button" onClick={() => selectRows(rows.filter((row) => new Date(row.startTime) >= new Date() && !row.invalidReason))}>
                 Doar viitoare
@@ -518,7 +518,7 @@ export function CalendarImportSection({ role, calendars, notify }: CalendarImpor
                         checked={selectedSet.has(row.id)}
                         onChange={() => toggleRow(row.id)}
                         disabled={busy || Boolean(row.invalidReason)}
-                        aria-label={`Selecteaza ${row.title}`}
+                        aria-label={`Selectează ${row.title}`}
                       />
                     </td>
                     <td>
@@ -556,7 +556,7 @@ export function CalendarImportSection({ role, calendars, notify }: CalendarImpor
                     checked={selectedSet.has(row.id)}
                     onChange={() => toggleRow(row.id)}
                     disabled={busy || Boolean(row.invalidReason)}
-                    aria-label={`Selecteaza ${row.title}`}
+                    aria-label={`Selectează ${row.title}`}
                   />
                   <div>
                     <strong>{row.title}</strong>

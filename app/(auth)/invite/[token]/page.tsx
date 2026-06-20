@@ -48,7 +48,7 @@ export default function InvitePage() {
     event.preventDefault();
     setError(null);
     if (password.length < 8) {
-      setError('Parola trebuie sa aiba minimum 8 caractere.');
+      setError('Parola trebuie să aiba minimum 8 caractere.');
       return;
     }
     if (password !== confirmPassword) {
@@ -73,7 +73,7 @@ export default function InvitePage() {
   if (loading) {
     return (
       <section className={styles.card}>
-        <p className={styles.loadingText}>Se incarca invitatia...</p>
+        <p className={styles.loadingText}>Se încarcă invitația...</p>
       </section>
     );
   }
@@ -94,12 +94,12 @@ export default function InvitePage() {
         <h1 id="auth-invite-title" className={styles.title}>Seteaza parola</h1>
         <p className={styles.subtitle}>
           Te alaturi la <strong style={{ color: 'var(--color-text)' }}>{invite.tenantName}</strong>.
-          Alege o parola si vei fi conectat imediat.
+          Alege o parolă și vei fi conectat imediat.
         </p>
         <p className={styles.subtitle}>
           {invite.role === 'asistent' && invite.assignedDentists?.length
-            ? `Esti invitat ca asistent al ${invite.assignedDentists.map((dentist) => dentist.name).join(' si ')}.`
-            : `Esti invitat cu rolul de ${ROLE_LABEL[invite.role] || invite.role}.`}
+            ? `Ești invitat ca asistent al ${invite.assignedDentists.map((dentist) => dentist.name).join(' și ')}.`
+            : `Ești invitat cu rolul de ${ROLE_LABEL[invite.role] || invite.role}.`}
         </p>
       </header>
 
@@ -159,7 +159,7 @@ export default function InvitePage() {
         </div>
 
         <button type="submit" className={styles.primaryButton} disabled={submitting}>
-          {submitting ? 'Se salveaza...' : 'Seteaza parola'}
+          {submitting ? 'Se salvează...' : 'Seteaza parola'}
         </button>
       </form>
     </section>

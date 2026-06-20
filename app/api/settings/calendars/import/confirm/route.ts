@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     const auth = await getAuthUser();
     if (!isClinicalRole(auth.role) || auth.role === 'super_admin') {
       return NextResponse.json(
-        { error: 'Importul calendarului este disponibil doar pentru owner si medici.' },
+        { error: 'Importul calendarului este disponibil doar pentru owner și medici.' },
         { status: 403 }
       );
     }

@@ -118,15 +118,15 @@ export async function sendInviteEmail(email: string, name: string, tenantName: s
     html: `
       <h2>Bine ai venit!</h2>
       <p>Salut ${name},</p>
-      <p>Ai fost invitat sa te alaturi platformei <strong>${tenantName}</strong>.</p>
-      <p>Apasa pe butonul de mai jos pentru a-ti seta parola:</p>
+      <p>Ai fost invitat să te alături platformei <strong>${tenantName}</strong>.</p>
+      <p>Apasă pe butonul de mai jos pentru a-ți seta parola:</p>
       <p>
         <a href="${inviteUrl}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">
-          Seteaza parola
+          Setează parola
         </a>
       </p>
-      <p>Link-ul expira in 48 de ore.</p>
-      <p style="color:#666;font-size:13px;">Daca nu ai solicitat aceasta invitatie, ignora acest email.</p>
+      <p>Link-ul expiră în 48 de ore.</p>
+      <p style="color:#666;font-size:13px;">Dacă nu ai solicitat această invitație, ignoră acest email.</p>
     `,
   });
 }

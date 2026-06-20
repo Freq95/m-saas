@@ -55,7 +55,7 @@ export default function SettingsTabs({ activeTab, isOwner: isOwnerProp }: Settin
 
   return (
     <>
-      <nav ref={navRef} className={styles.tabs} aria-label="Navigatie setari">
+      <nav ref={navRef} className={styles.tabs} aria-label="Navigatie setări">
       {visibleTabs.map((tab) => {
         const isActive = tab.key === optimisticActiveTab;
         return (

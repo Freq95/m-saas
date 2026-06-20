@@ -106,7 +106,7 @@ describe('ClientSection', () => {
 
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Sterge pacientul selectat')).toBeInTheDocument();
+    expect(screen.getByLabelText('Șterge pacientul selectat')).toBeInTheDocument();
   });
 
   it('loads recent patients on focus with an empty query', () => {
@@ -146,7 +146,7 @@ describe('ClientSection', () => {
       <ClientSectionHarness initialName="Ana Popescu" initialSelectedClientId={1} />
     );
 
-    fireEvent.click(screen.getByLabelText('Sterge pacientul selectat'));
+    fireEvent.click(screen.getByLabelText('Șterge pacientul selectat'));
 
     const input = screen.getByLabelText('Nume pacient *');
     expect(document.activeElement).toBe(input);
@@ -342,9 +342,9 @@ describe('AppointmentModal', () => {
     );
 
     expect(
-      screen.getAllByText('Nu exista calendare disponibile pentru creare.')[0]
+      screen.getAllByText('Nu există calendare disponibile pentru creare.')[0]
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Salveaza' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Salvează' })).toBeDisabled();
   });
 
   it('scopes patient suggestions to the selected calendar', () => {

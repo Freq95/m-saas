@@ -277,7 +277,7 @@ describe('POST /api/appointments/recurring shared calendar behavior', () => {
     const json = await res.json() as Doc;
 
     expect(res.status).toBe(403);
-    expect(json.error).toContain('Selecteaza un pacient existent');
+    expect(json.error).toContain('Selectează un pacient existent');
     expect(serviceFindOne).not.toHaveBeenCalled();
     expect(insertOne).not.toHaveBeenCalled();
   });

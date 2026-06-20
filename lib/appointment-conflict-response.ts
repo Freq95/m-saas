@@ -1,7 +1,7 @@
 const CONFLICT_MESSAGE_BY_TYPE: Record<string, string> = {
-  calendar_appointment: 'Exista deja o alta programare in acest interval.',
-  appointment_overlap: 'Exista deja o alta programare in acest interval.',
-  availability_block: 'Intervalul este blocat in calendar.',
+  calendar_appointment: 'Există deja o altă programare în acest interval.',
+  appointment_overlap: 'Există deja o altă programare în acest interval.',
+  availability_block: 'Intervalul este blocat în calendar.',
 };
 
 export function formatAppointmentConflictPayload(conflict: any) {
@@ -51,7 +51,7 @@ export function formatAppointmentConflictSuggestions(
 
 export function getAppointmentConflictWarning(conflicts: unknown[] = []) {
   return conflicts.length > 0
-    ? 'Programarea a fost salvata, dar intervalul se suprapune cu alta programare.'
+    ? 'Programarea a fost salvată, dar intervalul se suprapune cu altă programare.'
     : null;
 }
 

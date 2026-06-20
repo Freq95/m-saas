@@ -79,7 +79,7 @@ export const createAppointmentSchema = z.object({
   googleAccessToken: z.string().optional(),
 }).strict().refine(
   (data) => data.serviceId !== undefined || (data.serviceIds && data.serviceIds.length > 0),
-  { message: 'Cel putin un serviciu este obligatoriu', path: ['serviceIds'] }
+  { message: 'Cel puțin un serviciu este obligatoriu', path: ['serviceIds'] }
 ).refine(
   (data) => typeof data.clientId === 'number' || Boolean(data.clientName?.trim()),
   { message: 'Client name is required when clientId is not provided', path: ['clientName'] }
@@ -217,7 +217,7 @@ export const createRecurringAppointmentSchema = z
   .strict()
   .refine(
     (data) => data.serviceId !== undefined || (data.serviceIds && data.serviceIds.length > 0),
-    { message: 'Cel putin un serviciu este obligatoriu', path: ['serviceIds'] }
+    { message: 'Cel puțin un serviciu este obligatoriu', path: ['serviceIds'] }
   )
   .refine(
     (data) => typeof data.clientId === 'number' || Boolean(data.clientName?.trim()),

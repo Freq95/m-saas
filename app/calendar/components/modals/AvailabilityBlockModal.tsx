@@ -112,7 +112,7 @@ export function AvailabilityBlockModal({
     const startIso = composeIso(startDate, allDay ? '00:00' : startClock);
     const endIso = composeIso(endDate, allDay ? '23:59' : endClock, allDay);
     if (new Date(startIso) >= new Date(endIso)) {
-      setError('Ora de final trebuie sa fie dupa inceput.');
+      setError('Ora de final trebuie să fie după inceput.');
       return;
     }
     setBusy(true);
@@ -148,14 +148,14 @@ export function AvailabilityBlockModal({
     setConfirmDeleteOpen(false);
   };
 
-  const title = mode === 'create' ? 'Blocaj de disponibilitate' : readOnly ? 'Detalii blocaj' : 'Editeaza blocaj';
+  const title = mode === 'create' ? 'Blocaj de disponibilitate' : readOnly ? 'Detalii blocaj' : 'Editează blocaj';
 
   return (
     <div className={styles.modalOverlay} onPointerDown={handleBackdropPointerDown} onClick={handleBackdropClick}>
       <div className={`${styles.modal} ${styles.createSheet}`} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label={title}>
         <div className={styles.modalHeader}>
           <h3>{title}</h3>
-          <button type="button" className={styles.modalIconButton} onClick={onClose} disabled={busy} aria-label="Inchide" data-tooltip="Inchide">x</button>
+          <button type="button" className={styles.modalIconButton} onClick={onClose} disabled={busy} aria-label="Închide" data-tooltip="Închide">x</button>
         </div>
 
         <div className={styles.modalContent}>
@@ -168,7 +168,7 @@ export function AvailabilityBlockModal({
                 <span className={styles.previewValue}>{block?.type_label}</span>
               </div>
               <div className={styles.previewRow}>
-                <span className={styles.previewLabel}>Data si ora</span>
+                <span className={styles.previewLabel}>Data și ora</span>
                 <span className={styles.previewValue}>
                   {block && `${format(new Date(block.start_time), "EEEE, d MMMM yyyy 'la' HH:mm", { locale: ro })} - ${format(new Date(block.end_time), 'HH:mm', { locale: ro })}`}
                 </span>
@@ -227,20 +227,20 @@ export function AvailabilityBlockModal({
 
         <div className={styles.modalActions}>
           {mode !== 'create' && block?.can_delete && onDelete && (
-            <button type="button" className={styles.deleteButton} disabled={busy} onClick={() => setConfirmDeleteOpen(true)}>Sterge</button>
+            <button type="button" className={styles.deleteButton} disabled={busy} onClick={() => setConfirmDeleteOpen(true)}>Șterge</button>
           )}
           {readOnly && block?.can_edit && (
-            <button type="button" className={styles.editButton} disabled={busy} onClick={() => setError('Deschide editarea din Setari > Calendare pentru modificari complete.')}>Editeaza</button>
+            <button type="button" className={styles.editButton} disabled={busy} onClick={() => setError('Deschide editarea dîn Setări > Calendare pentru modificări complete.')}>Editează</button>
           )}
-          <button type="button" className={styles.cancelButton} onClick={onClose} disabled={busy}>{readOnly ? 'Inchide' : 'Renunta'}</button>
+          <button type="button" className={styles.cancelButton} onClick={onClose} disabled={busy}>{readOnly ? 'Închide' : 'Renunță'}</button>
           {!readOnly && (
             <button type="button" className={styles.saveButton} onClick={submit} disabled={busy}>
               {busy ? (
                 <>
-                  <Spinner size={14} thickness={2} centered={false} label="Se salveaza" />
-                  <span>Se salveaza</span>
+                  <Spinner size={14} thickness={2} centered={false} label="Se salvează" />
+                  <span>Se salvează</span>
                 </>
-              ) : 'Salveaza'}
+              ) : 'Salvează'}
             </button>
           )}
         </div>
@@ -248,9 +248,9 @@ export function AvailabilityBlockModal({
       <ConfirmModal
         isOpen={confirmDeleteOpen}
         title="Stergere blocaj"
-        message={`Sigur vrei sa stergi blocajul${block?.type_label ? ` "${block.type_label}"` : ''}?`}
-        confirmLabel="Sterge"
-        cancelLabel="Renunta"
+        message={`Sigur vrei să ștergi blocajul${block?.type_label ? ` "${block.type_label}"` : ''}?`}
+        confirmLabel="Șterge"
+        cancelLabel="Renunță"
         tone="danger"
         onClose={() => setConfirmDeleteOpen(false)}
         onConfirm={handleConfirmDelete}

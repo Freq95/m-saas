@@ -63,7 +63,7 @@ export const AppointmentBlock = React.memo<AppointmentBlockProps>(
     const nameFirst = compact || narrow;
     const serviceNames = getServiceNames(appointment);
     const serviceSummary = serviceNames.join(' + ');
-    const ariaServiceSummary = serviceSummary || appointment.service_name || 'fara serviciu';
+    const ariaServiceSummary = serviceSummary || appointment.service_name || 'fără serviciu';
     const compactServiceSummary = serviceNames.length > 1
       ? `${serviceNames[0]} (+${serviceNames.length - 1})`
       : serviceNames[0] || '';

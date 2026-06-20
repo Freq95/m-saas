@@ -73,7 +73,7 @@ export function useDentistServices({
         });
         const payload = await res.json().catch(() => null);
         if (!res.ok) {
-          throw new Error(payload?.error || 'Nu am putut incarca lista dentistilor.');
+          throw new Error(payload?.error || 'Nu am putut încărca lista dentiștilor.');
         }
         if (!controller.signal.aborted) {
           setDentists(Array.isArray(payload?.dentists) ? payload.dentists : []);
@@ -82,7 +82,7 @@ export function useDentistServices({
         if (controller.signal.aborted) return;
         setDentists(fallbackSelfDentist ? [fallbackSelfDentist] : []);
         setDentistError(
-          err instanceof Error ? err.message : 'Nu am putut incarca lista dentistilor.'
+          err instanceof Error ? err.message : 'Nu am putut încărca lista dentiștilor.'
         );
       } finally {
         if (!controller.signal.aborted) setLoadingDentists(false);
@@ -124,7 +124,7 @@ export function useDentistServices({
         });
         const payload = await res.json().catch(() => null);
         if (!res.ok) {
-          throw new Error(payload?.error || 'Nu am putut incarca serviciile.');
+          throw new Error(payload?.error || 'Nu am putut încărca serviciile.');
         }
         if (!controller.signal.aborted) {
           setExternalServices(Array.isArray(payload?.services) ? payload.services : []);
@@ -132,7 +132,7 @@ export function useDentistServices({
       } catch (err) {
         if (controller.signal.aborted) return;
         setExternalServices([]);
-        setServicesError(err instanceof Error ? err.message : 'Nu am putut incarca serviciile.');
+        setServicesError(err instanceof Error ? err.message : 'Nu am putut încărca serviciile.');
       } finally {
         if (!controller.signal.aborted) setLoadingServices(false);
       }

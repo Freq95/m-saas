@@ -25,17 +25,17 @@ export function ForgotPasswordForm() {
 
       if (!response.ok) {
         if (response.status === 429) {
-          throw new Error('Ai depasit limita de 7 cereri pe ora. Incearca din nou mai tarziu.');
+          throw new Error('Ai depășit limita de 7 cereri pe ora. Încearcă din nou mai târziu.');
         }
         throw new Error('Request failed');
       }
 
-      setMessage('Daca adresa exista, vei primi un email cu instructiuni.');
+      setMessage('Dacă adresa există, vei primi un email cu instrucțiuni.');
     } catch (submitError) {
       setError(
         submitError instanceof Error
           ? submitError.message
-          : 'Nu am putut trimite cererea. Incearca din nou.'
+          : 'Nu am putut trimite cererea. Încearcă din nou.'
       );
     } finally {
       setSubmitting(false);
@@ -46,7 +46,7 @@ export function ForgotPasswordForm() {
     <section className={styles.card} aria-labelledby="auth-forgot-title">
       <header className={styles.header}>
         <h1 id="auth-forgot-title" className={styles.title}>Recupereaza parola</h1>
-        <p className={styles.subtitle}>Introdu adresa de email folosita la autentificare.</p>
+        <p className={styles.subtitle}>Introdu adresa de email folosită la autentificare.</p>
       </header>
 
       {message && (

@@ -107,8 +107,8 @@ export async function POST(request: NextRequest) {
           subject: 'Resetare parola',
           html: `
             <p>Ai cerut resetarea parolei.</p>
-            <p><a href="${resetLink}">Apasa aici pentru a seta o parola noua</a></p>
-            <p>Linkul expira in 1 ora.</p>
+            <p><a href="${resetLink}">Apasă aici pentru a seta o parolă noua</a></p>
+            <p>Linkul expiră în 1 ora.</p>
           `,
         });
 

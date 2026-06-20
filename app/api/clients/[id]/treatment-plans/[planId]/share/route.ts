@@ -105,14 +105,14 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
     // action === 'whatsapp'
     if (!whatsappPhone) {
       return createErrorResponse(
-        'Pacientul nu are un numar de telefon valid. Adauga-l in fisa pacientului.',
+        'Pacientul nu are un număr de telefon valid. Adaugă-l în fișa pacientului.',
         400
       );
     }
 
     const message =
-      `Buna ziua, ${firstName}! Planul dumneavoastra de tratament de la ${plan.clinic_name_snapshot} ` +
-      `este disponibil aici: ${publicUrl} — il puteti vizualiza si descarca direct de pe telefon. O zi buna!`;
+      `Bună ziua, ${firstName}! Planul dumneavoastră de tratament de la ${plan.clinic_name_snapshot} ` +
+      `este disponibil aici: ${publicUrl} — îl puteți vizualiza și descărca direct de pe telefon. O zi bună!`;
     const waUrl = `https://wa.me/${whatsappPhone}?text=${encodeURIComponent(message)}`;
 
     const updated = await markTreatmentPlanSent(planScope, planId, 'whatsapp');

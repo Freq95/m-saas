@@ -82,12 +82,12 @@ function CategorySectionBase({
     <div className={styles.modalField}>
       <label>Categorie</label>
       {loading ? (
-        <p className={styles.fieldHint}>Se incarca categoriile...</p>
+        <p className={styles.fieldHint}>Se încarcă categoriile...</p>
       ) : error ? (
         <p className={styles.fieldHint}>{error}</p>
       ) : categories.length === 0 ? (
         <p className={styles.fieldHint}>
-          Acest medic nu are categorii definite. Configureaza-le in Setari - Calendare.
+          Acest medic nu are categorii definite. Configurează-le în Setări - Calendare.
         </p>
       ) : (
         <div className={styles.categoryPicker} role="radiogroup" aria-label="Categorie programare">

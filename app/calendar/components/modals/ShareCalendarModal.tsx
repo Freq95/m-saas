@@ -48,28 +48,28 @@ const PERMISSION_OPTIONS: Array<{
 }> = [
   {
     key: 'can_create',
-    title: 'Poate crea programari',
+    title: 'Poate crea programări',
     description: 'Permite adaugarea programarilor noi.',
   },
   {
     key: 'can_edit_own',
-    title: 'Editeaza proprii',
+    title: 'Editează proprii',
     description: 'Poate modifica doar programarile proprii.',
   },
   {
     key: 'can_edit_all',
-    title: 'Editeaza toate',
+    title: 'Editează toate',
     description: 'Acces complet de editare pe calendar.',
   },
   {
     key: 'can_delete_own',
-    title: 'Sterge proprii',
-    description: 'Poate sterge doar programarile proprii.',
+    title: 'Șterge proprii',
+    description: 'Poate șterge doar programarile proprii.',
   },
   {
     key: 'can_delete_all',
-    title: 'Sterge toate',
-    description: 'Poate sterge orice programare.',
+    title: 'Șterge toate',
+    description: 'Poate șterge orice programare.',
   },
 ];
 
@@ -83,8 +83,8 @@ function formatPermissionsSummary(permissions: CalendarPermissions): string {
   if (permissions.can_create) parts.push('creare');
   if (permissions.can_edit_all) parts.push('editare toate');
   else if (permissions.can_edit_own) parts.push('editare proprii');
-  if (permissions.can_delete_all) parts.push('stergere toate');
-  else if (permissions.can_delete_own) parts.push('stergere proprii');
+  if (permissions.can_delete_all) parts.push('ștergere toate');
+  else if (permissions.can_delete_own) parts.push('ștergere proprii');
   return parts.join(', ');
 }
 
@@ -147,11 +147,11 @@ export function ShareCalendarModal({
     try {
       const response = await fetch(`/api/calendars/${calendar.id}/shares`, { cache: 'no-store' });
       const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(getErrorMessage(payload, 'Nu am putut incarca lista de partajari.'));
+      if (!response.ok) throw new Error(getErrorMessage(payload, 'Nu am putut încărca lista de partajari.'));
       setShares(Array.isArray(payload?.shares) ? payload.shares : []);
     } catch (loadError) {
       setShares([]);
-      setNotice({ kind: 'error', text: loadError instanceof Error ? loadError.message : 'Nu am putut incarca lista de partajari.' });
+      setNotice({ kind: 'error', text: loadError instanceof Error ? loadError.message : 'Nu am putut încărca lista de partajari.' });
     } finally {
       setLoadingShares(false);
     }
@@ -230,12 +230,12 @@ export function ShareCalendarModal({
       );
       const payload = await response.json().catch(() => null);
       if (!response.ok) {
-        throw new Error(getErrorMessage(payload, isEditing ? 'Nu am putut actualiza partajarea.' : 'Nu am putut trimite invitatia.'));
+        throw new Error(getErrorMessage(payload, isEditing ? 'Nu am putut actualiza partajarea.' : 'Nu am putut trimite invitația.'));
       }
       await loadShares();
       await onChanged?.();
       resetForm();
-      setNotice({ kind: 'success', text: isEditing ? 'Permisiunile au fost actualizate.' : 'Invitatia a fost trimisa.' });
+      setNotice({ kind: 'success', text: isEditing ? 'Permisiunile au fost actualizate.' : 'Invitația a fost trimisa.' });
     } catch (submitError) {
       setNotice({ kind: 'error', text: submitError instanceof Error ? submitError.message : 'Nu am putut salva partajarea.' });
     } finally {
@@ -266,12 +266,12 @@ export function ShareCalendarModal({
       const response = await fetch(`/api/calendars/${calendar.id}/shares/${share.id}`, { method: 'DELETE' });
       if (!response.ok && response.status !== 204) {
         const payload = await response.json().catch(() => null);
-        throw new Error(getErrorMessage(payload, 'Nu am putut elimina partajarea.'));
+        throw new Error(getErrorMessage(payload, 'Nu am putut elimină partajarea.'));
       }
       if (editingShareId === share.id) resetForm();
       await loadShares();
       await onChanged?.();
-      setNotice({ kind: 'success', text: share.status === 'accepted' ? 'Accesul a fost revocat.' : 'Invitatia a fost eliminata.' });
+      setNotice({ kind: 'success', text: share.status === 'accepted' ? 'Accesul a fost revocat.' : 'Invitația a fost eliminată.' });
     } finally {
       setProcessingShareId(null);
     }
@@ -313,8 +313,8 @@ export function ShareCalendarModal({
             type="button"
             className={styles.modalIconButton}
             onClick={requestClose}
-            aria-label="Inchide"
-            data-tooltip="Inchide"
+            aria-label="Închide"
+            data-tooltip="Închide"
           >
             <IconX />
           </button>
@@ -332,7 +332,7 @@ export function ShareCalendarModal({
             <div className={styles.modalSectionHeader}>
               <h4 className={styles.modalSectionTitle}>
                 {isEditing
-                  ? `Editeaza permisiunile — ${editingShare?.shared_with_email || ''}`
+                  ? `Editează permisiunile — ${editingShare?.shared_with_email || ''}`
                   : 'Invita o persoana'}
               </h4>
               {isEditing && (
@@ -342,7 +342,7 @@ export function ShareCalendarModal({
                   onClick={resetForm}
                   disabled={isSubmitting}
                 >
-                  Renunta
+                  Renunță
                 </button>
               )}
             </div>
@@ -394,10 +394,10 @@ export function ShareCalendarModal({
               >
                 {isSubmitting ? (
                   <>
-                    <Spinner size={14} thickness={2} centered={false} label="Se salveaza" />
-                    <span>Se salveaza</span>
+                    <Spinner size={14} thickness={2} centered={false} label="Se salvează" />
+                    <span>Se salvează</span>
                   </>
-                ) : isEditing ? 'Actualizeaza' : 'Trimite invitatia'}
+                ) : isEditing ? 'Actualizează' : 'Trimite invitația'}
               </button>
             </div>
           </section>
@@ -459,8 +459,8 @@ export function ShareCalendarModal({
                               className={styles.secondaryInlineAction}
                               onClick={() => handleEditShare(share)}
                               disabled={!activeShare || processingShareId === share.id || isSubmitting}
-                              aria-label={`Editeaza ${share.shared_with_email}`}
-                              data-tooltip="Editeaza permisiunile"
+                              aria-label={`Editează ${share.shared_with_email}`}
+                              data-tooltip="Editează permisiunile"
                             >
                               <IconEdit />
                             </button>
@@ -469,12 +469,12 @@ export function ShareCalendarModal({
                               className={styles.dangerInlineAction}
                               onClick={() => handleDeleteShare(share)}
                               disabled={processingShareId === share.id || isSubmitting}
-                              aria-label={share.status === 'accepted' ? `Revoca ${share.shared_with_email}` : `Sterge invitatia pentru ${share.shared_with_email}`}
-                              data-tooltip={share.status === 'accepted' ? 'Revoca accesul' : 'Sterge invitatia'}
+                              aria-label={share.status === 'accepted' ? `Revocă ${share.shared_with_email}` : `Șterge invitația pentru ${share.shared_with_email}`}
+                              data-tooltip={share.status === 'accepted' ? 'Revocă accesul' : 'Șterge invitația'}
                             >
                               {processingShareId === share.id ? (
                                 <Spinner size={14} thickness={2} centered={false} label="Se proceseaza" />
-                              ) : share.status === 'accepted' ? 'Revoca' : 'Sterge'}
+                              ) : share.status === 'accepted' ? 'Revocă' : 'Șterge'}
                             </button>
                           </div>
                         </td>
@@ -491,13 +491,13 @@ export function ShareCalendarModal({
 
       <ConfirmModal
         isOpen={deleteTarget !== null}
-        title={deleteTarget?.status === 'accepted' ? 'Revoca accesul' : 'Sterge invitatia'}
+        title={deleteTarget?.status === 'accepted' ? 'Revocă accesul' : 'Șterge invitația'}
         message={
           deleteTarget?.status === 'accepted'
             ? `Revoci accesul pentru ${deleteTarget?.shared_with_email}?`
-            : `Stergi invitatia pentru ${deleteTarget?.shared_with_email}?`
+            : `Ștergi invitația pentru ${deleteTarget?.shared_with_email}?`
         }
-        confirmLabel={deleteTarget?.status === 'accepted' ? 'Revoca' : 'Sterge'}
+        confirmLabel={deleteTarget?.status === 'accepted' ? 'Revocă' : 'Șterge'}
         tone="danger"
         onClose={() => setDeleteTarget(null)}
         onConfirm={async () => {

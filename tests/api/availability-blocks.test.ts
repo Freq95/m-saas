@@ -131,7 +131,7 @@ describe('/api/availability-blocks', () => {
 
     expect(res.status).toBe(201);
     expect(json.block.type_label).toBe('Colaborator');
-    expect(json.warning).toContain('exista programari');
+    expect(json.warning).toContain('există programări');
     expect(json.overlappingAppointments).toEqual([{ id: 901, client_name: 'Ana Test' }]);
     expect(mockCreateAvailabilityBlock).toHaveBeenCalledWith(expect.objectContaining({
       typeLabel: 'Colaborator',

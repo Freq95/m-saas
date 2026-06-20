@@ -54,7 +54,7 @@ function healthLabel(integration: EmailIntegration | null | undefined): string |
   if (integration.last_sync_status === 'failed') {
     return integration.last_sync_error_code === 'AUTH_REVOKED'
       ? 'Reconecteaza — autorizarea a expirat'
-      : 'Sincronizarea a esuat — incearca din nou';
+      : 'Sincronizarea a eșuat — încearcă din nou';
   }
   return null;
 }
@@ -187,7 +187,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId, isOwner 
     }
 
     if (errorCode) {
-      toastError('Conectarea Gmail a esuat. Incearca din nou.');
+      toastError('Conectarea Gmail a eșuat. Încearcă din nou.');
       window.history.replaceState({}, '', '/settings/email');
     }
   }, [loadIntegrations, toastError, toastSuccess]);
@@ -778,7 +778,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId, isOwner 
                 onClick={() => setLastEmailByIntegration((prev) => ({ ...prev, [yahooIntegration.id]: null }))}
                 className={styles.closeButton}
                 aria-label="Close email preview"
-                data-tooltip="Inchide"
+                data-tooltip="Închide"
               >
                 <IconX />
               </button>
@@ -813,7 +813,7 @@ function EmailSettingsPageContent({ initialIntegrations, initialUserId, isOwner 
                 onClick={() => setLastEmailByIntegration((prev) => ({ ...prev, [gmailIntegration.id]: null }))}
                 className={styles.closeButton}
                 aria-label="Close email preview"
-                data-tooltip="Inchide"
+                data-tooltip="Închide"
               >
                 <IconX />
               </button>

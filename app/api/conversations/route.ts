@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
       contact_name: contactName,
       contact_email: contactEmail || null,
       contact_phone: contactPhone || null,
-      subject: subject || 'Fara subiect',
+      subject: subject || 'Fără subiect',
       created_at: now,
       updated_at: now,
     };

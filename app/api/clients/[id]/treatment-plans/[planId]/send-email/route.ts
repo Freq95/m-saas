@@ -70,7 +70,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
 
     const to = parsed.data.to || client.email;
     if (!to) {
-      return createErrorResponse('Pacientul nu are email. Completeaza o adresa pentru trimitere.', 400);
+      return createErrorResponse('Pacientul nu are email. Completează o adresă pentru trimitere.', 400);
     }
 
     const file = await db.collection('client_files').findOne({
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       to,
       subject: `Plan de tratament - ${plan.clinic_name_snapshot}`,
       html: `
-        <p>Buna ziua, ${escapeHtml(client.name || '')}</p>
+        <p>Bună ziua, ${escapeHtml(client.name || '')}</p>
         <p>Gasiti mai jos planul de tratament transmis de ${escapeHtml(plan.clinic_name_snapshot)}.</p>
         ${optionalMessage}
         <p>
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
             Deschide planul de tratament
           </a>
         </p>
-        <p>Linkul este valabil pana la ${new Date(link.expiresAt).toLocaleDateString('ro-RO')}.</p>
+        <p>Linkul este valabil până la ${new Date(link.expiresAt).toLocaleDateString('ro-RO')}.</p>
         <p>Cu respect,<br>${escapeHtml(plan.doctor_name_snapshot)}</p>
       `,
       attachments,

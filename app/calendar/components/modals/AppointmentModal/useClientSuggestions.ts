@@ -83,7 +83,7 @@ export function useClientSuggestions({
         const payload = await res.json().catch(() => null);
         if (controller.signal.aborted) return;
         if (!res.ok) {
-          throw new Error(payload?.error || 'Nu am putut cauta pacientii existenti.');
+          throw new Error(payload?.error || 'Nu am putut caută pacientii existenti.');
         }
         const rows = Array.isArray(payload?.clients) ? payload.clients : [];
         setSuggestions(
@@ -98,7 +98,7 @@ export function useClientSuggestions({
       } catch (err) {
         if (controller.signal.aborted) return;
         setSuggestions([]);
-        setError(err instanceof Error ? err.message : 'Nu am putut cauta pacientii existenti.');
+        setError(err instanceof Error ? err.message : 'Nu am putut caută pacientii existenti.');
         setResolvedQuery(normalized);
       } finally {
         if (!controller.signal.aborted) setLoading(false);

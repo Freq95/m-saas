@@ -12,7 +12,7 @@ async function fetchAppointmentCategories(url: string): Promise<AppointmentCateg
   const response = await fetch(url, { cache: 'no-store' });
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    throw new Error(payload?.error || 'Nu am putut incarca categoriile.');
+    throw new Error(payload?.error || 'Nu am putut încărca categoriile.');
   }
   return Array.isArray(payload?.categories) ? payload.categories : [];
 }

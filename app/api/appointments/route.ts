@@ -210,7 +210,7 @@ export async function POST(request: NextRequest) {
     // Only the dentist themselves can create new patients in their own account.
     if (!dentistAssignment.isCurrentUser && (typeof clientId !== 'number' || forceNewClient)) {
       return NextResponse.json(
-        { error: 'Selecteaza un pacient existent. Pacientii pot fi adaugati doar de medicul selectat.' },
+        { error: 'Selectează un pacient existent. Pacientii pot fi adăugați doar de medicul selectat.' },
         { status: 403 }
       );
     }
@@ -257,7 +257,7 @@ export async function POST(request: NextRequest) {
     if (hasAvailabilityBlockConflict(conflictCheck.conflicts)) {
       return NextResponse.json(
         {
-          error: 'Intervalul este blocat in calendar.',
+          error: 'Intervalul este blocat în calendar.',
           conflicts: conflictCheck.conflicts.map(formatAppointmentConflictPayload),
           suggestions: formatAppointmentConflictSuggestions(conflictCheck.suggestions),
         },

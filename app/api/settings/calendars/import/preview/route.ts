@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     // clean 403 instead of a misleading 400 about malformed input.
     if (!isClinicalRole(auth.role) || auth.role === 'super_admin') {
       return NextResponse.json(
-        { error: 'Importul calendarului este disponibil doar pentru owner si medici.' },
+        { error: 'Importul calendarului este disponibil doar pentru owner și medici.' },
         { status: 403 }
       );
     }
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     const file = form.get('file');
     const rawOptions = form.get('options');
     if (!(file instanceof File)) {
-      return NextResponse.json({ error: 'Fisierul .ics lipseste.' }, { status: 400 });
+      return NextResponse.json({ error: 'Fișierul .ics lipsește.' }, { status: 400 });
     }
 
     const options = parseImportOptions(

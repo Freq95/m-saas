@@ -28,7 +28,7 @@ export default function GlobalError({ error, reset }: { error: Error; reset: () 
       >
         <h1 style={{ marginTop: 0, marginBottom: '8px', fontSize: '30px' }}>A aparut o eroare</h1>
         <p style={{ margin: 0, color: 'var(--color-text-soft)' }}>
-          Ceva nu a mers bine. Incearca din nou.
+          Ceva nu a mers bine. Încearcă din nou.
         </p>
         <p style={{ marginTop: '10px', marginBottom: 0, color: 'var(--color-text-soft)', fontSize: '13px' }}>
           {error.message}
@@ -47,7 +47,7 @@ export default function GlobalError({ error, reset }: { error: Error; reset: () 
               cursor: 'pointer',
             }}
           >
-            Incearca din nou
+            Încearcă din nou
           </button>
           <Link
             href="/dashboard"

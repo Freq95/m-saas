@@ -234,7 +234,7 @@ function ClientSectionBase({
                   inputRef.current?.focus();
                 });
               }}
-              aria-label="Sterge pacientul selectat"
+              aria-label="Șterge pacientul selectat"
               disabled={disabled}
             >
               x
@@ -247,7 +247,7 @@ function ClientSectionBase({
               role="listbox"
             >
               {loading && suggestions.length === 0 ? (
-                <div className={styles.clientSuggestionEmpty}>Se cauta...</div>
+                <div className={styles.clientSuggestionEmpty}>Se caută...</div>
               ) : (
                 suggestions.map((suggestion, index) => (
                   <button
@@ -298,7 +298,7 @@ function ClientSectionBase({
             className={`${styles.clientStatusBadge} ${styles.clientStatusBadgeNew}`}
             role="status"
           >
-            <span>Selecteaza un pacient existent — pacientii pot fi adaugati doar de medicul selectat.</span>
+            <span>Selectează un pacient existent — pacientii pot fi adăugați doar de medicul selectat.</span>
           </div>
         )}
       </div>

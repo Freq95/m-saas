@@ -253,7 +253,7 @@ function ServiceSectionEditable({
 
   const inputDisabled = disabled || loading;
   const placeholder = loading
-    ? 'Se incarca serviciile...'
+    ? 'Se încarcă serviciile...'
     : services.length === 0
       ? '(niciun serviciu)'
       : availableServices.length === 0

@@ -70,7 +70,7 @@ function CalendarPickerSectionBase({
         </select>
         {hasNoWritableCalendars && (
           <p className={styles.fieldHint} role="alert">
-            Nu exista calendare disponibile pentru creare.
+            Nu există calendare disponibile pentru creare.
           </p>
         )}
         {calendarError && (
@@ -89,7 +89,7 @@ function CalendarPickerSectionBase({
             onChange={(event) => onDentistChange(event.target.value)}
             disabled={disabled || loadingDentists}
           >
-            <option value="">(selecteaza)</option>
+            <option value="">(selectează)</option>
             {dentists.map((dentist) => (
               <option key={dentist.userId} value={String(dentist.userId)}>
                 {dentist.displayName}

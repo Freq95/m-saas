@@ -39,7 +39,7 @@ const NAV_ITEMS = [
   { key: 'dashboard', href: '/dashboard', label: 'Dashboard' },
   { key: 'inbox', href: '/inbox', label: 'Inbox' },
   { key: 'calendar', href: '/calendar', label: 'Calendar' },
-  { key: 'clients', href: '/clients', label: 'Pacienti' },
+  { key: 'clients', href: '/clients', label: 'Pacienți' },
 ] as const;
 
 const MOBILE_SETTINGS_BREAKPOINT = 780;
@@ -318,7 +318,7 @@ export default function AppTopNav({
         })}
         <a
           href="/settings"
-          aria-label="Setari"
+          aria-label="Setări"
           data-nav-key="settings"
           className={`${styles.link} ${styles.mobileSettingsLink} ${activeSection === 'settings' ? styles.activeLink : ''}`}
           onPointerEnter={() => prefetchRoute('/settings')}
@@ -375,8 +375,8 @@ export default function AppTopNav({
         <a
           href="/settings"
           className={`${styles.settingsIcon} ${activeSection === 'settings' ? styles.settingsIconActive : ''}`}
-          aria-label="Setari"
-          data-tooltip="Setari"
+          aria-label="Setări"
+          data-tooltip="Setări"
           onPointerDown={() => setOptimisticActiveSection('settings')}
           onPointerEnter={() => prefetchRoute('/settings/services')}
           onTouchStart={() => prefetchRoute('/settings/services')}

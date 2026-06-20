@@ -55,7 +55,7 @@ export default function ClientCreateModal({
   initialData,
   onCreated,
   onUpdated,
-  title = 'Adauga pacient nou',
+  title = 'Adaugă pacient nou',
   submitLabel,
   dentistUserId,
 }: ClientCreateModalProps) {
@@ -84,7 +84,7 @@ export default function ClientCreateModal({
 
   const isEditMode = mode === 'edit';
   const isMobile = useIsMobile();
-  const resolvedSubmitLabel = submitLabel || (isEditMode ? 'Salveaza modificarile' : 'Salveaza pacient');
+  const resolvedSubmitLabel = submitLabel || (isEditMode ? 'Salvează modificarile' : 'Salvează pacient');
 
   useEffect(() => {
     setMounted(true);
@@ -338,7 +338,7 @@ export default function ClientCreateModal({
                   className={`${styles.mobileActionBtn} ${styles.mobileActionBtnPrimary}`}
                   disabled={loading || !formData.name.trim()}
                 >
-                  {loading ? <Spinner size={14} thickness={2} centered={false} label="Salvare" /> : 'Salveaza'}
+                  {loading ? <Spinner size={14} thickness={2} centered={false} label="Salvare" /> : 'Salvează'}
                 </button>
               </div>
 
@@ -346,21 +346,21 @@ export default function ClientCreateModal({
                 {errorMessage && <div className={styles.mobileError}>{errorMessage}</div>}
                 {duplicateMatch && (
                   <div className={styles.duplicateNotice} role="alert">
-                    <div className={styles.duplicateTitle}>Pacient existent gasit</div>
+                    <div className={styles.duplicateTitle}>Pacient existent găsit</div>
                     <div className={styles.duplicateBody}>
-                      Exista deja un pacient <strong>{duplicateMatch.name}</strong>
+                      Există deja un pacient <strong>{duplicateMatch.name}</strong>
                       {duplicateMatch.phone ? <> (<span>{duplicateMatch.phone}</span>)</> : null}.
-                      Foloseste-l sau creeaza un duplicat?
+                      Folosește-l sau creeaza un duplicat?
                     </div>
                     <div className={styles.duplicateActions}>
                       <button type="button" className={styles.duplicatePrimary} onClick={handleUseMatched}>
-                        Foloseste pacientul existent
+                        Folosește pacientul existent
                       </button>
                       <button type="button" className={styles.duplicateSecondary} onClick={handleForceDuplicate}>
                         Creeaza duplicat
                       </button>
                       <button type="button" className={styles.duplicateGhost} onClick={handleCancelDuplicate}>
-                        Anuleaza
+                        Anulează
                       </button>
                     </div>
                   </div>
@@ -435,8 +435,8 @@ export default function ClientCreateModal({
                   <div className={styles.mobileSectionHeader}>
                     <span className={styles.mobileRowIcon}><ShieldIcon /></span>
                     <div>
-                      <div className={styles.mobileSectionTitle}>Consimtamant GDPR</div>
-                      <div className={styles.mobileSectionCaption}>Date si acorduri pacient</div>
+                      <div className={styles.mobileSectionTitle}>Consimțământ GDPR</div>
+                      <div className={styles.mobileSectionCaption}>Date și acorduri pacient</div>
                     </div>
                   </div>
 
@@ -448,7 +448,7 @@ export default function ClientCreateModal({
 
                   <label className={styles.mobileSwitchRow}>
                     <span>
-                      <span className={styles.mobileSwitchTitle}>Consimtamant obtinut</span>
+                      <span className={styles.mobileSwitchTitle}>Consimțământ obținut</span>
                       <span className={styles.mobileSwitchSubtitle}>Marcheaza acordul pacientului</span>
                     </span>
                     <MobileSwitch
@@ -465,8 +465,8 @@ export default function ClientCreateModal({
                         value={formData.consent_method}
                         onChange={(event) => setField('consent_method', event.target.value)}
                       >
-                        <option value="">Selecteaza</option>
-                        <option value="digital_signature">Semnatura digitala</option>
+                        <option value="">Selectează</option>
+                        <option value="digital_signature">Semnătura digitală</option>
                         <option value="scanned_document">Document scanat</option>
                         <option value="paper_on_file">Document fizic</option>
                       </select>
@@ -478,7 +478,7 @@ export default function ClientCreateModal({
                   <label className={styles.mobileSwitchRow}>
                     <span>
                       <span className={styles.mobileSwitchTitle}>Pacient minor</span>
-                      <span className={styles.mobileSwitchSubtitle}>Adauga parinte sau tutore</span>
+                      <span className={styles.mobileSwitchSubtitle}>Adaugă părinte sau tutore</span>
                     </span>
                     <MobileSwitch
                       checked={formData.is_minor}
@@ -490,7 +490,7 @@ export default function ClientCreateModal({
                     <label className={styles.mobileInputRow}>
                       <span className={styles.mobileRowIcon}><GuardianIcon /></span>
                       <span className={styles.mobileInputMain}>
-                        <span className={styles.mobileInputLabel}>Parinte / Tutore</span>
+                        <span className={styles.mobileInputLabel}>Părinte / Tutore</span>
                         <input
                           type="text"
                           value={formData.parent_guardian_name}
@@ -519,7 +519,7 @@ export default function ClientCreateModal({
       <div className={styles.modal} onClick={(event) => event.stopPropagation()}>
         <div className={styles.header}>
           <h2 className={styles.title}>{title}</h2>
-          <button type="button" className={styles.closeButton} onClick={resetAndClose} aria-label="Inchide" data-tooltip="Inchide">
+          <button type="button" className={styles.closeButton} onClick={resetAndClose} aria-label="Închide" data-tooltip="Închide">
             x
           </button>
         </div>
@@ -581,7 +581,7 @@ export default function ClientCreateModal({
             </div>
 
             <div className={`${styles.field} ${styles.fieldFull}`} style={{ borderTop: '1px solid #e5e7eb', paddingTop: '1rem', marginTop: '0.5rem' }}>
-              <label style={{ fontWeight: 600, fontSize: '0.9rem' }}>Consimtamant GDPR</label>
+              <label style={{ fontWeight: 600, fontSize: '0.9rem' }}>Consimțământ GDPR</label>
               {privacyNoticeText && (
                 <p style={{
                   fontSize: '0.8rem',
@@ -607,7 +607,7 @@ export default function ClientCreateModal({
                   onChange={(e) => setFormData(prev => ({ ...prev, consent_given: e.target.checked }))}
                   style={{ width: '18px', height: '18px' }}
                 />
-                Consimtamant obtinut
+                Consimțământ obținut
               </label>
             </div>
 
@@ -619,8 +619,8 @@ export default function ClientCreateModal({
                 onChange={(e) => setFormData(prev => ({ ...prev, consent_method: e.target.value }))}
                 style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '0.875rem' }}
               >
-                <option value="">-- Selecteaza --</option>
-                <option value="digital_signature">Semnatura digitala</option>
+                <option value="">-- Selectează --</option>
+                <option value="digital_signature">Semnătura digitală</option>
                 <option value="scanned_document">Document scanat</option>
                 <option value="paper_on_file">Document fizic</option>
               </select>
@@ -641,7 +641,7 @@ export default function ClientCreateModal({
 
             {formData.is_minor && (
               <div className={styles.field}>
-                <label htmlFor="parent-name">Parinte / Tutore</label>
+                <label htmlFor="parent-name">Părinte / Tutore</label>
                 <input
                   id="parent-name"
                   type="text"
@@ -656,21 +656,21 @@ export default function ClientCreateModal({
           {errorMessage && <div className={styles.error}>{errorMessage}</div>}
           {duplicateMatch && (
             <div className={styles.duplicateNotice} role="alert">
-              <div className={styles.duplicateTitle}>Pacient existent gasit</div>
+              <div className={styles.duplicateTitle}>Pacient existent găsit</div>
               <div className={styles.duplicateBody}>
-                Exista deja un pacient <strong>{duplicateMatch.name}</strong>
+                Există deja un pacient <strong>{duplicateMatch.name}</strong>
                 {duplicateMatch.phone ? <> (<span>{duplicateMatch.phone}</span>)</> : null}.
-                Foloseste-l sau creeaza un duplicat?
+                Folosește-l sau creeaza un duplicat?
               </div>
               <div className={styles.duplicateActions}>
                 <button type="button" className={styles.duplicatePrimary} onClick={handleUseMatched}>
-                  Foloseste pacientul existent
+                  Folosește pacientul existent
                 </button>
                 <button type="button" className={styles.duplicateSecondary} onClick={handleForceDuplicate}>
                   Creeaza duplicat
                 </button>
                 <button type="button" className={styles.duplicateGhost} onClick={handleCancelDuplicate}>
-                  Anuleaza
+                  Anulează
                 </button>
               </div>
             </div>
@@ -678,13 +678,13 @@ export default function ClientCreateModal({
 
           <div className={styles.actions}>
             <button type="button" className={styles.cancelButton} onClick={resetAndClose}>
-              Anuleaza
+              Anulează
             </button>
             <button type="submit" className={styles.submitButton} disabled={loading || !formData.name.trim()}>
               {loading ? (
                 <>
-                  <Spinner size={14} thickness={2} centered={false} label="Se salveaza" />
-                  <span>Se salveaza</span>
+                  <Spinner size={14} thickness={2} centered={false} label="Se salvează" />
+                  <span>Se salvează</span>
                 </>
               ) : resolvedSubmitLabel}
             </button>

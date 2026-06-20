@@ -35,7 +35,7 @@ export async function checkUpdateRateLimit(userId: number | string): Promise<Nex
     const retryAfterSec = Math.max(1, Math.ceil((existing.resetAt - now) / 1000));
     return NextResponse.json(
       {
-        error: `Prea multe modificari. Reincearca in ${retryAfterSec} secunde.`,
+        error: `Prea multe modificări. Reîncearcă în ${retryAfterSec} secunde.`,
         retryAfterSeconds: retryAfterSec,
       },
       { status: 429, headers: { 'Retry-After': String(retryAfterSec) } }
@@ -67,7 +67,7 @@ export async function checkWriteRateLimit(userId: number | string): Promise<Next
     const retryAfterSec = Math.max(1, Math.ceil((existing.resetAt - now) / 1000));
     return NextResponse.json(
       {
-        error: `Prea multe cereri. Reincearca in ${retryAfterSec} secunde.`,
+        error: `Prea multe cereri. Reîncearcă în ${retryAfterSec} secunde.`,
         retryAfterSeconds: retryAfterSec,
       },
       { status: 429, headers: { 'Retry-After': String(retryAfterSec) } }
@@ -99,7 +99,7 @@ export async function checkPublicLinkRateLimit(identifier: string): Promise<Next
   if (existing.count >= PUBLIC_LINK_LIMIT) {
     const retryAfterSec = Math.max(1, Math.ceil((existing.resetAt - now) / 1000));
     return NextResponse.json(
-      { error: 'Prea multe cereri. Reincearca mai tarziu.' },
+      { error: 'Prea multe cereri. Reîncearcă mai târziu.' },
       { status: 429, headers: { 'Retry-After': String(retryAfterSec) } }
     );
   }

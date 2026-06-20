@@ -257,7 +257,7 @@ describe('POST /api/appointments service validation', () => {
     const json = await res.json() as Doc;
 
     expect(res.status).toBe(409);
-    expect(json.error).toBe('Intervalul este blocat in calendar.');
+    expect(json.error).toBe('Intervalul este blocat în calendar.');
     expect(json.conflicts).toEqual([
       expect.objectContaining({
         type: 'availability_block',
@@ -496,7 +496,7 @@ describe('POST /api/appointments service validation', () => {
     const json = await res.json() as Doc;
 
     expect(res.status).toBe(409);
-    expect(json.error).toContain('Pacientul selectat nu mai exista');
+    expect(json.error).toContain('Pacientul selectat nu mai există');
     expect(mockFindOrCreateClient).not.toHaveBeenCalled();
     expect(insertOne).not.toHaveBeenCalled();
   });

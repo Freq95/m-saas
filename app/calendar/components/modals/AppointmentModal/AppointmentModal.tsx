@@ -281,14 +281,14 @@ export function AppointmentModal({
 
   const getDesktopFieldErrors = useCallback((): DesktopFieldErrors => {
     const next: DesktopFieldErrors = {};
-    if (!state.calendarId) next.calendarId = 'Selecteaza un calendar.';
-    if (state.serviceIds.length === 0) next.serviceIds = 'Selecteaza cel putin un serviciu.';
+    if (!state.calendarId) next.calendarId = 'Selectează un calendar.';
+    if (state.serviceIds.length === 0) next.serviceIds = 'Selectează cel puțin un serviciu.';
     if (!state.clientName.trim()) next.clientName = 'Completeaza numele pacientului.';
-    if (!state.date) next.date = 'Selecteaza data.';
-    if (!state.startTime) next.startTime = 'Selecteaza ora de inceput.';
-    if (!state.endTime) next.endTime = 'Selecteaza ora de final.';
+    if (!state.date) next.date = 'Selectează data.';
+    if (!state.startTime) next.startTime = 'Selectează ora de inceput.';
+    if (!state.endTime) next.endTime = 'Selectează ora de final.';
     if (state.startTime && state.endTime && state.startTime >= state.endTime) {
-      next.endTime = 'Ora de final trebuie sa fie dupa ora de inceput.';
+      next.endTime = 'Ora de final trebuie să fie după ora de inceput.';
     }
     if (state.isRecurring) {
       if (state.recurrence.interval < 1) next.recurrenceInterval = 'Minim 1.';
@@ -296,7 +296,7 @@ export function AppointmentModal({
         next.recurrenceCount = 'Minim 1 repetare.';
       }
       if (state.recurrence.endType === 'date' && !state.recurrence.endDate) {
-        next.recurrenceEndDate = 'Selecteaza data finala.';
+        next.recurrenceEndDate = 'Selectează data finala.';
       }
     }
     return next;
@@ -307,14 +307,14 @@ export function AppointmentModal({
     if (readOnly || isSubmitting) return;
     if (noWritableCalendars) {
       if (!isMobile) {
-        setDesktopFieldErrors({ calendarId: 'Nu exista calendare disponibile pentru creare.' });
+        setDesktopFieldErrors({ calendarId: 'Nu există calendare disponibile pentru creare.' });
         dispatch({ type: 'SET_ERROR', error: null });
         focusDesktopField('calendarId');
         return;
       }
       dispatch({
         type: 'SET_ERROR',
-        error: 'Nu exista calendare disponibile pentru creare.',
+        error: 'Nu există calendare disponibile pentru creare.',
       });
       return;
     }
@@ -340,11 +340,11 @@ export function AppointmentModal({
     const endIso = composeIso(state.date, state.endTime);
     if (!startIso || !endIso) {
       if (!isMobile) {
-        setDesktopFieldErrors({ date: 'Data si ora nu sunt valide.' });
+        setDesktopFieldErrors({ date: 'Data și ora nu sunt valide.' });
         focusDesktopField('date');
         return;
       }
-      dispatch({ type: 'SET_ERROR', error: 'Data si ora nu sunt valide.' });
+      dispatch({ type: 'SET_ERROR', error: 'Data și ora nu sunt valide.' });
       return;
     }
 
@@ -445,11 +445,11 @@ export function AppointmentModal({
   const resolvedTitle = useMemo(() => {
     if (title) return title;
     if (mode === 'view') return 'Detalii programare';
-    if (mode === 'edit') return 'Editeaza programare';
+    if (mode === 'edit') return 'Editează programare';
     return 'Creeaza programare';
   }, [title, mode]);
 
-  const resolvedSubmitLabel = submitLabel || (mode === 'edit' ? 'Salveaza modificarile' : 'Salveaza');
+  const resolvedSubmitLabel = submitLabel || (mode === 'edit' ? 'Salvează modificarile' : 'Salvează');
 
   // On phones, render a Google-Calendar-style bottom sheet instead of the desktop modal.
   // The form state, reducers and submit handler above are reused as-is — only the layout changes.
@@ -545,8 +545,8 @@ export function AppointmentModal({
               <Link
                 href={patientProfileHref}
                 className={styles.modalIconButton}
-                aria-label="Deschide fisa pacientului"
-                data-tooltip="Deschide fisa pacientului"
+                aria-label="Deschide fișa pacientului"
+                data-tooltip="Deschide fișa pacientului"
               >
                 <UserIcon />
               </Link>
@@ -566,8 +566,8 @@ export function AppointmentModal({
                 type="button"
                 className={styles.modalIconButton}
                 onClick={() => onModeChange('edit')}
-                aria-label="Editeaza"
-                data-tooltip="Editeaza"
+                aria-label="Editează"
+                data-tooltip="Editează"
               >
                 <svg
                   width="15"
@@ -590,8 +590,8 @@ export function AppointmentModal({
                 type="button"
                 className={`${styles.modalIconButton} ${styles.modalIconButtonDanger}`}
                 onClick={onDelete}
-                aria-label="Sterge"
-                data-tooltip="Sterge"
+                aria-label="Șterge"
+                data-tooltip="Șterge"
               >
                 <svg
                   width="15"
@@ -616,8 +616,8 @@ export function AppointmentModal({
               type="button"
               className={styles.closeButton}
               onClick={onClose}
-              aria-label="Inchide"
-              data-tooltip="Inchide"
+              aria-label="Închide"
+              data-tooltip="Închide"
               disabled={isSubmitting}
             >
               ×
@@ -788,7 +788,7 @@ export function AppointmentModal({
                   className={styles.cancelButton}
                   disabled={isSubmitting}
                 >
-                  Renunta
+                  Renunță
                 </button>
                 <button
                   type="submit"
@@ -797,8 +797,8 @@ export function AppointmentModal({
                 >
                   {isSubmitting ? (
                     <>
-                      <Spinner size={14} thickness={2} centered={false} label="Se salveaza" />
-                      <span>Se salveaza</span>
+                      <Spinner size={14} thickness={2} centered={false} label="Se salvează" />
+                      <span>Se salvează</span>
                     </>
                   ) : resolvedSubmitLabel}
                 </button>
@@ -1011,7 +1011,7 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
                 onClick={onClose}
                 disabled={isSubmitting}
               >
-                {readOnly ? 'Inchide' : 'Anulati'}
+                {readOnly ? 'Închide' : 'Anulati'}
               </button>
 
               <div className={m.topBarCenter}>
@@ -1026,7 +1026,7 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
                       type="button"
                       className={m.iconHeaderBtn}
                       onClick={() => setShowActionMenu((open) => !open)}
-                      aria-label="Actiuni programare"
+                      aria-label="Acțiuni programare"
                       aria-expanded={showActionMenu}
                       aria-controls="mobile-appointment-actions"
                     >
@@ -1040,7 +1040,7 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
                   className={`${m.actionBtn} ${m.actionBtnPrimary}`}
                   disabled={isSubmitting || noWritableCalendars}
                 >
-                  {isSubmitting ? <Spinner size={14} thickness={2} centered={false} label="Salvare" /> : 'Salveaza'}
+                  {isSubmitting ? <Spinner size={14} thickness={2} centered={false} label="Salvare" /> : 'Salvează'}
                 </button>
               )}
             </div>
@@ -1048,11 +1048,11 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
             {/* ── Body ── */}
             <div className={m.body}>
               {readOnly && showActionMenu && (
-                <div id="mobile-appointment-actions" className={m.mobileActionMenu} role="menu" aria-label="Actiuni programare">
+                <div id="mobile-appointment-actions" className={m.mobileActionMenu} role="menu" aria-label="Acțiuni programare">
                   {patientProfileHref && (
                     <Link href={patientProfileHref} className={m.mobileActionItem} role="menuitem" onClick={() => setShowActionMenu(false)}>
                       <span className={m.mobileActionIcon}><UserIcon /></span>
-                      <span>Deschide fisa pacientului</span>
+                      <span>Deschide fișa pacientului</span>
                     </Link>
                   )}
                   {newTreatmentPlanHref && (
@@ -1064,13 +1064,13 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
                   {canEdit && onModeChange && (
                     <button type="button" className={m.mobileActionItem} role="menuitem" onClick={() => { setShowActionMenu(false); onModeChange('edit'); }}>
                       <span className={m.mobileActionIcon}><EditIcon /></span>
-                      <span>Editeaza</span>
+                      <span>Editează</span>
                     </button>
                   )}
                   {canDelete && onDelete && (
                     <button type="button" className={`${m.mobileActionItem} ${m.mobileActionItemDanger}`} role="menuitem" onClick={() => { setShowActionMenu(false); onDelete(); }}>
                       <span className={m.mobileActionIcon}><TrashIcon /></span>
-                      <span>Sterge</span>
+                      <span>Șterge</span>
                     </button>
                   )}
                 </div>
@@ -1140,7 +1140,7 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
                       />
                     </PickerRow>
                     {durationMinutes > 0 && (
-                      <div className={m.timeDuration}>Durata: {durationMinutes} min</div>
+                      <div className={m.timeDuration}>Durată: {durationMinutes} min</div>
                     )}
                   </div>
                 </div>
@@ -1159,7 +1159,7 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
                     <div className={m.rowMain}>
                       <div className={m.rowLabel}>Calendar</div>
                       <div className={m.rowValue}>
-                        {selectedCalendarOption?.name || 'Selecteaza calendar'}
+                        {selectedCalendarOption?.name || 'Selectează calendar'}
                       </div>
                     </div>
                     {!calendarRowDisabled && (
@@ -1206,7 +1206,7 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
                     <div className={m.rowValue}>
                       {selectedServices.length > 0
                         ? selectedServices.map((s) => s.name).join(', ')
-                        : initialData?.serviceNames?.join(', ') || (readOnly ? 'â€”' : 'Selecteaza un serviciu')}
+                        : initialData?.serviceNames?.join(', ') || (readOnly ? '—' : 'Selectează un serviciu')}
                     </div>
                   </div>
                   {!readOnly && (
@@ -1218,7 +1218,7 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
                 {!readOnly && expandedRow === 'service' && (
                   <div className={m.expanded}>
                     {loadingServices ? (
-                      <div className={m.autocompleteEmpty}>Se incarca serviciile...</div>
+                      <div className={m.autocompleteEmpty}>Se încarcă serviciile...</div>
                     ) : servicesError ? (
                       <div className={m.autocompleteEmpty}>{servicesError}</div>
                     ) : effectiveServices.length === 0 ? (
@@ -1315,7 +1315,7 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
                                 type="button"
                                 className={m.patientClearButton}
                                 onClick={() => dispatch({ type: 'CLEAR_CLIENT_LINK' })}
-                                aria-label="Sterge pacientul selectat"
+                                aria-label="Șterge pacientul selectat"
                               >
                                 x
                               </button>
@@ -1324,7 +1324,7 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
                           {showSuggestions && (
                             <div className={m.autocomplete} role="listbox">
                               {loadingSuggestions && suggestions.length === 0 ? (
-                                <div className={m.autocompleteEmpty}>Se cauta...</div>
+                                <div className={m.autocompleteEmpty}>Se caută...</div>
                               ) : (
                                 suggestions.map((s) => (
                                   <button
@@ -1423,7 +1423,7 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
                     <div className={m.rowMain}>
                       <div className={m.rowLabel}>Medic</div>
                       <div className={m.rowValue}>
-                        {loadingDentists ? 'Se incarca...' : (selectedDentist?.displayName || dentistError || 'Selecteaza medicul')}
+                        {loadingDentists ? 'Se încarcă...' : (selectedDentist?.displayName || dentistError || 'Selectează medicul')}
                       </div>
                     </div>
                     {!readOnly && !loadingDentists && (
@@ -1486,7 +1486,7 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
                     <div className={m.rowMain}>
                       <div className={m.rowLabel}>Recurent</div>
                       <div className={m.rowValue}>
-                        {state.isRecurring ? 'Se repeta automat' : 'O singura aparitie'}
+                        {state.isRecurring ? 'Se repeta automat' : 'O singura apariție'}
                       </div>
                     </div>
                     <ToggleSwitch
@@ -1536,18 +1536,18 @@ function MobileAppointmentSheet(props: MobileSheetProps) {
                               })
                             }
                           >
-                            <option value="count">Dupa N aparitii</option>
+                            <option value="count">Dupa N apariții</option>
                             <option value="date">La o data</option>
                           </select>
                         </div>
                         {state.recurrence.endType === 'count' ? (
                           <div className={m.recurrenceField}>
-                            <label className={m.recurrenceFieldLabel}>Nr. aparitii</label>
+                            <label className={m.recurrenceFieldLabel}>Nr. apariții</label>
                             <NumberStepper
                               value={state.recurrence.count}
                               min={1}
                               max={52}
-                              ariaLabel="Numar aparitii recurenta"
+                              ariaLabel="Număr apariții recurenta"
                               onChange={(next) => dispatch({ type: 'SET_RECURRENCE', patch: { count: next } })}
                             />
                           </div>

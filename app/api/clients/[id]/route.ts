@@ -180,7 +180,7 @@ export async function DELETE(request: NextRequest, props: { params: Promise<{ id
     );
     if (futureAppointment) {
       return createErrorResponse(
-        'Pacientul are programari viitoare. Anuleaza sau muta-le inainte de stergere.',
+        'Pacientul are programări viitoare. Anulează sau muta-le înainte de ștergere.',
         409
       );
     }

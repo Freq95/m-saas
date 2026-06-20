@@ -35,14 +35,14 @@ export const GDPR_COLOR: Record<GdprState, string> = {
 /** Long, descriptive label — used in tooltips and aria-label so screen readers
  *  always announce the full meaning of a colored avatar. */
 export const GDPR_FULL_LABEL: Record<GdprState, string> = {
-  green:  'Consimtamant GDPR acordat',
-  orange: 'Consimtamant GDPR retras',
-  red:    'Fara consimtamant GDPR',
+  green:  'Consimțământ GDPR acordat',
+  orange: 'Consimțământ GDPR retras',
+  red:    'Fără consimțământ GDPR',
 };
 
 /** Short label suitable for compact pills/badges in headers and list rows. */
 export const GDPR_SHORT_LABEL: Record<GdprState, string> = {
   green:  'GDPR ✓',
-  orange: 'Consimtamant retras',
-  red:    'Fara consimtamant',
+  orange: 'Consimțământ retras',
+  red:    'Fără consimțământ',
 };

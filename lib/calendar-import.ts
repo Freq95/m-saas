@@ -176,7 +176,7 @@ export function parseRowOverrides(raw: unknown): Record<string, CalendarImportRo
 
 export async function resolveImportScope(auth: AuthContext, options: CalendarImportOptions): Promise<ImportScope> {
   if (!isClinicalRole(auth.role) || auth.role === 'super_admin') {
-    throw new AuthError('Importul calendarului este disponibil doar pentru owner si medici.', 403);
+    throw new AuthError('Importul calendarului este disponibil doar pentru owner și medici.', 403);
   }
   const calendarAuth = await getCalendarAuth(auth, options.calendarId);
   requireCalendarPermission(calendarAuth, 'can_create');
@@ -192,7 +192,7 @@ export async function resolveImportScope(auth: AuthContext, options: CalendarImp
 
 async function extractIcsTexts(file: File): Promise<Array<{ name: string; text: string }>> {
   if (file.size > MAX_FILE_BYTES) {
-    throw new AuthError('Fisierul este prea mare pentru import.', 400);
+    throw new AuthError('Fișierul este prea mare pentru import.', 400);
   }
   const bytes = Buffer.from(await file.arrayBuffer());
   const lowerName = file.name.toLowerCase();
@@ -200,11 +200,11 @@ async function extractIcsTexts(file: File): Promise<Array<{ name: string; text: 
   if (lowerName.endsWith('.zip') || file.type.includes('zip')) {
     const JSZip = (await import('jszip')).default;
     const zip = await JSZip.loadAsync(bytes).catch(() => {
-      throw new AuthError('Arhiva .zip nu poate fi citita. Re-exporta calendarul si incearca din nou.', 400);
+      throw new AuthError('Arhiva .zip nu poate fi citită. Re-exporta calendarul și încearcă din nou.', 400);
     });
     const entries = Object.values(zip.files).filter((entry) => !entry.dir && entry.name.toLowerCase().endsWith('.ics'));
     if (entries.length === 0) {
-      throw new AuthError('Arhiva nu contine fisiere .ics.', 400);
+      throw new AuthError('Arhiva nu conține fișiere .ics.', 400);
     }
     return Promise.all(entries.map(async (entry) => ({
       name: entry.name,
@@ -213,7 +213,7 @@ async function extractIcsTexts(file: File): Promise<Array<{ name: string; text: 
   }
 
   if (!lowerName.endsWith('.ics') && !file.type.includes('calendar')) {
-    throw new AuthError('Incarca un fisier .ics sau o arhiva .zip cu fisiere .ics.', 400);
+    throw new AuthError('Încarcă un fișier .ics sau o arhiva .zip cu fișiere .ics.', 400);
   }
 
   return [{ name: file.name, text: bytes.toString('utf8') }];
@@ -539,7 +539,7 @@ export async function parseRowsFromImportFile(file: File, options: CalendarImpor
       try {
         return parseIcsText(icsFile.text);
       } catch {
-        throw new AuthError(`Fisierul ICS "${icsFile.name}" nu poate fi citit. Verifica exportul Google Calendar.`, 400);
+        throw new AuthError(`Fișierul ICS "${icsFile.name}" nu poate fi citit. Verifică exportul Google Calendar.`, 400);
       }
     })();
     const calendarName = parsed.calendarName;
@@ -585,7 +585,7 @@ export async function parseRowsFromImportFile(file: File, options: CalendarImpor
       }
 
       if (rows.length > MAX_EVENTS) {
-        throw new AuthError(`Fisierul contine peste ${MAX_EVENTS} evenimente. Restrange intervalul de import.`, 400);
+        throw new AuthError(`Fișierul conține peste ${MAX_EVENTS} evenimente. Restrânge intervalul de import.`, 400);
       }
     }
   }
@@ -747,7 +747,7 @@ export async function loadImportPreview(auth: AuthContext, previewId: string): P
     expires_at: { $gt: new Date() },
   });
   if (!preview) {
-    throw new AuthError('Previzualizarea importului a expirat sau nu exista.', 404);
+    throw new AuthError('Previzualizarea importului a expirat sau nu există.', 404);
   }
   return preview;
 }

@@ -90,7 +90,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ cale
 
     const { email: sharedEmail, permissions } = validationResult.data;
     if (sharedEmail === email.toLowerCase().trim()) {
-      return createErrorResponse('Nu poti partaja calendarul cu tine insuti', 400);
+      return createErrorResponse('Nu poți partaja calendarul cu tine insuti', 400);
     }
 
     const calendar = await requireOwnerCalendar(auth, calendarId);
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest, props: { params: Promise<{ cale
       status: { $in: ['pending', 'accepted'] },
     });
     if (duplicateShare) {
-      return createErrorResponse('Acest calendar este deja partajat cu aceasta adresa de email', 409);
+      return createErrorResponse('Acest calendar este deja partajat cu această adresă de email', 409);
     }
 
     const existingUser = await db.collection('users').findOne({

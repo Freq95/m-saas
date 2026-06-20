@@ -86,7 +86,7 @@ export function RecurrenceScopeModal({
         aria-modal="true"
         aria-label="Aplica modificarile"
       >
-        <h3>Salveaza modificarile</h3>
+        <h3>Salvează modificarile</h3>
         <p className={styles.sheetDescription}>
           {clientName ? (
             <>
@@ -112,7 +112,7 @@ export function RecurrenceScopeModal({
               onChange={() => setScope('this')}
               disabled={isSubmitting}
             />
-            <span>Doar aceasta aparitie</span>
+            <span>Doar această apariție</span>
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
             <input
@@ -129,15 +129,15 @@ export function RecurrenceScopeModal({
 
         <div className={styles.modalActions}>
           <button type="button" onClick={onClose} className={styles.cancelButton} disabled={isSubmitting}>
-            Renunta
+            Renunță
           </button>
           <button type="button" onClick={handleConfirm} className={styles.editButton} disabled={isSubmitting}>
             {isSubmitting ? (
               <>
-                <Spinner size={14} thickness={2} centered={false} label="Se salveaza" />
-                <span>Se salveaza</span>
+                <Spinner size={14} thickness={2} centered={false} label="Se salvează" />
+                <span>Se salvează</span>
               </>
-            ) : scope === 'series' ? 'Salveaza seria' : 'Salveaza'}
+            ) : scope === 'series' ? 'Salvează seria' : 'Salvează'}
           </button>
         </div>
       </div>

@@ -60,7 +60,7 @@ function IconTrash() {
 function validateForm(form: CategoryFormState): string | null {
   const label = form.label.trim();
   if (!label) return 'Numele categoriei este obligatoriu.';
-  if (label.length > 50) return 'Numele categoriei trebuie sa aiba maximum 50 de caractere.';
+  if (label.length > 50) return 'Numele categoriei trebuie să aiba maximum 50 de caractere.';
   if (!CATEGORY_COLOR_PALETTE.some((color) => color.hex === form.color)) {
     return 'Alege o culoare din paleta.';
   }
@@ -119,14 +119,14 @@ export function AppointmentCategoriesSection({
     try {
       const response = await fetch(`/api/appointment-categories?dentistUserId=${dentistUserId}`);
       const data = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(data?.error || 'Nu am putut incarca categoriile.');
+      if (!response.ok) throw new Error(data?.error || 'Nu am putut încărca categoriile.');
       setCategories(Array.isArray(data?.categories) ? data.categories : []);
       setSelectedDentistUserId(dentistUserId);
       setShowAddForm(false);
       setEditingId(null);
       setConfirmDeleteId(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nu am putut incarca categoriile.');
+      setError(err instanceof Error ? err.message : 'Nu am putut încărca categoriile.');
     } finally {
       setSaving(false);
     }
@@ -153,13 +153,13 @@ export function AppointmentCategoriesSection({
       });
       const data = await response.json().catch(() => null);
       if (!response.ok || !data?.category) {
-        throw new Error(data?.error || 'Nu am putut adauga categoria.');
+        throw new Error(data?.error || 'Nu am putut adaugă categoria.');
       }
       setCategories((prev) => [...prev, data.category]);
       setAddForm(emptyForm);
       setShowAddForm(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nu am putut adauga categoria.');
+      setError(err instanceof Error ? err.message : 'Nu am putut adaugă categoria.');
     } finally {
       setSaving(false);
     }
@@ -203,12 +203,12 @@ export function AppointmentCategoriesSection({
       const response = await fetch(`/api/appointment-categories/${id}`, { method: 'DELETE' });
       if (!response.ok && response.status !== 204) {
         const data = await response.json().catch(() => null);
-        throw new Error(data?.error || 'Nu am putut sterge categoria.');
+        throw new Error(data?.error || 'Nu am putut șterge categoria.');
       }
       setCategories((prev) => prev.filter((category) => category.id !== id));
       setConfirmDeleteId(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nu am putut sterge categoria.');
+      setError(err instanceof Error ? err.message : 'Nu am putut șterge categoria.');
     } finally {
       setSaving(false);
     }
@@ -225,11 +225,11 @@ export function AppointmentCategoriesSection({
     <section className={embedded ? styles.embeddedCategorySection : styles.section}>
       <div className={styles.categoryHeader}>
         <div>
-          <h3 className={styles.sectionTitle}>Categorii programari</h3>
+          <h3 className={styles.sectionTitle}>Categorii programări</h3>
           <p className={styles.sectionCaption}>
             {role === 'asistent'
               ? 'Etichete colorate care apar pe programarile medicului selectat.'
-              : 'Etichete colorate care apar pe programarile din calendarul tau personal.'}
+              : 'Etichete colorate care apar pe programarile dîn calendarul tau personal.'}
           </p>
         </div>
         <button
@@ -243,7 +243,7 @@ export function AppointmentCategoriesSection({
           }}
           disabled={saving}
         >
-          {showAddForm ? 'Anuleaza' : '+ Adauga categorie'}
+          {showAddForm ? 'Anulează' : '+ Adaugă categorie'}
         </button>
       </div>
 
@@ -284,10 +284,10 @@ export function AppointmentCategoriesSection({
           />
           <div className={styles.categoryFormActions}>
             <button type="button" className={styles.acceptBtn} onClick={() => setShowAddForm(false)} disabled={saving}>
-              Anuleaza
+              Anulează
             </button>
             <button type="button" className={styles.categorySaveButton} onClick={addCategory} disabled={saving}>
-              Salveaza
+              Salvează
             </button>
           </div>
         </div>
@@ -322,10 +322,10 @@ export function AppointmentCategoriesSection({
                   />
                   <div className={styles.categoryFormActions}>
                     <button type="button" className={styles.acceptBtn} onClick={() => setEditingId(null)} disabled={saving}>
-                      Anuleaza
+                      Anulează
                     </button>
                     <button type="button" className={styles.categorySaveButton} onClick={() => saveCategory(category.id)} disabled={saving}>
-                      Salveaza
+                      Salvează
                     </button>
                   </div>
                 </div>
@@ -337,7 +337,7 @@ export function AppointmentCategoriesSection({
                   </div>
                   {isConfirming ? (
                     <div className={styles.categoryConfirm}>
-                      <span>Sterge {category.label}? Programarile existente isi pastreaza culoarea.</span>
+                      <span>Șterge {category.label}? Programarile existente isi pastreaza culoarea.</span>
                       <button type="button" className={styles.acceptBtn} onClick={() => setConfirmDeleteId(null)} disabled={saving}>
                         Nu
                       </button>
@@ -352,8 +352,8 @@ export function AppointmentCategoriesSection({
                         className={styles.iconButton}
                         onClick={() => startEdit(category)}
                         disabled={saving}
-                        aria-label={`Editeaza ${category.label}`}
-                        data-tooltip="Editeaza"
+                        aria-label={`Editează ${category.label}`}
+                        data-tooltip="Editează"
                       >
                         <IconEdit />
                       </button>
@@ -365,8 +365,8 @@ export function AppointmentCategoriesSection({
                           setEditingId(null);
                         }}
                         disabled={saving}
-                        aria-label={`Sterge ${category.label}`}
-                        data-tooltip="Sterge"
+                        aria-label={`Șterge ${category.label}`}
+                        data-tooltip="Șterge"
                       >
                         <IconTrash />
                       </button>
@@ -380,7 +380,7 @@ export function AppointmentCategoriesSection({
 
         {categories.length === 0 && (
           <div className={styles.categoryEmpty}>
-            Nu exista categorii. Programarile se pot salva si fara categorie.
+            Nu există categorii. Programarile se pot salva și fără categorie.
           </div>
         )}
       </div>

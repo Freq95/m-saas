@@ -7,9 +7,9 @@ import GdprSettingsPageClient from './GdprSettingsPageClient';
 export const revalidate = 30;
 
 const DEFAULT_PRIVACY_NOTICE =
-  'Datele dumneavoastra personale sunt prelucrate in conformitate cu Regulamentul (UE) 2016/679 (GDPR). ' +
-  'Aveti dreptul la acces, rectificare, stergere si portabilitatea datelor. ' +
-  'Pentru exercitarea drepturilor dumneavoastra, va rugam sa contactati cabinetul.';
+  'Datele dumneavoastră personale sunt prelucrate în conformitate cu Regulamentul (UE) 2016/679 (GDPR). ' +
+  'Aveți dreptul la acces, rectificare, ștergere și portabilitatea datelor. ' +
+  'Pentru exercitarea drepturilor dumneavoastră, vă rugăm să contactați cabinetul.';
 
 // Editable for clinic professionals; receptionists and asistents view read-only.
 const EDIT_ROLES = new Set(['owner', 'dentist']);

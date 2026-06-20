@@ -56,18 +56,18 @@ function formatServiceMeta(service: Service): string {
 function validateForm(form: ServiceFormState): string | null {
   const name = form.name.trim();
   if (name.length < 1 || name.length > 255) {
-    return 'Numele este obligatoriu si trebuie sa aiba maximum 255 caractere.';
+    return 'Numele este obligatoriu și trebuie să aiba maximum 255 caractere.';
   }
 
   const duration = Number.parseInt(form.durationMinutes, 10);
   if (!Number.isInteger(duration) || duration <= 0) {
-    return 'Durata trebuie sa fie un numar intreg pozitiv.';
+    return 'Durată trebuie să fie un număr intreg pozitiv.';
   }
 
   if (form.price.trim() !== '') {
     const price = Number(form.price);
     if (!Number.isFinite(price) || price < 0) {
-      return 'Pretul trebuie sa fie un numar mai mare sau egal cu 0.';
+      return 'Pretul trebuie să fie un număr mai mare sau egal cu 0.';
     }
   }
 
@@ -109,14 +109,14 @@ export default function ServicesSettingsPageClient({
       const response = await fetch(`/api/services?dentistUserId=${dentistUserId}`);
       const data = (await response.json()) as { services?: Service[]; error?: string };
       if (!response.ok || !data.services) {
-        throw new Error(data.error || 'Nu am putut incarca serviciile.');
+        throw new Error(data.error || 'Nu am putut încărca serviciile.');
       }
       setServices(data.services);
       setSelectedDentistUserId(dentistUserId);
       closeAddForm();
       cancelEdit();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Nu am putut incarca serviciile.';
+      const message = err instanceof Error ? err.message : 'Nu am putut încărca serviciile.';
       setError(message);
       toast.error(message);
     } finally {
@@ -202,14 +202,14 @@ export default function ServicesSettingsPageClient({
       const data = (await response.json()) as { service?: Service; error?: string };
 
       if (!response.ok || !data.service) {
-        throw new Error(data.error || 'Nu am putut adauga serviciul.');
+        throw new Error(data.error || 'Nu am putut adaugă serviciul.');
       }
 
       setServices((prev) => [...prev, data.service as Service]);
       closeAddForm();
-      toast.success('Serviciu adaugat cu succes.');
+      toast.success('Serviciu adăugat cu succes.');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Nu am putut adauga serviciul.';
+      const message = err instanceof Error ? err.message : 'Nu am putut adaugă serviciul.';
       setError(message);
       toast.error(message);
     } finally {
@@ -269,8 +269,8 @@ export default function ServicesSettingsPageClient({
       if (!response.ok) {
         const message =
           response.status === 400
-            ? 'Serviciul este folosit in programari si nu poate fi sters.'
-            : data.error || 'Nu am putut sterge serviciul.';
+            ? 'Serviciul este folosit în programări și nu poate fi șters.'
+            : data.error || 'Nu am putut șterge serviciul.';
         setDeleteError(message);
         return;
       }
@@ -278,9 +278,9 @@ export default function ServicesSettingsPageClient({
       setServices((prev) => prev.filter((service) => service.id !== id));
       setConfirmDeleteId(null);
       setDeleteError(null);
-      toast.success('Serviciu sters.');
+      toast.success('Serviciu șters.');
     } catch {
-      setDeleteError('Nu am putut sterge serviciul.');
+      setDeleteError('Nu am putut șterge serviciul.');
     } finally {
       setIsDeleting(false);
     }
@@ -312,7 +312,7 @@ export default function ServicesSettingsPageClient({
               onClick={() => (showAddForm ? closeAddForm() : openAddForm())}
               disabled={saving || !selectedDentistUserId}
             >
-              {showAddForm ? 'Anuleaza' : '+ Manopera'}
+              {showAddForm ? 'Anulează' : '+ Manopera'}
             </button>
           )}
         </div>
@@ -353,7 +353,7 @@ export default function ServicesSettingsPageClient({
                 />
               </label>
               <label className={styles.field}>
-                <span>Durata (min) *</span>
+                <span>Durată (min) *</span>
                 <input
                   type="number"
                   min={1}
@@ -377,10 +377,10 @@ export default function ServicesSettingsPageClient({
             </div>
             <div className={styles.formActions}>
               <button type="button" className={styles.secondaryButton} onClick={closeAddForm} disabled={saving}>
-                Anuleaza
+                Anulează
               </button>
               <button type="button" className={styles.primaryButton} onClick={handleAddService} disabled={saving}>
-                {saving ? 'Se salveaza...' : 'Salveaza'}
+                {saving ? 'Se salvează...' : 'Salvează'}
               </button>
             </div>
           </div>
@@ -403,15 +403,15 @@ export default function ServicesSettingsPageClient({
             ))}
             {services.length === 0 && (
               <div className={styles.emptyState}>
-                <p>Niciun serviciu adaugat inca.</p>
+                <p>Niciun serviciu adăugat inca.</p>
               </div>
             )}
           </div>
         ) : services.length === 0 ? (
           <div className={styles.emptyState}>
-            <p>Niciun serviciu adaugat inca.</p>
+            <p>Niciun serviciu adăugat inca.</p>
             <button type="button" className={styles.primaryButton} onClick={openAddForm} disabled={saving || !selectedDentistUserId}>
-              + Adauga prima manopera
+              + Adaugă prima manopera
             </button>
           </div>
         ) : (
@@ -420,9 +420,9 @@ export default function ServicesSettingsPageClient({
               <thead>
                 <tr>
                   <th>Servicii Medicale</th>
-                  <th>Durata (min)</th>
+                  <th>Durată (min)</th>
                   <th>Pret RON</th>
-                  <th aria-label="Actiuni" />
+                  <th aria-label="Acțiuni" />
                 </tr>
               </thead>
               <tbody>
@@ -472,7 +472,7 @@ export default function ServicesSettingsPageClient({
                                   onClick={() => handleSaveEdit(service.id)}
                                   disabled={saving}
                                 >
-                                  Salveaza
+                                  Salvează
                                 </button>
                                 <button
                                   type="button"
@@ -480,7 +480,7 @@ export default function ServicesSettingsPageClient({
                                   onClick={cancelEdit}
                                   disabled={saving}
                                 >
-                                  Anuleaza
+                                  Anulează
                                 </button>
                               </div>
                             </td>
@@ -497,8 +497,8 @@ export default function ServicesSettingsPageClient({
                                   className={styles.iconButton}
                                   onClick={() => startEdit(service)}
                                   disabled={saving}
-                                  aria-label="Editeaza serviciu"
-                                  data-tooltip="Editeaza"
+                                  aria-label="Editează serviciu"
+                                  data-tooltip="Editează"
                                 >
                                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                 </button>
@@ -507,8 +507,8 @@ export default function ServicesSettingsPageClient({
                                   className={styles.iconButton}
                                   onClick={() => requestDelete(service.id)}
                                   disabled={saving}
-                                  aria-label="Sterge serviciu"
-                                  data-tooltip="Sterge"
+                                  aria-label="Șterge serviciu"
+                                  data-tooltip="Șterge"
                                 >
                                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                                 </button>
@@ -582,7 +582,7 @@ export default function ServicesSettingsPageClient({
                   />
                 </label>
                 <label className={styles.field}>
-                  <span>Durata (min) *</span>
+                  <span>Durată (min) *</span>
                   <input
                     type="number"
                     min={1}
@@ -607,14 +607,14 @@ export default function ServicesSettingsPageClient({
               {error && <p className={styles.modalError}>{error}</p>}
               <div className={styles.sheetFooter}>
                 <button type="button" className={styles.sheetDeleteButton} onClick={() => requestDelete(serviceToEdit.id)} disabled={saving}>
-                  Sterge
+                  Șterge
                 </button>
                 <div className={styles.sheetFooterActions}>
                   <button type="button" className={styles.btnGhost} onClick={cancelEdit} disabled={saving}>
-                    Anuleaza
+                    Anulează
                   </button>
                   <button type="button" className={styles.primaryButton} onClick={() => handleSaveEdit(serviceToEdit.id)} disabled={saving}>
-                    {saving ? 'Se salveaza...' : 'Salveaza'}
+                    {saving ? 'Se salvează...' : 'Salvează'}
                   </button>
                 </div>
               </div>

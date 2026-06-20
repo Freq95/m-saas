@@ -71,7 +71,7 @@ export function StatusPill({ status, onChange, canChange = true, className }: St
         onClick={toggle}
         aria-expanded={canChange ? open : undefined}
         aria-haspopup={canChange ? 'menu' : undefined}
-        aria-label={canChange ? `Status: ${cfg.label}. Apasa pentru a schimba.` : `Status: ${cfg.label}.`}
+        aria-label={canChange ? `Status: ${cfg.label}. Apasă pentru a schimba.` : `Status: ${cfg.label}.`}
         disabled={!canChange}
       >
         <span className={styles.dot} style={{ background: cfg.dot }} aria-hidden="true" />

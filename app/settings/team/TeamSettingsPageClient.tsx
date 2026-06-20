@@ -198,7 +198,7 @@ function EditPopover({ member, dentists, trigger, disabled = false, onSave, onRe
             >
               <div className={styles.popoverHeader}>
                 <strong>{displayName(member)}</strong>
-                <button type="button" className={styles.popoverClose} onClick={() => setOpen(false)} aria-label="Inchide">
+                <button type="button" className={styles.popoverClose} onClick={() => setOpen(false)} aria-label="Închide">
                   <IconClose />
                 </button>
               </div>
@@ -239,16 +239,16 @@ function EditPopover({ member, dentists, trigger, disabled = false, onSave, onRe
                       );
                     })}
                   </div>
-                  <p className={styles.popoverNote}>Debifarea il dezleaga &mdash; nu il elimina din clinica.</p>
+                  <p className={styles.popoverNote}>Debifarea îl dezleagă &mdash; nu îl elimină din clinică.</p>
                 </>
               )}
 
               <div className={styles.popoverActions}>
                 <button type="button" className={styles.popoverSecondary} onClick={() => setOpen(false)}>
-                  Anuleaza
+                  Anulează
                 </button>
                 <button type="button" className={styles.popoverPrimary} onClick={save}>
-                  Salveaza
+                  Salvează
                 </button>
               </div>
               {member.role !== 'owner' && (
@@ -431,12 +431,12 @@ export default function TeamSettingsPageClient({ initialTeamData, viewMode, isOw
       await refreshTeam();
       toast.success(`${displayName(member)} a fost actualizat.`, {
         duration: 5000,
-        actionLabel: 'Anuleaza',
+        actionLabel: 'Anulează',
         onAction: async () => {
           try {
             await patchMember(member, undoPayload);
             await refreshTeam();
-            toast.info('Schimbarea a fost anulata.');
+            toast.info('Schimbarea a fost anulată.');
           } catch (error) {
             toast.error(error instanceof Error ? error.message : 'Nu am putut anula schimbarea.');
           }
@@ -467,11 +467,11 @@ export default function TeamSettingsPageClient({ initialTeamData, viewMode, isOw
     const email = inviteEmail.trim();
     const name = inviteName.trim();
     if (!email || !name) {
-      setInviteError('Numele si emailul sunt obligatorii.');
+      setInviteError('Numele și emailul sunt obligatorii.');
       return;
     }
     if (inviteRole === 'asistent' && inviteAssignments.length === 0) {
-      setInviteError('Selecteaza cel putin un dentist.');
+      setInviteError('Selectează cel puțin un dentist.');
       return;
     }
     setInviting(true);
@@ -488,8 +488,8 @@ export default function TeamSettingsPageClient({ initialTeamData, viewMode, isOw
         }),
       });
       const data = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(data?.error || 'Nu am putut trimite invitatia.');
-      toast.success(typeof data?.message === 'string' ? data.message : 'Invitatia a fost trimisa.');
+      if (!res.ok) throw new Error(data?.error || 'Nu am putut trimite invitația.');
+      toast.success(typeof data?.message === 'string' ? data.message : 'Invitația a fost trimisa.');
       setShowInviteForm(false);
       setInviteEmail('');
       setInviteName('');
@@ -497,7 +497,7 @@ export default function TeamSettingsPageClient({ initialTeamData, viewMode, isOw
       setInviteAssignments([]);
       await refreshTeam();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Nu am putut trimite invitatia.';
+      const message = error instanceof Error ? error.message : 'Nu am putut trimite invitația.';
       setInviteError(message);
       toast.error(message);
     } finally {
@@ -508,8 +508,8 @@ export default function TeamSettingsPageClient({ initialTeamData, viewMode, isOw
   async function handleRemoveMember(member: TeamMemberRow) {
     const res = await fetch(`/api/team/${member.userId}`, { method: 'DELETE' });
     const data = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(data?.error || 'Nu am putut elimina membrul.');
-    toast.success(`${displayName(member)} a fost eliminat din clinica.`);
+    if (!res.ok) throw new Error(data?.error || 'Nu am putut elimină membrul.');
+    toast.success(`${displayName(member)} a fost eliminat din clinică.`);
     await refreshTeam();
   }
 
@@ -571,7 +571,7 @@ export default function TeamSettingsPageClient({ initialTeamData, viewMode, isOw
                   {...rest}
                   type="button"
                   className={`${styles.overflowButton} ${isOpen ? styles.overflowOpen : ''}`}
-                  aria-label={`Actiuni pentru ${displayName(member)}`}
+                  aria-label={`Acțiuni pentru ${displayName(member)}`}
                   aria-expanded={isOpen}
                   disabled={savingMemberId === member.userId}
                 >
@@ -592,7 +592,7 @@ export default function TeamSettingsPageClient({ initialTeamData, viewMode, isOw
       <div className={styles.branch}>
         {list.map((asistent) => {
           const others = otherDentistNames(asistent, dentistId);
-          const meta = others.length > 0 ? `si pentru ${others.join(', ')}` : null;
+          const meta = others.length > 0 ? `și pentru ${others.join(', ')}` : null;
           return (
             <MemberRow key={asistent.userId} member={asistent} nested sideMeta={meta} />
           );
@@ -639,7 +639,7 @@ export default function TeamSettingsPageClient({ initialTeamData, viewMode, isOw
                   className={styles.inviteClose}
                   onClick={() => setShowInviteForm(false)}
                   disabled={inviting}
-                  aria-label="Inchide formularul"
+                  aria-label="Închide formularul"
                 >
                   <IconClose />
                 </button>
@@ -681,7 +681,7 @@ export default function TeamSettingsPageClient({ initialTeamData, viewMode, isOw
               {inviteError && <p className={styles.inviteError}>{inviteError}</p>}
               <div className={styles.inviteActions}>
                 <button type="button" className={styles.popoverSecondary} onClick={() => setShowInviteForm(false)} disabled={inviting}>
-                  Anuleaza
+                  Anulează
                 </button>
                 <button type="button" className={styles.popoverPrimary} onClick={handleInvite} disabled={inviting}>
                   {inviting ? 'Se trimite...' : 'Trimite'}
@@ -725,7 +725,7 @@ export default function TeamSettingsPageClient({ initialTeamData, viewMode, isOw
               <div className={`${styles.cluster} ${styles.clusterWarning}`}>
                 <div className={styles.warningHeader}>
                   <IconAlert />
-                  <span>Asistenti fara dentist asignat</span>
+                  <span>Asistenti fără dentist asignat</span>
                 </div>
                 {grouped.orphanAsistents.map((member) => (
                   <MemberRow
@@ -779,7 +779,7 @@ export default function TeamSettingsPageClient({ initialTeamData, viewMode, isOw
       <ConfirmModal
         isOpen={removeTarget !== null}
         title="Elimina din clinica"
-        message={`Aceasta actiune scoate complet accesul lui ${removeTarget ? displayName(removeTarget) : ''} din clinica. Pentru o simpla reasignare, editeaza asignarea dentistilor.`}
+        message={`Această acțiune scoate complet accesul lui ${removeTarget ? displayName(removeTarget) : ''} din clinică. Pentru o simplă reasignare, editează asignarea dentiștilor.`}
         confirmLabel="Elimina din clinica"
         tone="danger"
         onClose={() => setRemoveTarget(null)}

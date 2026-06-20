@@ -203,7 +203,7 @@ export async function GET(request: NextRequest) {
       return createErrorResponse('Invitatie deja procesata', 409);
     }
     if (isExpired(share.expires_at)) {
-      return createErrorResponse('Aceasta invitatie a expirat', 410);
+      return createErrorResponse('Aceasta invitație a expirat', 410);
     }
 
     const [calendar, existingUser, session] = await Promise.all([
@@ -265,7 +265,7 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Invitatie deja procesata', 409);
     }
     if (isExpired(share.expires_at)) {
-      return createErrorResponse('Aceasta invitatie a expirat', 410);
+      return createErrorResponse('Aceasta invitație a expirat', 410);
     }
 
     const calendar = await db.collection('calendars').findOne({
@@ -286,11 +286,11 @@ export async function POST(request: NextRequest) {
       // enumerate sequential IDs and torch all pending invites.
       if (!token) {
         if (!authUser || !shareMatchesAuthUser(share, authUser)) {
-          return createErrorResponse('Autentificare necesara pentru a refuza invitatia.', 401);
+          return createErrorResponse('Autentificare necesara pentru a refuză invitația.', 401);
         }
       } else if (authUser && !shareMatchesAuthUser(share, authUser)) {
         // Token present but authenticated user is the wrong recipient.
-        return createErrorResponse('Invitatia apartine altui utilizator', 403);
+        return createErrorResponse('Invitația apartine altui utilizator', 403);
       }
 
       const declineResult = await db.collection('calendar_shares').updateOne(
@@ -327,7 +327,7 @@ export async function POST(request: NextRequest) {
 
     if (authUser) {
       if (!shareMatchesAuthUser(share, authUser)) {
-        return createErrorResponse('Invitatia apartine altui utilizator', 403);
+        return createErrorResponse('Invitația apartine altui utilizator', 403);
       }
 
       const { dentistColor, calendarColorUpdate } = await autoAssignColors(db, calendar.id, calendar.color_mine);
@@ -380,7 +380,7 @@ export async function POST(request: NextRequest) {
       status: { $ne: 'deleted' },
     });
     if (existingUser) {
-      return createErrorResponse('Acest cont exista deja. Autentifica-te pentru a accepta invitatia.', 401);
+      return createErrorResponse('Acest cont există deja. Autentifica-te pentru a acceptă invitația.', 401);
     }
 
     if (!token) {
@@ -443,7 +443,7 @@ export async function POST(request: NextRequest) {
     }
 
     return createSuccessResponse({
-      message: 'Cont creat si invitatie acceptata',
+      message: 'Cont creat și invitație acceptata',
       email: share.shared_with_email,
     });
   } catch (error) {

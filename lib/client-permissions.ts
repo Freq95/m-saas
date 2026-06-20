@@ -55,14 +55,14 @@ export async function resolveClientCreateScope(
   // Receptionists must pick a dentist explicitly — they don't own
   // patient records themselves, so there's no sensible default.
   if (auth.role === 'receptionist' && !requestedDentistUserId) {
-    throw new AuthError('Selecteaza medicul pentru care creezi pacientul.', 400);
+    throw new AuthError('Selectează medicul pentru căre creezi pacientul.', 400);
   }
 
   const targetUserId = requestedDentistUserId
     ?? (auth.role === 'asistent' ? auth.assigned_dentist_user_ids?.[0] : auth.userId);
 
   if (!targetUserId) {
-    throw new AuthError('Nu exista un medic asociat pentru acest asistent.', 403);
+    throw new AuthError('Nu există un medic asociat pentru acest asistent.', 403);
   }
 
   return resolveClientScopeForDentist(auth, targetUserId);

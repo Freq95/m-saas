@@ -34,14 +34,14 @@ export async function sendCalendarShareInviteEmail(params: {
     html: `
       <h2>Invitatie calendar</h2>
       <p>${params.inviterName} ti-a partajat calendarul <strong>${params.calendarName}</strong>.</p>
-      <p>Apasa pe butonul de mai jos pentru a accepta invitatia:</p>
+      <p>Apasă pe butonul de mai jos pentru a acceptă invitația:</p>
       <p>
         <a href="${inviteUrl}" style="background:#2563eb;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;display:inline-block;">
-          Accepta invitatia
+          Acceptă invitația
         </a>
       </p>
-      <p>Link-ul expira in 7 zile.</p>
-      <p style="color:#666;font-size:13px;">Daca nu te asteptai la aceasta invitatie, poti ignora acest email.</p>
+      <p>Link-ul expiră în 7 zile.</p>
+      <p style="color:#666;font-size:13px;">Dacă nu te așteptai la această invitație, poți ignoră acest email.</p>
     `,
   });
 }

@@ -159,7 +159,7 @@ export async function DELETE(_request: NextRequest, props: { params: Promise<{ c
 
     const { calendar } = await requireCalendarOwner(auth, calendarId);
     if (calendar.is_default) {
-      return createErrorResponse('Nu poti sterge calendarul implicit', 400);
+      return createErrorResponse('Nu poți șterge calendarul implicit', 400);
     }
 
     const db = await getMongoDbOrThrow();

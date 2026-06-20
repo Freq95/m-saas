@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
   try {
     const auth = await getAuthUser();
     if (auth.role !== 'owner') {
-      return createErrorResponse('Doar proprietarul clinicii poate incarca logo-ul.', 403);
+      return createErrorResponse('Doar proprietarul clinicii poate încărca logo-ul.', 403);
     }
     if (!isStorageConfigured()) {
       return createErrorResponse('Cloud storage is not configured.', 503);
@@ -38,14 +38,14 @@ export async function POST(request: NextRequest) {
     const file = formData.get('file') as File | null;
     if (!file) return createErrorResponse('No file provided', 400);
     if (file.size > 2 * 1024 * 1024) {
-      return createErrorResponse('Logo-ul nu poate depasi 2MB.', 400);
+      return createErrorResponse('Logo-ul nu poate depăși 2MB.', 400);
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
     // Trust the actual bytes, not the client-declared file.type.
     const sniffedMime = sniffImageMime(buffer);
     if (!sniffedMime) {
-      return createErrorResponse('Logo-ul trebuie sa fie o imagine (PNG, JPEG, GIF sau WEBP).', 400);
+      return createErrorResponse('Logo-ul trebuie să fie o imagine (PNG, JPEG, GIF sau WEBP).', 400);
     }
     const key = `tenants/${auth.tenantId}/treatment-plan-logo/${Date.now()}_${safeLogoName(file.name)}`;
     await getStorageProvider().upload(key, buffer, sniffedMime);

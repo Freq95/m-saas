@@ -49,9 +49,9 @@ const SORT_OPTIONS: Array<{ value: SortKey; label: string; shortLabel: string }>
 
 const CONSENT_OPTIONS: Array<{ value: ConsentFilter; label: string; shortLabel: string }> = [
   { value: 'all',           label: 'Toti pacientii',            shortLabel: 'GDPR: Toti' },
-  { value: 'consented',     label: 'Cu consimtamant GDPR',      shortLabel: 'GDPR: ✓' },
-  { value: 'not_consented', label: 'Fara consimtamant GDPR',    shortLabel: 'GDPR: ?' },
-  { value: 'withdrawn',     label: 'Consimtamant retras',       shortLabel: 'GDPR: ✗' },
+  { value: 'consented',     label: 'Cu consimțământ GDPR',      shortLabel: 'GDPR: ✓' },
+  { value: 'not_consented', label: 'Fără consimțământ GDPR',    shortLabel: 'GDPR: ?' },
+  { value: 'withdrawn',     label: 'Consimțământ retras',       shortLabel: 'GDPR: ✗' },
 ];
 
 // Initials from a name. Falls back to '?' for empty strings.
@@ -141,10 +141,10 @@ export default function MobileClientsView(props: MobileClientsViewProps) {
           <input
             type="search"
             className={m.searchInput}
-            placeholder="Cauta pacient..."
+            placeholder="Caută pacient..."
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            aria-label="Cauta dupa nume, email sau telefon"
+            aria-label="Caută după nume, email sau telefon"
             autoComplete="off"
           />
           {search && (
@@ -152,7 +152,7 @@ export default function MobileClientsView(props: MobileClientsViewProps) {
               type="button"
               className={m.searchClear}
               onClick={() => onSearchChange('')}
-              aria-label="Sterge cautarea"
+              aria-label="Șterge căutarea"
             >
               ✕
             </button>
@@ -162,7 +162,7 @@ export default function MobileClientsView(props: MobileClientsViewProps) {
           type="button"
           className={m.overflowBtn}
           onClick={() => setMenuOpen((prev) => !prev)}
-          aria-label="Mai multe optiuni"
+          aria-label="Mai multe opțiuni"
           aria-expanded={menuOpen}
         >
           <OverflowIcon />
@@ -202,7 +202,7 @@ export default function MobileClientsView(props: MobileClientsViewProps) {
       {/* ── Result count ── */}
       {pagination && (
         <div className={m.countStrip}>
-          {pagination.total} {pagination.total === 1 ? 'pacient' : 'pacienti'}
+          {pagination.total} {pagination.total === 1 ? 'pacient' : 'pacienți'}
           {search ? ` pentru "${search}"` : ''}
         </div>
       )}
@@ -214,12 +214,12 @@ export default function MobileClientsView(props: MobileClientsViewProps) {
         ) : clients.length === 0 ? (
           <div className={m.empty}>
             <div className={m.emptyTitle}>
-              {search ? 'Nu am gasit pacienti' : 'Niciun pacient inca'}
+              {search ? 'Nu am găsit pacienți' : 'Niciun pacient inca'}
             </div>
             <div className={m.emptyHint}>
               {search
-                ? 'Incearca un alt nume, email sau telefon.'
-                : 'Apasa butonul "+" pentru a adauga primul pacient.'}
+                ? 'Încearcă un alt nume, email sau telefon.'
+                : 'Apasă butonul "+" pentru a adaugă primul pacient.'}
             </div>
           </div>
         ) : (
@@ -264,7 +264,7 @@ export default function MobileClientsView(props: MobileClientsViewProps) {
         type="button"
         className={m.fab}
         onClick={onAddClient}
-        aria-label="Adauga pacient"
+        aria-label="Adaugă pacient"
       >
         <PlusIcon />
       </button>
@@ -291,7 +291,7 @@ export default function MobileClientsView(props: MobileClientsViewProps) {
       {/* ── Bottom sheets for sort / filter changes ── */}
       {activeSheet === 'sort' && (
         <OptionSheet
-          title="Sorteaza dupa"
+          title="Sorteaza după"
           options={SORT_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
           selectedValue={sortValue}
           onSelect={(value) => {
@@ -359,7 +359,7 @@ function ClientRow({ client, onClick }: { client: Client; onClick: () => void })
         {initialsOf(client.name)}
       </span>
       <div className={m.rowMain}>
-        <div className={m.rowName}>{client.name || 'Fara nume'}</div>
+        <div className={m.rowName}>{client.name || 'Fără nume'}</div>
         {client.phone ? (
           <a
             href={`tel:${client.phone.replace(/\s+/g, '')}`}
@@ -384,11 +384,11 @@ function ClientRow({ client, onClick }: { client: Client; onClick: () => void })
             <span>{client.email}</span>
           </a>
         ) : (
-          <span className={m.rowPhoneEmpty}>Fara contact</span>
+          <span className={m.rowPhoneEmpty}>Fără contact</span>
         )}
       </div>
       {appointments > 0 ? (
-        <div className={m.rowCount} aria-label={`${appointments} programari`}>
+        <div className={m.rowCount} aria-label={`${appointments} programări`}>
           <CalendarMiniIcon className={m.rowCountIcon} />
           <span>{appointments}</span>
         </div>

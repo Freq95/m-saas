@@ -61,7 +61,7 @@ export async function processReminders() {
     const appointmentTime = new Date(appointment.start_time);
     const timeStr = format(appointmentTime, "EEEE, d MMMM 'la' HH:mm", { locale: ro });
 
-    const message = `Buna ${appointment.client_name}! Reamintire programare maine la ora ${format(appointmentTime, 'HH:mm')}${service?.name ? ` pentru ${service.name}` : ''}. Va asteptam!`;
+    const message = `Bună ${appointment.client_name}! Reamintire programare mâine la ora ${format(appointmentTime, 'HH:mm')}${service?.name ? ` pentru ${service.name}` : ''}. Vă așteptăm!`;
 
     // Try to send via WhatsApp/SMS if phone is available
     if (appointment.client_phone) {

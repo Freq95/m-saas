@@ -66,7 +66,7 @@ function TimeSectionBase({
   if (readOnly) {
     return (
       <div className={styles.modalField}>
-        <label>Data si ora</label>
+        <label>Data și ora</label>
         <div className={styles.previewValue}>{formatReadableRange(date, startTime, endTime)}</div>
       </div>
     );
@@ -145,7 +145,7 @@ function TimeSectionBase({
             <span className={styles.recurringToggleText}>
               <span className={styles.recurringToggleTitle}>Programare recurenta</span>
               <span className={styles.recurringToggleHint}>
-                {isRecurring ? 'Se repeta automat' : 'O singura aparitie'}
+                {isRecurring ? 'Se repeta automat' : 'O singura apariție'}
               </span>
             </span>
             <span className={styles.recurringToggleSwitch}>
@@ -212,14 +212,14 @@ function TimeSectionBase({
                   }
                   disabled={disabled}
                 >
-                  <option value="count">Dupa N repetari</option>
+                  <option value="count">Dupa N repetări</option>
                   <option value="date">La o data</option>
                 </select>
               </div>
 
               {recurrence.endType === 'count' ? (
                 <div className={styles.modalField}>
-                  <label htmlFor="appt-rec-count">Numar repetari</label>
+                  <label htmlFor="appt-rec-count">Număr repetări</label>
                   <NumberStepper
                     id="appt-rec-count"
                     className={styles.recurrenceStepper}
@@ -227,7 +227,7 @@ function TimeSectionBase({
                     min={1}
                     max={52}
                     disabled={disabled}
-                    ariaLabel="Numar repetari recurenta"
+                    ariaLabel="Număr repetări recurenta"
                     onChange={(next) => onRecurrenceChange({ count: next })}
                   />
                   {errors.recurrenceCount && (

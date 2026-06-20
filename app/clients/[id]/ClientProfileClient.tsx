@@ -195,7 +195,7 @@ export default function ClientProfileClient({
       setConversations(result.conversations || []);
     } catch (error) {
       logger.error('Client profile: failed to fetch client data', error instanceof Error ? error : new Error(String(error)), { clientId });
-      toastError('Eroare la incarcarea datelor pacientului');
+      toastError('Eroare la încărcarea datelor pacientului');
     } finally {
       setLoading(false);
     }
@@ -209,7 +209,7 @@ export default function ClientProfileClient({
       setNotes(result.activities || []);
     } catch (error) {
       logger.error('Client profile: failed to fetch notes', error instanceof Error ? error : new Error(String(error)), { clientId });
-      toastError('Eroare la incarcarea notelor');
+      toastError('Eroare la încărcarea notelor');
     }
   }, [clientId, toastError]);
 
@@ -221,7 +221,7 @@ export default function ClientProfileClient({
       setFiles(result.files || []);
     } catch (error) {
       logger.error('Client profile: failed to fetch files', error instanceof Error ? error : new Error(String(error)), { clientId });
-      toastError('Eroare la incarcarea fisierelor');
+      toastError('Eroare la încărcarea fișierelor');
     }
   }, [clientId, toastError]);
 
@@ -233,7 +233,7 @@ export default function ClientProfileClient({
       setStats(result.stats || null);
     } catch (error) {
       logger.error('Client profile: failed to fetch stats', error instanceof Error ? error : new Error(String(error)), { clientId });
-      toastError('Eroare la incarcarea statisticilor');
+      toastError('Eroare la încărcarea statisticilor');
     }
   }, [clientId, toastError]);
 
@@ -370,7 +370,7 @@ export default function ClientProfileClient({
       fetchClientData();
     } catch (error) {
       logger.error('Client profile: failed to delete note', error instanceof Error ? error : new Error(String(error)), { clientId, noteId: note.id });
-      toastError('Eroare la stergerea notei');
+      toastError('Eroare la ștergerea notei');
     }
   };
 
@@ -387,7 +387,7 @@ export default function ClientProfileClient({
         successCount++;
       } catch (error) {
         logger.error('Client profile: failed to upload file', error instanceof Error ? error : new Error(String(error)), { clientId, fileName: file.name });
-        toastError(`Eroare la incarcarea fisierului: ${file.name}`);
+        toastError(`Eroare la încărcarea fișierului: ${file.name}`);
       }
     }
     e.target.value = '';
@@ -406,7 +406,7 @@ export default function ClientProfileClient({
       fetchFiles();
     } catch (error) {
       logger.error('Client profile: failed to delete file', error instanceof Error ? error : new Error(String(error)), { clientId, fileId });
-      toastError('Eroare la stergerea fisierului');
+      toastError('Eroare la ștergerea fișierului');
     }
   };
 
@@ -429,7 +429,7 @@ export default function ClientProfileClient({
       if (!response.ok) throw new Error('Failed to erase');
       window.location.href = '/clients';
     } catch {
-      toastError('Eroare la stergerea definitiva a datelor');
+      toastError('Eroare la ștergerea definitiva a datelor');
       setGdprErasing(false);
     }
   };
@@ -447,7 +447,7 @@ export default function ClientProfileClient({
       setClient(prev => prev ? { ...prev, ...result.client } : prev);
       setShowConsentWithdraw(false);
     } catch {
-      toastError('Eroare la retragerea consimtamantului');
+      toastError('Eroare la retragerea consimțământului');
     } finally {
       setConsentWithdrawing(false);
     }
@@ -568,7 +568,7 @@ export default function ClientProfileClient({
     return (
       <div className={navStyles.container}>
         <div className={styles.pageLoading}>
-          <p style={{ marginBottom: '1rem', color: 'var(--color-text-muted)' }}>Pacientul nu a fost gasit.</p>
+          <p style={{ marginBottom: '1rem', color: 'var(--color-text-muted)' }}>Pacientul nu a fost găsit.</p>
           <Link href="/clients" className={styles.btnGhost} prefetch>← Înapoi la listă</Link>
         </div>
       </div>
@@ -807,7 +807,7 @@ export default function ClientProfileClient({
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ opacity: 0.3, marginBottom: '0.75rem' }}>
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
                   </svg>
-                  Nu exista note.
+                  Nu există note.
                 </div>
               </div>
             ) : (
@@ -827,8 +827,8 @@ export default function ClientProfileClient({
                       <button
                         className={styles.btnIconSmall}
                         onClick={() => handleEditNote(note)}
-                        aria-label="Editeaza nota"
-                        data-tooltip="Editeaza"
+                        aria-label="Editează nota"
+                        data-tooltip="Editează"
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
@@ -837,8 +837,8 @@ export default function ClientProfileClient({
                       <button
                         className={`${styles.btnIconSmall} ${styles.btnIconDanger}`}
                         onClick={() => handleDeleteNote(note)}
-                        aria-label="Sterge nota"
-                        data-tooltip="Sterge"
+                        aria-label="Șterge nota"
+                        data-tooltip="Șterge"
                       >
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                           <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4h6v2" />
@@ -859,7 +859,7 @@ export default function ClientProfileClient({
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ opacity: 0.3, marginBottom: '0.75rem' }}>
                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
                   </svg>
-                  Nu exista programari.
+                  Nu există programări.
                 </div>
               ) : (
                 <table className={styles.dataTable}>
@@ -901,7 +901,7 @@ export default function ClientProfileClient({
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ opacity: 0.3, marginBottom: '0.75rem' }}>
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                   </svg>
-                  Nu exista conversatii.
+                  Nu există conversații.
                 </div>
               ) : (
                 <div className={styles.rowList}>
@@ -932,7 +932,7 @@ export default function ClientProfileClient({
                   <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ opacity: 0.3, marginBottom: '0.75rem' }}>
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" />
                   </svg>
-                  Nu exista fisiere.
+                  Nu există fișiere.
                 </div>
               ) : (
                 <div className={styles.rowList}>
@@ -955,12 +955,12 @@ export default function ClientProfileClient({
                             </svg>
                           </a>
                         )}
-                        <a href={`/api/clients/${clientId}/files/${file.id}/download`} target="_blank" className={styles.btnIconSmall} aria-label="Descarca" data-tooltip="Descarca">
+                        <a href={`/api/clients/${clientId}/files/${file.id}/download`} target="_blank" className={styles.btnIconSmall} aria-label="Descarcă" data-tooltip="Descarcă">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
                           </svg>
                         </a>
-                        <button className={`${styles.btnIconSmall} ${styles.btnIconDanger}`} onClick={() => handleDeleteFile(file.id)} aria-label="Sterge fisier" data-tooltip="Sterge">
+                        <button className={`${styles.btnIconSmall} ${styles.btnIconDanger}`} onClick={() => handleDeleteFile(file.id)} aria-label="Șterge fișier" data-tooltip="Șterge">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M9 6V4h6v2" />
                           </svg>
@@ -1030,8 +1030,8 @@ export default function ClientProfileClient({
           <div className={styles.modalOverlay} onPointerDown={handleEditNoteBackdropPointerDown} onClick={handleEditNoteBackdropClick}>
             <div className={styles.modal}>
               <div className={styles.modalHeader}>
-                <h3 className={styles.modalTitle}>Editeaza nota</h3>
-                <button className={styles.modalClose} onClick={() => { setEditingNote(null); setEditNoteContent(''); }} aria-label="Inchide">
+                <h3 className={styles.modalTitle}>Editează nota</h3>
+                <button className={styles.modalClose} onClick={() => { setEditingNote(null); setEditNoteContent(''); }} aria-label="Închide">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                 </button>
               </div>
@@ -1044,8 +1044,8 @@ export default function ClientProfileClient({
                 autoFocus
               />
               <div className={styles.modalFooter}>
-                <button onClick={() => { setEditingNote(null); setEditNoteContent(''); }} className={styles.btnGhost}>Anuleaza</button>
-                <button onClick={handleUpdateNote} className={styles.btnPrimary} disabled={!editNoteContent.trim()}>Salveaza</button>
+                <button onClick={() => { setEditingNote(null); setEditNoteContent(''); }} className={styles.btnGhost}>Anulează</button>
+                <button onClick={handleUpdateNote} className={styles.btnPrimary} disabled={!editNoteContent.trim()}>Salvează</button>
               </div>
             </div>
           </div>
@@ -1055,12 +1055,12 @@ export default function ClientProfileClient({
           <div className={styles.modalOverlay} onPointerDown={handleDeleteNoteBackdropPointerDown} onClick={handleDeleteNoteBackdropClick}>
             <div className={styles.modal}>
               <div className={styles.modalHeader}>
-                <h3 className={styles.modalTitle}>Confirmare stergere</h3>
+                <h3 className={styles.modalTitle}>Confirmare ștergere</h3>
               </div>
-              <p className={styles.modalBody}>Sigur vrei sa stergi aceasta nota? Actiunea nu poate fi anulata.</p>
+              <p className={styles.modalBody}>Sigur vrei să ștergi această notă? Acțiunea nu poate fi anulată.</p>
               <div className={styles.modalFooter}>
-                <button onClick={() => setPendingDeleteNote(null)} className={styles.btnGhost}>Anuleaza</button>
-                <button onClick={confirmDeleteNote} className={styles.btnDanger}>Sterge</button>
+                <button onClick={() => setPendingDeleteNote(null)} className={styles.btnGhost}>Anulează</button>
+                <button onClick={confirmDeleteNote} className={styles.btnDanger}>Șterge</button>
               </div>
             </div>
           </div>
@@ -1157,7 +1157,7 @@ export default function ClientProfileClient({
             is_minor: client.is_minor,
             parent_guardian_name: client.parent_guardian_name,
           }}
-          title="Editeaza pacient"
+          title="Editează pacient"
           submitLabel="Salvează modificările"
           onClose={() => setShowEditClient(false)}
           onUpdated={(updatedClient) => {

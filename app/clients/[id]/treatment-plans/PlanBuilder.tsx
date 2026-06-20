@@ -298,11 +298,11 @@ export default function PlanBuilder({
       .then((response) => response.json().then((data) => ({ response, data })))
       .then(({ response, data }) => {
         if (!alive) return;
-        if (!response.ok) throw new Error(data.error || 'Nu am putut incarca serviciile.');
+        if (!response.ok) throw new Error(data.error || 'Nu am putut încărca serviciile.');
         setServices(data.services || []);
       })
       .catch((error) => {
-        if (alive) onToastRef.current('error', error instanceof Error ? error.message : 'Nu am putut incarca serviciile.');
+        if (alive) onToastRef.current('error', error instanceof Error ? error.message : 'Nu am putut încărca serviciile.');
       });
     return () => { alive = false; };
   }, [doctorUserId]);
@@ -375,7 +375,7 @@ export default function PlanBuilder({
       }))
       .filter((item) => item.procedure.length > 0);
     if (cleanItems.length === 0) {
-      onToast('error', 'Adauga cel putin o procedura.');
+      onToast('error', 'Adaugă cel puțin o procedură.');
       return;
     }
 
@@ -499,7 +499,7 @@ export default function PlanBuilder({
               <div className={styles.rowActions}>
                 <button type="button" className={styles.actionIcon} onClick={() => moveRow(index, -1)} disabled={index === 0 || saving} aria-label="Muta mai sus" data-tooltip="Muta sus"><IconUp /></button>
                 <button type="button" className={styles.actionIcon} onClick={() => moveRow(index, 1)} disabled={index === items.length - 1 || saving} aria-label="Muta mai jos" data-tooltip="Muta jos"><IconDown /></button>
-                <button type="button" className={`${styles.actionIcon} ${styles.dangerAction}`} onClick={() => setItems((prev) => prev.length === 1 ? [newRow()] : prev.filter((_, i) => i !== index))} disabled={saving} aria-label="Sterge randul" data-tooltip="Sterge"><IconTrash /></button>
+                <button type="button" className={`${styles.actionIcon} ${styles.dangerAction}`} onClick={() => setItems((prev) => prev.length === 1 ? [newRow()] : prev.filter((_, i) => i !== index))} disabled={saving} aria-label="Șterge rândul" data-tooltip="Șterge"><IconTrash /></button>
               </div>
             )}
             <input
@@ -518,7 +518,7 @@ export default function PlanBuilder({
         <div className={styles.recap}>
           <h4>Recapitulare</h4>
           {recap.length === 0 ? (
-            <span className={styles.muted}>Nu exista proceduri.</span>
+            <span className={styles.muted}>Nu există proceduri.</span>
           ) : recap.map((line) => (
             <div key={line.label} className={styles.recapLine}>
               <span>{line.label}</span>
@@ -723,7 +723,7 @@ export default function PlanBuilder({
           <h3>{title}</h3>
           <div className={modal.modalHeaderActions}>
             {statusPill}
-            <button type="button" className={modal.closeButton} onClick={onCancel} aria-label="Inchide" data-tooltip="Inchide" disabled={saving}>
+            <button type="button" className={modal.closeButton} onClick={onCancel} aria-label="Închide" data-tooltip="Închide" disabled={saving}>
               ×
             </button>
           </div>
@@ -734,10 +734,10 @@ export default function PlanBuilder({
             <button type="button" className={modal.saveButton} onClick={() => save({ share: true })} disabled={saving}>
               {saving ? (
                 <>
-                  <Spinner size={14} thickness={2} centered={false} label="Se salveaza" />
-                  <span>Se salveaza</span>
+                  <Spinner size={14} thickness={2} centered={false} label="Se salvează" />
+                  <span>Se salvează</span>
                 </>
-              ) : 'Salveaza + trimite'}
+              ) : 'Salvează + trimite'}
             </button>
           </div>
         )}

@@ -11,8 +11,8 @@ export function AsistentReassignBanner({ state }: AsistentReassignBannerProps) {
       <h2>{isEmpty ? 'Asteapta asignarea.' : 'Asteapta o reasignare.'}</h2>
       <p>
         {isEmpty
-          ? 'Esti invitat ca asistent, dar proprietarul clinicii nu te-a asignat inca unui medic.'
-          : 'Niciunul dintre medicii carora le esti asistent nu are calendar activ. Proprietarul te va reasigna in curand.'}
+          ? 'Ești invitat ca asistent, dar proprietarul clinicii nu te-a asignat inca unui medic.'
+          : 'Niciunul dintre medicii cărora le ești asistent nu are calendar activ. Proprietarul te va reasigna în curând.'}
       </p>
     </section>
   );

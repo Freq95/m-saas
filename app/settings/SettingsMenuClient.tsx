@@ -295,7 +295,7 @@ export default function SettingsMenuClient({ role, accountLabel }: SettingsMenuC
               <p>Sigur vrei sa te deconectezi din cont?</p>
               <div className={styles.mobileLogoutActions}>
                 <button type="button" className={styles.mobileLogoutCancel} onClick={() => setShowLogoutConfirm(false)}>
-                  Renunta
+                  Renunță
                 </button>
                 <button type="button" className={styles.mobileLogoutConfirm} onClick={() => signOut({ callbackUrl: '/login' })}>
                   Deconecteaza

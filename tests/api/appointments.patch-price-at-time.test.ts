@@ -273,7 +273,7 @@ describe('PATCH /api/appointments/[id] price_at_time behavior', () => {
     expect(res.status).toBe(409);
     const json = await res.json();
 
-    expect(json.error).toContain('Pacientul selectat nu mai exista');
+    expect(json.error).toContain('Pacientul selectat nu mai există');
     expect(appointments[0]?.client_id).toBe(123);
   });
 
@@ -308,7 +308,7 @@ describe('PATCH /api/appointments/[id] price_at_time behavior', () => {
     const json = await res.json();
 
     expect(res.status).toBe(409);
-    expect(json.error).toBe('Intervalul este blocat in calendar.');
+    expect(json.error).toBe('Intervalul este blocat în calendar.');
     expect(json.conflicts[0]).toMatchObject({
       type: 'availability_block',
       block: { type_label: 'Vacanta', reason: 'Zi libera' },

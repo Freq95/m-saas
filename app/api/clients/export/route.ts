@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       'Email',
       'Telefon',
       'Total cheltuit (RON)',
-      'Programari totale',
+      'Programări totale',
       'Ultima vizita',
       'Ultima conversatie',
       'Prima contactare',

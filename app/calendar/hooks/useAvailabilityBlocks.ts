@@ -45,7 +45,7 @@ function extractApiError(payload: any, fallback: string): string {
 const fetcher = async (url: string) => {
   const response = await fetch(url, { cache: 'no-store' });
   const payload = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(extractApiError(payload, 'Nu am putut incarca blocajele.'));
+  if (!response.ok) throw new Error(extractApiError(payload, 'Nu am putut încărca blocajele.'));
   return Array.isArray(payload?.blocks) ? payload.blocks as AvailabilityBlock[] : [];
 };
 
@@ -145,7 +145,7 @@ export function useAvailabilityBlocks({
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
       mutate(snapshot, { revalidate: false });
-      return { ok: false, status: response.status, error: extractApiError(payload, 'Nu am putut sterge blocajul.') };
+      return { ok: false, status: response.status, error: extractApiError(payload, 'Nu am putut șterge blocajul.') };
     }
     return { ok: true, status: response.status };
   }, [data, mutate]);

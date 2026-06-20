@@ -86,7 +86,7 @@ export async function DELETE(_request: NextRequest, props: RouteParams) {
   try {
     const auth = await getAuthUser();
     if (!isClinicalRole(auth.role)) {
-      return createErrorResponse('Doar medicii pot sterge interventii dentare.', 403);
+      return createErrorResponse('Doar medicii pot șterge interventii dentare.', 403);
     }
     const limited = await checkUpdateRateLimit(auth.userId);
     if (limited) return limited;

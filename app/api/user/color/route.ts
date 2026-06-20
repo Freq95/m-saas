@@ -115,7 +115,7 @@ export async function GET() {
       takenByOthers: Array.from(taken),
     });
   } catch (error) {
-    return handleApiError(error, 'Nu am putut incarca culoarea.');
+    return handleApiError(error, 'Nu am putut încărca culoarea.');
   }
 }
 

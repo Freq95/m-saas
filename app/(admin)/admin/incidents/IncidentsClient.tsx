@@ -174,9 +174,9 @@ export default function IncidentsClient({ incidents }: IncidentsClientProps) {
               <option value="high">high</option>
               <option value="critical">critical</option>
             </select>
-            <input name="owner" placeholder="Incident owner (optional)" />
+            <input name="owner" placeholder="Incident owner (opțional)" />
             <label style={{ display: 'grid', gap: 4 }}>
-              <span>Discovered at (optional)</span>
+              <span>Discovered at (opțional)</span>
               <input type="datetime-local" name="discoveredAt" />
             </label>
           </div>
@@ -257,7 +257,7 @@ export default function IncidentsClient({ incidents }: IncidentsClientProps) {
                   <span>Force resend already-sent tenants</span>
                 </label>
               </div>
-              <input name="note" placeholder="Update note (optional)" />
+              <input name="note" placeholder="Update note (opțional)" />
               <button type="submit" disabled={working}>Save Update</button>
             </form>
           </article>

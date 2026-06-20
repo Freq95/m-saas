@@ -74,7 +74,7 @@ export function AvailabilityBlocksSection({
 
   const openCreate = () => {
     if (!canManageAvailability) {
-      notify.warning('Doar dentistul poate adauga indisponibilitati personale.');
+      notify.warning('Doar dentistul poate adaugă indisponibilitati personale.');
       return;
     }
     setSelectedBlock(null);
@@ -117,17 +117,17 @@ export function AvailabilityBlocksSection({
     await refetch();
     closeModal();
     if (result.warning) notify.warning(result.warning);
-    notify.success(modalMode === 'edit' ? 'Indisponibilitate actualizata.' : 'Indisponibilitate adaugata.');
+    notify.success(modalMode === 'edit' ? 'Indisponibilitate actualizata.' : 'Indisponibilitate adăugată.');
   };
 
   const removeBlock = async (block: AvailabilityBlock) => {
     const result = await deleteBlock(block.id);
     if (!result.ok) {
-      throw new Error(result.error || 'Nu am putut sterge blocajul.');
+      throw new Error(result.error || 'Nu am putut șterge blocajul.');
     }
     await refetch();
     closeModal();
-    notify.success('Indisponibilitate stearsa.');
+    notify.success('Indisponibilitate ștearsă.');
   };
 
   if (!canManageAvailability) {
@@ -144,7 +144,7 @@ export function AvailabilityBlocksSection({
         <div>
           <h3 className={styles.sectionTitle}>Indisponibilitate</h3>
           <p className={styles.sectionCaption}>
-            Blocaje fara pacient: cursuri, concedii, colaboratori sau cabinet inchis.
+            Blocaje fără pacient: cursuri, concedii, colaboratori sau cabinet închis.
           </p>
         </div>
         <button type="button" className={styles.categoryAddButton} onClick={openCreate}>
@@ -158,7 +158,7 @@ export function AvailabilityBlocksSection({
         {loading && sortedBlocks.length === 0 ? (
           <Spinner size={20} thickness={2} />
         ) : sortedBlocks.length === 0 ? (
-          <p className={styles.categoryEmpty}>Nu exista blocaje pentru urmatoarele 6 luni.</p>
+          <p className={styles.categoryEmpty}>Nu există blocaje pentru următoarele 6 luni.</p>
         ) : (
           sortedBlocks.map((block) => (
             <button

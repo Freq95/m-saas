@@ -49,7 +49,7 @@ export function MonthView({
   return (
     <div className={styles.monthCalendar}>
       <div className={styles.monthWeekDays}>
-        {['Luni', 'Marti', 'Miercuri', 'Joi', 'Vineri', 'Sâmbătă', 'Duminică'].map((day) => (
+        {['Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri', 'Sâmbătă', 'Duminică'].map((day) => (
           <div key={day} className={styles.monthWeekDay}>
             {day}
           </div>

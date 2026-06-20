@@ -13,7 +13,7 @@ const updateMeSchema = z
   })
   .strict()
   .refine((d) => d.name !== undefined || d.email !== undefined, {
-    message: 'Cel putin un camp este necesar.',
+    message: 'Cel puțin un câmp este necesar.',
   });
 
 export async function PATCH(request: NextRequest) {

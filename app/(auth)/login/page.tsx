@@ -13,7 +13,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const successMessage = resolvedSearchParams?.success === 'password-set'
     ? 'Password has been set. You can now sign in.'
     : resolvedSearchParams?.success === 'password-reset'
-      ? 'Parola a fost resetata. Te poti autentifica.'
+      ? 'Parola a fost resetata. Te poți autentifica.'
       : undefined;
   const redirectPath = typeof resolvedSearchParams?.redirect === 'string'
     ? resolvedSearchParams.redirect

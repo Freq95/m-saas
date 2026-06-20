@@ -564,7 +564,7 @@ export function WeekView({
         <div
           className={`${styles.timeGutter}${!compact && onHourHeightChange ? ` ${styles.timeGutterResizable}` : ''}`}
           onPointerDown={handleGutterPointerDown}
-          title={!compact && onHourHeightChange ? 'Trage in sus sau jos pentru densitatea calendarului' : undefined}
+          title={!compact && onHourHeightChange ? 'Trage în sus sau jos pentru densitatea calendarului' : undefined}
         >
           {visibleSlots.map(({ hour, minute }) => (
             <div key={`${hour}:${minute}`} className={styles.timeSlot} style={{ height: `${slotHeightPx}px` }}>

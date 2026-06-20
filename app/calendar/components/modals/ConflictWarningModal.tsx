@@ -63,7 +63,7 @@ export function ConflictWarningModal({
                   case 'provider_appointment':
                     return `Medicul are deja o programare în acest interval${timeRange ? ` (${timeRange})` : ''}.`;
                   case 'appointment_overlap':
-                    return `Exista deja o programare în acest interval${timeRange ? ` (${timeRange})` : ''}.`;
+                    return `Există deja o programare în acest interval${timeRange ? ` (${timeRange})` : ''}.`;
                   case 'blocked_time':
                     return 'Acest interval este marcat ca blocat.';
                   case 'outside_working_hours':
@@ -106,14 +106,14 @@ export function ConflictWarningModal({
 
           {suggestions.length === 0 && (
             <p className={styles.noSuggestions}>
-              Nu am gasit intervale alternative disponibile. Te rugam sa alegi alt moment.
+              Nu am găsit intervale alternative disponibile. Te rugăm să alegi alt moment.
             </p>
           )}
         </div>
 
         <div className={styles.modalActions}>
           <button onClick={onClose} className={styles.cancelButton}>
-            Inchide
+            Închide
           </button>
         </div>
       </div>

@@ -247,21 +247,21 @@ export default function CalendarsSettingsPageClient({
   const handleAcceptPendingShare = async (shareId: number) => {
     const result = await acceptShare(shareId);
     if (!result.ok) {
-      toast.error(result.error || 'Nu am putut accepta invitatia.');
+      toast.error(result.error || 'Nu am putut acceptă invitația.');
       return;
     }
     await Promise.all([refetchCalendars(), refetchPendingShares()]);
-    toast.success('Calendarul partajat a fost adaugat.');
+    toast.success('Calendarul partajat a fost adăugat.');
   };
 
   const handleDeclinePendingShare = async (shareId: number) => {
     const result = await declineShare(shareId);
     if (!result.ok) {
-      toast.error(result.error || 'Nu am putut refuza invitatia.');
+      toast.error(result.error || 'Nu am putut refuză invitația.');
       return;
     }
     await refetchPendingShares();
-    toast.info('Invitatia a fost refuzata.');
+    toast.info('Invitația a fost refuzata.');
   };
 
   const handleCalendarFormSubmit = async (payload: CalendarFormValues) => {
@@ -292,12 +292,12 @@ export default function CalendarsSettingsPageClient({
     });
     const result = await response.json().catch(() => null);
     if (!response.ok) {
-      throw new Error(result?.error || 'Nu am putut sterge calendarul.');
+      throw new Error(result?.error || 'Nu am putut șterge calendarul.');
     }
     await refetchCalendars();
     setShowCalendarFormModal(false);
     setCalendarFormTarget(null);
-    toast.success('Calendar sters.');
+    toast.success('Calendar șters.');
   };
 
   const handleRevokeSentShare = (share: SentPendingShare) => {
@@ -315,11 +315,11 @@ export default function CalendarsSettingsPageClient({
       );
       if (!response.ok && response.status !== 204) {
         const result = await response.json().catch(() => null);
-        throw new Error(result?.error || 'Nu am putut revoca invitatia.');
+        throw new Error(result?.error || 'Nu am putut revocă invitația.');
       }
       await refetchCalendars();
       setPendingRevoke(null);
-      toast.success('Invitatia a fost revocata.');
+      toast.success('Invitația a fost revocata.');
     } finally {
       setRevokingShareId(null);
     }
@@ -573,8 +573,8 @@ export default function CalendarsSettingsPageClient({
                           className={styles.iconButtonDanger}
                           onClick={() => handleRevokeSentShare(share)}
                           disabled={revokingShareId === share.id}
-                          aria-label={`Revoca invitatia pentru ${share.shared_with_email}`}
-                          data-tooltip="Revoca invitatia"
+                          aria-label={`Revocă invitația pentru ${share.shared_with_email}`}
+                          data-tooltip="Revocă invitația"
                         >
                           <IconX />
                         </button>
@@ -608,8 +608,8 @@ export default function CalendarsSettingsPageClient({
                             className={styles.iconButtonDanger}
                             onClick={() => handleDeclinePendingShare(share.id)}
                             disabled={actionShareId === share.id}
-                            aria-label={`Refuza invitatia la ${share.calendar.name}`}
-                            data-tooltip="Refuza"
+                            aria-label={`Refuză invitația la ${share.calendar.name}`}
+                            data-tooltip="Refuză"
                           >
                             <IconX />
                           </button>
@@ -618,9 +618,9 @@ export default function CalendarsSettingsPageClient({
                             className={styles.acceptBtn}
                             onClick={() => handleAcceptPendingShare(share.id)}
                             disabled={actionShareId === share.id}
-                            aria-label={`Accepta invitatia la ${share.calendar.name}`}
+                            aria-label={`Acceptă invitația la ${share.calendar.name}`}
                           >
-                            {actionShareId === share.id ? '...' : 'Accepta'}
+                            {actionShareId === share.id ? '...' : 'Acceptă'}
                           </button>
                         </div>
                       </div>
@@ -660,10 +660,10 @@ export default function CalendarsSettingsPageClient({
         title="Revocare invitatie"
         message={
           pendingRevoke
-            ? `Revoci invitatia trimisa catre ${pendingRevoke.dentist_display_name || pendingRevoke.shared_with_email}?`
+            ? `Revoci invitația trimisa către ${pendingRevoke.dentist_display_name || pendingRevoke.shared_with_email}?`
             : ''
         }
-        confirmLabel="Revoca"
+        confirmLabel="Revocă"
         tone="danger"
         onClose={() => setPendingRevoke(null)}
         onConfirm={confirmRevokeSentShare}

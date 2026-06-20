@@ -58,7 +58,7 @@ export default function GdprSettingsPageClient({ initialText, canEdit = true, is
               htmlFor="privacyNotice"
               style={{ fontSize: '0.88rem', color: 'var(--color-text-soft)', fontWeight: 600 }}
             >
-              Text notificare GDPR afisata pacientilor
+              Text notificare GDPR afișată pacienților
             </label>
             <textarea
               id="privacyNotice"
@@ -89,8 +89,8 @@ export default function GdprSettingsPageClient({ initialText, canEdit = true, is
               </div>
             )}
             <p style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>
-              Acest text este afisat pacientilor atunci cand cabinetul inregistreaza consimtamantul GDPR.
-              {canEdit ? ' Editarea este disponibila pentru proprietar si medici.' : ' Doar proprietarul si medicii pot edita acest text.'}
+              Acest text este afișat pacienților atunci când cabinetul înregistrează consimțământul GDPR.
+              {canEdit ? ' Editarea este disponibila pentru proprietar și medici.' : ' Doar proprietarul și medicii pot edita acest text.'}
             </p>
           </div>
 
@@ -109,7 +109,7 @@ export default function GdprSettingsPageClient({ initialText, canEdit = true, is
                 disabled={saving || !isDirty}
                 className={styles.primaryButton}
               >
-                {saving ? 'Se salveaza...' : 'Salveaza'}
+                {saving ? 'Se salvează...' : 'Salvează'}
               </button>
             </div>
           )}
@@ -122,12 +122,12 @@ export default function GdprSettingsPageClient({ initialText, canEdit = true, is
           <ul style={{ fontSize: '0.9rem', color: 'var(--color-text-soft)', lineHeight: 2, paddingLeft: 'var(--space-4)' }}>
             <li>
               <a href="/privacy" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent)' }}>
-                Politica de confidentialitate a platformei
+                Politica de confidențialitate a platformei
               </a>
             </li>
             <li>
               <a href="/terms" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-accent)' }}>
-                Termeni si conditii
+                Termeni și condiții
               </a>
             </li>
           </ul>

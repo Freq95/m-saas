@@ -31,10 +31,10 @@ export default function LoginForm({ successMessage, redirectPath, forcedLogout }
 
   function getLoginErrorMessage(result: Awaited<ReturnType<typeof signIn>>): string {
     if (result?.code === 'database_connection_failed') {
-      return 'Conexiunea cu baza de date a esuat. Incearca din nou in scurt timp.';
+      return 'Conexiunea cu baza de date a eșuat. Încearcă din nou în scurt timp.';
     }
     if (result?.error === 'CallbackRouteError') {
-      return 'Serviciul de autentificare nu raspunde. Incearca din nou in scurt timp.';
+      return 'Serviciul de autentificare nu raspunde. Încearcă din nou în scurt timp.';
     }
     return 'Email sau parola incorecte.';
   }
@@ -79,7 +79,7 @@ export default function LoginForm({ successMessage, redirectPath, forcedLogout }
   function handleRedirectTimeout() {
     setShowOverlay(false);
     setSubmitting(false);
-    setError('Ceva nu a mers bine. Te rog incearca din nou.');
+    setError('Ceva nu a mers bine. Te rog încearcă din nou.');
   }
 
   return (
@@ -87,7 +87,7 @@ export default function LoginForm({ successMessage, redirectPath, forcedLogout }
       <section className={styles.card} aria-labelledby="auth-login-title">
         <header className={styles.header}>
           <h1 id="auth-login-title" className={styles.title}>Conecteaza-te</h1>
-          <p className={styles.subtitle}>Acceseaza programarile, mesajele si datele clinicii tale.</p>
+          <p className={styles.subtitle}>Acceseaza programarile, mesajele și datele clinicii tale.</p>
         </header>
 
         {forcedLogout && (
@@ -143,8 +143,8 @@ export default function LoginForm({ successMessage, redirectPath, forcedLogout }
         </form>
 
         <div className={styles.footer}>
-          <Link href="/privacy" className={styles.footerLink}>Politica de confidentialitate</Link>
-          <Link href="/terms" className={styles.footerLink}>Termeni si conditii</Link>
+          <Link href="/privacy" className={styles.footerLink}>Politica de confidențialitate</Link>
+          <Link href="/terms" className={styles.footerLink}>Termeni și condiții</Link>
         </div>
       </section>
 

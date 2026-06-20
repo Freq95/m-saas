@@ -54,7 +54,7 @@ export default function AccountSettingsPageClient({ initialName, initialEmail, i
       return;
     }
     if (newPassword.length < 8) {
-      toast.error('Noua parola trebuie sa aiba cel putin 8 caractere.');
+      toast.error('Noua parola trebuie să aiba cel puțin 8 caractere.');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -124,7 +124,7 @@ export default function AccountSettingsPageClient({ initialName, initialEmail, i
               onClick={saveProfile}
               disabled={savingProfile || !profileDirty}
             >
-              {savingProfile ? 'Se salveaza...' : 'Salveaza profilul'}
+              {savingProfile ? 'Se salvează...' : 'Salvează profilul'}
             </button>
           </div>
         </section>
@@ -134,7 +134,7 @@ export default function AccountSettingsPageClient({ initialName, initialEmail, i
           <h3 className={styles.sectionTitle}>Schimba parola</h3>
           <div className={styles.formStack}>
             <label className={styles.field}>
-              <span>Parola curenta</span>
+              <span>Parola curentă</span>
               <input
                 type="password"
                 value={currentPassword}

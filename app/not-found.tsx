@@ -32,7 +32,7 @@ export default function NotFound() {
         <div style={{ fontSize: '72px', fontWeight: 800, lineHeight: 1, color: 'var(--color-accent)' }}>404</div>
         <h1 style={{ marginTop: '12px', marginBottom: '8px', fontSize: '28px' }}>Pagina nu a fost gasita</h1>
         <p style={{ margin: 0, color: 'var(--color-text-soft)' }}>
-          Pagina pe care o cauti nu exista sau a fost mutata.
+          Pagina pe care o cauti nu există sau a fost mutata.
         </p>
         <div style={{ marginTop: '24px', display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
           <button

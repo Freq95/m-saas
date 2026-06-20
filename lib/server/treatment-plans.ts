@@ -17,7 +17,7 @@ import type {
 import { renderTreatmentPlanPdf } from '@/lib/treatment-plans/pdf';
 
 export const DEFAULT_TREATMENT_PLAN_DISCLAIMER =
-  'Planul de tratament poate suferi modificari in functie de evolutia clinica si necesitatile aparute pe parcursul tratamentului.';
+  'Planul de tratament poate suferi modificări în funcție de evoluția clinică și necesitățile apărute pe parcursul tratamentului.';
 
 export type TreatmentPlanStatus = 'draft' | 'sent' | 'accepted';
 
@@ -105,8 +105,8 @@ function defaultSettings(tenantId: ObjectId): TreatmentPlanSettingsDoc {
     clinic_name: 'CMArt Dent',
     logo_storage_key: null,
     disclaimer: DEFAULT_TREATMENT_PLAN_DISCLAIMER,
-    signature_label_doctor: 'Semnatura medic',
-    signature_label_patient: 'Semnatura pacient',
+    signature_label_doctor: 'Semnătura medicului',
+    signature_label_patient: 'Semnătura pacientului',
     currency: 'lei',
   };
 }
@@ -143,7 +143,7 @@ export function deriveTreatmentPlanTotals(
 ): { recap: TreatmentPlanRecapLine[]; total: number; total_override: number | null } {
   const recapByLabel = new Map<string, number>();
   for (const item of items) {
-    const label = item.procedure.trim() || 'Procedura';
+    const label = item.procedure.trim() || 'Procedură';
     recapByLabel.set(label, roundMoney((recapByLabel.get(label) ?? 0) + item.line_total));
   }
   const recap = Array.from(recapByLabel.entries()).map(([label, amount]) => ({ label, amount }));
@@ -167,7 +167,7 @@ async function getDoctorIdentity(tenantId: ObjectId, doctorUserId: number): Prom
     status: { $ne: 'deleted' },
   });
   if (!doctor) {
-    throw new AuthError('Medicul selectat nu exista in aceasta clinica.', 404);
+    throw new AuthError('Medicul selectat nu există în această clinică.', 404);
   }
   return {
     userId: doctorUserId,
@@ -189,7 +189,7 @@ async function assertCanUseDoctor(auth: AuthContext, doctorUserId: number): Prom
     await getDoctorIdentity(auth.tenantId, doctorUserId);
     return;
   }
-  throw new AuthError('Nu ai dreptul sa actionezi pentru medicul selectat.', 403);
+  throw new AuthError('Nu ai dreptul să actionezi pentru medicul selectat.', 403);
 }
 
 export async function listTreatmentPlanDentists(auth: AuthContext): Promise<TreatmentPlanDentistOption[]> {

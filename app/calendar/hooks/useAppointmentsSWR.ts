@@ -274,7 +274,7 @@ export function useAppointmentsSWR({
   const createAppointment = useCallback(
     async (data: CreateAppointmentInput): Promise<CreateAppointmentResult> => {
       if (!effectiveUserId) {
-        return { ok: false, status: 401, error: 'Sesiune invalida. Reautentifica-te.' };
+        return { ok: false, status: 401, error: 'Sesiune invalida. Reautentifică-te.' };
       }
 
       try {
@@ -431,7 +431,7 @@ export function useAppointmentsSWR({
             return {
               ok: false,
               status: response.status,
-              error: extractApiError(errorData, 'Intervalul ales intra in conflict.'),
+              error: extractApiError(errorData, 'Intervalul ales intra în conflict.'),
               conflicts,
               suggestions,
             };
@@ -542,7 +542,7 @@ export function useAppointmentsSWR({
           return {
             ok: false,
             status: response.status,
-            error: extractApiError(errorData, 'Nu s-a putut sterge programarea.'),
+            error: extractApiError(errorData, 'Nu s-a putut șterge programarea.'),
           };
         }
 
@@ -553,7 +553,7 @@ export function useAppointmentsSWR({
         logger.error('Calendar hook: failed to delete appointment', err instanceof Error ? err : new Error(String(err)), {
           appointmentId: id,
         });
-        return { ok: false, status: 0, error: 'Eroare de retea la stergerea programarii.' };
+        return { ok: false, status: 0, error: 'Eroare de retea la ștergerea programarii.' };
       }
     },
     [appointments, mutate]

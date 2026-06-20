@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
     return createSuccessResponse({
       block: result.block,
       warning: result.overlappingAppointments.length > 0
-        ? 'Blocajul a fost salvat, dar exista programari in acest interval.'
+        ? 'Blocajul a fost salvat, dar există programări în acest interval.'
         : null,
       overlappingAppointments: result.overlappingAppointments,
     }, 201);
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('Intervalul nu este valid.', 400);
     }
     if (error?.message === 'FORBIDDEN_CREATE') {
-      return createErrorResponse('Nu ai permisiunea sa creezi blocaje in acest calendar.', 403);
+      return createErrorResponse('Nu ai permisiunea să creezi blocaje în acest calendar.', 403);
     }
     return handleApiError(error, 'Failed to create availability block');
   }

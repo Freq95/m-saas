@@ -39,7 +39,7 @@ export function ResetPasswordForm() {
       } catch {
         if (cancelled) return;
         setValidToken(false);
-        setError('Nu am putut valida linkul de resetare.');
+        setError('Nu am putut validă linkul de resetare.');
       } finally {
         if (!cancelled) {
           setChecking(false);
@@ -57,7 +57,7 @@ export function ResetPasswordForm() {
     event.preventDefault();
     if (!validToken) return;
     if (password.length < 8) {
-      setError('Parola trebuie sa aiba cel putin 8 caractere.');
+      setError('Parola trebuie să aiba cel puțin 8 caractere.');
       return;
     }
     if (password !== confirmPassword) {
@@ -90,7 +90,7 @@ export function ResetPasswordForm() {
     <section className={styles.card} aria-labelledby="auth-reset-title">
       <header className={styles.header}>
         <h1 id="auth-reset-title" className={styles.title}>Seteaza parola noua</h1>
-        <p className={styles.subtitle}>Alege o parola pe care o poti tine minte si care are minimum 8 caractere.</p>
+        <p className={styles.subtitle}>Alege o parolă pe care o poți tine minte și care are minimum 8 caractere.</p>
       </header>
 
       {checking && <p className={styles.loadingText}>Se valideaza linkul...</p>}
@@ -129,7 +129,7 @@ export function ResetPasswordForm() {
           </div>
 
           <button type="submit" className={styles.primaryButton} disabled={submitting}>
-            {submitting ? 'Se actualizeaza...' : 'Reseteaza parola'}
+            {submitting ? 'Se actualizează...' : 'Reseteaza parola'}
           </button>
         </form>
       )}

@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       ? Array.from(new Set(assigned_dentist_user_ids ?? []))
       : [];
     if (userRole === 'asistent' && assignmentIds.length === 0) {
-      return createErrorResponse('Selecteaza cel putin un medic.', 400);
+      return createErrorResponse('Selectează cel puțin un medic.', 400);
     }
     if (assignmentIds.length > 0) {
       const validDentistCount = await db.collection('users').countDocuments({
@@ -209,7 +209,7 @@ export async function POST(request: NextRequest) {
       // Hard conflict: an active or non-pending account with this email already
       // exists in the tenant. Owner needs to remove that account first.
       if (existingUser && existingUser.status !== 'deleted' && existingUser.status !== 'pending_invite') {
-        return createErrorResponse('Exista deja un utilizator activ cu acest email in clinica.', 409);
+        return createErrorResponse('Există deja un utilizator activ cu acest email în clinică.', 409);
       }
 
       // Recoverable cases:
@@ -283,12 +283,12 @@ export async function POST(request: NextRequest) {
       // 502 so the UI can show a real error instead of a misleading success.
       const message = sendResult.reason === 'not_configured'
         ? 'Trimiterea de emailuri nu este configurata. Contacteaza administratorul platformei.'
-        : 'Nu am putut trimite emailul de invitatie. Datele invitatiei au fost salvate; te rugam sa reincerci.';
+        : 'Nu am putut trimite emailul de invitație. Datele invitatiei au fost salvate; te rugăm să reincerci.';
       return createErrorResponse(message, 502);
     }
 
     return createSuccessResponse(
-      { message: isReinvite ? 'Invitatia a fost retrimisa' : 'Invitatia a fost trimisa', resent: isReinvite },
+      { message: isReinvite ? 'Invitația a fost retrimisa' : 'Invitația a fost trimisa', resent: isReinvite },
       isReinvite ? 200 : 201,
     );
   } catch (error) {

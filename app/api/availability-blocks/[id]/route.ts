@@ -44,14 +44,14 @@ export async function PATCH(request: NextRequest, props: { params: Promise<{ id:
     return createSuccessResponse({
       block: result.block,
       warning: result.overlappingAppointments.length > 0
-        ? 'Blocajul a fost salvat, dar exista programari in acest interval.'
+        ? 'Blocajul a fost salvat, dar există programări în acest interval.'
         : null,
       overlappingAppointments: result.overlappingAppointments,
     });
   } catch (error: any) {
-    if (error?.message === 'NOT_FOUND') return createErrorResponse('Blocajul nu a fost gasit.', 404);
+    if (error?.message === 'NOT_FOUND') return createErrorResponse('Blocajul nu a fost găsit.', 404);
     if (error?.message === 'INVALID_TIME_RANGE') return createErrorResponse('Intervalul nu este valid.', 400);
-    if (error?.message === 'FORBIDDEN_EDIT') return createErrorResponse('Nu ai permisiunea sa modifici acest blocaj.', 403);
+    if (error?.message === 'FORBIDDEN_EDIT') return createErrorResponse('Nu ai permisiunea să modifici acest blocaj.', 403);
     return handleApiError(error, 'Failed to update availability block');
   }
 }
@@ -69,8 +69,8 @@ export async function DELETE(_request: NextRequest, props: { params: Promise<{ i
     await deleteAvailabilityBlock({ auth, blockId });
     return createSuccessResponse({ success: true });
   } catch (error: any) {
-    if (error?.message === 'NOT_FOUND') return createErrorResponse('Blocajul nu a fost gasit.', 404);
-    if (error?.message === 'FORBIDDEN_DELETE') return createErrorResponse('Nu ai permisiunea sa stergi acest blocaj.', 403);
+    if (error?.message === 'NOT_FOUND') return createErrorResponse('Blocajul nu a fost găsit.', 404);
+    if (error?.message === 'FORBIDDEN_DELETE') return createErrorResponse('Nu ai permisiunea să ștergi acest blocaj.', 403);
     return handleApiError(error, 'Failed to delete availability block');
   }
 }

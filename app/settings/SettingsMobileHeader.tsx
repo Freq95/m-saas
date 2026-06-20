@@ -75,7 +75,7 @@ export function SettingsMobileHeader({ title }: { title: string }) {
 
   return (
     <div className={styles.mobileHeader}>
-      <Link href="/settings" prefetch={false} className={styles.backButton} aria-label="Inapoi la setari">
+      <Link href="/settings" prefetch={false} className={styles.backButton} aria-label="Inapoi la setări">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <path d="M15 18l-6-6 6-6" />
         </svg>

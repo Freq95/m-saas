@@ -23,7 +23,7 @@ export function RoleMigrationBanner({ userId }: RoleMigrationBannerProps) {
     <div className={styles.banner} hidden={visible === null}>
       <div>
         <strong>Roluri actualizate.</strong>
-        <span> Clinica ta are acum roluri pentru proprietar, medic, receptioner si asistent.</span>
+        <span> Clinica ta are acum roluri pentru proprietar, medic, receptioner și asistent.</span>
       </div>
       <button
         type="button"
@@ -32,7 +32,7 @@ export function RoleMigrationBanner({ userId }: RoleMigrationBannerProps) {
           setVisible(false);
         }}
       >
-        Inchide
+        Închide
       </button>
     </div>
   );

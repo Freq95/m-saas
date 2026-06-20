@@ -100,7 +100,7 @@ export function CalendarFormModal({
 
   if (!isOpen) return null;
 
-  const saveLabel = isEditMode ? 'Salveaza' : 'Creeaza';
+  const saveLabel = isEditMode ? 'Salvează' : 'Creeaza';
 
   return (
     <div
@@ -120,8 +120,8 @@ export function CalendarFormModal({
             type="button"
             className={styles.modalIconButton}
             onClick={requestClose}
-            aria-label="Inchide"
-            data-tooltip="Inchide"
+            aria-label="Închide"
+            data-tooltip="Închide"
             disabled={busy}
           >
             <IconX />
@@ -159,10 +159,10 @@ export function CalendarFormModal({
           >
               {isDeleting ? (
                 <>
-                  <Spinner size={14} thickness={2} centered={false} label="Se sterge" />
-                  <span>Se sterge</span>
+                  <Spinner size={14} thickness={2} centered={false} label="Se șterge" />
+                  <span>Se șterge</span>
                 </>
-              ) : 'Sterge'}
+              ) : 'Șterge'}
             </button>
           )}
           <button
@@ -171,7 +171,7 @@ export function CalendarFormModal({
             className={styles.cancelButton}
             disabled={busy}
           >
-            Renunta
+            Renunță
           </button>
           <button
             type="button"
@@ -181,8 +181,8 @@ export function CalendarFormModal({
           >
             {isSubmitting ? (
               <>
-                <Spinner size={14} thickness={2} centered={false} label="Se salveaza" />
-                <span>Se salveaza</span>
+                <Spinner size={14} thickness={2} centered={false} label="Se salvează" />
+                <span>Se salvează</span>
               </>
             ) : saveLabel}
           </button>
@@ -191,8 +191,8 @@ export function CalendarFormModal({
       <ConfirmModal
         isOpen={showDeleteConfirm}
         title="Stergere calendar"
-        message={calendar ? `Stergi calendarul "${calendar.name}"?` : ''}
-        confirmLabel="Sterge"
+        message={calendar ? `Ștergi calendarul "${calendar.name}"?` : ''}
+        confirmLabel="Șterge"
         tone="danger"
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={handleDeleteConfirm}

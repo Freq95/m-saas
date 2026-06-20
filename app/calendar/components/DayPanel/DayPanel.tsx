@@ -355,7 +355,7 @@ export function AppointmentCard({
             role={canChangeStatus ? 'button' : undefined}
             tabIndex={canChangeStatus ? 0 : -1}
             aria-expanded={canChangeStatus ? statusMenuOpen : undefined}
-            aria-label={canChangeStatus ? `Status: ${statusCfg.label}. Apasa pentru a schimba.` : `Status: ${statusCfg.label}.`}
+            aria-label={canChangeStatus ? `Status: ${statusCfg.label}. Apasă pentru a schimba.` : `Status: ${statusCfg.label}.`}
             onKeyDown={(e) => {
               if (!canChangeStatus) return;
               if (e.key === 'Enter' || e.key === ' ') {
@@ -555,18 +555,18 @@ export function DayPanel({
       <input
         type="search"
         className={styles.searchInput}
-        placeholder="Cauta programari..."
+        placeholder="Caută programări..."
         value={searchQuery}
         onChange={(e) => onSearchChange(e.target.value)}
-        aria-label="Cauta programari"
+        aria-label="Caută programări"
       />
       {isSearching && (
         <button
           className={styles.searchClear}
           type="button"
           onClick={() => onSearchChange('')}
-          aria-label="Sterge cautarea"
-          data-tooltip="Sterge cautarea"
+          aria-label="Șterge căutarea"
+          data-tooltip="Șterge căutarea"
         >
           {'\u00D7'}
         </button>
@@ -645,7 +645,7 @@ export function DayPanel({
           {!selectedDay ? (
             <div className={styles.emptyPlaceholder}>
               <svg className={styles.emptyEmoji} width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-              <p className={styles.emptyTitle}>Selecteaza o zi din calendar pentru a vedea programarile.</p>
+              <p className={styles.emptyTitle}>Selectează o zi dîn calendar pentru a vedea programarile.</p>
             </div>
           ) : (
             <>
@@ -677,10 +677,10 @@ export function DayPanel({
                   className={styles.addBtn}
                   type="button"
                   onClick={onCreateClick}
-                  aria-label="Adauga programare"
+                  aria-label="Adaugă programare"
                   disabled={!canCreate}
                 >
-                  {canCreate ? '+ Programare' : 'Fara creare'}
+                  {canCreate ? '+ Programare' : 'Fără creare'}
                 </button>
               </div>
 
@@ -739,8 +739,8 @@ export function DayPanel({
                     <svg className={styles.emptyDayEmoji} width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                     <p className={styles.emptyDayText}>
                       {statusFilter !== 'all'
-                        ? 'Nicio programare cu acest status pentru aceasta zi.'
-                        : 'Nicio programare pentru aceasta zi. Apasa + Programare pentru a crea una.'}
+                        ? 'Nicio programare cu acest status pentru această zi.'
+                        : 'Nicio programare pentru această zi. Apasă + Programare pentru a crea una.'}
                     </p>
                   </div>
                 ) : (

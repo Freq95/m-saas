@@ -22,7 +22,7 @@ export function ConfirmModal({
   title,
   message,
   confirmLabel = 'Confirma',
-  cancelLabel = 'Renunta',
+  cancelLabel = 'Renunță',
   tone = 'default',
   onClose,
   onConfirm,
@@ -50,7 +50,7 @@ export function ConfirmModal({
     try {
       await onConfirm();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Actiunea a esuat. Incearca din nou.');
+      setError(err instanceof Error ? err.message : 'Acțiunea a eșuat. Încearcă din nou.');
     } finally {
       setIsWorking(false);
     }

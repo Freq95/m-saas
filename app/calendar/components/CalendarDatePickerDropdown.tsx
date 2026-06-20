@@ -49,7 +49,7 @@ export function CalendarDatePickerDropdown({
     <div
       className={[styles.dateDropdown, className].filter(Boolean).join(' ')}
       role="dialog"
-      aria-label="Selecteaza data"
+      aria-label="Selectează data"
     >
       <div className={styles.dateDropdownCalendar}>
         <div className={styles.dropdownMonthHeader}>

@@ -26,8 +26,8 @@ export default function EditClientPageClient({ clientId, initialClient }: EditCl
     return (
       <div className={navStyles.container}>
         <div style={{ padding: '1.5rem' }}>
-          <p style={{ marginBottom: '0.8rem' }}>Pacientul nu a fost gasit.</p>
-          <Link href="/clients">Inapoi la pacienti</Link>
+          <p style={{ marginBottom: '0.8rem' }}>Pacientul nu a fost găsit.</p>
+          <Link href="/clients">Inapoi la pacienți</Link>
         </div>
       </div>
     );
@@ -39,8 +39,8 @@ export default function EditClientPageClient({ clientId, initialClient }: EditCl
       mode="edit"
       clientId={numericClientId}
       initialData={initialClient}
-      title="Editeaza pacient"
-      submitLabel="Salveaza modificarile"
+      title="Editează pacient"
+      submitLabel="Salvează modificarile"
       onClose={() => router.push(`/clients/${clientId}`)}
       onUpdated={() => router.push(`/clients/${clientId}`)}
     />

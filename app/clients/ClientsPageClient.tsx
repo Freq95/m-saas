@@ -235,8 +235,8 @@ export default function ClientsPageClient({
 
             <input
               type="text"
-              aria-label="Cauta dupa nume, email sau telefon"
-              placeholder="Cauta dupa nume, email sau telefon"
+              aria-label="Caută după nume, email sau telefon"
+              placeholder="Caută după nume, email sau telefon"
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -246,7 +246,7 @@ export default function ClientsPageClient({
             />
 
             <select
-              aria-label="Sorteaza dupa"
+              aria-label="Sorteaza după"
               value={`${sortBy}-${sortOrder}`}
               onChange={(e) => {
                 const [col, order] = e.target.value.split('-');
@@ -267,7 +267,7 @@ export default function ClientsPageClient({
             </select>
 
             <select
-              aria-label="Filtreaza dupa consimtamant GDPR"
+              aria-label="Filtrează după consimțământ GDPR"
               value={consentFilter}
               onChange={(e) => {
                 setConsentFilter(e.target.value as typeof consentFilter);
@@ -276,9 +276,9 @@ export default function ClientsPageClient({
               className={styles.filterSelect}
             >
               <option value="all">Toate (GDPR)</option>
-              <option value="consented">Cu consimtamant</option>
-              <option value="not_consented">Fara consimtamant</option>
-              <option value="withdrawn">Consimtamant retras</option>
+              <option value="consented">Cu consimțământ</option>
+              <option value="not_consented">Fără consimțământ</option>
+              <option value="withdrawn">Consimțământ retras</option>
             </select>
 
             <a
@@ -293,7 +293,7 @@ export default function ClientsPageClient({
               onClick={openCreateClient}
               className={styles.addButton}
             >
-              + Adauga pacient
+              + Adaugă pacient
             </button>
           </div>
         </div>
@@ -302,13 +302,13 @@ export default function ClientsPageClient({
           <PageLoading />
         ) : clients.length === 0 ? (
           <div className={styles.empty}>
-            <p>Nu exista pacienti inregistrati. Apasa 'Adauga primul pacient' pentru a adauga primul pacient.</p>
+            <p>Nu există pacienți inregistrati. Apasă 'Adaugă primul pacient' pentru a adaugă primul pacient.</p>
             <button
               type="button"
               onClick={openCreateClient}
               className={styles.addButton}
             >
-              Adauga primul pacient
+              Adaugă primul pacient
             </button>
           </div>
         ) : (
@@ -319,7 +319,7 @@ export default function ClientsPageClient({
                   <th>Nume</th>
                   <th>Contact</th>
                   <th>Total cheltuit</th>
-                  <th>Programari</th>
+                  <th>Programări</th>
                   <th>Ultima vizita</th>
                   <th>GDPR</th>
                 </tr>
@@ -346,7 +346,7 @@ export default function ClientsPageClient({
                         {client.email && <span className={styles.email}>{client.email}</span>}
                         {client.phone && <span className={styles.phone}>{client.phone}</span>}
                         {!client.email && !client.phone && (
-                          <span className={styles.noContact}>Fara contact</span>
+                          <span className={styles.noContact}>Fără contact</span>
                         )}
                       </div>
                     </td>
@@ -359,17 +359,17 @@ export default function ClientsPageClient({
                       className={`${styles.gdprCell} ${client.consent_withdrawn ? styles.gdprCellWithdrawn : ''}`}
                       aria-label={
                         client.consent_given && !client.consent_withdrawn
-                          ? 'Cu consimtamant GDPR'
+                          ? 'Cu consimțământ GDPR'
                           : client.consent_withdrawn
-                            ? 'Consimtamant GDPR retras'
-                            : 'Fara consimtamant GDPR'
+                            ? 'Consimțământ GDPR retras'
+                            : 'Fără consimțământ GDPR'
                       }
                       title={
                         client.consent_given && !client.consent_withdrawn
-                          ? 'Cu consimtamant'
+                          ? 'Cu consimțământ'
                           : client.consent_withdrawn
-                            ? 'Consimtamant retras'
-                            : 'Fara consimtamant'
+                            ? 'Consimțământ retras'
+                            : 'Fără consimțământ'
                       }
                     >
                       {client.consent_given && !client.consent_withdrawn ? (

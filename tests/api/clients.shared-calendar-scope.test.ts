@@ -83,7 +83,7 @@ describe('GET /api/clients shared calendar scope', () => {
     mockLogDataAccess.mockResolvedValue(undefined);
   });
 
-  it('loads patients from the selected calendar owner, not the logged-in user', async () => {
+  it('loads patients from the selected calendar owner, not the logged-în user', async () => {
     const req = new NextRequest('http://localhost/api/clients?calendarId=11&search=Alice&page=1&limit=8');
 
     const res = await GET(req);

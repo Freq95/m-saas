@@ -15,7 +15,7 @@ validateServerEnv()
 
 export const metadata: Metadata = {
   title: 'densa',
-  description: 'Gestionare centralizata pentru mesaje, programari si automatizari',
+  description: 'Gestionare centralizata pentru mesaje, programări și automatizari',
 }
 
 export default async function RootLayout({

@@ -99,7 +99,7 @@ async function sendOwnerIncidentNotificationEmail(params: {
       <h2>Notificare incident de securitate</h2>
       <p>Salut ${params.ownerName || 'owner'},</p>
       <p>
-        Am identificat un incident de securitate care poate afecta datele cu caracter personal pentru clinica
+        Am identificat un incident de securitate care poate afecta datele cu caracter personal pentru clinică
         <strong>${params.tenantName}</strong>.
       </p>
       <ul>
@@ -110,8 +110,8 @@ async function sendOwnerIncidentNotificationEmail(params: {
         <li><strong>ID incident:</strong> ${params.incidentId}</li>
       </ul>
       <p><strong>Rezumat:</strong> ${params.incidentSummary}</p>
-      <p>Echipa noastra investigheaza si revine cu update-uri.</p>
-      <p style="color:#666;font-size:13px;">Daca ai intrebari urgente, contacteaza suportul platformei.</p>
+      <p>Echipa noastră investighează și revine cu update-uri.</p>
+      <p style="color:#666;font-size:13px;">Dacă ai întrebări urgențe, contactează suportul platformei.</p>
       <p style="color:#666;font-size:12px;">${appBaseUrl}</p>
     `,
   });

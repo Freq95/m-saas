@@ -100,8 +100,8 @@ export function usePendingShares(options: UsePendingSharesOptions = {}): UsePend
             error: extractErrorMessage(
               payload,
               action === 'accept'
-                ? 'Nu am putut accepta invitatia.'
-                : 'Nu am putut refuza invitatia.'
+                ? 'Nu am putut acceptă invitația.'
+                : 'Nu am putut refuză invitația.'
             ),
           };
         }

@@ -245,8 +245,8 @@ function getOffHoursWarning(
     end.getHours() > workingHours.endHour ||
     (end.getHours() === workingHours.endHour && end.getMinutes() > 0);
   if (!isSunday && !startsBefore && !endsAfter) return null;
-  if (isSunday) return 'Programarea este in zi de duminica.';
-  return 'Programarea este in afara orelor de lucru.';
+  if (isSunday) return 'Programarea este în zi de duminica.';
+  return 'Programarea este în afara orelor de lucru.';
 }
 
 function computeFitHourHeight(
@@ -832,7 +832,7 @@ export default function CalendarPageClient({
       : new Date(defaultStart.getTime() + 30 * 60_000);
 
     if (!defaultCreateCalendar) {
-      showErrorToast('Selecteaza un calendar pe care poti crea programari.');
+      showErrorToast('Selectează un calendar pe care poți crea programări.');
       return;
     }
 
@@ -869,7 +869,7 @@ export default function CalendarPageClient({
         });
         setShowCreateModal(true);
       } catch {
-        showErrorToast('Nu am putut preincarca datele pacientului pentru programare.');
+        showErrorToast('Nu am putut preîncărca datele pacientului pentru programare.');
       }
     })();
   }, [actions.selectSlot, defaultCreateCalendar?.id, defaultCreateCalendar?.name, searchParams, showErrorToast, state.selectedSlot]);
@@ -910,10 +910,10 @@ export default function CalendarPageClient({
           suggestions: result.suggestions || [],
         });
         setShowConflictModal(true);
-        toast.warning(result.error || 'Intervalul ales intra in conflict.');
+        toast.warning(result.error || 'Intervalul ales intra în conflict.');
         return false;
       }
-      toast.error(result.error || 'Nu s-a putut muta programarea. Verifica conflictele.');
+      toast.error(result.error || 'Nu s-a putut muta programarea. Verifică conflictele.');
       return false;
     }
   );
@@ -927,7 +927,7 @@ export default function CalendarPageClient({
     fetch('/api/services')
       .then((r) => r.json())
       .then((d) => setServices(d.services || []))
-      .catch(() => showErrorToast('Eroare la incarcarea serviciilor.'));
+      .catch(() => showErrorToast('Eroare la încărcarea serviciilor.'));
   }, [initialServices.length, showErrorToast]);
 
   // ESC to close all modals
@@ -992,7 +992,7 @@ export default function CalendarPageClient({
       ? contextCalendar
       : defaultCreateCalendar;
     if (!createCalendar) {
-      toast.warning('Selecteaza un calendar pe care poti crea programari.');
+      toast.warning('Selectează un calendar pe care poți crea programări.');
       return;
     }
     setSelectedDay(day);
@@ -1130,7 +1130,7 @@ export default function CalendarPageClient({
     }
     toast.success('Status schimbat.', {
       duration: 5000,
-      actionLabel: 'Anuleaza',
+      actionLabel: 'Anulează',
       onAction: async () => {
         const undoResult = await updateAppointment(appointment.id, { status: previousStatus });
         if (!undoResult.ok) {
@@ -1152,7 +1152,7 @@ export default function CalendarPageClient({
       return;
     }
     if (appointment.can_change_status === false) {
-      toast.warning('Nu ai permisiunea sa modifici aceasta programare.');
+      toast.warning('Nu ai permisiunea să modifici această programare.');
       return;
     }
 
@@ -1169,13 +1169,13 @@ export default function CalendarPageClient({
 
   const handleCreateAppointment = async (formData: AppointmentModalData) => {
     if (!formData.clientName.trim() || formData.serviceIds.length === 0 || !formData.startTime || !formData.endTime) {
-      toast.warning('Completeaza toate campurile obligatorii (nume pacient si serviciu).');
+      toast.warning('Completeaza toate campurile obligatorii (nume pacient și serviciu).');
       return;
     }
     const serviceIdsNum = formData.serviceIds.map((id) => parseInt(id, 10)).filter((n) => Number.isFinite(n));
     const targetCalendarId = formData.calendarId || defaultCreateCalendar?.id;
     if (!targetCalendarId) {
-      toast.warning('Selecteaza un calendar pe care poti crea programari.');
+      toast.warning('Selectează un calendar pe care poți crea programări.');
       return;
     }
     if (formData.isRecurring && formData.recurrence) {
@@ -1216,7 +1216,7 @@ export default function CalendarPageClient({
             toast.warning(result.warning);
           }
           toast.success(
-            `${result.created} programari recurente create.`
+            `${result.created} programări recurente create.`
           );
         } else {
           toast.error(result.error || 'Nu s-au putut crea programarile recurente.');
@@ -1268,7 +1268,7 @@ export default function CalendarPageClient({
   const handleEditClick = async () => {
     if (!state.selectedAppointment) return;
     if (state.selectedAppointment.can_edit === false) {
-      toast.warning('Nu ai permisiunea sa editezi aceasta programare.');
+      toast.warning('Nu ai permisiunea să editezi această programare.');
       return;
     }
     let appointment = state.selectedAppointment;
@@ -1293,7 +1293,7 @@ export default function CalendarPageClient({
   const handleEditAppointment = async (formData: AppointmentModalData) => {
     if (!state.selectedAppointment || !formData.startTime || !formData.endTime) return;
     if (state.selectedAppointment.can_edit === false) {
-      toast.warning('Nu ai permisiunea sa editezi aceasta programare.');
+      toast.warning('Nu ai permisiunea să editezi această programare.');
       return;
     }
 
@@ -1400,7 +1400,7 @@ export default function CalendarPageClient({
   const handleConfirmDelete = async (scope?: 'series') => {
     if (!state.selectedAppointment) return;
     if (state.selectedAppointment.can_delete === false) {
-      toast.warning('Nu ai permisiunea sa stergi aceasta programare.');
+      toast.warning('Nu ai permisiunea să ștergi această programare.');
       return;
     }
     const result = await deleteAppointment(state.selectedAppointment.id, scope);
@@ -1408,9 +1408,9 @@ export default function CalendarPageClient({
       setShowCreateModal(false);
       setShowDeleteConfirm(false);
       actions.clearSelection();
-      toast.success(scope === 'series' ? 'Seria a fost stearsa.' : 'Programarea a fost stearsa.');
+      toast.success(scope === 'series' ? 'Seria a fost ștearsă.' : 'Programarea a fost ștearsă.');
     } else {
-      toast.error(result.error || 'Nu s-a putut sterge programarea.');
+      toast.error(result.error || 'Nu s-a putut șterge programarea.');
     }
   };
 
@@ -1906,7 +1906,7 @@ export default function CalendarPageClient({
             type="button"
             className={styles.mobileHeaderIcon}
             onClick={() => setMobileSearchOpen(true)}
-            aria-label="Cauta programari"
+            aria-label="Caută programări"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="11" cy="11" r="8" />
@@ -2121,7 +2121,7 @@ export default function CalendarPageClient({
       <button
         type="button"
         className={styles.mobileFab}
-        aria-label="Adauga programare"
+        aria-label="Adaugă programare"
         onClick={() => handleSlotClick(selectedDay, 9, 0)}
         disabled={!canCreateAppointments}
       >
@@ -2153,7 +2153,7 @@ export default function CalendarPageClient({
                 setMobileSearchOpen(false);
                 setMobileSearchQuery('');
               }}
-              aria-label="Inchide cautarea"
+              aria-label="Închide căutarea"
             >
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <polyline points="15 18 9 12 15 6" />
@@ -2164,7 +2164,7 @@ export default function CalendarPageClient({
                 ref={mobileSearchInputRef}
                 type="text"
                 className={styles.mobileSearchInput}
-                placeholder="Cauta programari..."
+                placeholder="Caută programări..."
                 value={mobileSearchQuery}
                 onChange={(e) => setMobileSearchQuery(e.target.value)}
                 autoComplete="off"
@@ -2174,7 +2174,7 @@ export default function CalendarPageClient({
                   type="button"
                   className={styles.mobileSearchClear}
                   onClick={() => setMobileSearchQuery('')}
-                  aria-label="Sterge cautarea"
+                  aria-label="Șterge căutarea"
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <line x1="18" y1="6" x2="6" y2="18" />
@@ -2187,7 +2187,7 @@ export default function CalendarPageClient({
           <div className={styles.mobileSearchResults}>
             {mobileSearchQuery.trim() === '' ? (
               <div className={styles.mobileEmptyDay}>
-                <span style={{ opacity: 0.5 }}>Scrie pentru a cauta...</span>
+                <span style={{ opacity: 0.5 }}>Scrie pentru a caută...</span>
               </div>
             ) : mobileSearchResults.length === 0 ? (
               <div className={styles.mobileEmptyDay}>
@@ -2287,10 +2287,10 @@ export default function CalendarPageClient({
           appointmentModalMode === 'view'
             ? 'Detalii programare'
             : appointmentModalMode === 'edit'
-              ? 'Editeaza programare'
+              ? 'Editează programare'
               : 'Creeaza programare'
         }
-        submitLabel={appointmentModalMode === 'edit' ? 'Salveaza modificarile' : 'Salveaza'}
+        submitLabel={appointmentModalMode === 'edit' ? 'Salvează modificarile' : 'Salvează'}
         allowRecurring={appointmentModalMode !== 'view'}
         initialData={editInitialData}
         onModeChange={setAppointmentModalMode}
@@ -2360,7 +2360,7 @@ export default function CalendarPageClient({
                 suggestions: result.suggestions || [],
               });
               setShowConflictModal(true);
-              toast.warning(result.error || 'Intervalul ales intra in conflict.');
+              toast.warning(result.error || 'Intervalul ales intra în conflict.');
             } else {
               toast.error(result.error || 'Nu s-a putut muta programarea.');
             }

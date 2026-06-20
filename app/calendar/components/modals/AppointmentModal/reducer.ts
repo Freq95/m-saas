@@ -301,18 +301,18 @@ export function computeDurationMinutes(startTime: string, endTime: string): numb
 }
 
 export function validate(state: AppointmentFormState): string | null {
-  if (!state.calendarId) return 'Selecteaza un calendar.';
+  if (!state.calendarId) return 'Selectează un calendar.';
   if (!state.clientName.trim()) return 'Completeaza numele pacientului.';
-  if (state.serviceIds.length === 0) return 'Selecteaza cel putin un serviciu.';
-  if (!state.date || !state.startTime || !state.endTime) return 'Completeaza data si ora.';
-  if (state.startTime >= state.endTime) return 'Ora de final trebuie sa fie dupa ora de inceput.';
+  if (state.serviceIds.length === 0) return 'Selectează cel puțin un serviciu.';
+  if (!state.date || !state.startTime || !state.endTime) return 'Completeaza data și ora.';
+  if (state.startTime >= state.endTime) return 'Ora de final trebuie să fie după ora de inceput.';
   if (state.isRecurring) {
-    if (state.recurrence.interval < 1) return 'Intervalul de recurenta trebuie sa fie minim 1.';
+    if (state.recurrence.interval < 1) return 'Intervalul de recurenta trebuie să fie minim 1.';
     if (state.recurrence.endType === 'count' && state.recurrence.count < 1) {
-      return 'Numarul de repetari trebuie sa fie minim 1.';
+      return 'Numărul de repetări trebuie să fie minim 1.';
     }
     if (state.recurrence.endType === 'date' && !state.recurrence.endDate) {
-      return 'Selecteaza data la care se opreste recurenta.';
+      return 'Selectează data la care se opreste recurenta.';
     }
   }
   return null;

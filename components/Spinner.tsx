@@ -14,7 +14,7 @@ interface SpinnerProps {
 export default function Spinner({
   size = 28,
   thickness = 2.5,
-  label = 'Se incarca',
+  label = 'Se încarcă',
   centered = true,
 }: SpinnerProps) {
   const inner = (

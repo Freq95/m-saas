@@ -44,7 +44,7 @@ export default function CalendarInvitePage() {
       const data = await response.json();
       if (!response.ok) {
         setInvite(null);
-        setError(data.error || 'Invitatia nu a putut fi incarcata.');
+        setError(data.error || 'Invitația nu a putut fi încărcată.');
         setLoading(false);
         return;
       }
@@ -66,7 +66,7 @@ export default function CalendarInvitePage() {
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       setSubmitting(false);
-      setError(data.error || 'Invitatia nu a putut fi procesata.');
+      setError(data.error || 'Invitația nu a putut fi procesata.');
       return null;
     }
     return data;
@@ -93,7 +93,7 @@ export default function CalendarInvitePage() {
       return;
     }
     if (password.length < 8) {
-      setError('Parola trebuie sa aiba minimum 8 caractere.');
+      setError('Parola trebuie să aiba minimum 8 caractere.');
       return;
     }
     if (password !== confirmPassword) {
@@ -115,7 +115,7 @@ export default function CalendarInvitePage() {
     });
     if (!signInResult || signInResult.error) {
       setSubmitting(false);
-      setError('Contul a fost creat, dar autentificarea automata a esuat. Te rugam sa te autentifici manual.');
+      setError('Contul a fost creat, dar autentificarea automata a eșuat. Te rugăm să te autentifici manual.');
       return;
     }
 
@@ -125,7 +125,7 @@ export default function CalendarInvitePage() {
   if (loading) {
     return (
       <section className={styles.card}>
-        <p className={styles.loadingText}>Se incarca invitatia...</p>
+        <p className={styles.loadingText}>Se încarcă invitația...</p>
       </section>
     );
   }
@@ -174,7 +174,7 @@ export default function CalendarInvitePage() {
       {loggedInWrongAccount && (
         <div className={styles.buttonRow}>
           <p className={styles.inviteMeta}>
-            Esti autentificat cu alt cont. Te rugam sa folosesti contul asociat cu {invite.email}.
+            Ești autentificat cu alt cont. Te rugăm să folosești contul asociat cu {invite.email}.
           </p>
           <Link href={loginRedirect} className={styles.primaryButton} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
             Mergi la autentificare
@@ -190,7 +190,7 @@ export default function CalendarInvitePage() {
             onClick={handleAcceptLoggedIn}
             disabled={submitting}
           >
-            {submitting ? 'Se accepta...' : 'Accepta invitatia'}
+            {submitting ? 'Se acceptă...' : 'Acceptă invitația'}
           </button>
           <button
             type="button"
@@ -198,7 +198,7 @@ export default function CalendarInvitePage() {
             onClick={handleDecline}
             disabled={submitting}
           >
-            Refuza invitatia
+            Refuză invitația
           </button>
         </div>
       )}
@@ -206,7 +206,7 @@ export default function CalendarInvitePage() {
       {mustLogin && (
         <div className={styles.buttonRow}>
           <p className={styles.inviteMeta}>
-            Acest email are deja cont. Autentifica-te pentru a accepta invitatia.
+            Acest email are deja cont. Autentifica-te pentru a acceptă invitația.
           </p>
           <Link href={loginRedirect} className={styles.primaryButton} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none' }}>
             Mergi la autentificare
@@ -217,14 +217,14 @@ export default function CalendarInvitePage() {
             onClick={handleDecline}
             disabled={submitting}
           >
-            Refuza invitatia
+            Refuză invitația
           </button>
         </div>
       )}
 
       {canRegister && (
         <form onSubmit={handleRegister} className={styles.form}>
-          <p className={styles.inviteMeta}>Creeaza-ti contul pentru a accepta invitatia.</p>
+          <p className={styles.inviteMeta}>Creeaza-ți contul pentru a acceptă invitația.</p>
 
           <div className={styles.field}>
             <label htmlFor="cal-invite-name" className={styles.label}>Nume</label>
@@ -269,7 +269,7 @@ export default function CalendarInvitePage() {
           </div>
 
           <button type="submit" className={styles.primaryButton} disabled={submitting}>
-            {submitting ? 'Se creeaza contul...' : 'Creeaza cont si accepta'}
+            {submitting ? 'Se creeaza contul...' : 'Creeaza cont și acceptă'}
           </button>
           <button
             type="button"
@@ -277,7 +277,7 @@ export default function CalendarInvitePage() {
             onClick={handleDecline}
             disabled={submitting}
           >
-            Refuza invitatia
+            Refuză invitația
           </button>
         </form>
       )}
