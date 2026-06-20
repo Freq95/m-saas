@@ -1387,6 +1387,110 @@
 .mSendBtn:disabled { opacity: 0.7; cursor: not-allowed; }
 .mSendBtn svg { width: 16px; height: 16px; }
 
+/* ════════════════════════════════════════════════════════════════════════
+   Plan list — same clean row style as the Fișiere (files) sub-page
+   ════════════════════════════════════════════════════════════════════════ */
+.tpToolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-4);
+}
+
+/* min-width: 0 so this grid item doesn't expand past the column on its
+   nowrap row content (default grid min-width is auto). */
+.tpList { display: flex; flex-direction: column; min-width: 0; }
+
+.tpRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+  min-width: 0;
+}
+
+.tpRow:last-child { border-bottom: 0; }
+
+.tpIcon { flex-shrink: 0; display: inline-flex; color: var(--color-text-soft); opacity: 0.45; }
+.tpInfo { flex: 1; min-width: 0; }
+
+.tpName {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tpMeta {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--color-text-soft);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tpActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.tpIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xs);
+  color: var(--color-text-soft);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.tpIconBtn:hover { background: var(--color-surface-strong); color: var(--color-text); }
+.tpIconBtn:disabled { opacity: 0.45; cursor: not-allowed; }
+.tpIconBtn svg { width: 14px; height: 14px; }
+
+/* Floating "Plan nou" action — phone only (mirrors the dental FAB). */
+.tpFab { display: none; }
+
+@media (max-width: 640px) {
+  .tpToolbar { display: none; }
+
+  .tpFab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    right: 20px;
+    bottom: calc(84px + env(safe-area-inset-bottom));
+    z-index: 60;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: 0;
+    color: var(--color-text-on-accent);
+    background: var(--color-accent);
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--color-accent) 45%, transparent);
+    cursor: pointer;
+    transition: transform 140ms ease, filter 140ms ease;
+  }
+
+  .tpFab:hover { filter: brightness(1.08); }
+  .tpFab:active { transform: scale(0.94); }
+  .tpFab svg { width: 24px; height: 24px; }
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }

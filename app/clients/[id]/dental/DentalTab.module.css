@@ -722,7 +722,13 @@
   border-radius: var(--radius-lg, 18px);
   padding: var(--space-5) var(--space-6);
 }
-.chartHeader { margin-bottom: var(--space-4); }
+.chartHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
 .chartTitle {
   font-family: var(--font-brand);
   font-size: var(--text-xl);
@@ -731,22 +737,41 @@
   color: var(--color-text);
   margin: 0;
 }
-.chartBars {
-  list-style: none; margin: 0; padding: 0;
-  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: var(--space-3); align-items: end; min-height: 150px;
+.chartTotal { font-size: 0.78rem; color: var(--color-text-muted); white-space: nowrap; }
+.chartEmpty { margin: 0; font-size: var(--text-sm); color: var(--color-text-soft); }
+
+/* Horizontal count bars — readable on phones, widths reflect real counts. */
+.chartList { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.chartRow { display: grid; gap: 6px; }
+.chartRowHead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.chartRowLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--color-text);
+  min-width: 0;
 }
-.chartBar { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; min-height: 150px; }
-.chartPercent { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-muted); }
-.chartBarFill {
-  width: 100%; max-width: 36px; min-height: 4px;
-  border-radius: 6px 6px 2px 2px; display: block;
-  transition: height 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
-  box-shadow: inset 0 -2px 0 0 color-mix(in srgb, currentColor 18%, transparent);
+.chartDot { flex-shrink: 0; width: 9px; height: 9px; border-radius: 50%; }
+.chartCount {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
 }
-.chartBarLabel { font-size: 10px; color: var(--color-text-soft); text-align: center; line-height: 1.2; margin-top: 4px; }
-@media (max-width: 720px) {
-  .chartBars { grid-template-columns: repeat(4, minmax(0, 1fr)); row-gap: var(--space-5); }
+.chartTrack {
+  height: 9px;
+  border-radius: 999px;
+  background: var(--color-surface-muted);
+  overflow: hidden;
+}
+.chartFill {
+  display: block;
+  height: 100%;
+  min-width: 9px;
+  border-radius: 999px;
+  transition: width 320ms cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 /* ── FAB (mobile only) ───────────────────────────────────────────────── */
@@ -839,9 +864,12 @@
 
   .issueChips { grid-template-columns: 1fr; }
   .detailRow { grid-template-columns: 96px 1fr; }
+
+  /* The header CTA duplicates the floating FAB on phones — keep only the FAB. */
+  .recordCta { display: none; }
 }
 
 /* ── Reduced motion ──────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  .sheet, .chartBarFill, .fab { transition: none; }
+  .sheet, .chartFill, .fab { transition: none; }
 }

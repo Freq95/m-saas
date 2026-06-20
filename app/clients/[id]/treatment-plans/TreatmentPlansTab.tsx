@@ -649,22 +649,6 @@ export default function TreatmentPlansTab({
     }
   }
 
-  function getPrimaryPlanAction(plan: TreatmentPlan): { label: string; icon?: React.ReactNode; iconOnly?: boolean; run: () => void; disabled?: boolean } {
-    if (plan.status === 'draft') {
-      return { label: 'Continua', run: () => setSelectedPlan(plan) };
-    }
-    if (canEdit && plan.pdf_file_id) {
-      return {
-        label: 'Trimite',
-        icon: <IconSend />,
-        iconOnly: plan.status === 'sent',
-        run: () => openShareSheet(plan),
-        disabled: busyId === plan.id,
-      };
-    }
-    return { label: 'Deschide', run: () => setSelectedPlan(plan) };
-  }
-
   if (loading) {
     return (
       <div className={styles.loading}>
@@ -675,19 +659,14 @@ export default function TreatmentPlansTab({
 
   return (
     <div className={styles.wrap}>
-      <div className={styles.toolbar}>
-        <div>
-          <span className={styles.kicker}>Fișă pacient</span>
-          <h3>Planuri de tratament</h3>
-          <span>{client?.name || clientName || 'Pacient'}</span>
-        </div>
-        {canEdit && (
+      {canEdit && sortedPlans.length > 0 && (
+        <div className={styles.tpToolbar}>
           <button type="button" className={styles.primaryButton} onClick={() => setSelectedPlan(emptyPlan(dentists))}>
             <IconPlus />
             <span>Plan nou</span>
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {selectedPlan && (
         <PlanBuilder
@@ -719,41 +698,30 @@ export default function TreatmentPlansTab({
           )}
         </div>
       ) : (
-        <div className={styles.planList}>
-          <div className={styles.listHeader}>
-            <span>Data</span>
-            <span>Plan</span>
-            <span>Status</span>
-            <span>Actiuni</span>
-          </div>
+        <div className={styles.tpList}>
           {sortedPlans.map((plan) => {
             const dentistName = dentists.find((dentist) => dentist.userId === plan.doctor_user_id)?.name;
-            const primaryAction = getPrimaryPlanAction(plan);
             return (
-            <div key={plan.id} className={styles.planRow}>
-              <time className={styles.planDate}>{plan.plan_date}</time>
-              <div className={styles.planMain}>
-                <strong>Plan #{plan.id}{dentistName ? ` · ${dentistName}` : ''}</strong>
-                <span>{formatMoney(plan.total)} · {plan.items.length} proceduri</span>
-                {plan.sent_to_email && <span>Trimis către {plan.sent_to_email}</span>}
+            <div key={plan.id} className={styles.tpRow}>
+              <span className={styles.tpIcon}><IconFile /></span>
+              <div className={styles.tpInfo}>
+                <span className={styles.tpName}>Plan #{plan.id}{dentistName ? ` · ${dentistName}` : ''}</span>
+                <span className={styles.tpMeta}>{plan.plan_date} · {formatMoney(plan.total)} · {plan.items.length} proceduri</span>
               </div>
               <span className={`${styles.status} ${styles[`status_${plan.status}`]}`}>{STATUS_LABELS[plan.status]}</span>
-              <div className={styles.actions}>
-                <button
-                  type="button"
-                  className={`${styles.rowPrimaryAction} ${primaryAction.iconOnly ? styles.rowPrimaryActionIcon : ''}`}
-                  onClick={primaryAction.run}
-                  disabled={primaryAction.disabled}
-                  aria-label={primaryAction.label}
-                  data-tooltip={primaryAction.label}
-                >
-                  {primaryAction.icon}
-                  {!primaryAction.iconOnly && primaryAction.label}
+              <div className={styles.tpActions}>
+                <button type="button" className={styles.tpIconBtn} onClick={() => setSelectedPlan(plan)} aria-label="Deschide" data-tooltip="Deschide">
+                  <IconOpen />
                 </button>
+                {canEdit && (
+                  <button type="button" className={styles.tpIconBtn} onClick={() => void openShareSheet(plan)} disabled={busyId === plan.id} aria-label="Trimite" data-tooltip="Trimite">
+                    <IconSend />
+                  </button>
+                )}
                 <div className={styles.moreMenu} data-plan-menu-root>
                   <button
                     type="button"
-                    className={styles.actionIcon}
+                    className={styles.tpIconBtn}
                     aria-label="Mai multe actiuni"
                     aria-expanded={openMenuPlanId === plan.id}
                     data-tooltip="Mai multe actiuni"
@@ -763,8 +731,6 @@ export default function TreatmentPlansTab({
                   </button>
                   {openMenuPlanId === plan.id && (
                     <div role="menu">
-                      <button type="button" role="menuitem" onClick={() => { setOpenMenuPlanId(null); setSelectedPlan(plan); }}><IconOpen /> Deschide</button>
-                      {canEdit && <button type="button" role="menuitem" onClick={() => { setOpenMenuPlanId(null); void openShareSheet(plan); }} disabled={busyId === plan.id}><IconSend /> Trimite</button>}
                       {canEdit && !plan.pdf_file_id && <button type="button" role="menuitem" onClick={() => { setOpenMenuPlanId(null); void generatePdf(plan); }} disabled={busyId === plan.id}><IconFile /> Genereaza PDF</button>}
                       {plan.pdf_file_id && <a role="menuitem" href={`/api/clients/${clientId}/files/${plan.pdf_file_id}/preview`} target="_blank" onClick={() => setOpenMenuPlanId(null)}><IconEye /> Preview / print</a>}
                       {plan.pdf_file_id && <a role="menuitem" href={`/api/clients/${clientId}/files/${plan.pdf_file_id}/download`} target="_blank" onClick={() => setOpenMenuPlanId(null)}><IconDownload /> Descarca</a>}
@@ -778,6 +744,12 @@ export default function TreatmentPlansTab({
             );
           })}
         </div>
+      )}
+
+      {canEdit && sortedPlans.length > 0 && !selectedPlan && !share && (
+        <button type="button" className={styles.tpFab} onClick={() => setSelectedPlan(emptyPlan(dentists))} aria-label="Plan nou">
+          <IconPlus />
+        </button>
       )}
 
       {share && (
