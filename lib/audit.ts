@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { ObjectId } from 'mongodb';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { logger } from '@/lib/logger';
+import { addUtcYears, MINIMUM_CLINICAL_RETENTION_YEARS } from '@/lib/retention';
 
 export type AuditAction =
   | 'tenant.create'
@@ -114,6 +115,7 @@ export async function logDataAccess(input: DataAccessEntryInput): Promise<void> 
       null;
     const userAgent = input.request?.headers.get('user-agent') || null;
 
+    const createdAt = new Date();
     await db.collection('data_access_logs').insertOne({
       _id: new ObjectId(),
       actor_user_id: toMongoIdentifier(input.actorUserId),
@@ -127,7 +129,8 @@ export async function logDataAccess(input: DataAccessEntryInput): Promise<void> 
       ip,
       user_agent: userAgent,
       metadata: input.metadata ?? null,
-      created_at: new Date().toISOString(),
+      created_at: createdAt.toISOString(),
+      expires_at_date: addUtcYears(createdAt, MINIMUM_CLINICAL_RETENTION_YEARS),
     });
   } catch (error) {
     logger.warn('[AUDIT] Failed to write data access log', { error });

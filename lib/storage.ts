@@ -1,6 +1,7 @@
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -15,6 +16,14 @@ export interface StorageProvider {
     options?: { contentDisposition?: string; contentType?: string }
   ): Promise<string>;
   delete(key: string): Promise<void>;
+  list?(
+    prefix: string,
+    continuationToken?: string,
+    maxKeys?: number
+  ): Promise<{
+    objects: Array<{ key: string; lastModified: Date | null }>;
+    continuationToken: string | null;
+  }>;
 }
 
 type R2Config = {
@@ -125,6 +134,22 @@ class R2StorageProvider implements StorageProvider {
         Key: key,
       })
     );
+  }
+
+  async list(prefix: string, continuationToken?: string, maxKeys = 100) {
+    const { s3, bucketName } = getClient();
+    const result = await s3.send(new ListObjectsV2Command({
+      Bucket: bucketName,
+      Prefix: prefix,
+      ContinuationToken: continuationToken,
+      MaxKeys: Math.max(1, Math.min(1000, maxKeys)),
+    }));
+    return {
+      objects: (result.Contents ?? [])
+        .filter((object): object is typeof object & { Key: string } => typeof object.Key === 'string')
+        .map((object) => ({ key: object.Key, lastModified: object.LastModified ?? null })),
+      continuationToken: result.NextContinuationToken ?? null,
+    };
   }
 }
 

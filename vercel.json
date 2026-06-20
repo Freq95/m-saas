@@ -4,11 +4,15 @@
   "framework": "nextjs",
   "regions": ["fra1"],
   "crons": [
-    { "path": "/api/cron/email-sync", "schedule": "0 7 * * *" }
+    { "path": "/api/cron/email-sync", "schedule": "0 7 * * *" },
+    { "path": "/api/cron/data-retention", "schedule": "0 2 * * *" }
   ],
   "functions": {
     "app/api/cron/email-sync/route.ts": {
       "maxDuration": 120
+    },
+    "app/api/cron/data-retention/route.ts": {
+      "maxDuration": 300
     }
   }
 }

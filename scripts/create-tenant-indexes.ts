@@ -44,6 +44,22 @@ async function createTenantIndexes() {
   await db.collection('services').createIndex({ tenant_id: 1, is_active: 1 });
   await db.collection('tasks').createIndex({ tenant_id: 1, status: 1, due_date: 1 });
   await db.collection('reminders').createIndex({ tenant_id: 1, status: 1, scheduled_at: 1 });
+  await db.collection('clients').createIndex(
+    { deleted_at: 1, retention_legal_hold: 1 },
+    { name: 'clients_retention_candidates' }
+  );
+  await db.collection('data_access_logs').createIndex(
+    { expires_at_date: 1 },
+    { expireAfterSeconds: 0, name: 'data_access_logs_retention_ttl' }
+  );
+  await db.collection('gdpr_erasures').createIndex(
+    { expires_at_date: 1 },
+    { expireAfterSeconds: 0, name: 'gdpr_erasures_retention_ttl' }
+  );
+  await db.collection('retention_runs').createIndex(
+    { expires_at_date: 1 },
+    { expireAfterSeconds: 0, name: 'retention_runs_ttl' }
+  );
 
   await ensureNamedIndex(db, 'appointments',
     { tenant_id: 1, user_id: 1, deleted_at: 1, start_time: 1 },
