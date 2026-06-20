@@ -107,6 +107,153 @@ function IconTrash() {
   );
 }
 
+function IconCalendar() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />
+    </svg>
+  );
+}
+
+function IconUser() {
+  return (
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" />
+    </svg>
+  );
+}
+
+function IconChevron() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  );
+}
+
+function IconPlus() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+/** lower-case + strip diacritics so "consultaţie" matches "cons". */
+function normalizeSearch(value: string): string {
+  return value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+}
+
+/** One procedure rendered as an iOS-style expandable row, matching the
+ *  appointment sheet's service section (m.row → m.expanded → m.option). */
+function MobileProcedureItem({
+  item, index, total, services, disabled, isOpen, onToggle,
+  onPick, onText, onQuantity, onCost, onDetails, onMove, onRemove,
+}: {
+  item: TreatmentPlanItem;
+  index: number;
+  total: number;
+  services: Service[];
+  disabled: boolean;
+  isOpen: boolean;
+  onToggle: () => void;
+  onPick: (service: Service) => void;
+  onText: (text: string) => void;
+  onQuantity: (n: number) => void;
+  onCost: (n: number) => void;
+  onDetails: (text: string) => void;
+  onMove: (dir: -1 | 1) => void;
+  onRemove: () => void;
+}) {
+  const [query, setQuery] = useState('');
+  const matches = useMemo(() => {
+    const sorted = [...services].sort((a, b) => normalizeSearch(a.name).localeCompare(normalizeSearch(b.name), 'ro'));
+    const q = normalizeSearch(query);
+    return (q ? sorted.filter((s) => normalizeSearch(s.name).includes(q)) : sorted).slice(0, 24);
+  }, [services, query]);
+  const hasName = item.procedure.trim().length > 0;
+
+  return (
+    <div className={m.section}>
+      <button type="button" className={m.row} onClick={onToggle} disabled={disabled}>
+        <span className={`${m.rowIcon} ${styles.mobileProcNum}`}>{index + 1}</span>
+        <div className={m.rowMain}>
+          <div className={`${m.rowLabel} ${hasName ? '' : m.rowLabelMuted}`}>
+            {hasName ? item.procedure.trim() : 'Procedură nouă'}
+          </div>
+          <div className={m.rowValue}>{item.quantity} buc · {formatMoney(Number(item.line_total || 0))} lei</div>
+        </div>
+        {!disabled && (
+          <span className={`${m.rowChevron} ${isOpen ? m.rowChevronOpen : ''}`}><IconChevron /></span>
+        )}
+      </button>
+      {isOpen && !disabled && (
+        <div className={m.expanded}>
+          <input
+            type="text"
+            className={m.serviceSearch}
+            value={query}
+            placeholder="Caută serviciu sau scrie liber…"
+            onChange={(event) => { setQuery(event.target.value); onText(event.target.value); }}
+            aria-label="Caută serviciu"
+          />
+          {matches.map((service) => (
+            <button
+              key={service.id}
+              type="button"
+              className={`${m.option} ${item.procedure === service.name ? m.optionSelected : ''}`}
+              onClick={() => { onPick(service); setQuery(''); }}
+            >
+              <span>{service.name}</span>
+              {typeof service.price === 'number' && service.price > 0 && (
+                <span className={m.optionMeta}>{service.price} lei</span>
+              )}
+            </button>
+          ))}
+          <div className={m.recurrenceGrid}>
+            <div className={m.recurrenceField}>
+              <span className={m.recurrenceFieldLabel}>Cantitate</span>
+              <input
+                className={m.recurrenceInput}
+                type="number" min={1} step="0.5" inputMode="decimal"
+                value={item.quantity}
+                onChange={(event) => onQuantity(Number(event.target.value))}
+                aria-label="Cantitate"
+              />
+            </div>
+            <div className={m.recurrenceField}>
+              <span className={m.recurrenceFieldLabel}>Cost (lei)</span>
+              <input
+                className={m.recurrenceInput}
+                type="number" min={0} step="1" inputMode="decimal"
+                value={item.line_total}
+                onChange={(event) => onCost(Number(event.target.value))}
+                aria-label="Cost"
+              />
+            </div>
+          </div>
+          <div className={m.recurrenceField} style={{ marginTop: '0.65rem' }}>
+            <span className={m.recurrenceFieldLabel}>Detalii (opțional)</span>
+            <input
+              className={m.recurrenceInput}
+              type="text"
+              value={item.details}
+              placeholder="Note pentru această procedură"
+              onChange={(event) => onDetails(event.target.value)}
+              aria-label="Detalii"
+            />
+          </div>
+          <div className={styles.mobileProcActions}>
+            <button type="button" onClick={() => onMove(-1)} disabled={index === 0}><IconUp /> Sus</button>
+            <button type="button" onClick={() => onMove(1)} disabled={index === total - 1}><IconDown /> Jos</button>
+            <button type="button" className={styles.mobileProcDelete} onClick={onRemove}><IconTrash /> Șterge</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function PlanBuilder({
   clientId,
   plan,
@@ -122,6 +269,9 @@ export default function PlanBuilder({
   const [totalOverride, setTotalOverride] = useState(plan.total_override === null ? '' : String(plan.total_override));
   const [saving, setSaving] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
+  // Mobile-sheet UI state: which procedure row is expanded, and the medic picker.
+  const [openProcedure, setOpenProcedure] = useState<number | null>(0);
+  const [medicOpen, setMedicOpen] = useState(false);
   const onToastRef = useRef(onToast);
   const readOnly = !canEdit || plan.status !== 'draft';
 
@@ -134,6 +284,8 @@ export default function PlanBuilder({
     setPlanDate(plan.plan_date || new Date().toISOString().slice(0, 10));
     setItems(plan.items.length > 0 ? plan.items : [newRow()]);
     setTotalOverride(plan.total_override === null ? '' : String(plan.total_override));
+    setOpenProcedure(0);
+    setMedicOpen(false);
   }, [dentists, plan]);
 
   useEffect(() => {
@@ -415,8 +567,142 @@ export default function PlanBuilder({
               )}
             </div>
             <div className={m.body}>
-              <div className={styles.sheetPad}>
-                {body}
+              {readOnly && (
+                <div className={m.banner}>
+                  <span className={m.bannerIcon} aria-hidden>🔒</span>
+                  Plan {STATUS_LABELS[plan.status].toLowerCase()} — blocat pentru editare. Duplică-l pentru o revizie nouă.
+                </div>
+              )}
+              {!plan.id && plan.source_appointment_label && (
+                <div className={m.banner}>
+                  <span className={m.bannerIcon} aria-hidden>↩</span>
+                  {plan.source_appointment_label}
+                </div>
+              )}
+
+              {/* ── Detaliile planului ── */}
+              <div className={m.section}>
+                <div className={m.timeBlock}>
+                  <span className={m.rowIcon}><IconCalendar /></span>
+                  <div className={m.timeBlockMain}>
+                    <div className={m.timeBlockGroup}>
+                      <span className={m.timeBlockLabel}>Data</span>
+                      <span className={m.timeBlockValueArea}>
+                        <input
+                          type="date"
+                          className={m.nativeDateInput}
+                          value={planDate}
+                          onChange={(event) => setPlanDate(event.target.value)}
+                          disabled={readOnly || saving}
+                        />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className={m.section}>
+                <button
+                  type="button"
+                  className={m.row}
+                  onClick={() => !readOnly && setMedicOpen((open) => !open)}
+                  disabled={readOnly}
+                >
+                  <span className={m.rowIcon}><IconUser /></span>
+                  <div className={m.rowMain}>
+                    <div className={m.rowLabel}>Medic</div>
+                    <div className={m.rowValue}>
+                      {dentists.find((d) => d.userId === doctorUserId)?.name || 'Selectează medicul'}
+                    </div>
+                  </div>
+                  {!readOnly && (
+                    <span className={`${m.rowChevron} ${medicOpen ? m.rowChevronOpen : ''}`}><IconChevron /></span>
+                  )}
+                </button>
+                {medicOpen && !readOnly && (
+                  <div className={m.expanded}>
+                    {dentists.map((dentist) => (
+                      <button
+                        key={dentist.userId}
+                        type="button"
+                        className={`${m.option} ${dentist.userId === doctorUserId ? m.optionSelected : ''}`}
+                        onClick={() => { setDoctorUserId(dentist.userId); setMedicOpen(false); }}
+                      >
+                        <span>{dentist.name}</span>
+                        {dentist.doctorSpecialty && <span className={m.optionMeta}>{dentist.doctorSpecialty}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Proceduri ── */}
+              <div className={styles.mobileSectionTitle}>Proceduri</div>
+              {items.map((item, index) => (
+                <MobileProcedureItem
+                  key={index}
+                  item={item}
+                  index={index}
+                  total={items.length}
+                  services={services}
+                  disabled={readOnly || saving}
+                  isOpen={openProcedure === index}
+                  onToggle={() => setOpenProcedure((current) => (current === index ? null : index))}
+                  onPick={(service) => pickService(index, service)}
+                  onText={(text) => setProcedureText(index, text)}
+                  onQuantity={(n) => updateQuantity(index, n)}
+                  onCost={(n) => updateItem(index, { line_total: n })}
+                  onDetails={(text) => updateItem(index, { details: text })}
+                  onMove={(dir) => moveRow(index, dir)}
+                  onRemove={() => {
+                    setItems((prev) => (prev.length === 1 ? [newRow()] : prev.filter((_, i) => i !== index)));
+                    setOpenProcedure(null);
+                  }}
+                />
+              ))}
+              {!readOnly && (
+                <div className={m.section}>
+                  <button
+                    type="button"
+                    className={m.row}
+                    onClick={() => { setItems((prev) => [...prev, newRow()]); setOpenProcedure(items.length); }}
+                    disabled={saving}
+                  >
+                    <span className={m.rowIcon}><IconPlus /></span>
+                    <div className={m.rowMain}>
+                      <div className={`${m.rowLabel} ${styles.mobileAddLabel}`}>Adaugă procedură</div>
+                    </div>
+                  </button>
+                </div>
+              )}
+
+              {/* ── Total ── */}
+              <div className={styles.mobileSectionTitle}>Total</div>
+              <div className={m.section}>
+                <div className={`${m.row} ${m.rowStatic}`}>
+                  <span className={m.rowIcon} aria-hidden />
+                  <div className={m.rowMain}><div className={m.rowLabel}>Total calculat</div></div>
+                  <span className={m.rowTrailing}>{formatMoney(computedTotal)} lei</span>
+                </div>
+                <div className={m.inputRowWithLabel}>
+                  <span className={m.rowIcon} aria-hidden />
+                  <div className={m.inputRowMain}>
+                    <span className={m.inputRowLabel}>Total manual (opțional)</span>
+                    <input
+                      className={m.inputBare}
+                      type="number" min={0} step="0.01" inputMode="decimal"
+                      value={totalOverride}
+                      placeholder="Lasă gol pentru totalul calculat"
+                      onChange={(event) => setTotalOverride(event.target.value)}
+                      disabled={readOnly || saving}
+                    />
+                  </div>
+                </div>
+                <div className={`${m.row} ${m.rowStatic}`}>
+                  <span className={m.rowIcon} aria-hidden />
+                  <div className={m.rowMain}><div className={m.rowLabel}>Total general</div></div>
+                  <span className={`${m.rowTrailing} ${styles.mobileTotalValue}`}>{formatMoney(finalTotal)} lei</span>
+                </div>
               </div>
             </div>
           </Drawer.Content>

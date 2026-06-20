@@ -991,6 +991,78 @@
   color: var(--color-text-muted);
 }
 
+/* ── Mobile sheet (matches the appointment sheet's iOS row language) ─────── */
+.mobileSectionTitle {
+  padding: 1.15rem 1rem 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-soft);
+}
+
+/* Number badge in the leading icon slot of each procedure row. */
+.mobileProcNum {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-surface-muted);
+  color: var(--color-text-soft);
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.mobileProcActions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+}
+
+.mobileProcActions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  appearance: none;
+  background: color-mix(in srgb, var(--color-surface) 85%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+  font-family: inherit;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--color-text-soft);
+  cursor: pointer;
+}
+
+.mobileProcActions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.mobileProcActions button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.mobileProcActions .mobileProcDelete {
+  margin-left: auto;
+  color: var(--color-danger-text);
+  border-color: color-mix(in srgb, var(--color-danger-text) 30%, var(--color-border));
+}
+
+.mobileAddLabel {
+  color: var(--color-accent);
+  font-weight: 650;
+}
+
+.mobileTotalValue {
+  color: var(--color-text);
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
