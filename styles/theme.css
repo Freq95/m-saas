@@ -167,6 +167,8 @@
   --color-accent-subtle:   rgba(255, 255, 255, 0.05);
   --color-accent-contrast: #ffffff;
   --color-text-on-accent:  #fff;
+  --color-action-primary:       #0969da;
+  --color-action-primary-hover: #075bbb;
 
   --color-danger:  #f87171;
   --color-success: #34d399;
@@ -248,6 +250,8 @@
   --color-accent-strong:   #1d4ed8;
   --color-accent-subtle:   rgba(37, 99, 235, 0.1);
   --color-accent-contrast: #eff6ff;
+  --color-action-primary:       #1d4ed8;
+  --color-action-primary-hover: #1e40af;
 
   --color-danger:  #dc2626;
   --color-success: #16a34a;

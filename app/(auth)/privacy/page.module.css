@@ -36,7 +36,7 @@
   font-weight: 600;
   margin-top: 1rem;
   margin-bottom: 0.5rem;
-  color: var(--color-text-soft);
+  color: var(--color-text-muted);
 }
 
 .content p {

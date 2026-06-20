@@ -7,7 +7,6 @@ import AuthSessionProvider from '@/components/AuthSessionProvider'
 import NavigationProgress from '@/components/NavigationProgress'
 import { ThemeProvider } from '@/components/ThemeProvider'
 import { validateServerEnv } from '@/lib/env-validation'
-import PreventZoom from '@/components/PreventZoom'
 import ServiceWorkerRegister from '@/components/ServiceWorkerRegister'
 import TooltipLayer from '@/components/TooltipLayer'
 
@@ -26,7 +25,7 @@ export default async function RootLayout({
   return (
     <html lang="ro" suppressHydrationWarning>
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#000000" />
         <meta name="mobile-web-app-capable" content="yes" />
@@ -43,7 +42,6 @@ export default async function RootLayout({
         )}
       </head>
       <body>
-        <PreventZoom />
         <ServiceWorkerRegister />
         <NavigationProgress />
         <TooltipLayer />

@@ -22,6 +22,11 @@ const nextConfig = {
         headers: [
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=()',
+          },
           {
             key: 'Strict-Transport-Security',
             value: 'max-age=63072000; includeSubDomains; preload',
@@ -36,6 +41,9 @@ const nextConfig = {
               // Keep remote email images blocked inside srcdoc iframes to avoid tracking pixels and phishing-style UI spoofing.
               "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com",
               "connect-src 'self' https://*.r2.cloudflarestorage.com",
+              "object-src 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
               "frame-ancestors 'self'",
             ].join('; '),
           },
