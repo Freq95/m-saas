@@ -6,16 +6,13 @@ import { checkWriteRateLimit } from '@/lib/rate-limit';
 import { invalidateReadCaches } from '@/lib/cache-keys';
 import {
   createTreatmentPlan,
-  generateTreatmentPlanPdfFile,
   getTreatmentPlanSettings,
   listTreatmentPlanDentists,
   listTreatmentPlans,
 } from '@/lib/server/treatment-plans';
 import { getMongoDbOrThrow } from '@/lib/db/mongo-utils';
 import { createPlanSchema } from '@/lib/treatment-plans/schemas';
-import { logger } from '@/lib/logger';
 
-// PDFs are generated on save (@react-pdf/renderer is Node-only).
 export const runtime = 'nodejs';
 
 export async function GET(_request: NextRequest, props: { params: Promise<{ id: string }> }) {
@@ -73,27 +70,13 @@ export async function POST(request: NextRequest, props: { params: Promise<{ id: 
       return createErrorResponse('Invalid input', 400, parsed.error.issues);
     }
 
-    let plan = await createTreatmentPlan(
+    // The PDF is generated lazily (on first share/preview) so saving stays
+    // instant; the share + "Generează PDF" paths render it on demand.
+    const plan = await createTreatmentPlan(
       { tenantId: scope.tenantId, userId: scope.userId, clientId },
       auth,
       parsed.data
     );
-    // Generate the PDF up front so preview/download/share work immediately and
-    // the user never has to remember a separate "Generează PDF" step. Non-fatal.
-    if (plan.items.length > 0) {
-      try {
-        const withPdf = await generateTreatmentPlanPdfFile(
-          { tenantId: scope.tenantId, userId: scope.userId, clientId },
-          plan.id
-        );
-        if (withPdf) plan = withPdf;
-      } catch (error) {
-        logger.warn('Treatment plan: PDF auto-generation failed on create', {
-          planId: plan.id,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
     await invalidateReadCaches({ tenantId: scope.tenantId, userId: scope.userId });
     return createSuccessResponse({ plan }, 201);
   } catch (error) {

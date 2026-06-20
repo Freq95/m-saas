@@ -463,6 +463,29 @@ export async function updateTreatmentPlan(
     update.doctor_specialty_snapshot = doctor.specialty;
   }
 
+  // Editing line data makes any previously-generated PDF stale; drop it so the
+  // next share/preview regenerates a fresh one. Best-effort file cleanup.
+  if (editsLineData && existing.pdf_file_id) {
+    update.pdf_file_id = null;
+    try {
+      const oldFile = await db.collection('client_files').findOne({
+        id: existing.pdf_file_id,
+        tenant_id: scope.tenantId,
+        client_id: scope.clientId,
+      });
+      if (oldFile?.storage_key && isStorageConfigured()) {
+        await getStorageProvider().delete(String(oldFile.storage_key));
+      }
+      await db.collection('client_files').deleteOne({
+        id: existing.pdf_file_id,
+        tenant_id: scope.tenantId,
+        client_id: scope.clientId,
+      });
+    } catch {
+      // Non-fatal: a leftover file is harmless; the plan no longer points at it.
+    }
+  }
+
   const result = await db.collection('treatment_plans').findOneAndUpdate(
     {
       id: planId,

@@ -6,10 +6,9 @@ const nextConfig = {
   // Bundle the treatment-plan PDF fonts into the serverless functions that
   // render PDFs (files under public/ are not traced into functions by default).
   outputFileTracingIncludes: {
-    // Every route that can render the treatment-plan PDF needs the fonts bundled
-    // (files under public/ aren't traced into functions by default).
-    '/api/clients/[id]/treatment-plans': ['./public/fonts/ptserif/**'],
-    '/api/clients/[id]/treatment-plans/[planId]': ['./public/fonts/ptserif/**'],
+    // Routes that render the treatment-plan PDF need the fonts bundled (files
+    // under public/ aren't traced into functions by default). The PDF is built
+    // lazily, so only these on-demand routes touch it.
     '/api/clients/[id]/treatment-plans/[planId]/pdf': ['./public/fonts/ptserif/**'],
     '/api/clients/[id]/treatment-plans/[planId]/send-email': ['./public/fonts/ptserif/**'],
     '/api/clients/[id]/treatment-plans/[planId]/share': ['./public/fonts/ptserif/**'],
