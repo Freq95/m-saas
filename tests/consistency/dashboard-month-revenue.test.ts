@@ -79,6 +79,7 @@ vi.mock('@/lib/db/mongo-utils', async () => {
 
 const tenantId = new ObjectId('65f9a0e8f5f89f73d18b0007');
 const userId = 42;
+const appointmentFindQueries: Array<Doc> = [];
 
 function isoAt(base: Date, hour = 10): string {
   return new Date(Date.UTC(base.getUTCFullYear(), base.getUTCMonth(), base.getUTCDate(), hour, 0, 0)).toISOString();
@@ -89,7 +90,10 @@ function buildDb(appointments: Array<Doc>, services: Array<Doc>) {
     collection(name: string) {
       if (name === 'appointments') {
         return {
-          find: (query: Doc) => createCursor(matchAppointments(appointments, query)),
+          find: (query: Doc) => {
+            appointmentFindQueries.push(query);
+            return createCursor(matchAppointments(appointments, query));
+          },
           countDocuments: async (query: Doc) => matchAppointments(appointments, query).length,
           aggregate: () => ({ toArray: async () => [] as Doc[] }),
         };
@@ -127,6 +131,7 @@ function buildDb(appointments: Array<Doc>, services: Array<Doc>) {
 describe('dashboard month revenue & delta', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    appointmentFindQueries.length = 0;
   });
 
   it('sums month revenue with the service.price fallback when price_at_time is missing', async () => {
@@ -148,6 +153,18 @@ describe('dashboard month revenue & delta', () => {
     expect(dashboard.monthRevenue).toBe(500);
     // No prior-month appointments → baseline 0 (< 100) → delta omitted.
     expect(dashboard.monthRevenueDeltaPct).toBeNull();
+  });
+
+  it('keeps tenant scope when dashboard appointments use visible calendars', async () => {
+    mockGetMongoDbOrThrow.mockResolvedValue(buildDb([], []));
+
+    await getDashboardData(userId, tenantId, 7, [91]);
+
+    expect(appointmentFindQueries.length).toBeGreaterThan(0);
+    for (const query of appointmentFindQueries) {
+      expect(query.tenant_id).toEqual(tenantId);
+      expect(query.calendar_id).toEqual({ $in: [91] });
+    }
   });
 
   it('returns a clamped percentage when a real prior-month baseline exists', async () => {

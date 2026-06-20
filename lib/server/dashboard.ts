@@ -121,7 +121,10 @@ export async function getDashboardData(
     const scopeFilter = buildScopeFilter(scopedUserIds, tenantId);
     const appointmentScopeFilter =
       visibleCalendarIds && visibleCalendarIds.length > 0
-        ? { calendar_id: { $in: visibleCalendarIds } }
+        ? {
+            ...(tenantId ? { tenant_id: tenantId } : {}),
+            calendar_id: { $in: visibleCalendarIds },
+          }
         : scopeFilter;
     const activeClientsFilter: Record<string, unknown> = {
       ...scopeFilter,
