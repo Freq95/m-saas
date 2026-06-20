@@ -180,6 +180,9 @@ function MobileProcedureItem({
   onRemove: () => void;
 }) {
   const [query, setQuery] = useState('');
+  // The services list is a dropdown: open it while the user is searching, and
+  // collapse it the moment they pick one (or it would bury the qty/cost fields).
+  const [listOpen, setListOpen] = useState(false);
   const matches = useMemo(() => {
     const sorted = [...services].sort((a, b) => normalizeSearch(a.name).localeCompare(normalizeSearch(b.name), 'ro'));
     const q = normalizeSearch(query);
@@ -208,17 +211,18 @@ function MobileProcedureItem({
             className={styles.mSearch}
             value={query}
             placeholder="Caută serviciu sau scrie liber…"
-            onChange={(event) => { setQuery(event.target.value); onText(event.target.value); }}
+            onChange={(event) => { setQuery(event.target.value); onText(event.target.value); setListOpen(true); }}
+            onFocus={() => setListOpen(true)}
             aria-label="Caută serviciu"
           />
-          {matches.length > 0 && (
+          {listOpen && matches.length > 0 && (
             <div className={styles.mOptionList}>
               {matches.map((service) => (
                 <button
                   key={service.id}
                   type="button"
                   className={`${styles.mOption} ${item.procedure === service.name ? styles.mOptionSelected : ''}`}
-                  onClick={() => { onPick(service); setQuery(''); }}
+                  onClick={() => { onPick(service); setQuery(''); setListOpen(false); }}
                 >
                   <span className={styles.mOptionName}>{service.name}</span>
                   {typeof service.price === 'number' && service.price > 0 && (

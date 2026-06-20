@@ -35,6 +35,9 @@ interface Props {
   canEdit: boolean;
   dental: DentalData;
   view: InspectorView;
+  /** When the view is hosted inside the phone modal, the modal's top bar already
+   *  provides the title + cancel, so the form suppresses its own header. */
+  chromeless?: boolean;
   selectedFdi: number | null;
   recordKind: RecordKind;
   /** Active dentition — the Today overview is scoped to it for consistency with the chart. */
@@ -520,6 +523,7 @@ function RecordingView({
   selectedFdi,
   surgerySelection,
   bridgeSelection,
+  chromeless,
   onSetRecordKind,
   onCancelRecording,
   onSubmitTooth,
@@ -599,11 +603,17 @@ function RecordingView({
 
   return (
     <div className={styles.inspBody}>
-      <div className={styles.inspTopRow}>
-        <button type="button" className={styles.backLink} onClick={onCancelRecording}>← Anulează</button>
-      </div>
-      <span className={styles.kicker}>Înregistrează</span>
-      <h2 className={styles.inspTitle}>Intervenție nouă</h2>
+      {/* On the phone modal the top bar owns the title + cancel; only the
+          desktop panel and the surgery/bridge bottom panel show this header. */}
+      {!chromeless && (
+        <>
+          <div className={styles.inspTopRow}>
+            <button type="button" className={styles.backLink} onClick={onCancelRecording}>← Anulează</button>
+          </div>
+          <span className={styles.kicker}>Înregistrează</span>
+          <h2 className={styles.inspTitle}>Intervenție nouă</h2>
+        </>
+      )}
 
       {/* Kind selector — single funnel */}
       <div className={styles.kindSelector} role="tablist" aria-label="Tip intervenție">

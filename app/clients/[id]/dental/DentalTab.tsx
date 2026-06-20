@@ -415,7 +415,7 @@ export default function DentalTab({ clientId, canEdit, onToast, clientName, isMi
         >
           <Drawer.Portal>
             <Drawer.Overlay className={m.overlay} />
-            <Drawer.Content className={m.sheet} aria-label={view === 'recording' ? 'Înregistrează intervenție' : `Dinte ${selectedFdi ?? ''}`}>
+            <Drawer.Content className={m.sheet} aria-label={view === 'recording' ? `Intervenție · Dinte ${selectedFdi ?? ''}` : `Dinte ${selectedFdi ?? ''}`}>
               <div className={m.topBar}>
                 <button type="button" className={`${m.actionBtn} ${m.actionBtnLeft}`} onClick={closeToothModal}>
                   {view === 'recording' ? 'Anulează' : 'Închide'}
@@ -423,13 +423,13 @@ export default function DentalTab({ clientId, canEdit, onToast, clientName, isMi
                 <div className={m.topBarCenter}>
                   <Drawer.Handle className={m.dragHandle} />
                   <Drawer.Title className={m.topBarTitle}>
-                    {view === 'recording' ? 'Înregistrează' : `Dinte ${selectedFdi ?? ''}`}
+                    {view === 'recording' ? `Intervenție · Dinte ${selectedFdi ?? ''}` : `Dinte ${selectedFdi ?? ''}`}
                   </Drawer.Title>
                 </div>
                 <span aria-hidden style={{ width: 56 }} />
               </div>
               <div className={`${m.body} ${styles.modalBody}`}>
-                <DentalInspector {...inspectorProps} view={view} />
+                <DentalInspector {...inspectorProps} view={view} chromeless />
               </div>
             </Drawer.Content>
           </Drawer.Portal>
